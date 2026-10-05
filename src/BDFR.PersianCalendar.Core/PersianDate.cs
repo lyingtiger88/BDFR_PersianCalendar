@@ -4,7 +4,7 @@ namespace BDFR.PersianCalendar.Core;
 
 public readonly record struct PersianDate : IComparable<PersianDate>
 {
-    private static readonly PersianCalendar Calendar = new();
+    private static readonly System.Globalization.PersianCalendar Calendar = new();
 
     public static readonly string[] MonthNames =
     [
