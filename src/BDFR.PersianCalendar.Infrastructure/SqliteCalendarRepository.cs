@@ -122,15 +122,26 @@ public sealed class SqliteCalendarRepository(string databasePath) : ICalendarRep
         var events = new List<CalendarEvent>();
         await using (var cmd = db.CreateCommand())
         {
-            cmd.CommandText = "SELECT id,title,start_time,end_time,all_day,description,category,location,recurrence FROM events WHERE persian_date=$d ORDER BY all_day DESC,start_time";
+            cmd.CommandText = """
+                SELECT id,title,persian_date,start_time,end_time,all_day,description,category,location,recurrence
+                FROM events
+                WHERE persian_date=$d OR (recurrence<>0 AND persian_date <= $d)
+                ORDER BY all_day DESC,start_time;
+                """;
             cmd.Parameters.AddWithValue("$d", key);
             await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
             while (await reader.ReadAsync(cancellationToken))
+            {
+                var startDate = ParsePersianDate(reader.GetString(2));
+                var recurrence = (RecurrenceKind)reader.GetInt32(9);
+                if (!RecurrenceEngine.OccursOn(startDate, recurrence, date)) continue;
+
                 events.Add(new CalendarEvent(
                     reader.GetString(0), reader.GetString(1), date,
-                    ParseTime(reader, 2), ParseTime(reader, 3), reader.GetInt32(4) != 0,
-                    ReadNullable(reader, 5), ReadNullable(reader, 6), ReadNullable(reader, 7),
-                    (RecurrenceKind)reader.GetInt32(8)));
+                    ParseTime(reader, 3), ParseTime(reader, 4), reader.GetInt32(5) != 0,
+                    ReadNullable(reader, 6), ReadNullable(reader, 7), ReadNullable(reader, 8),
+                    recurrence));
+            }
         }
 
         var tasks = new List<CalendarTask>();
@@ -394,4 +405,16 @@ public sealed class SqliteCalendarRepository(string databasePath) : ICalendarRep
 
     private static string? ReadNullable(SqliteDataReader reader, int ordinal)
         => reader.IsDBNull(ordinal) ? null : reader.GetString(ordinal);
+
+    private static PersianDate ParsePersianDate(string value)
+    {
+        var parts = value.Split('/');
+        if (parts.Length != 3 ||
+            !int.TryParse(parts[0], out var year) ||
+            !int.TryParse(parts[1], out var month) ||
+            !int.TryParse(parts[2], out var day))
+            throw new FormatException($"Invalid Persian date stored in calendar database: {value}");
+
+        return new PersianDate(year, month, day);
+    }
 }
