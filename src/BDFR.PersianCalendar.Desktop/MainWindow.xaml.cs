@@ -12,6 +12,7 @@ public sealed partial class MainWindow : Window
     private readonly ICalendarRepository _repository;
     private readonly PlannerService _planner;
     private readonly IOccasionSource _occasionSource;
+    private readonly SpecialOccasionService _specialOccasions;
     private readonly PersianQuickAddParser _quickAdd = new();
 
     private PersianDate _selected = PersianDate.Today();
@@ -24,6 +25,7 @@ public sealed partial class MainWindow : Window
         _repository = repository;
         _planner = planner;
         _occasionSource = occasionSource;
+        _specialOccasions = specialOccasions;
 
         _year = _selected.Year;
         _month = _selected.Month;
