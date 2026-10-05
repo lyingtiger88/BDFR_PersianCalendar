@@ -34,7 +34,7 @@ public readonly record struct PersianDate : IComparable<PersianDate>
         => DateOnly.FromDateTime(Calendar.ToDateTime(Year, Month, Day, 0, 0, 0, 0));
 
     public DateTime ToDateTime()
-        => Calendar.ToDateTime(Year, Month, Day, 0, 0, 0, 0, DateTimeKind.Unspecified);
+        => Calendar.ToDateTime(Year, Month, Day, 0, 0, 0, 0);
 
     public PersianDate AddDays(int days) => FromDateOnly(ToDateOnly().AddDays(days));
 
