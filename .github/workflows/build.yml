@@ -13,8 +13,10 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
-      - run: dotnet run --project tools/BDFR.PersianCalendar.Smoke/BDFR.PersianCalendar.Smoke.csproj
-      - run: dotnet build src/BDFR.PersianCalendar.Infrastructure/BDFR.PersianCalendar.Infrastructure.csproj -c Release
+      - name: Run calendar and time.ir parser smoke checks
+        run: dotnet run --project tools/BDFR.PersianCalendar.Smoke/BDFR.PersianCalendar.Smoke.csproj
+      - name: Build infrastructure
+        run: dotnet build src/BDFR.PersianCalendar.Infrastructure/BDFR.PersianCalendar.Infrastructure.csproj -c Release
 
   windows:
     runs-on: windows-latest
@@ -23,4 +25,14 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
-      - run: dotnet build src/BDFR.PersianCalendar.Desktop/BDFR.PersianCalendar.Desktop.csproj -c Release -p:Platform=x64
+      - name: Build WinUI desktop app
+        run: dotnet build src/BDFR.PersianCalendar.Desktop/BDFR.PersianCalendar.Desktop.csproj -c Release -p:Platform=x64
+      - name: Publish Windows x64 test build
+        run: dotnet publish src/BDFR.PersianCalendar.Desktop/BDFR.PersianCalendar.Desktop.csproj -c Release -r win-x64 --self-contained true -p:Platform=x64 -p:WindowsAppSDKSelfContained=true -p:PublishSingleFile=false -o artifacts/BDFR_PersianCalendar-win-x64
+      - name: Upload Windows x64 test build
+        uses: actions/upload-artifact@v4
+        with:
+          name: BDFR_PersianCalendar-win-x64
+          path: artifacts/BDFR_PersianCalendar-win-x64/**
+          if-no-files-found: error
+          retention-days: 14
