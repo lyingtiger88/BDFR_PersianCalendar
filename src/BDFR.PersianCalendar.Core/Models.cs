@@ -1,7 +1,7 @@
 namespace BDFR.PersianCalendar.Core;
 
 public enum CalendarItemKind { Event, Task, Note, SpecialOccasion }
-public enum ReminderState { Pending, Fired, Snoozed, Dismissed, Completed }
+public enum ReminderState { Pending = 0, Scheduled = 1, Fired = 2, Snoozed = 3, Dismissed = 4, Completed = 5 }
 public enum CalendarSystemKind { Persian, Gregorian, Hijri }
 public enum RecurrenceKind { None, Daily, Weekly, Monthly, Yearly }
 

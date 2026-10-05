@@ -328,6 +328,33 @@ public sealed class SqliteCalendarRepository(string databasePath) : ICalendarRep
         return list;
     }
 
+    public async Task<IReadOnlyList<ReminderSchedule>> GetPendingRemindersAsync(
+        DateTimeOffset fromUtc,
+        DateTimeOffset toUtc,
+        CancellationToken cancellationToken = default)
+    {
+        await using var db = await OpenAsync(cancellationToken);
+        var cmd = db.CreateCommand();
+        cmd.CommandText = """
+            SELECT id,item_kind,item_id,fire_at_utc,state,title,body
+            FROM reminders
+            WHERE state=$pending AND fire_at_utc > $from AND fire_at_utc <= $to
+            ORDER BY fire_at_utc LIMIT 512;
+            """;
+        cmd.Parameters.AddWithValue("$pending", (int)ReminderState.Pending);
+        cmd.Parameters.AddWithValue("$from", fromUtc.ToUniversalTime().ToString("O"));
+        cmd.Parameters.AddWithValue("$to", toUtc.ToUniversalTime().ToString("O"));
+
+        var list = new List<ReminderSchedule>();
+        await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+            list.Add(new ReminderSchedule(
+                reader.GetString(0), (CalendarItemKind)reader.GetInt32(1), reader.GetString(2),
+                DateTimeOffset.Parse(reader.GetString(3)), (ReminderState)reader.GetInt32(4),
+                reader.GetString(5), reader.GetString(6)));
+        return list;
+    }
+
     public async Task SetReminderStateAsync(string reminderId, ReminderState state, DateTimeOffset? newFireAtUtc = null, CancellationToken cancellationToken = default)
     {
         await using var db = await OpenAsync(cancellationToken);

@@ -13,6 +13,7 @@ public interface ICalendarRepository
     Task<IReadOnlyList<SpecialOccasion>> GetSpecialOccasionsAsync(CancellationToken cancellationToken = default);
     Task ScheduleReminderAsync(ReminderSchedule reminder, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<ReminderSchedule>> GetDueRemindersAsync(DateTimeOffset nowUtc, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<ReminderSchedule>> GetPendingRemindersAsync(DateTimeOffset fromUtc, DateTimeOffset toUtc, CancellationToken cancellationToken = default);
     Task SetReminderStateAsync(string reminderId, ReminderState state, DateTimeOffset? newFireAtUtc = null, CancellationToken cancellationToken = default);
     Task AddActivityAsync(ActivityLogEntry entry, CancellationToken cancellationToken = default);
 }
@@ -26,4 +27,9 @@ public interface IOccasionSource
 public interface INotificationSink
 {
     Task ShowAsync(ReminderSchedule reminder, CancellationToken cancellationToken = default);
+}
+
+public interface IReminderScheduler
+{
+    Task<bool> TryScheduleAsync(ReminderSchedule reminder, CancellationToken cancellationToken = default);
 }

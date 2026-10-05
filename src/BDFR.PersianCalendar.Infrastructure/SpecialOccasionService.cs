@@ -3,7 +3,7 @@ using BDFR.PersianCalendar.Core;
 
 namespace BDFR.PersianCalendar.Infrastructure;
 
-public sealed class SpecialOccasionService(ICalendarRepository repository, TimeZoneInfo timeZone)
+public sealed class SpecialOccasionService(ICalendarRepository repository, TimeZoneInfo timeZone, IReminderScheduler? platformScheduler = null)
 {
     public async Task<SpecialOccasion> AddPersianAnnualAsync(
         string title,
@@ -55,9 +55,16 @@ public sealed class SpecialOccasionService(ICalendarRepository repository, TimeZ
 
             var id = $"{occasion.Id}-{target:yyyyMMdd}-{days}";
             var body = days == 0 ? $"امروز: {occasion.Title}" : $"{days} روز تا {occasion.Title}";
-            await repository.ScheduleReminderAsync(new ReminderSchedule(
+            var reminder = new ReminderSchedule(
                 id, CalendarItemKind.SpecialOccasion, occasion.Id, fireAt,
-                ReminderState.Pending, occasion.Title, body), cancellationToken);
+                ReminderState.Pending, occasion.Title, body);
+            await repository.ScheduleReminderAsync(reminder, cancellationToken);
+            if (platformScheduler is not null &&
+                await platformScheduler.TryScheduleAsync(reminder, cancellationToken))
+            {
+                await repository.SetReminderStateAsync(
+                    reminder.Id, ReminderState.Scheduled, cancellationToken: cancellationToken);
+            }
         }
     }
 
