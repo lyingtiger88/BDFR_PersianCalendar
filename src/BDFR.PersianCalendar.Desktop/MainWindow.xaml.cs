@@ -18,7 +18,7 @@ public sealed partial class MainWindow : Window
     private int _year;
     private int _month;
 
-    public MainWindow(ICalendarRepository repository, PlannerService planner, IOccasionSource occasionSource)
+    public MainWindow(ICalendarRepository repository, PlannerService planner, IOccasionSource occasionSource, SpecialOccasionService specialOccasions)
     {
         InitializeComponent();
         _repository = repository;
@@ -221,6 +221,38 @@ public sealed partial class MainWindow : Window
             BuildCalendar();
             await LoadSelectedDayAsync();
             StatusText.Text = "فعالیت با افزودن سریع ثبت شد.";
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = ex.Message;
+        }
+    }
+
+    private async void AddSpecialOccasion_Click(object sender, RoutedEventArgs e)
+    {
+        if (string.IsNullOrWhiteSpace(SpecialTitleBox.Text))
+        {
+            StatusText.Text = "عنوان مناسبت را وارد کنید.";
+            return;
+        }
+
+        var month = (int)SpecialMonthBox.Value;
+        var day = (int)SpecialDayBox.Value;
+        var reminderDays = (SpecialReminderDaysBox.Text ?? "7,1,0")
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(x => int.TryParse(PersianQuickAddParser.NormalizeDigits(x), out var n) ? n : -1)
+            .Where(x => x >= 0)
+            .Distinct()
+            .ToArray();
+
+        try
+        {
+            await _specialOccasions.AddPersianAnnualAsync(
+                SpecialTitleBox.Text.Trim(), month, day,
+                reminderDays.Length == 0 ? [7, 1, 0] : reminderDays,
+                new TimeOnly(9, 0));
+            SpecialTitleBox.Text = "";
+            StatusText.Text = "مناسبت شخصی و یادآورهای سالانه ثبت شد.";
         }
         catch (Exception ex)
         {

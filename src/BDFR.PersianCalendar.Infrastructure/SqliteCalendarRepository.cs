@@ -269,6 +269,29 @@ public sealed class SqliteCalendarRepository(string databasePath) : ICalendarRep
         await cmd.ExecuteNonQueryAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<SpecialOccasion>> GetSpecialOccasionsAsync(CancellationToken cancellationToken = default)
+    {
+        await using var db = await OpenAsync(cancellationToken);
+        var cmd = db.CreateCommand();
+        cmd.CommandText = "SELECT id,title,calendar_system,month,day,repeat_yearly,reminder_days,category,note FROM special_occasions ORDER BY month,day,title";
+        var list = new List<SpecialOccasion>();
+        await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            var reminders = reader.GetString(6)
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(int.Parse)
+                .Distinct()
+                .OrderByDescending(x => x)
+                .ToArray();
+            list.Add(new SpecialOccasion(
+                reader.GetString(0), reader.GetString(1), (CalendarSystemKind)reader.GetInt32(2),
+                reader.GetInt32(3), reader.GetInt32(4), reader.GetInt32(5) != 0, reminders,
+                ReadNullable(reader, 7), ReadNullable(reader, 8)));
+        }
+        return list;
+    }
+
     public async Task ScheduleReminderAsync(ReminderSchedule reminder, CancellationToken cancellationToken = default)
     {
         await using var db = await OpenAsync(cancellationToken);

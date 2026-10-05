@@ -32,17 +32,16 @@ public partial class App : Application
         _reminders = new ReminderPollingService(repository, notificationSink);
         _reminders.Start();
 
-        _http = new HttpClient
-        {
-            Timeout = TimeSpan.FromSeconds(20)
-        };
+        _http = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
         _http.DefaultRequestHeaders.UserAgent.ParseAdd("BDFR-PersianCalendar/0.1 (+Windows 11)");
         var source = new TimeIrOccasionSource(_http);
 
         var timeZone = TimeZoneInfo.Local;
         var planner = new PlannerService(repository, timeZone);
+        var specialOccasions = new SpecialOccasionService(repository, timeZone);
+        await specialOccasions.EnsureUpcomingRemindersAsync(new TimeOnly(9, 0));
 
-        _window = new MainWindow(repository, planner, source);
+        _window = new MainWindow(repository, planner, source, specialOccasions);
         _window.Closed += async (_, _) =>
         {
             if (_reminders is not null) await _reminders.DisposeAsync();

@@ -95,6 +95,19 @@
                     <TextBox x:Name="TaskTitleBox" PlaceholderText="عنوان کار"/>
                     <TextBox x:Name="TaskTimeBox" PlaceholderText="موعد اختیاری، مثل 18:00"/>
                     <Button Content="ثبت کار" Click="AddTask_Click"/>
+
+                    <TextBlock Text="مناسبت شخصی سالانه" FontWeight="SemiBold" Margin="0,18,0,0"/>
+                    <TextBox x:Name="SpecialTitleBox" PlaceholderText="مثلاً تولد علی"/>
+                    <Grid ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition/><ColumnDefinition/>
+                        </Grid.ColumnDefinitions>
+                        <NumberBox x:Name="SpecialMonthBox" Grid.Column="0" Header="ماه شمسی" Minimum="1" Maximum="12" Value="1"/>
+                        <NumberBox x:Name="SpecialDayBox" Grid.Column="1" Header="روز" Minimum="1" Maximum="31" Value="1"/>
+                    </Grid>
+                    <TextBox x:Name="SpecialReminderDaysBox" Header="روزهای یادآوری قبل از مناسبت"
+                             Text="7,1,0" PlaceholderText="مثلاً 30,7,1,0"/>
+                    <Button Content="ثبت مناسبت و یادآورها" Click="AddSpecialOccasion_Click"/>
                 </StackPanel>
             </ScrollViewer>
         </Border>
