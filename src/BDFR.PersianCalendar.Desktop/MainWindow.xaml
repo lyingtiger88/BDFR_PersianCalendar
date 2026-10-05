@@ -1,0 +1,102 @@
+<Window
+    x:Class="BDFR.PersianCalendar.Desktop.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="BDFR Persian Calendar">
+    <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" FlowDirection="RightToLeft">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="290"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="380"/>
+        </Grid.ColumnDefinitions>
+
+        <Border Grid.Column="0" Padding="20" BorderThickness="0,0,1,0" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+            <StackPanel Spacing="14">
+                <TextBlock Text="BDFR Persian Calendar" FontSize="22" FontWeight="SemiBold"/>
+                <TextBlock Text="تقویم، برنامه‌ریز و یادآور فارسی ویندوز" Opacity="0.65" TextWrapping="Wrap"/>
+                <Button Content="امروز" Click="Today_Click" HorizontalAlignment="Stretch"/>
+                <Button Content="همگام‌سازی مناسبت‌های time.ir" Click="Sync_Click" HorizontalAlignment="Stretch"/>
+                <ProgressRing x:Name="SyncProgress" IsActive="False" Width="24" Height="24"/>
+
+                <TextBlock Text="افزودن سریع" FontWeight="SemiBold" Margin="0,18,0,0"/>
+                <TextBox x:Name="QuickAddBox" PlaceholderText="مثلاً: فردا ساعت 16:30 جلسه تیم" AcceptsReturn="False"/>
+                <Button Content="افزودن" Click="QuickAdd_Click" HorizontalAlignment="Stretch"/>
+
+                <Border Background="{ThemeResource AccentGlassBrush}" CornerRadius="12" Padding="12" Margin="0,18,0,0">
+                    <TextBlock TextWrapping="Wrap"
+                               Text="اطلاعات و مناسبت‌ها در SQLite به‌صورت محلی نگهداری می‌شوند؛ برنامه بدون اینترنت هم قابل استفاده است."/>
+                </Border>
+                <TextBlock x:Name="StatusText" TextWrapping="Wrap" Opacity="0.75"/>
+            </StackPanel>
+        </Border>
+
+        <Grid Grid.Column="1" Padding="24">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Button Grid.Column="0" Content="‹" FontSize="22" Click="NextMonth_Click"/>
+                <TextBlock Grid.Column="1" x:Name="MonthTitle" HorizontalAlignment="Center" VerticalAlignment="Center"
+                           FontSize="28" FontWeight="SemiBold"/>
+                <Button Grid.Column="2" Content="›" FontSize="22" Click="PreviousMonth_Click"/>
+            </Grid>
+
+            <Grid Grid.Row="1" Margin="0,20,0,10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition/><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/>
+                    <ColumnDefinition/><ColumnDefinition/><ColumnDefinition/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="شنبه" HorizontalAlignment="Center"/>
+                <TextBlock Grid.Column="1" Text="یکشنبه" HorizontalAlignment="Center"/>
+                <TextBlock Grid.Column="2" Text="دوشنبه" HorizontalAlignment="Center"/>
+                <TextBlock Grid.Column="3" Text="سه‌شنبه" HorizontalAlignment="Center"/>
+                <TextBlock Grid.Column="4" Text="چهارشنبه" HorizontalAlignment="Center"/>
+                <TextBlock Grid.Column="5" Text="پنجشنبه" HorizontalAlignment="Center"/>
+                <TextBlock Grid.Column="6" Text="جمعه" HorizontalAlignment="Center" Foreground="IndianRed"/>
+            </Grid>
+
+            <Grid x:Name="CalendarGrid" Grid.Row="2"/>
+        </Grid>
+
+        <Border Grid.Column="2" Padding="20" BorderThickness="1,0,0,0" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+            <ScrollViewer>
+                <StackPanel Spacing="12">
+                    <TextBlock x:Name="SelectedDateTitle" FontSize="24" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="GregorianDateText" Opacity="0.65"/>
+
+                    <TextBlock Text="مناسبت‌ها" FontWeight="SemiBold" Margin="0,10,0,0"/>
+                    <StackPanel x:Name="OccasionsPanel" Spacing="6"/>
+
+                    <TextBlock Text="رویدادها" FontWeight="SemiBold" Margin="0,12,0,0"/>
+                    <StackPanel x:Name="EventsPanel" Spacing="6"/>
+
+                    <TextBlock Text="کارها" FontWeight="SemiBold" Margin="0,12,0,0"/>
+                    <StackPanel x:Name="TasksPanel" Spacing="6"/>
+
+                    <TextBlock Text="یادداشت روز" FontWeight="SemiBold" Margin="0,12,0,0"/>
+                    <TextBox x:Name="NoteBox" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="100"/>
+                    <Button Content="ذخیره یادداشت" Click="SaveNote_Click"/>
+
+                    <TextBlock Text="رویداد جدید" FontWeight="SemiBold" Margin="0,18,0,0"/>
+                    <TextBox x:Name="EventTitleBox" PlaceholderText="عنوان رویداد"/>
+                    <TextBox x:Name="EventTimeBox" PlaceholderText="زمان، مثل 14:30"/>
+                    <NumberBox x:Name="ReminderMinutesBox" Header="یادآوری چند دقیقه قبل؟" Value="10" Minimum="0" Maximum="10080"/>
+                    <Button Content="ثبت رویداد و یادآور" Click="AddEvent_Click"/>
+
+                    <TextBlock Text="کار جدید" FontWeight="SemiBold" Margin="0,18,0,0"/>
+                    <TextBox x:Name="TaskTitleBox" PlaceholderText="عنوان کار"/>
+                    <TextBox x:Name="TaskTimeBox" PlaceholderText="موعد اختیاری، مثل 18:00"/>
+                    <Button Content="ثبت کار" Click="AddTask_Click"/>
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+    </Grid>
+</Window>

@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="src/BDFR.PersianCalendar.Core/BDFR.PersianCalendar.Core.csproj" />
+  <Project Path="src/BDFR.PersianCalendar.Infrastructure/BDFR.PersianCalendar.Infrastructure.csproj" />
+  <Project Path="src/BDFR.PersianCalendar.Desktop/BDFR.PersianCalendar.Desktop.csproj" />
+  <Project Path="tools/BDFR.PersianCalendar.Smoke/BDFR.PersianCalendar.Smoke.csproj" />
+</Solution>
