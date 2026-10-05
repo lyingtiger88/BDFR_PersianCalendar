@@ -70,6 +70,17 @@ public sealed class TimeIrOccasionSource(HttpClient httpClient) : IOccasionSourc
 
                 if (!match.Success) continue;
 
+                // Parent containers can inherit the concatenated text of multiple event rows.
+                // Keep the actual event row and ignore a div that contains another div
+                // which itself already looks like a valid event row for this month.
+                var containsNestedEventRow = node.Children
+                    .Where(child => child.LocalName.Equals("div", StringComparison.OrdinalIgnoreCase))
+                    .Any(child => Regex.IsMatch(
+                        Collapse(child.TextContent),
+                        $@"^[0-9۰-۹٠-٩]{{1,2}}\s+{Regex.Escape(monthName)}\s+.+$",
+                        RegexOptions.CultureInvariant));
+                if (containsNestedEventRow) continue;
+
                 var dayText = PersianQuickAddParser.NormalizeDigits(match.Groups["day"].Value);
                 if (!int.TryParse(dayText, out var day) ||
                     day < 1 ||
