@@ -13,7 +13,8 @@ public sealed class PlannerService(
         TimeOnly start,
         int durationMinutes = 60,
         int[]? reminderMinutes = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        RecurrenceKind recurrence = RecurrenceKind.None)
     {
         var calendarEvent = new CalendarEvent(
             Guid.NewGuid().ToString("N"),
@@ -21,7 +22,8 @@ public sealed class PlannerService(
             date,
             start,
             start.AddMinutes(durationMinutes),
-            false);
+            false,
+            Recurrence: recurrence);
 
         await repository.AddEventAsync(calendarEvent, cancellationToken);
         foreach (var reminder in ReminderEngine.ForEvent(calendarEvent, timeZone, reminderMinutes ?? [10]))
