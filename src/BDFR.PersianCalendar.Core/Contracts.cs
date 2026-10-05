@@ -9,7 +9,8 @@ public interface ICalendarRepository
     Task SetTaskCompletedAsync(string taskId, bool completed, CancellationToken cancellationToken = default);
     Task AddEventAsync(CalendarEvent calendarEvent, CancellationToken cancellationToken = default);
     Task UpsertOccasionsAsync(IEnumerable<Occasion> occasions, CancellationToken cancellationToken = default);
-    Task AddSpecialOccasionAsync(SpecialOccasion occasion, CancellationToken cancellationToken = default);\n    Task<IReadOnlyList<SpecialOccasion>> GetSpecialOccasionsAsync(CancellationToken cancellationToken = default);
+    Task AddSpecialOccasionAsync(SpecialOccasion occasion, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<SpecialOccasion>> GetSpecialOccasionsAsync(CancellationToken cancellationToken = default);
     Task ScheduleReminderAsync(ReminderSchedule reminder, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<ReminderSchedule>> GetDueRemindersAsync(DateTimeOffset nowUtc, CancellationToken cancellationToken = default);
     Task SetReminderStateAsync(string reminderId, ReminderState state, DateTimeOffset? newFireAtUtc = null, CancellationToken cancellationToken = default);
