@@ -212,7 +212,12 @@ public sealed partial class MainWindow : Window
         {
             var parsed = _quickAdd.Parse(QuickAddBox.Text);
             if (parsed.Time is not null)
-                await _planner.AddEventAsync(parsed.Title, parsed.Date, parsed.Time.Value, reminderMinutes: [parsed.ReminderMinutesBefore]);
+                await _planner.AddEventAsync(
+                    parsed.Title,
+                    parsed.Date,
+                    parsed.Time.Value,
+                    reminderMinutes: [parsed.ReminderMinutesBefore],
+                    recurrence: parsed.Recurrence);
             else
                 await _planner.AddTaskAsync(parsed.Title, parsed.Date);
 
