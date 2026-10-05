@@ -7,7 +7,7 @@ if (nowruz.ToDateOnly() != new DateOnly(2026, 3, 21))
 var parser = new PersianQuickAddParser();
 var parsed = parser.Parse("فردا ساعت 16:30 جلسه تیم", new PersianDate(1405, 7, 14));
 if (parsed.Date != new PersianDate(1405, 7, 15) || parsed.Time != new TimeOnly(16, 30) || parsed.Title != "جلسه تیم")
-    throw new Exception("QuickAdd parser failed.");
+    throw new Exception($"QuickAdd parser failed. Date={parsed.Date}, Time={parsed.Time}, Title=[{parsed.Title}]");
 
 var grid = MonthGridBuilder.Build(1405, 7, new PersianDate(1405, 7, 14));
 if (grid.Count != 42 || grid.Count(x => x.IsToday) != 1)
