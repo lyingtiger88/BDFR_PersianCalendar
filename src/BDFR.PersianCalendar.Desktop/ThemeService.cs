@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Microsoft.UI.Xaml.Media;
 
 namespace BDFR.PersianCalendar.Desktop;
@@ -43,17 +44,91 @@ public sealed class ThemeService
     public string ThemeRoot(ThemeDefinition theme)
         => Path.Combine(ThemesRoot, theme.Id);
 
-    public string GetSeasonalBackgroundPath(int persianMonth)
+    public string? GetSeasonalBackgroundPath(int persianMonth, double targetAspectRatio)
     {
-        var fileName = persianMonth switch
+        var season = persianMonth switch
         {
-            <= 3 => "spring.svg",
-            <= 6 => "summer.svg",
-            <= 9 => "autumn.svg",
-            _ => "winter.svg"
+            <= 3 => "spring",
+            <= 6 => "summer",
+            <= 9 => "autumn",
+            _ => "winter"
         };
 
-        return Path.Combine(SeasonalBackgroundsRoot, fileName);
+        if (!Directory.Exists(SeasonalBackgroundsRoot))
+            return null;
+
+        var allowedExtensions = new HashSet<string>(
+            [".svg", ".png", ".jpg", ".jpeg", ".webp"],
+            StringComparer.OrdinalIgnoreCase);
+
+        var files = Directory
+            .EnumerateFiles(SeasonalBackgroundsRoot, "*.*", SearchOption.TopDirectoryOnly)
+            .Where(path => allowedExtensions.Contains(Path.GetExtension(path)))
+            .ToArray();
+
+        var candidates = new List<(string Path, double Ratio, bool HasRatio)>();
+
+        foreach (var path in files)
+        {
+            var name = Path.GetFileNameWithoutExtension(path);
+            if (string.Equals(name, season, StringComparison.OrdinalIgnoreCase))
+            {
+                candidates.Add((path, 0, false));
+                continue;
+            }
+
+            var match = Regex.Match(
+                name,
+                $@"^{Regex.Escape(season)}[_\-\s]?(?<w>\d{{1,3}})x(?<h>\d{{1,3}})$",
+                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+            if (!match.Success ||
+                !double.TryParse(match.Groups["w"].Value, out var width) ||
+                !double.TryParse(match.Groups["h"].Value, out var height) ||
+                width <= 0 ||
+                height <= 0)
+                continue;
+
+            candidates.Add((path, width / height, true));
+        }
+
+        if (candidates.Count == 0)
+            return null;
+
+        targetAspectRatio = targetAspectRatio > 0
+            ? targetAspectRatio
+            : 16d / 9d;
+
+        var ratioCandidates = candidates
+            .Where(x => x.HasRatio)
+            .OrderBy(x => Math.Abs(x.Ratio - targetAspectRatio))
+            .ThenBy(x => Path.GetExtension(x.Path).Equals(".svg", StringComparison.OrdinalIgnoreCase) ? 1 : 0)
+            .ToArray();
+
+        if (ratioCandidates.Length > 0)
+            return ratioCandidates[0].Path;
+
+        return candidates.FirstOrDefault(x => !x.HasRatio).Path;
+    }
+
+    public static string FormatAspectRatioLabel(double aspectRatio)
+    {
+        var known = new (int W, int H)[]
+        {
+            (32, 9),
+            (21, 9),
+            (16, 9),
+            (16, 10),
+            (3, 2),
+            (4, 3),
+            (5, 4)
+        };
+
+        var best = known
+            .OrderBy(x => Math.Abs((double)x.W / x.H - aspectRatio))
+            .First();
+
+        return $"{best.W}x{best.H}";
     }
 
     public static SolidColorBrush Brush(string value, string fallback = "#FFFFFFFF")
