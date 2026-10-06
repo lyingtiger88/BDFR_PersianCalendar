@@ -803,8 +803,8 @@ public sealed class MainWindow : Window
     private FrameworkElement BuildAboutUsPanel()
     {
         _aboutUsPanel.Children.Clear();
-        _aboutUsPanel.Spacing = 6;
-        _aboutUsPanel.Padding = new Thickness(10);
+        _aboutUsPanel.Spacing = 10;
+        _aboutUsPanel.Padding = new Thickness(12);
         _aboutUsPanel.Visibility = Visibility.Collapsed;
 
         var version = typeof(MainWindow).Assembly.GetName().Version?.ToString()
@@ -812,23 +812,81 @@ public sealed class MainWindow : Window
 
         _aboutUsPanel.Children.Add(new TextBlock
         {
-            Text = "BDFR Persian Calendar",
-            FontSize = 16,
+            Text = "About",
+            FontSize = 20,
+            FontWeight = Microsoft.UI.Text.FontWeights.Bold,
+            Foreground = ThemeService.Brush(_theme.PrimaryText)
+        });
+
+        _aboutUsPanel.Children.Add(new TextBlock
+        {
+            Text = "Created by Behdad Badfar",
+            FontSize = 14,
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
             Foreground = ThemeService.Brush(_theme.PrimaryText)
         });
+
         _aboutUsPanel.Children.Add(new TextBlock
         {
-            Text = $"Version {version}",
+            Text = "Made with love in Iran 🇮🇷",
+            FontSize = 13,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Foreground = ThemeService.Brush(_theme.PrimaryText)
+        });
+
+        _aboutUsPanel.Children.Add(new TextBlock
+        {
+            Text = $"BDFR Persian Calendar · Version {version}",
             FontSize = 11,
-            Opacity = 0.65,
+            Opacity = 0.62,
             Foreground = ThemeService.Brush(_theme.SecondaryText)
         });
+
+        AddAboutParagraph(
+            "Every project begins with an idea, but bringing an idea to life takes time, patience, countless attempts, and someone who stays beside you through all of it.");
+
+        AddAboutParagraph("This project is a reflection of that journey.");
+
         _aboutUsPanel.Children.Add(new TextBlock
         {
-            Text = "این بخش برای متن معرفی، اعتبارها و اطلاعات تکمیلی پروژه آماده شده است. متن نهایی با محتوایی که بعداً می‌فرستی جایگزین می‌شود.",
+            Text = "Special Thanks",
+            FontSize = 17,
+            FontWeight = Microsoft.UI.Text.FontWeights.Bold,
+            Margin = new Thickness(0, 8, 0, 0),
+            Foreground = ThemeService.Brush(_theme.PrimaryText)
+        });
+
+        _aboutUsPanel.Children.Add(new TextBlock
+        {
+            Text = "To my partner,sweet lovely elaa",
+            FontSize = 14,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Foreground = ThemeService.Brush(_theme.Accent)
+        });
+
+        AddAboutParagraph(
+            "Thank you for standing beside me through every idea, every challenge, every late night, and every moment when things didn't go as planned.");
+
+        AddAboutParagraph(
+            "Your patience, encouragement, and support have been an important part of this journey. Even when you weren't directly involved in the work, your presence made it easier to keep going.");
+
+        AddAboutParagraph(
+            "This project may carry my name as its creator, but a part of the journey behind it belongs to you too.");
+
+        _aboutUsPanel.Children.Add(new TextBlock
+        {
+            Text = "Thank you for believing in me, supporting me, and being part of this journey. ❤️",
             TextWrapping = TextWrapping.Wrap,
-            FontSize = 12,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Foreground = ThemeService.Brush(_theme.PrimaryText)
+        });
+
+        _aboutUsPanel.Children.Add(new TextBlock
+        {
+            Text = "Built with passion.\nMade with love.\nFrom Iran, with ❤️",
+            TextWrapping = TextWrapping.Wrap,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Margin = new Thickness(0, 8, 0, 0),
             Foreground = ThemeService.Brush(_theme.PrimaryText)
         });
 
@@ -842,6 +900,18 @@ public sealed class MainWindow : Window
         if (_aboutUsSurface.Child is null)
             _aboutUsSurface.Child = _aboutUsPanel;
         return _aboutUsSurface;
+    }
+
+    private void AddAboutParagraph(string text)
+    {
+        _aboutUsPanel.Children.Add(new TextBlock
+        {
+            Text = text,
+            TextWrapping = TextWrapping.Wrap,
+            FontSize = 12,
+            LineHeight = 19,
+            Foreground = ThemeService.Brush(_theme.PrimaryText)
+        });
     }
 
     private async Task SelectElenaModeAsync()
