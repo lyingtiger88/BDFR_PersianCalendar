@@ -4,6 +4,8 @@ using Microsoft.UI;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Windowing;
+using Windows.Graphics;
 
 namespace BDFR.PersianCalendar.Desktop;
 
@@ -31,7 +33,24 @@ public sealed partial class MainWindow : Window
         _month = _selected.Month;
 
         ExtendsContentIntoTitleBar = true;
-        SystemBackdrop = new MicaBackdrop();
+
+        try
+        {
+            SystemBackdrop = new MicaBackdrop();
+        }
+        catch
+        {
+            // Mica is cosmetic; never prevent the calendar from opening.
+        }
+
+        try
+        {
+            AppWindow.Resize(new SizeInt32(1280, 820));
+        }
+        catch
+        {
+            // Keep the platform default size if AppWindow sizing is unavailable.
+        }
 
         BuildCalendar();
         _ = LoadSelectedDayAsync();
