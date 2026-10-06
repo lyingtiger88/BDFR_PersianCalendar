@@ -4,11 +4,12 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <Application.Resources>
         <ResourceDictionary>
-            <ResourceDictionary.ThemeDictionaries>
-                <ResourceDictionary x:Key="Default">
-                    <SolidColorBrush x:Key="AccentGlassBrush" Color="#262D7DFF"/>
-                </ResourceDictionary>
-            </ResourceDictionary.ThemeDictionaries>
+            <ResourceDictionary.MergedDictionaries>
+                <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <SolidColorBrush x:Key="AccentGlassBrush" Color="#262D7DFF"/>
+            <SolidColorBrush x:Key="PanelStrokeBrush" Color="#33000000"/>
         </ResourceDictionary>
     </Application.Resources>
 </Application>
