@@ -1,5 +1,6 @@
 using BDFR.PersianCalendar.Core;
-using Microsoft.UI.Xaml.Media;\nusing Microsoft.UI.Xaml.Media.Imaging;
+using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Media.Imaging;
 using Windows.Storage;
 using Windows.Storage.Streams;
 
@@ -14,11 +15,9 @@ public sealed class PictureService(ThemeService themeService)
     {
         var title = occasion.Title ?? string.Empty;
 
-        var file = occasion.Source == "personal"
-            ? "personal.svg"
-            : ContainsAny(title, "تولد", "سالگرد")
-                ? "birthday.svg"
-                : ContainsAny(title, "نوروز", "تحویل سال", "سیزده بدر", "طبیعت")
+        var file = ContainsAny(title, "تولد", "سالگرد")
+            ? "birthday.svg"
+            : ContainsAny(title, "نوروز", "تحویل سال", "سیزده بدر", "طبیعت")
                     ? "nowruz.svg"
                     : ContainsAny(title, "یلدا", "شب چله")
                         ? "yalda.svg"
@@ -26,7 +25,9 @@ public sealed class PictureService(ThemeService themeService)
                             ? "religious.svg"
                             : ContainsAny(title, "انقلاب", "جمهوری اسلامی", "ملی شدن", "استقلال", "آزادی")
                                 ? "national.svg"
-                                : "default.svg";
+                                : occasion.Source == "personal"
+                                    ? "personal.svg"
+                                    : "default.svg";
 
         var path = Path.Combine(EventPicturesRoot, file);
         if (File.Exists(path))
