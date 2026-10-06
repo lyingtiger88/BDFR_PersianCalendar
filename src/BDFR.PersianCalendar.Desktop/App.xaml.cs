@@ -15,6 +15,18 @@ public partial class App : Application
 
     public App()
     {
+        AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+            StartupDiagnostics.Log($"AppDomain unhandled exception (terminating={e.IsTerminating}): {e.ExceptionObject}");
+
+        AppDomain.CurrentDomain.ProcessExit += (_, _) =>
+            StartupDiagnostics.Log("ProcessExit raised.");
+
+        TaskScheduler.UnobservedTaskException += (_, e) =>
+        {
+            StartupDiagnostics.Log($"Unobserved task exception: {e.Exception}");
+            e.SetObserved();
+        };
+
         UnhandledException += OnUnhandledException;
 
         try
@@ -47,18 +59,19 @@ public partial class App : Application
             await repository.InitializeAsync();
             StartupDiagnostics.Log("SQLite initialized.");
 
-            var scheduler = new WindowsScheduledReminderScheduler();
             var timeZone = TimeZoneInfo.Local;
-            var planner = new PlannerService(repository, timeZone, scheduler);
-            var specialOccasions = new SpecialOccasionService(repository, timeZone, scheduler);
-            _reminderActions = new ReminderActionService(repository, scheduler);
+
+            // Keep core planner services independent from Windows notification runtime.
+            var planner = new PlannerService(repository, timeZone, platformScheduler: null);
+            var specialOccasions = new SpecialOccasionService(repository, timeZone, platformScheduler: null);
+            _reminderActions = new ReminderActionService(repository, platformScheduler: null);
 
             _http = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
             _http.DefaultRequestHeaders.UserAgent.ParseAdd("BDFR-PersianCalendar/1.0-test (+Windows 11)");
             var source = new TimeIrOccasionSource(_http);
 
             StartupDiagnostics.Log("Creating MainWindow.");
-            MainWindow? mainWindow = null;
+            MainWindow mainWindow;
             try
             {
                 mainWindow = new MainWindow(repository, planner, source, specialOccasions);
@@ -66,7 +79,7 @@ public partial class App : Application
             }
             catch (Exception ex)
             {
-                StartupDiagnostics.Log($"MainWindow XAML failed; entering safe mode: {ex}");
+                StartupDiagnostics.Log($"MainWindow creation failed; entering safe mode: {ex}");
                 var fallback = new StartupFallbackWindow(ex);
                 _window = fallback;
                 fallback.Activate();
@@ -77,6 +90,7 @@ public partial class App : Application
             _window.Closed += async (_, _) =>
             {
                 StartupDiagnostics.Log("MainWindow closed.");
+
                 if (_reminders is not null)
                     await _reminders.DisposeAsync();
 
@@ -100,13 +114,11 @@ public partial class App : Application
             _window.Activate();
             StartupDiagnostics.Log("MainWindow activated.");
 
-            // Never block first paint on notifications, reminders or network work.
             _ = InitializeBackgroundServicesAsync(
                 repository,
                 planner,
                 source,
                 specialOccasions,
-                scheduler,
                 mainWindow);
         }
         catch (Exception ex)
@@ -120,58 +132,79 @@ public partial class App : Application
         PlannerService planner,
         IOccasionSource source,
         SpecialOccasionService specialOccasions,
-        WindowsScheduledReminderScheduler scheduler,
         MainWindow mainWindow)
     {
         try
         {
+            // Allow the first frame to render before any optional background work.
+            await Task.Delay(750);
             StartupDiagnostics.Log("Background initialization starting.");
+
+            var notificationsAvailable = false;
+            WindowsScheduledReminderScheduler? scheduler = null;
 
             try
             {
                 _notificationManager = AppNotificationManager.Default;
                 _notificationManager.NotificationInvoked += OnNotificationInvoked;
                 _notificationManager.Register();
+                notificationsAvailable = true;
+                scheduler = new WindowsScheduledReminderScheduler();
+                _reminderActions = new ReminderActionService(repository, scheduler);
                 StartupDiagnostics.Log("App notifications registered.");
             }
             catch (Exception ex)
             {
-                StartupDiagnostics.Log($"Notification registration skipped: {ex}");
+                StartupDiagnostics.Log($"Notifications disabled for this session: {ex}");
+                _notificationManager = null;
+
+                mainWindow.DispatcherQueue.TryEnqueue(() =>
+                    mainWindow.NotifyExternalChange(
+                        "تقویم فعال است؛ اعلان‌های ویندوز در این اجرا غیرفعال شدند چون Windows App Runtime موردنیاز اعلان‌ها در دسترس نبود."));
             }
 
+            // Always persist personal-occasion reminders locally.
             try
             {
                 await specialOccasions.EnsureUpcomingRemindersAsync(new TimeOnly(9, 0));
+                StartupDiagnostics.Log("Local reminder records initialized.");
+            }
+            catch (Exception ex)
+            {
+                StartupDiagnostics.Log($"Local reminder initialization failed: {ex}");
+            }
 
-                var now = DateTimeOffset.UtcNow;
-                foreach (var reminder in await repository.GetPendingRemindersAsync(now, now.AddDays(30)))
+            // Touch Windows notification APIs only after registration succeeded.
+            if (notificationsAvailable && scheduler is not null)
+            {
+                try
                 {
-                    if (await scheduler.TryScheduleAsync(reminder))
+                    var now = DateTimeOffset.UtcNow;
+                    foreach (var reminder in await repository.GetPendingRemindersAsync(now, now.AddDays(30)))
                     {
-                        await repository.SetReminderStateAsync(
-                            reminder.Id,
-                            ReminderState.Scheduled);
+                        if (await scheduler.TryScheduleAsync(reminder))
+                        {
+                            await repository.SetReminderStateAsync(
+                                reminder.Id,
+                                ReminderState.Scheduled);
+                        }
                     }
+
+                    _reminders = new ReminderPollingService(
+                        repository,
+                        new WindowsNotificationSink());
+                    _reminders.Start();
+
+                    StartupDiagnostics.Log("Windows reminder scheduling and polling started.");
                 }
-
-                StartupDiagnostics.Log("Scheduled reminders initialized.");
+                catch (Exception ex)
+                {
+                    StartupDiagnostics.Log($"Windows reminder subsystem disabled: {ex}");
+                }
             }
-            catch (Exception ex)
+            else
             {
-                StartupDiagnostics.Log($"Scheduled reminder initialization failed: {ex}");
-            }
-
-            try
-            {
-                _reminders = new ReminderPollingService(
-                    repository,
-                    new WindowsNotificationSink());
-                _reminders.Start();
-                StartupDiagnostics.Log("Reminder polling started.");
-            }
-            catch (Exception ex)
-            {
-                StartupDiagnostics.Log($"Reminder polling failed to start: {ex}");
+                StartupDiagnostics.Log("Windows reminder scheduling/polling skipped because notifications are unavailable.");
             }
 
             await AutoSyncOccasionsAsync(repository, planner, source, mainWindow);
@@ -182,12 +215,13 @@ public partial class App : Application
             StartupDiagnostics.Log($"Background initialization failed: {ex}");
             mainWindow.DispatcherQueue.TryEnqueue(() =>
                 mainWindow.NotifyExternalChange(
-                    "برنامه باز شده است، اما یکی از سرویس‌های پس‌زمینه با خطا مواجه شد. startup.log را بررسی کنید."));
+                    "برنامه باز است، اما یکی از سرویس‌های پس‌زمینه با خطا مواجه شد. startup.log را بررسی کنید."));
         }
     }
 
     private void OnUnhandledException(object sender, Microsoft.UI.Xaml.UnhandledExceptionEventArgs e)
     {
+        StartupDiagnostics.Log($"WinUI unhandled exception: {e.Exception}");
         StartupDiagnostics.ShowFatal(e.Exception);
         e.Handled = false;
     }
