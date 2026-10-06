@@ -683,6 +683,11 @@ public sealed class MainWindow : Window
                 _themeService.ThemesRoot,
                 SearchOption.AllDirectories);
 
+            var seasonalCount = await AddPictureFolderSectionAsync(
+                "🌦 Season Backgrounds",
+                _themeService.SeasonalBackgroundsRoot,
+                SearchOption.TopDirectoryOnly);
+
             var eventCount = await AddPictureFolderSectionAsync(
                 "🖼 Event Pictures",
                 _pictureService.EventPicturesRoot,
@@ -695,7 +700,7 @@ public sealed class MainWindow : Window
 
             _pictureLibraryPanel.Children.Insert(1, new TextBlock
             {
-                Text = $"مجموع تصاویر: {ToPersianDigits((themeCount + eventCount + userCount).ToString())}",
+                Text = $"مجموع تصاویر: {ToPersianDigits((themeCount + seasonalCount + eventCount + userCount).ToString())}",
                 FontSize = 11,
                 Opacity = 0.68,
                 Foreground = ThemeService.Brush(_theme.SecondaryText)
@@ -966,7 +971,7 @@ public sealed class MainWindow : Window
             }
             else if (mode == "elena")
             {
-                path = _themeService.GetSeasonalBackgroundPath(_theme, _month);
+                path = _themeService.GetSeasonalBackgroundPath(_month);
                 var season = _month switch
                 {
                     <= 3 => "بهار",
@@ -987,7 +992,7 @@ public sealed class MainWindow : Window
                 _seasonalBackgroundCheck.IsChecked = true;
                 _settingsService.Save(_settings);
 
-                path = _themeService.GetSeasonalBackgroundPath(_theme, _month);
+                path = _themeService.GetSeasonalBackgroundPath(_month);
                 source = await PictureService.LoadImageAsync(path);
                 label = "Elena Mode · بازگشت خودکار";
                 isCustom = false;
