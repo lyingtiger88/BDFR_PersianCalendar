@@ -95,6 +95,27 @@ try
     if ((await repository.GetRecentActivitiesAsync(10)).Count == 0)
         throw new Exception("Activity center repository query failed.");
 
+    var personalOccasion = new SpecialOccasion(
+        "special-smoke",
+        "تولد آزمایشی",
+        CalendarSystemKind.Persian,
+        10,
+        5,
+        true,
+        [7, 1, 0]);
+    await repository.AddSpecialOccasionAsync(personalOccasion);
+
+    var personalDay = await repository.GetDayAsync(new PersianDate(1405, 10, 5));
+    if (!personalDay.Occasions.Any(x =>
+            x.Id == personalOccasion.Id &&
+            x.Title == personalOccasion.Title &&
+            x.Source == "personal"))
+        throw new Exception("Personal Persian occasion did not appear on its configured day.");
+
+    var wrongDay = await repository.GetDayAsync(new PersianDate(1405, 10, 6));
+    if (wrongDay.Occasions.Any(x => x.Id == personalOccasion.Id))
+        throw new Exception("Personal Persian occasion appeared one day late.");
+
     var syncAt = DateTimeOffset.UtcNow;
     await repository.SetLastOccasionSyncAsync("time.ir", 1405, syncAt);
     var loadedSyncAt = await repository.GetLastOccasionSyncAsync("time.ir", 1405);
