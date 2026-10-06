@@ -26,17 +26,17 @@ public sealed class MainWindow : Window
     private readonly TextBox NoteBox = new();
     private readonly TextBox EventTitleBox = new();
     private readonly TextBox EventTimeBox = new();
-    private readonly NumberBox ReminderMinutesBox = new();
+    private readonly TextBox ReminderMinutesBox = new();
     private readonly TextBox TaskTitleBox = new();
     private readonly TextBox TaskTimeBox = new();
     private readonly TextBox SpecialTitleBox = new();
-    private readonly ComboBox SpecialCalendarBox = new();
-    private readonly NumberBox SpecialMonthBox = new();
-    private readonly NumberBox SpecialDayBox = new();
+    private readonly TextBox SpecialCalendarBox = new();
+    private readonly TextBox SpecialMonthBox = new();
+    private readonly TextBox SpecialDayBox = new();
     private readonly TextBox SpecialReminderDaysBox = new();
     private readonly TextBox QuickAddBox = new();
     private readonly TextBlock StatusText = new();
-    private readonly ProgressRing SyncProgress = new();
+    private readonly TextBlock SyncProgress = new();
     private readonly StackPanel ActivityPanel = new();
 
     private PersianDate _selected = PersianDate.Today();
@@ -61,6 +61,14 @@ public sealed class MainWindow : Window
 
         Title = "BDFR Persian Calendar";
         Content = BuildRoot();
+
+        Activated += (_, _) => StartupDiagnostics.Log("MainWindow Activated event fired.");
+        Closed += (_, _) => StartupDiagnostics.Log("MainWindow Closed event fired.");
+        AppWindow.Changed += (_, e) =>
+        {
+            if (e.DidVisibilityChange)
+                StartupDiagnostics.Log($"MainWindow visibility changed: {AppWindow.IsVisible}");
+        };
 
         try
         {
@@ -133,9 +141,8 @@ public sealed class MainWindow : Window
         sync.Click += Sync_Click;
         stack.Children.Add(sync);
 
-        SyncProgress.IsActive = false;
-        SyncProgress.Width = 24;
-        SyncProgress.Height = 24;
+        SyncProgress.Text = "";
+        SyncProgress.Opacity = 0.65;
         stack.Children.Add(SyncProgress);
 
         stack.Children.Add(SectionTitle("افزودن سریع"));
@@ -284,10 +291,9 @@ public sealed class MainWindow : Window
         EventTimeBox.PlaceholderText = "زمان، مثل 14:30";
         stack.Children.Add(EventTimeBox);
 
-        ReminderMinutesBox.Header = "یادآوری چند دقیقه قبل؟";
-        ReminderMinutesBox.Minimum = 0;
-        ReminderMinutesBox.Maximum = 10080;
-        ReminderMinutesBox.Value = 10;
+        stack.Children.Add(new TextBlock { Text = "یادآوری چند دقیقه قبل؟", Opacity = 0.7 });
+        ReminderMinutesBox.Text = "10";
+        ReminderMinutesBox.PlaceholderText = "مثلاً 10";
         stack.Children.Add(ReminderMinutesBox);
 
         var addEvent = MakeButton("ثبت رویداد و یادآور");
@@ -311,28 +317,22 @@ public sealed class MainWindow : Window
         SpecialTitleBox.PlaceholderText = "مثلاً تولد علی";
         stack.Children.Add(SpecialTitleBox);
 
-        SpecialCalendarBox.Header = "نوع تقویم";
-        SpecialCalendarBox.Items.Add("شمسی");
-        SpecialCalendarBox.Items.Add("میلادی");
-        SpecialCalendarBox.Items.Add("قمری");
-        SpecialCalendarBox.SelectedIndex = 0;
+        stack.Children.Add(new TextBlock { Text = "نوع تقویم", Opacity = 0.7 });
+        SpecialCalendarBox.Text = "شمسی";
+        SpecialCalendarBox.PlaceholderText = "شمسی / میلادی / قمری";
         stack.Children.Add(SpecialCalendarBox);
 
         var md = new Grid { ColumnSpacing = 8 };
         md.ColumnDefinitions.Add(new ColumnDefinition());
         md.ColumnDefinitions.Add(new ColumnDefinition());
 
-        SpecialMonthBox.Header = "ماه";
-        SpecialMonthBox.Minimum = 1;
-        SpecialMonthBox.Maximum = 12;
-        SpecialMonthBox.Value = 1;
+        SpecialMonthBox.Text = "1";
+        SpecialMonthBox.PlaceholderText = "ماه 1 تا 12";
         Grid.SetColumn(SpecialMonthBox, 0);
         md.Children.Add(SpecialMonthBox);
 
-        SpecialDayBox.Header = "روز";
-        SpecialDayBox.Minimum = 1;
-        SpecialDayBox.Maximum = 31;
-        SpecialDayBox.Value = 1;
+        SpecialDayBox.Text = "1";
+        SpecialDayBox.PlaceholderText = "روز 1 تا 31";
         Grid.SetColumn(SpecialDayBox, 1);
         md.Children.Add(SpecialDayBox);
 
@@ -542,9 +542,11 @@ public sealed class MainWindow : Window
             return;
         }
 
-        var reminder = double.IsNaN(ReminderMinutesBox.Value)
-            ? 10
-            : (int)ReminderMinutesBox.Value;
+        var reminder = int.TryParse(
+            PersianQuickAddParser.NormalizeDigits(ReminderMinutesBox.Text ?? "10"),
+            out var parsedReminder)
+            ? Math.Clamp(parsedReminder, 0, 10080)
+            : 10;
 
         await _planner.AddEventAsync(
             EventTitleBox.Text,
@@ -632,8 +634,14 @@ public sealed class MainWindow : Window
             return;
         }
 
-        var month = (int)SpecialMonthBox.Value;
-        var day = (int)SpecialDayBox.Value;
+        if (!int.TryParse(PersianQuickAddParser.NormalizeDigits(SpecialMonthBox.Text ?? ""), out var month) ||
+            month is < 1 or > 12 ||
+            !int.TryParse(PersianQuickAddParser.NormalizeDigits(SpecialDayBox.Text ?? ""), out var day) ||
+            day is < 1 or > 31)
+        {
+            StatusText.Text = "ماه یا روز مناسبت معتبر نیست.";
+            return;
+        }
 
         var reminderDays = (SpecialReminderDaysBox.Text ?? "7,1,0")
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
@@ -644,7 +652,12 @@ public sealed class MainWindow : Window
 
         try
         {
-            var calendarSystem = (CalendarSystemKind)Math.Clamp(SpecialCalendarBox.SelectedIndex, 0, 2);
+            var calendarSystem = (SpecialCalendarBox.Text ?? "شمسی").Trim() switch
+            {
+                "میلادی" => CalendarSystemKind.Gregorian,
+                "قمری" => CalendarSystemKind.Hijri,
+                _ => CalendarSystemKind.Persian
+            };
 
             await _specialOccasions.AddAnnualAsync(
                 SpecialTitleBox.Text.Trim(),
@@ -666,7 +679,7 @@ public sealed class MainWindow : Window
 
     private async void Sync_Click(object sender, RoutedEventArgs e)
     {
-        SyncProgress.IsActive = true;
+        SyncProgress.Text = "در حال دریافت مناسبت‌ها...";
         StatusText.Text = "در حال دریافت مناسبت‌ها...";
 
         try
@@ -683,7 +696,7 @@ public sealed class MainWindow : Window
         }
         finally
         {
-            SyncProgress.IsActive = false;
+            SyncProgress.Text = "";
         }
     }
 
