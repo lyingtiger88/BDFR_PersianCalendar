@@ -32,6 +32,8 @@ public sealed class MainWindow : Window
     private readonly TextBlock _backgroundPathText = new();
 
     private readonly TextBlock MonthTitle = new();
+    private readonly TextBlock MonthLeftDecoration = new();
+    private readonly TextBlock MonthRightDecoration = new();
     private readonly Grid CalendarGrid = new();
     private readonly TextBlock SelectedDateTitle = new();
     private readonly TextBlock GregorianDateText = new();
@@ -271,8 +273,30 @@ public sealed class MainWindow : Window
         MonthTitle.Foreground = ThemeService.Brush(_theme.PrimaryText);
         MonthTitle.HorizontalAlignment = HorizontalAlignment.Center;
         MonthTitle.VerticalAlignment = VerticalAlignment.Center;
-        Grid.SetColumn(MonthTitle, 1);
-        header.Children.Add(MonthTitle);
+        MonthTitle.FlowDirection = FlowDirection.RightToLeft;
+
+        MonthLeftDecoration.FontSize = 22;
+        MonthLeftDecoration.Opacity = 0.82;
+        MonthLeftDecoration.VerticalAlignment = VerticalAlignment.Center;
+
+        MonthRightDecoration.FontSize = 22;
+        MonthRightDecoration.Opacity = 0.82;
+        MonthRightDecoration.VerticalAlignment = VerticalAlignment.Center;
+
+        var decoratedMonthTitle = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 10,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            FlowDirection = FlowDirection.LeftToRight
+        };
+        decoratedMonthTitle.Children.Add(MonthLeftDecoration);
+        decoratedMonthTitle.Children.Add(MonthTitle);
+        decoratedMonthTitle.Children.Add(MonthRightDecoration);
+
+        Grid.SetColumn(decoratedMonthTitle, 1);
+        header.Children.Add(decoratedMonthTitle);
 
         var prev = MakeButton("›");
         prev.FontSize = 22;
@@ -492,15 +516,25 @@ public sealed class MainWindow : Window
             }
         });
 
-        _seasonalBackgroundCheck.Content = "بک‌گراند فصلی";
-        _seasonalBackgroundCheck.IsChecked = _settings.UseSeasonalBackground;
+        _seasonalBackgroundCheck.Content = "Elena Mode";
+        _seasonalBackgroundCheck.IsChecked =
+            string.Equals(ResolveBackgroundMode(), "elena", StringComparison.OrdinalIgnoreCase);
         _seasonalBackgroundCheck.Click += async (_, _) =>
         {
-            _settings.UseSeasonalBackground = _seasonalBackgroundCheck.IsChecked == true;
+            var enabled = _seasonalBackgroundCheck.IsChecked == true;
+            _settings.UseSeasonalBackground = enabled;
+            _settings.BackgroundMode = enabled ? "elena" : "none";
             _settingsService.Save(_settings);
             await ApplyBackgroundAsync();
         };
         _settingsPanel.Children.Add(_seasonalBackgroundCheck);
+        _settingsPanel.Children.Add(new TextBlock
+        {
+            Text = "پس‌زمینه فصلی خودکار؛ متناسب با ماه شمسی",
+            FontSize = 11,
+            Opacity = 0.65,
+            Foreground = ThemeService.Brush(_theme.SecondaryText)
+        });
 
         var chooseBackground = MakeButton("انتخاب عکس زمینه دلخواه");
         chooseBackground.Click += SelectCustomBackground_Click;
@@ -510,6 +544,9 @@ public sealed class MainWindow : Window
         clearBackground.Click += async (_, _) =>
         {
             _settings.CustomBackgroundPath = null;
+            _settings.BackgroundMode = "elena";
+            _settings.UseSeasonalBackground = true;
+            _seasonalBackgroundCheck.IsChecked = true;
             _settingsService.Save(_settings);
             await ApplyBackgroundAsync();
         };
@@ -522,7 +559,7 @@ public sealed class MainWindow : Window
 
         _settingsPanel.Children.Add(new TextBlock
         {
-            Text = "شدت عکس زمینه (۰ تا ۰٫۸۵)",
+            Text = "شدت عکس زمینه (۰ تا ۰٫۹۵)",
             FontSize = 12,
             Foreground = ThemeService.Brush(_theme.SecondaryText)
         });
@@ -537,7 +574,7 @@ public sealed class MainWindow : Window
                     System.Globalization.CultureInfo.InvariantCulture,
                     out var opacity))
             {
-                _settings.BackgroundOpacity = Math.Clamp(opacity, 0, 0.85);
+                _settings.BackgroundOpacity = Math.Clamp(opacity, 0, 0.95);
                 _settingsService.Save(_settings);
                 await ApplyBackgroundAsync();
             }
@@ -611,7 +648,7 @@ public sealed class MainWindow : Window
             if (file is null)
                 return;
 
-            var copied = await _settingsService.CopyCustomBackgroundAsync(file.Path);
+            var copied = await _settingsService.CopyCustomBackgroundAsync(file);
             if (copied is null)
             {
                 StatusText.Text = "کپی تصویر زمینه انجام نشد.";
@@ -619,6 +656,18 @@ public sealed class MainWindow : Window
             }
 
             _settings.CustomBackgroundPath = copied;
+            _settings.BackgroundMode = "custom";
+            _settings.UseSeasonalBackground = false;
+            _seasonalBackgroundCheck.IsChecked = false;
+
+            // A custom photograph must be visibly applied on first selection.
+            if (_settings.BackgroundOpacity < 0.45)
+                _settings.BackgroundOpacity = 0.72;
+
+            _backgroundOpacityBox.Text = _settings.BackgroundOpacity.ToString(
+                "0.00",
+                System.Globalization.CultureInfo.InvariantCulture);
+
             _settingsService.Save(_settings);
             await ApplyBackgroundAsync();
             StatusText.Text = "عکس زمینه دلخواه اعمال شد.";
@@ -630,20 +679,45 @@ public sealed class MainWindow : Window
         }
     }
 
+    private string ResolveBackgroundMode()
+    {
+        if (!string.IsNullOrWhiteSpace(_settings.BackgroundMode))
+            return _settings.BackgroundMode.Trim().ToLowerInvariant();
+
+        // Migration for settings created before Elena/custom/none modes existed.
+        if (!string.IsNullOrWhiteSpace(_settings.CustomBackgroundPath) &&
+            File.Exists(_settings.CustomBackgroundPath))
+        {
+            _settings.BackgroundMode = "custom";
+            if (_settings.BackgroundOpacity < 0.30)
+                _settings.BackgroundOpacity = 0.72;
+            _settingsService.Save(_settings);
+            return "custom";
+        }
+
+        _settings.BackgroundMode = _settings.UseSeasonalBackground ? "elena" : "none";
+        _settingsService.Save(_settings);
+        return _settings.BackgroundMode;
+    }
+
     private async Task ApplyBackgroundAsync()
     {
         try
         {
             string? path = null;
             var label = "بدون تصویر زمینه";
+            var mode = ResolveBackgroundMode();
+            var isCustom = false;
 
-            if (!string.IsNullOrWhiteSpace(_settings.CustomBackgroundPath) &&
+            if (mode == "custom" &&
+                !string.IsNullOrWhiteSpace(_settings.CustomBackgroundPath) &&
                 File.Exists(_settings.CustomBackgroundPath))
             {
                 path = _settings.CustomBackgroundPath;
-                label = $"سفارشی: {Path.GetFileName(path)}";
+                isCustom = true;
+                label = $"تصویر شخصی · {Path.GetFileName(path)}";
             }
-            else if (_settings.UseSeasonalBackground)
+            else if (mode == "elena")
             {
                 path = _themeService.GetSeasonalBackgroundPath(_theme, _month);
                 var season = _month switch
@@ -653,11 +727,30 @@ public sealed class MainWindow : Window
                     <= 9 => "پاییز",
                     _ => "زمستان"
                 };
-                label = $"فصلی: {season}";
+                label = $"Elena Mode · {season}";
             }
 
-            _backgroundImage.Source = await PictureService.LoadImageAsync(path);
-            _backgroundImage.Opacity = Math.Clamp(_settings.BackgroundOpacity, 0, 0.85);
+            var source = await PictureService.LoadImageAsync(path);
+
+            // If a saved custom file disappears, gracefully fall back to Elena Mode.
+            if (mode == "custom" && source is null)
+            {
+                _settings.BackgroundMode = "elena";
+                _settings.UseSeasonalBackground = true;
+                _seasonalBackgroundCheck.IsChecked = true;
+                _settingsService.Save(_settings);
+
+                path = _themeService.GetSeasonalBackgroundPath(_theme, _month);
+                source = await PictureService.LoadImageAsync(path);
+                label = "Elena Mode · بازگشت خودکار";
+                isCustom = false;
+            }
+
+            _backgroundImage.Source = source;
+            _backgroundImage.Opacity = Math.Clamp(_settings.BackgroundOpacity, 0, 0.95);
+
+            // Zara Pastel keeps Elena subtle, while a user photo is intentionally visible.
+            _backgroundWash.Opacity = isCustom ? 0.16 : 0.58;
             _backgroundPathText.Text = label;
         }
         catch (Exception ex)
@@ -668,9 +761,42 @@ public sealed class MainWindow : Window
         }
     }
 
+    private void UpdateMonthDecorations()
+    {
+        if (!string.Equals(_theme.Id, "zara-pastel", StringComparison.OrdinalIgnoreCase))
+        {
+            MonthLeftDecoration.Text = "";
+            MonthRightDecoration.Text = "";
+            return;
+        }
+
+        var pair = _month switch
+        {
+            1 => ("🌱", "🌸"),
+            2 => ("🌷", "🌿"),
+            3 => ("🌼", "🪻"),
+            4 => ("☀️", "🌿"),
+            5 => ("🌻", "☀️"),
+            6 => ("🍉", "🌾"),
+            7 => ("🍁", "🍂"),
+            8 => ("🍂", "🌰"),
+            9 => ("🌾", "🍁"),
+            10 => ("❄️", "✦"),
+            11 => ("☁️", "❄️"),
+            12 => ("🌨️", "🌱"),
+            _ => ("✦", "✦")
+        };
+
+        MonthLeftDecoration.Text = pair.Item1;
+        MonthRightDecoration.Text = pair.Item2;
+        MonthLeftDecoration.Foreground = ThemeService.Brush(_theme.SecondaryText);
+        MonthRightDecoration.Foreground = ThemeService.Brush(_theme.SecondaryText);
+    }
+
     private void BuildCalendar()
     {
         MonthTitle.Text = $"{PersianDate.MonthNames[_month - 1]} {_year}";
+        UpdateMonthDecorations();
         CalendarGrid.Children.Clear();
         CalendarGrid.RowDefinitions.Clear();
         CalendarGrid.ColumnDefinitions.Clear();
