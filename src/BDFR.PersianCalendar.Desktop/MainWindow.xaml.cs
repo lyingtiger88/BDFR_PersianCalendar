@@ -1,6 +1,7 @@
 using BDFR.PersianCalendar.Core;
 using BDFR.PersianCalendar.Infrastructure;
 using Microsoft.UI;
+using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
@@ -952,6 +953,31 @@ public sealed class MainWindow : Window
         return _settings.BackgroundMode;
     }
 
+    private double GetDesktopAspectRatio()
+    {
+        try
+        {
+            var displayArea = DisplayArea.GetFromWindowId(
+                AppWindow.Id,
+                DisplayAreaFallback.Primary);
+
+            var workArea = displayArea.WorkArea;
+            if (workArea.Width > 0 && workArea.Height > 0)
+            {
+                var ratio = (double)workArea.Width / workArea.Height;
+                StartupDiagnostics.Log(
+                    $"Desktop work area: {workArea.Width}x{workArea.Height}, ratio={ratio:0.000}");
+                return ratio;
+            }
+        }
+        catch (Exception ex)
+        {
+            StartupDiagnostics.Log($"Desktop aspect ratio detection failed: {ex}");
+        }
+
+        return 16d / 9d;
+    }
+
     private async Task ApplyBackgroundAsync()
     {
         try
@@ -971,7 +997,8 @@ public sealed class MainWindow : Window
             }
             else if (mode == "elena")
             {
-                path = _themeService.GetSeasonalBackgroundPath(_month);
+                var desktopAspectRatio = GetDesktopAspectRatio();
+                path = _themeService.GetSeasonalBackgroundPath(_month, desktopAspectRatio);
                 var season = _month switch
                 {
                     <= 3 => "بهار",
@@ -979,7 +1006,10 @@ public sealed class MainWindow : Window
                     <= 9 => "پاییز",
                     _ => "زمستان"
                 };
-                label = $"Elena Mode · {season}";
+                var ratioLabel = ThemeService.FormatAspectRatioLabel(desktopAspectRatio);
+                label = path is null
+                    ? $"Elena Mode · {season} · {ratioLabel} · تصویری پیدا نشد"
+                    : $"Elena Mode · {season} · {ratioLabel} · {Path.GetFileName(path)}";
             }
 
             var source = await PictureService.LoadImageAsync(path);
@@ -992,9 +1022,13 @@ public sealed class MainWindow : Window
                 _seasonalBackgroundCheck.IsChecked = true;
                 _settingsService.Save(_settings);
 
-                path = _themeService.GetSeasonalBackgroundPath(_month);
+                var desktopAspectRatio = GetDesktopAspectRatio();
+                path = _themeService.GetSeasonalBackgroundPath(_month, desktopAspectRatio);
                 source = await PictureService.LoadImageAsync(path);
-                label = "Elena Mode · بازگشت خودکار";
+                var ratioLabel = ThemeService.FormatAspectRatioLabel(desktopAspectRatio);
+                label = path is null
+                    ? $"Elena Mode · بازگشت خودکار · {ratioLabel}"
+                    : $"Elena Mode · بازگشت خودکار · {ratioLabel} · {Path.GetFileName(path)}";
                 isCustom = false;
             }
 
