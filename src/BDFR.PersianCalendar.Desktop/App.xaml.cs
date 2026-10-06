@@ -58,8 +58,21 @@ public partial class App : Application
             var source = new TimeIrOccasionSource(_http);
 
             StartupDiagnostics.Log("Creating MainWindow.");
-            var mainWindow = new MainWindow(repository, planner, source, specialOccasions);
-            _window = mainWindow;
+            MainWindow? mainWindow = null;
+            try
+            {
+                mainWindow = new MainWindow(repository, planner, source, specialOccasions);
+                _window = mainWindow;
+            }
+            catch (Exception ex)
+            {
+                StartupDiagnostics.Log($"MainWindow XAML failed; entering safe mode: {ex}");
+                var fallback = new StartupFallbackWindow(ex);
+                _window = fallback;
+                fallback.Activate();
+                StartupDiagnostics.Log("Safe-mode fallback window activated.");
+                return;
+            }
 
             _window.Closed += async (_, _) =>
             {
