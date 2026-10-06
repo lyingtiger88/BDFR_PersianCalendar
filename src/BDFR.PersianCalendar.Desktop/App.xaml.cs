@@ -68,8 +68,9 @@ public partial class App : Application
             var specialOccasions = new SpecialOccasionService(repository, timeZone, platformScheduler: null);
             _reminderActions = new ReminderActionService(repository, platformScheduler: null);
 
-            _http = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
-            _http.DefaultRequestHeaders.UserAgent.ParseAdd("BDFR-PersianCalendar/1.0-test (+Windows 11)");
+            // time.ir can occasionally respond slowly. Request headers are applied
+            // per request by TimeIrOccasionSource so retries can mimic a normal browser.
+            _http = new HttpClient { Timeout = TimeSpan.FromSeconds(35) };
             var source = new TimeIrOccasionSource(_http);
 
             StartupDiagnostics.Log("Creating MainWindow.");
