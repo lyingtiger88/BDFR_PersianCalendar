@@ -80,6 +80,32 @@ var fallbackRegular = fallbackOccasions.SingleOrDefault(x => x.Date == new Persi
 if (fallbackRegular is null || fallbackRegular.IsHoliday)
     throw new Exception("time.ir fallback parser failed for regular occasion.");
 
+var timeIrCurrentMarkupFixture = """
+<!doctype html>
+<html lang="fa">
+<body>
+  <main>
+    <section data-month="11">
+      <h2>مناسبت‌های ماه بهمن</h2>
+      <custom-event><a href="/calendar">4 بهمن ولادت حضرت قائم عجل الله تعالی فرجه و جشن نیمه شعبان[ ۱۵ شعبان ]</a></custom-event>
+      <custom-event><a href="/calendar">6 بهمن بزرگداشت صفی‌الدین اُرمَوی و روز موسیقی ایرانی</a></custom-event>
+    </section>
+  </main>
+</body>
+</html>
+""";
+
+var currentMarkupOccasions = await TimeIrOccasionSource.ParseAnnualHtmlAsync(
+    timeIrCurrentMarkupFixture,
+    1405);
+var halfShaaban = currentMarkupOccasions.SingleOrDefault(
+    x => x.Date == new PersianDate(1405, 11, 4));
+if (halfShaaban is null ||
+    !halfShaaban.Title.StartsWith("ولادت حضرت قائم", StringComparison.Ordinal))
+{
+    throw new Exception("time.ir current-markup parser failed for 4 Bahman 1405.");
+}
+
 var dbPath = Path.Combine(Path.GetTempPath(), $"bdfr-calendar-smoke-{Guid.NewGuid():N}.db");
 try
 {
