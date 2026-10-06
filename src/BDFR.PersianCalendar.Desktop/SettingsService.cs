@@ -34,16 +34,46 @@ public sealed class SettingsService
             if (!File.Exists(SettingsPath))
                 return new AppSettings();
 
-            return JsonSerializer.Deserialize<AppSettings>(
-                       File.ReadAllText(SettingsPath),
-                       JsonOptions)
-                   ?? new AppSettings();
+            var settings = JsonSerializer.Deserialize<AppSettings>(
+                               File.ReadAllText(SettingsPath),
+                               JsonOptions)
+                           ?? new AppSettings();
+
+            Migrate(settings);
+            return settings;
         }
         catch (Exception ex)
         {
             StartupDiagnostics.Log($"Settings load failed: {ex}");
             return new AppSettings();
         }
+    }
+
+    private static void Migrate(AppSettings settings)
+    {
+        if (string.IsNullOrWhiteSpace(settings.AppearanceMode))
+        {
+            settings.AppearanceMode =
+                string.Equals(settings.BackgroundMode, "elena", StringComparison.OrdinalIgnoreCase) ||
+                settings.UseSeasonalBackground
+                    ? "elena"
+                    : "theme";
+        }
+
+        settings.AppearanceMode = settings.AppearanceMode.Trim().ToLowerInvariant() switch
+        {
+            "elena" => "elena",
+            _ => "theme"
+        };
+
+        if (string.Equals(settings.BackgroundMode, "elena", StringComparison.OrdinalIgnoreCase))
+            settings.BackgroundMode = "none";
+
+        if (string.IsNullOrWhiteSpace(settings.ThemeId))
+            settings.ThemeId = "zara-pastel";
+
+        if (string.IsNullOrWhiteSpace(settings.ElenaAccentId))
+            settings.ElenaAccentId = "azure";
     }
 
     public void Save(AppSettings settings)
