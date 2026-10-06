@@ -4,6 +4,7 @@ using Microsoft.UI;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Media;
 using Windows.Graphics;
 using Windows.Storage.Pickers;
@@ -32,7 +33,8 @@ public sealed class MainWindow : Window
     private readonly CheckBox _seasonalBackgroundCheck = new();
     private readonly CheckBox _occasionPicturesCheck = new();
     private readonly CheckBox _glassModeCheck = new();
-    private readonly TextBox _backgroundOpacityBox = new();
+    private readonly Slider _backgroundOpacitySlider = new();
+    private readonly TextBlock _backgroundOpacityValue = new();
     private readonly ComboBox _fontFamilyCombo = new();
     private readonly NumberBox _fontSizeBox = new();
     private readonly ComboBox _fontWeightCombo = new();
@@ -842,18 +844,54 @@ public sealed class MainWindow : Window
 
         _settingsPanel.Children.Add(new TextBlock
         {
-            Text = isElena ? "شدت تصویر فصلی (۰ تا ۰٫۹۵)" : "شدت عکس زمینه (۰ تا ۰٫۹۵)",
+            Text = isElena ? "شدت تصویر فصلی" : "شدت عکس زمینه",
             FontSize = 12,
             Foreground = ThemeService.Brush(_theme.SecondaryText)
         });
 
-        _backgroundOpacityBox.Text = _settings.BackgroundOpacity.ToString(
-            "0.00",
-            System.Globalization.CultureInfo.InvariantCulture);
-        _backgroundOpacityBox.PlaceholderText = "مثلاً 0.65";
-        _backgroundOpacityBox.LostFocus -= BackgroundOpacityBox_LostFocus;
-        _backgroundOpacityBox.LostFocus += BackgroundOpacityBox_LostFocus;
-        _settingsPanel.Children.Add(_backgroundOpacityBox);
+        var opacityRow = new Grid { ColumnSpacing = 8 };
+        opacityRow.ColumnDefinitions.Add(
+            new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        opacityRow.ColumnDefinitions.Add(
+            new ColumnDefinition { Width = GridLength.Auto });
+        opacityRow.ColumnDefinitions.Add(
+            new ColumnDefinition { Width = GridLength.Auto });
+
+        _backgroundOpacitySlider.Minimum = 0;
+        _backgroundOpacitySlider.Maximum = 95;
+        _backgroundOpacitySlider.StepFrequency = 1;
+        _backgroundOpacitySlider.Value = Math.Round(
+            Math.Clamp(_settings.BackgroundOpacity, 0, 0.95) * 100);
+        _backgroundOpacitySlider.HorizontalAlignment = HorizontalAlignment.Stretch;
+        _backgroundOpacitySlider.ValueChanged -= BackgroundOpacitySlider_ValueChanged;
+        _backgroundOpacitySlider.ValueChanged += BackgroundOpacitySlider_ValueChanged;
+        Grid.SetColumn(_backgroundOpacitySlider, 0);
+        opacityRow.Children.Add(_backgroundOpacitySlider);
+
+        _backgroundOpacityValue.Text =
+            $"{Math.Round(_backgroundOpacitySlider.Value):0}%";
+        _backgroundOpacityValue.MinWidth = 42;
+        _backgroundOpacityValue.VerticalAlignment = VerticalAlignment.Center;
+        _backgroundOpacityValue.HorizontalAlignment = HorizontalAlignment.Center;
+        _backgroundOpacityValue.Foreground = ThemeService.Brush(_theme.PrimaryText);
+        Grid.SetColumn(_backgroundOpacityValue, 1);
+        opacityRow.Children.Add(_backgroundOpacityValue);
+
+        var applyBackgroundOpacity = MakeButton("اعمال");
+        applyBackgroundOpacity.Click += ApplyBackgroundOpacity_Click;
+        Grid.SetColumn(applyBackgroundOpacity, 2);
+        opacityRow.Children.Add(applyBackgroundOpacity);
+
+        _settingsPanel.Children.Add(opacityRow);
+
+        _settingsPanel.Children.Add(new TextBlock
+        {
+            Text = "مقدار را با اسلایدر تنظیم کنید و «اعمال» را بزنید؛ بدون تعویض تم، تصویر همان لحظه به‌روزرسانی می‌شود.",
+            FontSize = 10.5,
+            TextWrapping = TextWrapping.Wrap,
+            Opacity = 0.62,
+            Foreground = ThemeService.Brush(_theme.SecondaryText)
+        });
 
         _occasionPicturesCheck.Content = "نمایش عکس برای مناسبت‌ها";
         _occasionPicturesCheck.IsChecked = _settings.ShowOccasionPictures;
@@ -1942,23 +1980,45 @@ public sealed class MainWindow : Window
         }
     }
 
-    private async void BackgroundOpacityBox_LostFocus(object sender, RoutedEventArgs e)
+    private void BackgroundOpacitySlider_ValueChanged(
+        object sender,
+        RangeBaseValueChangedEventArgs e)
     {
-        if (double.TryParse(
-                PersianQuickAddParser.NormalizeDigits(_backgroundOpacityBox.Text ?? ""),
-                System.Globalization.NumberStyles.Float,
-                System.Globalization.CultureInfo.InvariantCulture,
-                out var opacity))
+        _backgroundOpacityValue.Text = $"{Math.Round(e.NewValue):0}%";
+    }
+
+    private async void ApplyBackgroundOpacity_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        try
         {
-            _settings.BackgroundOpacity = Math.Clamp(opacity, 0, 0.95);
+            _settings.BackgroundOpacity = Math.Clamp(
+                _backgroundOpacitySlider.Value / 100.0,
+                0,
+                0.95);
+
             _settingsService.Save(_settings);
             await ApplyBackgroundAsync();
+
+            var modeLabel = string.Equals(
+                    _settings.AppearanceMode,
+                    "elena",
+                    StringComparison.OrdinalIgnoreCase)
+                ? "تصویر فصلی"
+                : "عکس زمینه";
+
+            StatusText.Text =
+                $"شدت {modeLabel} روی {Math.Round(_settings.BackgroundOpacity * 100):0}% اعمال شد.";
         }
-        else
+        catch (Exception ex)
         {
-            _backgroundOpacityBox.Text = _settings.BackgroundOpacity.ToString(
-                "0.00",
-                System.Globalization.CultureInfo.InvariantCulture);
+            StartupDiagnostics.Log($"Background opacity apply failed: {ex}");
+            _backgroundOpacitySlider.Value =
+                Math.Round(Math.Clamp(_settings.BackgroundOpacity, 0, 0.95) * 100);
+            _backgroundOpacityValue.Text =
+                $"{Math.Round(_backgroundOpacitySlider.Value):0}%";
+            StatusText.Text = "اعمال شدت تصویر انجام نشد؛ مقدار قبلی حفظ شد.";
         }
     }
 
