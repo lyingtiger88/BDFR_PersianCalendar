@@ -11,6 +11,11 @@ internal static class StartupDiagnostics
 
     public static string LogPath => Path.Combine(DirectoryPath, "startup.log");
 
+    public static void BeginSession()
+    {
+        Log($"========== SESSION START pid={Environment.ProcessId} version={typeof(StartupDiagnostics).Assembly.GetName().Version} ==========");
+    }
+
     public static void Log(string message)
     {
         try
