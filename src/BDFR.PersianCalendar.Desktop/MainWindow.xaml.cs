@@ -5,6 +5,8 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Windows.Graphics;
+using Windows.Storage.Pickers;
+using System.Diagnostics;
 
 namespace BDFR.PersianCalendar.Desktop;
 
@@ -15,6 +17,19 @@ public sealed class MainWindow : Window
     private readonly IOccasionSource _occasionSource;
     private readonly SpecialOccasionService _specialOccasions;
     private readonly PersianQuickAddParser _quickAdd = new();
+    private readonly SettingsService _settingsService;
+    private readonly ThemeService _themeService;
+    private readonly PictureService _pictureService;
+    private readonly AppSettings _settings;
+    private readonly ThemeDefinition _theme;
+
+    private readonly Image _backgroundImage = new();
+    private readonly Border _backgroundWash = new();
+    private readonly StackPanel _settingsPanel = new();
+    private readonly CheckBox _seasonalBackgroundCheck = new();
+    private readonly CheckBox _occasionPicturesCheck = new();
+    private readonly TextBox _backgroundOpacityBox = new();
+    private readonly TextBlock _backgroundPathText = new();
 
     private readonly TextBlock MonthTitle = new();
     private readonly Grid CalendarGrid = new();
@@ -60,6 +75,12 @@ public sealed class MainWindow : Window
         _occasionSource = occasionSource;
         _specialOccasions = specialOccasions;
 
+        _settingsService = new SettingsService();
+        _themeService = new ThemeService();
+        _settings = _settingsService.Load();
+        _theme = _themeService.Load(_settings.ThemeId);
+        _pictureService = new PictureService(_themeService);
+
         _year = _selected.Year;
         _month = _selected.Month;
 
@@ -86,25 +107,48 @@ public sealed class MainWindow : Window
         BuildCalendar();
         _ = LoadSelectedDayAsync();
         _ = LoadActivitiesAsync();
+        _ = ApplyBackgroundAsync();
 
         StartupDiagnostics.Log("MainWindow: programmatic UI ready.");
     }
 
     private FrameworkElement BuildRoot()
     {
+        var outer = new Grid
+        {
+            Background = ThemeService.Brush(_theme.WindowBackground)
+        };
+
+        _backgroundImage.Stretch = Stretch.UniformToFill;
+        _backgroundImage.Opacity = Math.Clamp(_settings.BackgroundOpacity, 0, 0.85);
+        outer.Children.Add(_backgroundImage);
+
+        _backgroundWash.Background = ThemeService.Brush(_theme.WindowBackground);
+        _backgroundWash.Opacity = 0.62;
+        outer.Children.Add(_backgroundWash);
+
         var root = new Grid
         {
-            FlowDirection = FlowDirection.RightToLeft
+            FlowDirection = FlowDirection.RightToLeft,
+            Margin = new Thickness(12),
+            ColumnSpacing = 12
         };
-        root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(290) });
+        root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(300) });
         root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(380) });
+        root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(390) });
 
         var left = BuildLeftPanel();
         Grid.SetColumn(left, 0);
         root.Children.Add(left);
 
-        var center = BuildCalendarPanel();
+        var center = new Border
+        {
+            Background = ThemeService.Brush(_theme.CardBackground),
+            CornerRadius = new CornerRadius(18),
+            BorderBrush = ThemeService.Brush(_theme.Accent),
+            BorderThickness = new Thickness(1),
+            Child = BuildCalendarPanel()
+        };
         Grid.SetColumn(center, 1);
         root.Children.Add(center);
 
@@ -112,7 +156,8 @@ public sealed class MainWindow : Window
         Grid.SetColumn(right, 2);
         root.Children.Add(right);
 
-        return root;
+        outer.Children.Add(root);
+        return outer;
     }
 
     private FrameworkElement BuildLeftPanel()
@@ -127,14 +172,16 @@ public sealed class MainWindow : Window
         {
             Text = "BDFR Persian Calendar",
             FontSize = 24,
-            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Foreground = ThemeService.Brush(_theme.PrimaryText)
         });
 
         stack.Children.Add(new TextBlock
         {
             Text = "تقویم، برنامه‌ریز و یادآور فارسی ویندوز",
-            Opacity = 0.65,
-            TextWrapping = TextWrapping.Wrap
+            Opacity = 0.72,
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = ThemeService.Brush(_theme.SecondaryText)
         });
 
         var today = MakeButton("امروز");
@@ -183,10 +230,20 @@ public sealed class MainWindow : Window
         ActivityPanel.Spacing = 6;
         stack.Children.Add(ActivityPanel);
 
+        var settingsButton = MakeButton("⚙ تنظیمات");
+        settingsButton.Click += (_, _) =>
+            _settingsPanel.Visibility = _settingsPanel.Visibility == Visibility.Visible
+                ? Visibility.Collapsed
+                : Visibility.Visible;
+        stack.Children.Add(settingsButton);
+        stack.Children.Add(BuildSettingsPanel());
+
         return new Border
         {
-            BorderThickness = new Thickness(0, 0, 1, 0),
-            BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(32, 128, 128, 128)),
+            Background = ThemeService.Brush(_theme.PanelBackground),
+            CornerRadius = new CornerRadius(18),
+            BorderThickness = new Thickness(1),
+            BorderBrush = ThemeService.Brush(_theme.Accent),
             Child = new ScrollViewer { Content = stack }
         };
     }
@@ -211,6 +268,7 @@ public sealed class MainWindow : Window
 
         MonthTitle.FontSize = 28;
         MonthTitle.FontWeight = Microsoft.UI.Text.FontWeights.SemiBold;
+        MonthTitle.Foreground = ThemeService.Brush(_theme.PrimaryText);
         MonthTitle.HorizontalAlignment = HorizontalAlignment.Center;
         MonthTitle.VerticalAlignment = VerticalAlignment.Center;
         Grid.SetColumn(MonthTitle, 1);
@@ -232,10 +290,21 @@ public sealed class MainWindow : Window
         var names = new[] { "شنبه", "یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه" };
         for (var i = 0; i < names.Length; i++)
         {
-            var label = new TextBlock
+            var label = new Border
             {
-                Text = names[i],
-                HorizontalAlignment = HorizontalAlignment.Center
+                Margin = new Thickness(4),
+                Padding = new Thickness(8, 5, 8, 5),
+                CornerRadius = new CornerRadius(12),
+                Background = ThemeService.Brush(GetWeekdayColor(i)),
+                Child = new TextBlock
+                {
+                    Text = names[i],
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    Foreground = i == 6
+                        ? ThemeService.Brush(_theme.HolidayText)
+                        : ThemeService.Brush(_theme.PrimaryText),
+                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
+                }
             };
             Grid.SetColumn(label, i);
             weekdays.Children.Add(label);
@@ -260,6 +329,7 @@ public sealed class MainWindow : Window
 
         SelectedDateTitle.FontSize = 24;
         SelectedDateTitle.FontWeight = Microsoft.UI.Text.FontWeights.SemiBold;
+        SelectedDateTitle.Foreground = ThemeService.Brush(_theme.PrimaryText);
         stack.Children.Add(SelectedDateTitle);
 
         GregorianDateText.Opacity = 0.65;
@@ -353,26 +423,41 @@ public sealed class MainWindow : Window
 
         return new Border
         {
-            BorderThickness = new Thickness(1, 0, 0, 0),
-            BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(32, 128, 128, 128)),
+            Background = ThemeService.Brush(_theme.PanelBackground),
+            CornerRadius = new CornerRadius(18),
+            BorderThickness = new Thickness(1),
+            BorderBrush = ThemeService.Brush(_theme.Accent),
             Child = new ScrollViewer { Content = stack }
         };
     }
 
-    private static TextBlock SectionTitle(string text)
+    private TextBlock SectionTitle(string text)
         => new()
         {
             Text = text,
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Foreground = ThemeService.Brush(_theme.PrimaryText),
             Margin = new Thickness(0, 10, 0, 0)
         };
 
-    private static Button MakeButton(string text)
+    private Button MakeButton(string text)
         => new()
         {
             Content = text,
-            HorizontalAlignment = HorizontalAlignment.Stretch
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            Background = ThemeService.Brush(_theme.Accent),
+            Foreground = ThemeService.Brush(_theme.PrimaryText),
+            BorderThickness = new Thickness(0)
         };
+
+    private string GetWeekdayColor(int column)
+    {
+        if (_theme.WeekdayColors is { Length: > 0 })
+            return _theme.WeekdayColors[Math.Clamp(column, 0, _theme.WeekdayColors.Length - 1)];
+
+        return _theme.CardBackground;
+    }
+
 
     private void BuildCalendar()
     {
@@ -401,8 +486,8 @@ public sealed class MainWindow : Window
                     : Microsoft.UI.Text.FontWeights.Normal,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 Foreground = cell.Date.DayOfWeek == DayOfWeek.Friday
-                    ? new SolidColorBrush(Colors.IndianRed)
-                    : null
+                    ? ThemeService.Brush(_theme.HolidayText)
+                    : ThemeService.Brush(_theme.PrimaryText)
             };
 
             var occasionPanel = new StackPanel
@@ -427,8 +512,15 @@ public sealed class MainWindow : Window
                 VerticalContentAlignment = VerticalAlignment.Top,
                 Margin = new Thickness(4),
                 MinHeight = 88,
-                Padding = new Thickness(5),
+                Padding = new Thickness(6),
                 Opacity = cell.IsCurrentMonth ? 1 : 0.35,
+                Background = cell.Date == _selected
+                    ? ThemeService.Brush(_theme.SelectedDay)
+                    : ThemeService.Brush(GetWeekdayColor(i % 7)),
+                BorderBrush = cell.Date == _selected
+                    ? ThemeService.Brush(_theme.PrimaryText)
+                    : ThemeService.Brush(_theme.Accent),
+                BorderThickness = cell.Date == _selected ? new Thickness(2) : new Thickness(0),
                 Content = content
             };
 
@@ -436,6 +528,7 @@ public sealed class MainWindow : Window
             button.Click += async (_, _) =>
             {
                 _selected = captured;
+                BuildCalendar();
                 await LoadSelectedDayAsync();
             };
 
@@ -449,6 +542,7 @@ public sealed class MainWindow : Window
 
         _ = LoadCalendarCellOccasionsAsync(_year, _month);
         _ = EnsureYearOccasionsAsync(_year);
+        _ = ApplyBackgroundAsync();
     }
 
     private async Task LoadCalendarCellOccasionsAsync(int year, int month)
@@ -486,7 +580,7 @@ public sealed class MainWindow : Window
                         TextTrimming = TextTrimming.CharacterEllipsis,
                         HorizontalAlignment = HorizontalAlignment.Stretch,
                         Foreground = occasion.IsHoliday
-                            ? new SolidColorBrush(Colors.IndianRed)
+                            ? ThemeService.Brush(_theme.HolidayText)
                             : null
                     });
                 }
@@ -505,7 +599,7 @@ public sealed class MainWindow : Window
                 if (snapshot.IsHoliday &&
                     _calendarDayNumberLabels.TryGetValue(date, out var dayLabel))
                 {
-                    dayLabel.Foreground = new SolidColorBrush(Colors.IndianRed);
+                    dayLabel.Foreground = ThemeService.Brush(_theme.HolidayText);
                 }
             }
         }
@@ -578,7 +672,7 @@ public sealed class MainWindow : Window
                 {
                     Text = $"{(item.IsHoliday ? "● " : "• ")}{item.Title}",
                     TextWrapping = TextWrapping.Wrap,
-                    Foreground = item.IsHoliday ? new SolidColorBrush(Colors.IndianRed) : null
+                    Foreground = item.IsHoliday ? ThemeService.Brush(_theme.HolidayText) : null
                 });
             }
             if (snapshot.Occasions.Count == 0)
