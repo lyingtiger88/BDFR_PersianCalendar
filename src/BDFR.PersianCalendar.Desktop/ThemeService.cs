@@ -13,6 +13,7 @@ public sealed class ThemeService
 
     public string PictureRoot => Path.Combine(AppContext.BaseDirectory, "picture");
     public string ThemesRoot => Path.Combine(PictureRoot, "themes");
+    public string SeasonalBackgroundsRoot => Path.Combine(PictureRoot, "theme", "season backgrounds");
 
     public ThemeDefinition Load(string themeId)
     {
@@ -42,21 +43,17 @@ public sealed class ThemeService
     public string ThemeRoot(ThemeDefinition theme)
         => Path.Combine(ThemesRoot, theme.Id);
 
-    public string? GetSeasonalBackgroundPath(ThemeDefinition theme, int persianMonth)
+    public string GetSeasonalBackgroundPath(int persianMonth)
     {
-        var season = persianMonth switch
+        var fileName = persianMonth switch
         {
-            <= 3 => "spring",
-            <= 6 => "summer",
-            <= 9 => "autumn",
-            _ => "winter"
+            <= 3 => "spring.svg",
+            <= 6 => "summer.svg",
+            <= 9 => "autumn.svg",
+            _ => "winter.svg"
         };
 
-        if (!theme.SeasonalBackgrounds.TryGetValue(season, out var relative) ||
-            string.IsNullOrWhiteSpace(relative))
-            return null;
-
-        return Path.Combine(ThemeRoot(theme), relative.Replace('/', Path.DirectorySeparatorChar));
+        return Path.Combine(SeasonalBackgroundsRoot, fileName);
     }
 
     public static SolidColorBrush Brush(string value, string fallback = "#FFFFFFFF")
