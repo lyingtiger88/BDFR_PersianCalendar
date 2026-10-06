@@ -15,6 +15,17 @@ if (parsed.Date != new PersianDate(1405, 7, 15) ||
         $"QuickAdd parser failed. Date={parsed.Date}, Time={parsed.Time}, Title=[{parsed.Title}]");
 }
 
+var recurring = parser.Parse(
+    "هفتگی سه‌شنبه ساعت 18:00 تمرین",
+    new PersianDate(1405, 7, 14));
+if (recurring.Recurrence != RecurrenceKind.Weekly ||
+    recurring.Time != new TimeOnly(18, 0) ||
+    recurring.Title != "تمرین")
+{
+    throw new Exception(
+        $"QuickAdd recurrence failed. Recurrence={recurring.Recurrence}, Title=[{recurring.Title}]");
+}
+
 var grid = MonthGridBuilder.Build(1405, 7, new PersianDate(1405, 7, 14));
 if (grid.Count != 42 || grid.Count(x => x.IsToday) != 1)
     throw new Exception("Month grid failed.");
