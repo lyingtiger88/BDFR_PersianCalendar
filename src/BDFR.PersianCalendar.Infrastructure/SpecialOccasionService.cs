@@ -16,8 +16,13 @@ public sealed class SpecialOccasionService(ICalendarRepository repository, TimeZ
 
         await repository.AddSpecialOccasionAsync(occasion, cancellationToken);
         await ScheduleNextAsync(occasion, notificationTime, cancellationToken);
-        await repository.AddActivityAsync(new ActivityLogEntry(Guid.NewGuid().ToString("N"), DateTimeOffset.UtcNow,
-            "special-occasion-created", CalendarItemKind.SpecialOccasion, occasion.Id, occasion.Title), cancellationToken);
+        await repository.AddActivityAsync(new ActivityLogEntry(
+            Guid.NewGuid().ToString("N"),
+            DateTimeOffset.UtcNow,
+            "special-occasion-created",
+            CalendarItemKind.SpecialOccasion,
+            occasion.Id,
+            $"{occasion.Title} — {FormatOccasionDate(occasion)}"), cancellationToken);
         return occasion;
     }
 
@@ -101,4 +106,16 @@ public sealed class SpecialOccasionService(ICalendarRepository repository, TimeZ
 
         if (day is < 1 || day > max) throw new ArgumentOutOfRangeException(nameof(day));
     }
+    private static string FormatOccasionDate(SpecialOccasion occasion)
+        => occasion.CalendarSystem switch
+        {
+            CalendarSystemKind.Persian =>
+                $"{occasion.Day} {PersianDate.MonthNames[occasion.Month - 1]} (سالانه)",
+            CalendarSystemKind.Gregorian =>
+                $"روز {occasion.Day} ماه {occasion.Month} میلادی (سالانه)",
+            CalendarSystemKind.Hijri =>
+                $"روز {occasion.Day} ماه {occasion.Month} قمری (سالانه)",
+            _ => $"{occasion.Month}/{occasion.Day}"
+        };
+
 }
