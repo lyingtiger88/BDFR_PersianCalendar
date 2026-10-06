@@ -7,9 +7,6 @@
             <ResourceDictionary.MergedDictionaries>
                 <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
             </ResourceDictionary.MergedDictionaries>
-
-            <SolidColorBrush x:Key="AccentGlassBrush" Color="#262D7DFF"/>
-            <SolidColorBrush x:Key="PanelStrokeBrush" Color="#33000000"/>
         </ResourceDictionary>
     </Application.Resources>
 </Application>
