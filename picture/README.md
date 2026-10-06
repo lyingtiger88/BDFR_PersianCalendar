@@ -6,18 +6,18 @@ Runtime picture assets for BDFR Persian Calendar.
 
 - `themes/zara-pastel/`
   - `theme.json`
-  - `backgrounds/spring.jpg`
-  - `backgrounds/summer.jpg`
-  - `backgrounds/autumn.jpg`
-  - `backgrounds/winter.jpg`
+  - `backgrounds/spring.svg`
+  - `backgrounds/summer.svg`
+  - `backgrounds/autumn.svg`
+  - `backgrounds/winter.svg`
 - `event picture/`
-  - `default.png`
-  - `birthday.png`
-  - `nowruz.png`
-  - `yalda.png`
-  - `religious.png`
-  - `national.png`
-  - `personal.png`
+  - `default.svg`
+  - `birthday.svg`
+  - `nowruz.svg`
+  - `yalda.svg`
+  - `religious.svg`
+  - `national.svg`
+  - `personal.svg`
 
 User-selected backgrounds are copied at runtime to:
 `%LOCALAPPDATA%\BDFR\PersianCalendar\picture\user background`.
