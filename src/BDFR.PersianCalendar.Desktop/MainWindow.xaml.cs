@@ -36,6 +36,15 @@ public sealed class MainWindow : Window
     private readonly StackPanel _accentSubmenuPanel = new();
     private readonly StackPanel _aboutUsPanel = new();
 
+    private Grid? _rootSurface;
+    private Border? _leftPanelSurface;
+    private Border? _centerPanelSurface;
+    private Border? _rightPanelSurface;
+    private Border? _settingsSurface;
+    private Border? _accentSubmenuSurface;
+    private Border? _pictureLibrarySurface;
+    private Border? _aboutUsSurface;
+
     private readonly TextBlock MonthTitle = new();
     private readonly TextBlock MonthLeftDecoration = new();
     private readonly TextBlock MonthRightDecoration = new();
@@ -130,6 +139,8 @@ public sealed class MainWindow : Window
                 : ElementTheme.Light
         };
 
+        _rootSurface = outer;
+
         _backgroundImage.Stretch = Stretch.UniformToFill;
         _backgroundImage.Opacity = Math.Clamp(_settings.BackgroundOpacity, 0, 0.95);
         outer.Children.Add(_backgroundImage);
@@ -160,6 +171,7 @@ public sealed class MainWindow : Window
             BorderThickness = new Thickness(1),
             Child = BuildCalendarPanel()
         };
+        _centerPanelSurface = center;
         Grid.SetColumn(center, 1);
         root.Children.Add(center);
 
@@ -249,7 +261,7 @@ public sealed class MainWindow : Window
         stack.Children.Add(settingsButton);
         stack.Children.Add(BuildSettingsPanel());
 
-        return new Border
+        _leftPanelSurface = new Border
         {
             Background = ThemeService.Brush(_theme.PanelBackground),
             CornerRadius = new CornerRadius(18),
@@ -257,6 +269,7 @@ public sealed class MainWindow : Window
             BorderBrush = ThemeService.Brush(_theme.Accent),
             Child = new ScrollViewer { Content = stack }
         };
+        return _leftPanelSurface;
     }
 
     private FrameworkElement BuildCalendarPanel()
@@ -454,7 +467,7 @@ public sealed class MainWindow : Window
         addSpecial.Click += AddSpecialOccasion_Click;
         stack.Children.Add(addSpecial);
 
-        return new Border
+        _rightPanelSurface = new Border
         {
             Background = ThemeService.Brush(_theme.PanelBackground),
             CornerRadius = new CornerRadius(18),
@@ -462,6 +475,7 @@ public sealed class MainWindow : Window
             BorderBrush = ThemeService.Brush(_theme.Accent),
             Child = new ScrollViewer { Content = stack }
         };
+        return _rightPanelSurface;
     }
 
     private TextBlock SectionTitle(string text)
@@ -668,14 +682,16 @@ public sealed class MainWindow : Window
         _settingsPanel.Children.Add(aboutToggle);
         _settingsPanel.Children.Add(BuildAboutUsPanel());
 
-        return new Border
+        _settingsSurface ??= new Border
         {
-            Background = BrushWithAlpha(_theme.CardBackground, 0xE0),
             CornerRadius = new CornerRadius(14),
-            BorderBrush = ThemeService.Brush(_theme.Accent),
-            BorderThickness = new Thickness(1),
-            Child = _settingsPanel
+            BorderThickness = new Thickness(1)
         };
+        _settingsSurface.Background = BrushWithAlpha(_theme.CardBackground, 0xE0);
+        _settingsSurface.BorderBrush = ThemeService.Brush(_theme.Accent);
+        if (_settingsSurface.Child is null)
+            _settingsSurface.Child = _settingsPanel;
+        return _settingsSurface;
     }
 
     private FrameworkElement BuildElenaAccentSubmenu()
@@ -706,14 +722,16 @@ public sealed class MainWindow : Window
             _accentSubmenuPanel.Children.Add(button);
         }
 
-        return new Border
+        _accentSubmenuSurface ??= new Border
         {
-            Background = BrushWithAlpha("#FFFFFFFF", 0x62),
             CornerRadius = new CornerRadius(12),
-            BorderBrush = BrushWithAlpha(_theme.Accent, 0x80),
-            BorderThickness = new Thickness(1),
-            Child = _accentSubmenuPanel
+            BorderThickness = new Thickness(1)
         };
+        _accentSubmenuSurface.Background = BrushWithAlpha("#FFFFFFFF", 0x62);
+        _accentSubmenuSurface.BorderBrush = BrushWithAlpha(_theme.Accent, 0x80);
+        if (_accentSubmenuSurface.Child is null)
+            _accentSubmenuSurface.Child = _accentSubmenuPanel;
+        return _accentSubmenuSurface;
     }
 
     private FrameworkElement BuildAboutUsPanel()
@@ -748,14 +766,16 @@ public sealed class MainWindow : Window
             Foreground = ThemeService.Brush(_theme.PrimaryText)
         });
 
-        return new Border
+        _aboutUsSurface ??= new Border
         {
-            Background = BrushWithAlpha(_theme.PanelBackground, 0xA0),
             CornerRadius = new CornerRadius(12),
-            BorderBrush = BrushWithAlpha(_theme.Accent, 0x88),
-            BorderThickness = new Thickness(1),
-            Child = _aboutUsPanel
+            BorderThickness = new Thickness(1)
         };
+        _aboutUsSurface.Background = BrushWithAlpha(_theme.PanelBackground, 0xA0);
+        _aboutUsSurface.BorderBrush = BrushWithAlpha(_theme.Accent, 0x88);
+        if (_aboutUsSurface.Child is null)
+            _aboutUsSurface.Child = _aboutUsPanel;
+        return _aboutUsSurface;
     }
 
     private async Task SelectElenaModeAsync()
@@ -768,7 +788,7 @@ public sealed class MainWindow : Window
             _settings.BackgroundOpacity = 0.62;
 
         _settingsService.Save(_settings);
-        await RebuildAppearanceAsync();
+        await ApplyAppearanceAsync();
     }
 
     private async Task SelectElenaAccentAsync(string accentId)
@@ -777,7 +797,7 @@ public sealed class MainWindow : Window
         _settings.ElenaAccentId = accentId;
         _settings.UseSeasonalBackground = true;
         _settingsService.Save(_settings);
-        await RebuildAppearanceAsync();
+        await ApplyAppearanceAsync();
     }
 
     private async Task SelectThemeAsync(string themeId)
@@ -790,26 +810,49 @@ public sealed class MainWindow : Window
             _settings.BackgroundMode = "none";
 
         _settingsService.Save(_settings);
-        await RebuildAppearanceAsync();
+        await ApplyAppearanceAsync();
     }
 
-    private async Task RebuildAppearanceAsync()
+    private async Task ApplyAppearanceAsync()
     {
         _theme = _themeService.ResolveAppearance(_settings);
 
-        Content = null;
+        if (_rootSurface is not null)
+        {
+            _rootSurface.Background = ThemeService.Brush(_theme.WindowBackground);
+            _rootSurface.RequestedTheme =
+                string.Equals(_theme.Id, "graphite-night", StringComparison.OrdinalIgnoreCase)
+                    ? ElementTheme.Dark
+                    : ElementTheme.Light;
+        }
 
-        _settingsPanel.Children.Clear();
-        _pictureLibraryPanel.Children.Clear();
-        _accentSubmenuPanel.Children.Clear();
-        _aboutUsPanel.Children.Clear();
-        CalendarGrid.Children.Clear();
-        OccasionsPanel.Children.Clear();
-        EventsPanel.Children.Clear();
-        TasksPanel.Children.Clear();
-        ActivityPanel.Children.Clear();
+        _backgroundWash.Background = ThemeService.Brush(_theme.WindowBackground);
 
-        Content = BuildRoot();
+        if (_leftPanelSurface is not null)
+        {
+            _leftPanelSurface.Background = ThemeService.Brush(_theme.PanelBackground);
+            _leftPanelSurface.BorderBrush = ThemeService.Brush(_theme.Accent);
+        }
+
+        if (_centerPanelSurface is not null)
+        {
+            _centerPanelSurface.Background = BrushWithAlpha(_theme.CardBackground, 0x58);
+            _centerPanelSurface.BorderBrush = BrushWithAlpha("#FFFFFFFF", 0xA8);
+        }
+
+        if (_rightPanelSurface is not null)
+        {
+            _rightPanelSurface.Background = ThemeService.Brush(_theme.PanelBackground);
+            _rightPanelSurface.BorderBrush = ThemeService.Brush(_theme.Accent);
+        }
+
+        MonthTitle.Foreground = ThemeService.Brush(_theme.PrimaryText);
+        SelectedDateTitle.Foreground = ThemeService.Brush(_theme.PrimaryText);
+
+        ApplyGenericTheme(Content);
+
+        // Rebuild only dynamic surfaces whose children are safe to detach/recreate.
+        BuildSettingsPanel();
         BuildCalendar();
         await LoadSelectedDayAsync();
         await LoadActivitiesAsync();
@@ -821,6 +864,30 @@ public sealed class MainWindow : Window
             StringComparison.OrdinalIgnoreCase)
             ? $"Elena Mode فعال شد · Accent: {AppearanceCatalog.GetElenaAccent(_settings.ElenaAccentId).DisplayName}"
             : $"Theme فعال شد: {_theme.DisplayName}";
+    }
+
+    private void ApplyGenericTheme(DependencyObject? root)
+    {
+        if (root is null)
+            return;
+
+        if (root is Button button)
+        {
+            button.Background = ThemeService.Brush(_theme.Accent);
+            button.Foreground = ThemeService.Brush(_theme.PrimaryText);
+        }
+        else if (root is TextBlock text)
+        {
+            text.Foreground = ThemeService.Brush(_theme.PrimaryText);
+        }
+        else if (root is CheckBox checkBox)
+        {
+            checkBox.Foreground = ThemeService.Brush(_theme.PrimaryText);
+        }
+
+        var count = VisualTreeHelper.GetChildrenCount(root);
+        for (var i = 0; i < count; i++)
+            ApplyGenericTheme(VisualTreeHelper.GetChild(root, i));
     }
 
     private async void BackgroundOpacityBox_LostFocus(object sender, RoutedEventArgs e)
@@ -866,14 +933,16 @@ public sealed class MainWindow : Window
         refresh.Click += async (_, _) => await RefreshPictureLibraryAsync();
         _pictureLibraryPanel.Children.Add(refresh);
 
-        return new Border
+        _pictureLibrarySurface ??= new Border
         {
-            Background = BrushWithAlpha(_theme.CardBackground, 0x72),
             CornerRadius = new CornerRadius(14),
-            BorderBrush = BrushWithAlpha("#FFFFFFFF", 0xA0),
-            BorderThickness = new Thickness(1),
-            Child = _pictureLibraryPanel
+            BorderThickness = new Thickness(1)
         };
+        _pictureLibrarySurface.Background = BrushWithAlpha(_theme.CardBackground, 0x72);
+        _pictureLibrarySurface.BorderBrush = BrushWithAlpha("#FFFFFFFF", 0xA0);
+        if (_pictureLibrarySurface.Child is null)
+            _pictureLibrarySurface.Child = _pictureLibraryPanel;
+        return _pictureLibrarySurface;
     }
 
     private async Task RefreshPictureLibraryAsync()
@@ -1139,7 +1208,7 @@ public sealed class MainWindow : Window
             _settingsService.Save(_settings);
 
             if (wasElena)
-                await RebuildAppearanceAsync();
+                await ApplyAppearanceAsync();
             else
                 await ApplyBackgroundAsync();
 
