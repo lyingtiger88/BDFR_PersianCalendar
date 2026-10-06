@@ -27,6 +27,13 @@
                                Text="اطلاعات و مناسبت‌ها در SQLite به‌صورت محلی نگهداری می‌شوند؛ برنامه بدون اینترنت هم قابل استفاده است."/>
                 </Border>
                 <TextBlock x:Name="StatusText" TextWrapping="Wrap" Opacity="0.75"/>
+
+                <Expander Header="مرکز فعالیت" IsExpanded="True" Margin="0,12,0,0">
+                    <StackPanel Spacing="8">
+                        <Button Content="تازه‌سازی فعالیت‌ها" Click="RefreshActivities_Click" HorizontalAlignment="Stretch"/>
+                        <StackPanel x:Name="ActivityPanel" Spacing="6"/>
+                    </StackPanel>
+                </Expander>
             </StackPanel>
         </Border>
 
@@ -98,11 +105,16 @@
 
                     <TextBlock Text="مناسبت شخصی سالانه" FontWeight="SemiBold" Margin="0,18,0,0"/>
                     <TextBox x:Name="SpecialTitleBox" PlaceholderText="مثلاً تولد علی"/>
+                    <ComboBox x:Name="SpecialCalendarBox" Header="نوع تقویم" SelectedIndex="0">
+                        <ComboBoxItem Content="شمسی"/>
+                        <ComboBoxItem Content="میلادی"/>
+                        <ComboBoxItem Content="قمری"/>
+                    </ComboBox>
                     <Grid ColumnSpacing="8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition/><ColumnDefinition/>
                         </Grid.ColumnDefinitions>
-                        <NumberBox x:Name="SpecialMonthBox" Grid.Column="0" Header="ماه شمسی" Minimum="1" Maximum="12" Value="1"/>
+                        <NumberBox x:Name="SpecialMonthBox" Grid.Column="0" Header="ماه" Minimum="1" Maximum="12" Value="1"/>
                         <NumberBox x:Name="SpecialDayBox" Grid.Column="1" Header="روز" Minimum="1" Maximum="31" Value="1"/>
                     </Grid>
                     <TextBox x:Name="SpecialReminderDaysBox" Header="روزهای یادآوری قبل از مناسبت"
