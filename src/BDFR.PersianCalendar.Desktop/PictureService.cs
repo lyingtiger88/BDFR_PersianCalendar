@@ -1,5 +1,5 @@
 using BDFR.PersianCalendar.Core;
-using Microsoft.UI.Xaml.Media.Imaging;
+using Microsoft.UI.Xaml.Media;\nusing Microsoft.UI.Xaml.Media.Imaging;
 using Windows.Storage;
 using Windows.Storage.Streams;
 
@@ -15,27 +15,27 @@ public sealed class PictureService(ThemeService themeService)
         var title = occasion.Title ?? string.Empty;
 
         var file = occasion.Source == "personal"
-            ? "personal.png"
+            ? "personal.svg"
             : ContainsAny(title, "تولد", "سالگرد")
-                ? "birthday.png"
+                ? "birthday.svg"
                 : ContainsAny(title, "نوروز", "تحویل سال", "سیزده بدر", "طبیعت")
-                    ? "nowruz.png"
+                    ? "nowruz.svg"
                     : ContainsAny(title, "یلدا", "شب چله")
-                        ? "yalda.png"
+                        ? "yalda.svg"
                         : ContainsAny(title, "عاشورا", "تاسوعا", "اربعین", "رمضان", "فطر", "قربان", "غدیر", "پیامبر", "امام", "حضرت")
-                            ? "religious.png"
+                            ? "religious.svg"
                             : ContainsAny(title, "انقلاب", "جمهوری اسلامی", "ملی شدن", "استقلال", "آزادی")
-                                ? "national.png"
-                                : "default.png";
+                                ? "national.svg"
+                                : "default.svg";
 
         var path = Path.Combine(EventPicturesRoot, file);
         if (File.Exists(path))
             return path;
 
-        return Path.Combine(EventPicturesRoot, "default.png");
+        return Path.Combine(EventPicturesRoot, "default.svg");
     }
 
-    public static async Task<BitmapImage?> LoadBitmapAsync(string? path)
+    public static async Task<ImageSource?> LoadImageAsync(string? path)
     {
         if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
             return null;
@@ -44,9 +44,16 @@ public sealed class PictureService(ThemeService themeService)
         {
             var file = await StorageFile.GetFileFromPathAsync(Path.GetFullPath(path));
             using IRandomAccessStream stream = await file.OpenAsync(FileAccessMode.Read);
-            var image = new BitmapImage();
-            await image.SetSourceAsync(stream);
-            return image;
+            if (string.Equals(Path.GetExtension(path), ".svg", StringComparison.OrdinalIgnoreCase))
+            {
+                var svg = new SvgImageSource();
+                await svg.SetSourceAsync(stream);
+                return svg;
+            }
+
+            var bitmap = new BitmapImage();
+            await bitmap.SetSourceAsync(stream);
+            return bitmap;
         }
         catch (Exception ex)
         {
