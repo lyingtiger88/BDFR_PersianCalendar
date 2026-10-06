@@ -296,6 +296,53 @@ public sealed class SqliteCalendarRepository(string databasePath) : ICalendarRep
         await tx.CommitAsync(cancellationToken);
     }
 
+    public async Task ReplaceOccasionsForYearAsync(
+        string source,
+        int persianYear,
+        IEnumerable<Occasion> occasions,
+        CancellationToken cancellationToken = default)
+    {
+        await using var db = await OpenAsync(cancellationToken);
+        await using var tx = await db.BeginTransactionAsync(cancellationToken);
+
+        var delete = db.CreateCommand();
+        delete.Transaction = (SqliteTransaction)tx;
+        delete.CommandText = """
+            DELETE FROM occasions
+            WHERE source=$source
+              AND persian_date >= $from
+              AND persian_date <= $to;
+            """;
+        delete.Parameters.AddWithValue("$source", source);
+        delete.Parameters.AddWithValue("$from", $"{persianYear:0000}/01/01");
+        delete.Parameters.AddWithValue("$to", $"{persianYear:0000}/12/30");
+        await delete.ExecuteNonQueryAsync(cancellationToken);
+
+        foreach (var item in occasions)
+        {
+            var cmd = db.CreateCommand();
+            cmd.Transaction = (SqliteTransaction)tx;
+            cmd.CommandText = """
+                INSERT INTO occasions(id,persian_date,title,is_holiday,source,source_hash)
+                VALUES($id,$d,$t,$h,$s,$hash)
+                ON CONFLICT(persian_date,title,source)
+                DO UPDATE SET
+                    is_holiday=excluded.is_holiday,
+                    source_hash=excluded.source_hash,
+                    id=excluded.id;
+                """;
+            cmd.Parameters.AddWithValue("$id", item.Id);
+            cmd.Parameters.AddWithValue("$d", item.Date.ToString());
+            cmd.Parameters.AddWithValue("$t", item.Title);
+            cmd.Parameters.AddWithValue("$h", item.IsHoliday ? 1 : 0);
+            cmd.Parameters.AddWithValue("$s", item.Source);
+            cmd.Parameters.AddWithValue("$hash", (object?)item.SourceHash ?? DBNull.Value);
+            await cmd.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        await tx.CommitAsync(cancellationToken);
+    }
+
     public async Task AddSpecialOccasionAsync(SpecialOccasion occasion, CancellationToken cancellationToken = default)
     {
         await using var db = await OpenAsync(cancellationToken);
