@@ -58,6 +58,28 @@ var republicDay = occasions.SingleOrDefault(x => x.Date == new PersianDate(1405,
 if (republicDay is null || republicDay.IsHoliday)
     throw new Exception("time.ir parser fixture failed for regular event.");
 
+var timeIrFallbackFixture = """
+<!doctype html>
+<html lang="fa">
+<body>
+  <section>
+    <h2>مناسبت‌های ماه مهر</h2>
+    <div class="event holiday"><span>14 مهر تعطیلی آزمایشی</span></div>
+    <div class="event"><span>16 مهر مناسبت آزمایشی</span></div>
+  </section>
+</body>
+</html>
+""";
+
+var fallbackOccasions = await TimeIrOccasionSource.ParseAnnualHtmlAsync(timeIrFallbackFixture, 1405);
+var fallbackHoliday = fallbackOccasions.SingleOrDefault(x => x.Date == new PersianDate(1405, 7, 14));
+if (fallbackHoliday is null || !fallbackHoliday.IsHoliday || fallbackHoliday.Title != "تعطیلی آزمایشی")
+    throw new Exception("time.ir fallback parser failed to preserve holiday status.");
+
+var fallbackRegular = fallbackOccasions.SingleOrDefault(x => x.Date == new PersianDate(1405, 7, 16));
+if (fallbackRegular is null || fallbackRegular.IsHoliday)
+    throw new Exception("time.ir fallback parser failed for regular occasion.");
+
 var dbPath = Path.Combine(Path.GetTempPath(), $"bdfr-calendar-smoke-{Guid.NewGuid():N}.db");
 try
 {
@@ -115,6 +137,34 @@ try
     var wrongDay = await repository.GetDayAsync(new PersianDate(1405, 10, 6));
     if (wrongDay.Occasions.Any(x => x.Id == personalOccasion.Id))
         throw new Exception("Personal Persian occasion appeared one day late.");
+
+    await repository.UpsertOccasionsAsync([
+        new Occasion(
+            "old-timeir",
+            new PersianDate(1405, 7, 1),
+            "رکورد قدیمی",
+            false,
+            "time.ir")
+    ]);
+
+    await repository.ReplaceOccasionsForYearAsync(
+        "time.ir",
+        1405,
+        [
+            new Occasion(
+                "fresh-timeir",
+                new PersianDate(1405, 7, 2),
+                "رکورد تازه",
+                true,
+                "time.ir")
+        ]);
+
+    if ((await repository.GetDayAsync(new PersianDate(1405, 7, 1))).Occasions.Any(x => x.Id == "old-timeir"))
+        throw new Exception("Yearly occasion refresh did not remove stale time.ir rows.");
+
+    var refreshedDay = await repository.GetDayAsync(new PersianDate(1405, 7, 2));
+    if (!refreshedDay.Occasions.Any(x => x.Id == "fresh-timeir" && x.IsHoliday))
+        throw new Exception("Yearly occasion refresh did not store fresh holiday rows.");
 
     var syncAt = DateTimeOffset.UtcNow;
     await repository.SetLastOccasionSyncAsync("time.ir", 1405, syncAt);
