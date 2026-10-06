@@ -32,6 +32,16 @@ public sealed class AppSettings
     // Zara Pastel optional Liquid Glass presentation.
     public bool GlassMode { get; set; }
 
-    // Global UI font. Any installed Windows font family can be used.
+    // Global UI typography.
     public string FontFamilyName { get; set; } = "Segoe UI Variable";
+
+    // Base UI size. Existing visual hierarchy is scaled relative to 14px.
+    public double FontSize { get; set; } = 14.0;
+
+    // light / normal / semibold / bold.
+    // "normal" preserves the designed weight hierarchy.
+    public string FontWeightMode { get; set; } = "normal";
+
+    // normal / italic.
+    public string FontStyleMode { get; set; } = "normal";
 }

@@ -88,6 +88,28 @@ public sealed class SettingsService
 
         if (string.IsNullOrWhiteSpace(settings.FontFamilyName))
             settings.FontFamilyName = "Segoe UI Variable";
+
+        settings.FontSize = settings.FontSize is >= 10 and <= 24
+            ? settings.FontSize
+            : 14.0;
+
+        settings.FontWeightMode = (settings.FontWeightMode ?? "normal")
+            .Trim()
+            .ToLowerInvariant() switch
+        {
+            "light" => "light",
+            "semibold" => "semibold",
+            "bold" => "bold",
+            _ => "normal"
+        };
+
+        settings.FontStyleMode = (settings.FontStyleMode ?? "normal")
+            .Trim()
+            .ToLowerInvariant() switch
+        {
+            "italic" => "italic",
+            _ => "normal"
+        };
     }
 
     public void Save(AppSettings settings)
@@ -98,6 +120,13 @@ public sealed class SettingsService
             settings.FontFamilyName = string.IsNullOrWhiteSpace(settings.FontFamilyName)
                 ? "Segoe UI Variable"
                 : settings.FontFamilyName.Trim();
+            settings.FontSize = Math.Clamp(settings.FontSize, 10.0, 24.0);
+            settings.FontWeightMode = (settings.FontWeightMode ?? "normal")
+                .Trim()
+                .ToLowerInvariant();
+            settings.FontStyleMode = (settings.FontStyleMode ?? "normal")
+                .Trim()
+                .ToLowerInvariant();
             Directory.CreateDirectory(DataRoot);
             File.WriteAllText(SettingsPath, JsonSerializer.Serialize(settings, JsonOptions));
         }

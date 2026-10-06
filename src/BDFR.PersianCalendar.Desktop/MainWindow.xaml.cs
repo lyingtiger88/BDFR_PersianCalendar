@@ -8,6 +8,8 @@ using Microsoft.UI.Xaml.Media;
 using Windows.Graphics;
 using Windows.Storage.Pickers;
 using System.Diagnostics;
+using Microsoft.Win32;
+using System.Runtime.CompilerServices;
 
 namespace BDFR.PersianCalendar.Desktop;
 
@@ -31,7 +33,12 @@ public sealed class MainWindow : Window
     private readonly CheckBox _occasionPicturesCheck = new();
     private readonly CheckBox _glassModeCheck = new();
     private readonly TextBox _backgroundOpacityBox = new();
-    private readonly TextBox _fontFamilyBox = new();
+    private readonly ComboBox _fontFamilyCombo = new();
+    private readonly NumberBox _fontSizeBox = new();
+    private readonly ComboBox _fontWeightCombo = new();
+    private readonly ComboBox _fontStyleCombo = new();
+    private readonly TextBlock _fontPreview = new();
+    private readonly ConditionalWeakTable<DependencyObject, TypographyBaseline> _typographyBaselines = new();
     private readonly TextBlock _backgroundPathText = new();
     private readonly StackPanel _pictureLibraryPanel = new();
     private readonly TextBlock _pictureLibrarySummary = new();
@@ -863,7 +870,7 @@ public sealed class MainWindow : Window
 
         _settingsPanel.Children.Add(new TextBlock
         {
-            Text = "فونت رابط کاربری",
+            Text = "فونت و تایپوگرافی",
             FontSize = 15,
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
             Foreground = ThemeService.Brush(_theme.PrimaryText)
@@ -871,22 +878,87 @@ public sealed class MainWindow : Window
 
         _settingsPanel.Children.Add(new TextBlock
         {
-            Text = "نام هر فونت نصب‌شده در ویندوز را وارد کنید؛ مثل Segoe UI Variable، Tahoma، Vazirmatn یا B Nazanin.",
+            Text = "فونت‌های نصب‌شده ویندوز از کتابخانه فونت سیستم خوانده می‌شوند. اندازه، وزن و حالت نوشته نیز مستقل قابل تنظیم‌اند.",
             FontSize = 10.5,
             TextWrapping = TextWrapping.Wrap,
             Opacity = 0.65,
             Foreground = ThemeService.Brush(_theme.SecondaryText)
         });
 
-        _fontFamilyBox.Text = _settings.FontFamilyName;
-        _fontFamilyBox.PlaceholderText = "Segoe UI Variable";
-        _settingsPanel.Children.Add(_fontFamilyBox);
+        PopulateFontLibrary();
+        _fontFamilyCombo.Header = "Font Family";
+        _fontFamilyCombo.HorizontalAlignment = HorizontalAlignment.Stretch;
+        _fontFamilyCombo.SelectionChanged -= FontTypographyPreview_Changed;
+        _fontFamilyCombo.SelectionChanged += FontTypographyPreview_Changed;
+        _settingsPanel.Children.Add(_fontFamilyCombo);
 
-        var applyFont = MakeButton("اعمال فونت");
+        var fontControls = new Grid { ColumnSpacing = 8 };
+        fontControls.ColumnDefinitions.Add(new ColumnDefinition());
+        fontControls.ColumnDefinitions.Add(new ColumnDefinition());
+
+        _fontSizeBox.Header = "اندازه پایه";
+        _fontSizeBox.Minimum = 10;
+        _fontSizeBox.Maximum = 24;
+        _fontSizeBox.SmallChange = 0.5;
+        _fontSizeBox.Value = _settings.FontSize;
+        _fontSizeBox.SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Inline;
+        _fontSizeBox.ValueChanged -= FontSizeBox_ValueChanged;
+        _fontSizeBox.ValueChanged += FontSizeBox_ValueChanged;
+        Grid.SetColumn(_fontSizeBox, 0);
+        fontControls.Children.Add(_fontSizeBox);
+
+        _fontWeightCombo.Header = "وزن";
+        _fontWeightCombo.ItemsSource = new[]
+        {
+            "Light",
+            "Normal",
+            "SemiBold",
+            "Bold"
+        };
+        _fontWeightCombo.SelectedItem = FontWeightModeDisplayName(_settings.FontWeightMode);
+        _fontWeightCombo.SelectionChanged -= FontTypographyPreview_Changed;
+        _fontWeightCombo.SelectionChanged += FontTypographyPreview_Changed;
+        Grid.SetColumn(_fontWeightCombo, 1);
+        fontControls.Children.Add(_fontWeightCombo);
+
+        _settingsPanel.Children.Add(fontControls);
+
+        _fontStyleCombo.Header = "حالت نوشته";
+        _fontStyleCombo.ItemsSource = new[] { "Normal", "Italic" };
+        _fontStyleCombo.SelectedItem = string.Equals(
+            _settings.FontStyleMode,
+            "italic",
+            StringComparison.OrdinalIgnoreCase)
+            ? "Italic"
+            : "Normal";
+        _fontStyleCombo.SelectionChanged -= FontTypographyPreview_Changed;
+        _fontStyleCombo.SelectionChanged += FontTypographyPreview_Changed;
+        _settingsPanel.Children.Add(_fontStyleCombo);
+
+        _fontPreview.Text =
+            "آناهیتا · امروز یک روز تازه است — Anahita Calendar 1405";
+        _fontPreview.TextWrapping = TextWrapping.Wrap;
+        _fontPreview.Margin = new Thickness(2, 6, 2, 6);
+        _fontPreview.Padding = new Thickness(10);
+        _fontPreview.Background = BrushWithAlpha(_theme.CardBackground, 0xA0);
+        _fontPreview.Foreground = ThemeService.Brush(_theme.PrimaryText);
+        UpdateFontPreview();
+        _settingsPanel.Children.Add(_fontPreview);
+
+        var applyFont = MakeButton("اعمال تنظیمات فونت");
         applyFont.Click += ApplyFont_Click;
         _settingsPanel.Children.Add(applyFont);
 
-        var resetFont = MakeButton("بازگشت به فونت پیش‌فرض");
+        var refreshFonts = MakeButton("↻ بازخوانی کتابخانه فونت ویندوز");
+        refreshFonts.Click += (_, _) =>
+        {
+            PopulateFontLibrary();
+            UpdateFontPreview();
+            StatusText.Text = "کتابخانه فونت‌های ویندوز دوباره خوانده شد.";
+        };
+        _settingsPanel.Children.Add(refreshFonts);
+
+        var resetFont = MakeButton("بازگشت تایپوگرافی به حالت پیش‌فرض");
         resetFont.Click += ResetFont_Click;
         _settingsPanel.Children.Add(resetFont);
 
@@ -1468,11 +1540,163 @@ public sealed class MainWindow : Window
         }
     }
 
-    private FontFamily ResolveUserFont()
+    private sealed record TypographyBaseline(
+        double FontSize,
+        Windows.UI.Text.FontWeight FontWeight,
+        Windows.UI.Text.FontStyle FontStyle);
+
+    private static string FontWeightModeDisplayName(string? value)
+        => (value ?? "normal").Trim().ToLowerInvariant() switch
+        {
+            "light" => "Light",
+            "semibold" => "SemiBold",
+            "bold" => "Bold",
+            _ => "Normal"
+        };
+
+    private static string NormalizeFontWeightMode(string? value)
+        => (value ?? "normal").Trim().ToLowerInvariant() switch
+        {
+            "light" => "light",
+            "semibold" => "semibold",
+            "bold" => "bold",
+            _ => "normal"
+        };
+
+    private static string NormalizeFontStyleMode(string? value)
+        => string.Equals(
+                value?.Trim(),
+                "italic",
+                StringComparison.OrdinalIgnoreCase)
+            ? "italic"
+            : "normal";
+
+    private static string NormalizeRegistryFontName(string valueName)
     {
-        var requested = string.IsNullOrWhiteSpace(_settings.FontFamilyName)
+        var name = valueName.Trim();
+
+        var paren = name.LastIndexOf(" (", StringComparison.Ordinal);
+        if (paren > 0)
+            name = name[..paren].Trim();
+
+        string[] suffixes =
+        [
+            " Bold Italic",
+            " Bold Oblique",
+            " SemiBold Italic",
+            " Semibold Italic",
+            " SemiBold",
+            " Semibold",
+            " ExtraBold",
+            " ExtraLight",
+            " UltraLight",
+            " Medium",
+            " Regular",
+            " Light",
+            " Bold",
+            " Italic",
+            " Oblique",
+            " Black",
+            " Thin"
+        ];
+
+        var changed = true;
+        while (changed)
+        {
+            changed = false;
+            foreach (var suffix in suffixes)
+            {
+                if (!name.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                name = name[..^suffix.Length].Trim();
+                changed = true;
+                break;
+            }
+        }
+
+        return name;
+    }
+
+    private static IReadOnlyList<string> GetInstalledFontFamilies()
+    {
+        var fonts = new SortedSet<string>(StringComparer.CurrentCultureIgnoreCase)
+        {
+            "Segoe UI Variable",
+            "Segoe UI",
+            "Tahoma",
+            "Arial"
+        };
+
+        static void ReadRegistryFonts(
+            SortedSet<string> target,
+            RegistryKey root,
+            string path)
+        {
+            try
+            {
+                using var key = root.OpenSubKey(path);
+                if (key is null)
+                    return;
+
+                foreach (var valueName in key.GetValueNames())
+                {
+                    var family = NormalizeRegistryFontName(valueName);
+                    if (!string.IsNullOrWhiteSpace(family))
+                        target.Add(family);
+                }
+            }
+            catch (Exception ex)
+            {
+                StartupDiagnostics.Log(
+                    $"Windows font library registry read skipped ({path}): {ex.Message}");
+            }
+        }
+
+        const string machineFonts =
+            @"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts";
+        const string userFonts =
+            @"Software\Microsoft\Windows NT\CurrentVersion\Fonts";
+
+        ReadRegistryFonts(fonts, Registry.LocalMachine, machineFonts);
+        ReadRegistryFonts(fonts, Registry.CurrentUser, userFonts);
+
+        return fonts.ToArray();
+    }
+
+    private void PopulateFontLibrary()
+    {
+        var current = string.IsNullOrWhiteSpace(_settings.FontFamilyName)
             ? "Segoe UI Variable"
             : _settings.FontFamilyName.Trim();
+
+        var fonts = GetInstalledFontFamilies().ToList();
+        if (!fonts.Contains(current, StringComparer.CurrentCultureIgnoreCase))
+        {
+            fonts.Add(current);
+            fonts = fonts
+                .Distinct(StringComparer.CurrentCultureIgnoreCase)
+                .OrderBy(x => x, StringComparer.CurrentCultureIgnoreCase)
+                .ToList();
+        }
+
+        _fontFamilyCombo.ItemsSource = fonts;
+        _fontFamilyCombo.SelectedItem =
+            fonts.FirstOrDefault(x =>
+                string.Equals(
+                    x,
+                    current,
+                    StringComparison.CurrentCultureIgnoreCase))
+            ?? fonts.FirstOrDefault();
+    }
+
+    private FontFamily ResolveUserFont(string? familyName = null)
+    {
+        var requested = string.IsNullOrWhiteSpace(familyName)
+            ? string.IsNullOrWhiteSpace(_settings.FontFamilyName)
+                ? "Segoe UI Variable"
+                : _settings.FontFamilyName.Trim()
+            : familyName.Trim();
 
         try
         {
@@ -1486,6 +1710,42 @@ public sealed class MainWindow : Window
         }
     }
 
+    private static Windows.UI.Text.FontWeight ResolveUserFontWeight(
+        string? mode,
+        Windows.UI.Text.FontWeight baseline)
+        => NormalizeFontWeightMode(mode) switch
+        {
+            "light" => Microsoft.UI.Text.FontWeights.Light,
+            "semibold" => Microsoft.UI.Text.FontWeights.SemiBold,
+            "bold" => Microsoft.UI.Text.FontWeights.Bold,
+            _ => baseline
+        };
+
+    private static Windows.UI.Text.FontStyle ResolveUserFontStyle(
+        string? mode,
+        Windows.UI.Text.FontStyle baseline)
+        => NormalizeFontStyleMode(mode) == "italic"
+            ? Windows.UI.Text.FontStyle.Italic
+            : baseline;
+
+    private TypographyBaseline GetTypographyBaseline(
+        DependencyObject element,
+        double fontSize,
+        Windows.UI.Text.FontWeight fontWeight,
+        Windows.UI.Text.FontStyle fontStyle)
+    {
+        if (_typographyBaselines.TryGetValue(element, out var baseline))
+            return baseline;
+
+        baseline = new TypographyBaseline(
+            fontSize > 0 ? fontSize : 14.0,
+            fontWeight,
+            fontStyle);
+
+        _typographyBaselines.Add(element, baseline);
+        return baseline;
+    }
+
     private void ApplyUserFont(DependencyObject? root)
     {
         if (root is null)
@@ -1494,12 +1754,49 @@ public sealed class MainWindow : Window
         try
         {
             var font = ResolveUserFont();
+            var sizeScale = Math.Clamp(_settings.FontSize, 10.0, 24.0) / 14.0;
 
             if (root is Control control)
+            {
+                var baseline = GetTypographyBaseline(
+                    control,
+                    control.FontSize,
+                    control.FontWeight,
+                    control.FontStyle);
+
                 control.FontFamily = font;
+                control.FontSize = Math.Clamp(
+                    baseline.FontSize * sizeScale,
+                    8.0,
+                    52.0);
+                control.FontWeight = ResolveUserFontWeight(
+                    _settings.FontWeightMode,
+                    baseline.FontWeight);
+                control.FontStyle = ResolveUserFontStyle(
+                    _settings.FontStyleMode,
+                    baseline.FontStyle);
+            }
 
             if (root is TextBlock textBlock)
+            {
+                var baseline = GetTypographyBaseline(
+                    textBlock,
+                    textBlock.FontSize,
+                    textBlock.FontWeight,
+                    textBlock.FontStyle);
+
                 textBlock.FontFamily = font;
+                textBlock.FontSize = Math.Clamp(
+                    baseline.FontSize * sizeScale,
+                    8.0,
+                    52.0);
+                textBlock.FontWeight = ResolveUserFontWeight(
+                    _settings.FontWeightMode,
+                    baseline.FontWeight);
+                textBlock.FontStyle = ResolveUserFontStyle(
+                    _settings.FontStyleMode,
+                    baseline.FontStyle);
+            }
 
             var count = VisualTreeHelper.GetChildrenCount(root);
             for (var i = 0; i < count; i++)
@@ -1512,28 +1809,84 @@ public sealed class MainWindow : Window
         }
     }
 
+    private void UpdateFontPreview()
+    {
+        var family = _fontFamilyCombo.SelectedItem as string
+                     ?? _settings.FontFamilyName;
+
+        var requestedSize = double.IsNaN(_fontSizeBox.Value)
+            ? _settings.FontSize
+            : _fontSizeBox.Value;
+
+        var weightMode = NormalizeFontWeightMode(
+            _fontWeightCombo.SelectedItem as string
+            ?? _settings.FontWeightMode);
+
+        var styleMode = NormalizeFontStyleMode(
+            _fontStyleCombo.SelectedItem as string
+            ?? _settings.FontStyleMode);
+
+        _fontPreview.FontFamily = ResolveUserFont(family);
+        _fontPreview.FontSize = Math.Clamp(requestedSize, 10.0, 24.0);
+        _fontPreview.FontWeight = ResolveUserFontWeight(
+            weightMode,
+            Microsoft.UI.Text.FontWeights.Normal);
+        _fontPreview.FontStyle = ResolveUserFontStyle(
+            styleMode,
+            Windows.UI.Text.FontStyle.Normal);
+    }
+
+    private void FontTypographyPreview_Changed(
+        object sender,
+        SelectionChangedEventArgs e)
+        => UpdateFontPreview();
+
+    private void FontSizeBox_ValueChanged(
+        NumberBox sender,
+        NumberBoxValueChangedEventArgs args)
+        => UpdateFontPreview();
+
     private void ApplyFont_Click(object sender, RoutedEventArgs e)
     {
-        var requested = (_fontFamilyBox.Text ?? string.Empty).Trim();
-        _settings.FontFamilyName = string.IsNullOrWhiteSpace(requested)
+        var family = _fontFamilyCombo.SelectedItem as string;
+        _settings.FontFamilyName = string.IsNullOrWhiteSpace(family)
             ? "Segoe UI Variable"
-            : requested;
+            : family.Trim();
+
+        _settings.FontSize = double.IsNaN(_fontSizeBox.Value)
+            ? 14.0
+            : Math.Clamp(_fontSizeBox.Value, 10.0, 24.0);
+
+        _settings.FontWeightMode = NormalizeFontWeightMode(
+            _fontWeightCombo.SelectedItem as string);
+
+        _settings.FontStyleMode = NormalizeFontStyleMode(
+            _fontStyleCombo.SelectedItem as string);
 
         _settingsService.Save(_settings);
-        _fontFamilyBox.Text = _settings.FontFamilyName;
         ApplyUserFont(Content);
+        UpdateFontPreview();
 
         StatusText.Text =
-            $"فونت رابط کاربری روی «{_settings.FontFamilyName}» تنظیم شد.";
+            $"فونت «{_settings.FontFamilyName}» · اندازه {_settings.FontSize:0.#} · {FontWeightModeDisplayName(_settings.FontWeightMode)} · {_settings.FontStyleMode}";
     }
 
     private void ResetFont_Click(object sender, RoutedEventArgs e)
     {
         _settings.FontFamilyName = "Segoe UI Variable";
+        _settings.FontSize = 14.0;
+        _settings.FontWeightMode = "normal";
+        _settings.FontStyleMode = "normal";
         _settingsService.Save(_settings);
-        _fontFamilyBox.Text = _settings.FontFamilyName;
+
+        PopulateFontLibrary();
+        _fontSizeBox.Value = _settings.FontSize;
+        _fontWeightCombo.SelectedItem = "Normal";
+        _fontStyleCombo.SelectedItem = "Normal";
+
         ApplyUserFont(Content);
-        StatusText.Text = "فونت رابط کاربری به حالت پیش‌فرض برگشت.";
+        UpdateFontPreview();
+        StatusText.Text = "فونت و تایپوگرافی به حالت پیش‌فرض برگشت.";
     }
 
     private static bool IsMourningHolidayTitle(string? title)
