@@ -29,6 +29,7 @@ public sealed class MainWindow : Window
     private readonly StackPanel _settingsPanel = new();
     private readonly CheckBox _seasonalBackgroundCheck = new();
     private readonly CheckBox _occasionPicturesCheck = new();
+    private readonly CheckBox _glassModeCheck = new();
     private readonly TextBox _backgroundOpacityBox = new();
     private readonly TextBlock _backgroundPathText = new();
     private readonly StackPanel _pictureLibraryPanel = new();
@@ -168,9 +169,9 @@ public sealed class MainWindow : Window
 
         var center = new Border
         {
-            Background = BrushWithAlpha(_theme.CardBackground, 0x58),
-            CornerRadius = new CornerRadius(18),
-            BorderBrush = BrushWithAlpha("#FFFFFFFF", 0xA8),
+            Background = CreateCenterSurfaceBrush(),
+            CornerRadius = new CornerRadius(IsLiquidGlassActive() ? 24 : 18),
+            BorderBrush = BrushWithAlpha("#FFFFFFFF", IsLiquidGlassActive() ? (byte)0xD0 : (byte)0xA8),
             BorderThickness = new Thickness(1),
             Child = BuildCalendarPanel()
         };
@@ -266,8 +267,8 @@ public sealed class MainWindow : Window
 
         _leftPanelSurface = new Border
         {
-            Background = ThemeService.Brush(_theme.PanelBackground),
-            CornerRadius = new CornerRadius(18),
+            Background = CreateSideSurfaceBrush(),
+            CornerRadius = new CornerRadius(IsLiquidGlassActive() ? 24 : 18),
             BorderThickness = new Thickness(1),
             BorderBrush = ThemeService.Brush(_theme.Accent),
             Child = new ScrollViewer { Content = stack }
@@ -357,7 +358,7 @@ public sealed class MainWindow : Window
                 Margin = new Thickness(4),
                 Padding = new Thickness(8, 5, 8, 5),
                 CornerRadius = new CornerRadius(12),
-                Background = BrushWithAlpha(GetWeekdayColor(i), 0xB0),
+                Background = CreateWeekdayHeaderBrush(GetWeekdayColor(i)),
                 Child = text
             };
 
@@ -481,8 +482,8 @@ public sealed class MainWindow : Window
 
         _rightPanelSurface = new Border
         {
-            Background = ThemeService.Brush(_theme.PanelBackground),
-            CornerRadius = new CornerRadius(18),
+            Background = CreateSideSurfaceBrush(),
+            CornerRadius = new CornerRadius(IsLiquidGlassActive() ? 24 : 18),
             BorderThickness = new Thickness(1),
             BorderBrush = ThemeService.Brush(_theme.Accent),
             Child = new ScrollViewer { Content = stack }
@@ -514,6 +515,94 @@ public sealed class MainWindow : Window
         var parsed = ThemeService.ParseColor(color);
         return new SolidColorBrush(
             Windows.UI.Color.FromArgb(alpha, parsed.R, parsed.G, parsed.B));
+    }
+
+    private bool IsZaraPastelActive()
+        => string.Equals(
+               _settings.AppearanceMode,
+               "theme",
+               StringComparison.OrdinalIgnoreCase) &&
+           string.Equals(
+               _settings.ThemeId,
+               "zara-pastel",
+               StringComparison.OrdinalIgnoreCase);
+
+    private bool IsLiquidGlassActive()
+        => IsZaraPastelActive() && _settings.GlassMode;
+
+    private Brush CreateLiquidGlassBrush(
+        string tintHex,
+        double tintOpacity = 0.20,
+        byte fallbackAlpha = 0xA8)
+    {
+        var tint = ThemeService.ParseColor(tintHex);
+
+        try
+        {
+            return new AcrylicBrush
+            {
+                TintColor = tint,
+                TintOpacity = tintOpacity,
+                FallbackColor = Windows.UI.Color.FromArgb(
+                    fallbackAlpha,
+                    tint.R,
+                    tint.G,
+                    tint.B)
+            };
+        }
+        catch (Exception ex)
+        {
+            StartupDiagnostics.Log($"Acrylic brush fallback used: {ex.Message}");
+            return BrushWithAlpha(tintHex, fallbackAlpha);
+        }
+    }
+
+    private Brush CreateCenterSurfaceBrush()
+    {
+        if (IsLiquidGlassActive())
+            return CreateLiquidGlassBrush(_theme.CardBackground, 0.14, 0x9A);
+
+        if (IsZaraPastelActive())
+            return BrushWithAlpha(_theme.CardBackground, 0x44);
+
+        return BrushWithAlpha(_theme.CardBackground, 0x58);
+    }
+
+    private Brush CreateSideSurfaceBrush()
+    {
+        if (IsLiquidGlassActive())
+            return CreateLiquidGlassBrush(_theme.PanelBackground, 0.22, 0xB0);
+
+        return ThemeService.Brush(_theme.PanelBackground);
+    }
+
+    private Brush CreateCalendarCellBrush(string color, bool selected)
+    {
+        if (IsLiquidGlassActive())
+            return CreateLiquidGlassBrush(
+                color,
+                selected ? 0.30 : 0.16,
+                selected ? (byte)0xB8 : (byte)0x78);
+
+        if (IsZaraPastelActive())
+            return BrushWithAlpha(
+                color,
+                selected ? (byte)0xA4 : (byte)0x58);
+
+        return BrushWithAlpha(
+            color,
+            selected ? (byte)0xC8 : (byte)0x76);
+    }
+
+    private Brush CreateWeekdayHeaderBrush(string color)
+    {
+        if (IsLiquidGlassActive())
+            return CreateLiquidGlassBrush(color, 0.18, 0x86);
+
+        if (IsZaraPastelActive())
+            return BrushWithAlpha(color, 0x78);
+
+        return BrushWithAlpha(color, 0xB0);
     }
 
     private string GetWeekdayColor(int column)
@@ -664,6 +753,44 @@ public sealed class MainWindow : Window
             });
         }
 
+        var isZaraPastel = !isElena &&
+                          string.Equals(
+                              _settings.ThemeId,
+                              "zara-pastel",
+                              StringComparison.OrdinalIgnoreCase);
+
+        if (isZaraPastel)
+        {
+            _settingsPanel.Children.Add(new Border
+            {
+                Height = 1,
+                Margin = new Thickness(0, 4, 0, 4),
+                Background = BrushWithAlpha(_theme.SecondaryText, 0x30)
+            });
+
+            _settingsPanel.Children.Add(new TextBlock
+            {
+                Text = "Zara Pastel",
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                Foreground = ThemeService.Brush(_theme.PrimaryText)
+            });
+
+            _glassModeCheck.Content = "Glass Mode · Liquid Glass";
+            _glassModeCheck.IsChecked = _settings.GlassMode;
+            _glassModeCheck.Click -= GlassModeCheck_Click;
+            _glassModeCheck.Click += GlassModeCheck_Click;
+            _settingsPanel.Children.Add(_glassModeCheck);
+
+            _settingsPanel.Children.Add(new TextBlock
+            {
+                Text = "شفافیت بیشتر جدول‌ها و پنل‌های Acrylic شیشه‌ای؛ برای دیده‌شدن بهتر تصویر زمینه.",
+                FontSize = 10.5,
+                TextWrapping = TextWrapping.Wrap,
+                Opacity = 0.62,
+                Foreground = ThemeService.Brush(_theme.SecondaryText)
+            });
+        }
+
         if (!isElena)
         {
             _settingsPanel.Children.Add(new Border
@@ -754,7 +881,9 @@ public sealed class MainWindow : Window
             CornerRadius = new CornerRadius(14),
             BorderThickness = new Thickness(1)
         };
-        _settingsSurface.Background = BrushWithAlpha(_theme.CardBackground, 0xE0);
+        _settingsSurface.Background = IsLiquidGlassActive()
+            ? CreateLiquidGlassBrush(_theme.CardBackground, 0.18, 0xA8)
+            : BrushWithAlpha(_theme.CardBackground, 0xE0);
         _settingsSurface.BorderBrush = ThemeService.Brush(_theme.Accent);
         if (_settingsSurface.Child is null)
             _settingsSurface.Child = _settingsPanel;
@@ -896,7 +1025,9 @@ public sealed class MainWindow : Window
             CornerRadius = new CornerRadius(12),
             BorderThickness = new Thickness(1)
         };
-        _aboutUsSurface.Background = BrushWithAlpha(_theme.PanelBackground, 0xA0);
+        _aboutUsSurface.Background = IsLiquidGlassActive()
+            ? CreateLiquidGlassBrush(_theme.PanelBackground, 0.16, 0x98)
+            : BrushWithAlpha(_theme.PanelBackground, 0xA0);
         _aboutUsSurface.BorderBrush = BrushWithAlpha(_theme.Accent, 0x88);
         if (_aboutUsSurface.Child is null)
             _aboutUsSurface.Child = _aboutUsPanel;
@@ -1080,37 +1211,52 @@ public sealed class MainWindow : Window
 
         if (_leftPanelSurface is not null)
         {
-            _leftPanelSurface.Background = ThemeService.Brush(_theme.PanelBackground);
-            _leftPanelSurface.BorderBrush = ThemeService.Brush(_theme.Accent);
+            _leftPanelSurface.Background = CreateSideSurfaceBrush();
+            _leftPanelSurface.CornerRadius = new CornerRadius(IsLiquidGlassActive() ? 24 : 18);
+            _leftPanelSurface.BorderBrush = IsLiquidGlassActive()
+                ? BrushWithAlpha("#FFFFFFFF", 0xC8)
+                : ThemeService.Brush(_theme.Accent);
         }
 
         if (_centerPanelSurface is not null)
         {
-            _centerPanelSurface.Background = BrushWithAlpha(_theme.CardBackground, 0x58);
-            _centerPanelSurface.BorderBrush = BrushWithAlpha("#FFFFFFFF", 0xA8);
+            _centerPanelSurface.Background = CreateCenterSurfaceBrush();
+            _centerPanelSurface.CornerRadius = new CornerRadius(IsLiquidGlassActive() ? 24 : 18);
+            _centerPanelSurface.BorderBrush = BrushWithAlpha(
+                "#FFFFFFFF",
+                IsLiquidGlassActive() ? (byte)0xD0 : (byte)0xA8);
         }
 
         if (_rightPanelSurface is not null)
         {
-            _rightPanelSurface.Background = ThemeService.Brush(_theme.PanelBackground);
-            _rightPanelSurface.BorderBrush = ThemeService.Brush(_theme.Accent);
+            _rightPanelSurface.Background = CreateSideSurfaceBrush();
+            _rightPanelSurface.CornerRadius = new CornerRadius(IsLiquidGlassActive() ? 24 : 18);
+            _rightPanelSurface.BorderBrush = IsLiquidGlassActive()
+                ? BrushWithAlpha("#FFFFFFFF", 0xC8)
+                : ThemeService.Brush(_theme.Accent);
         }
 
         if (_settingsSurface is not null)
         {
-            _settingsSurface.Background = BrushWithAlpha(_theme.CardBackground, 0xE0);
+            _settingsSurface.Background = IsLiquidGlassActive()
+                ? CreateLiquidGlassBrush(_theme.CardBackground, 0.18, 0xA8)
+                : BrushWithAlpha(_theme.CardBackground, 0xE0);
             _settingsSurface.BorderBrush = ThemeService.Brush(_theme.Accent);
         }
 
         if (_pictureLibrarySurface is not null)
         {
-            _pictureLibrarySurface.Background = BrushWithAlpha(_theme.CardBackground, 0x72);
+            _pictureLibrarySurface.Background = IsLiquidGlassActive()
+                ? CreateLiquidGlassBrush(_theme.CardBackground, 0.14, 0x90)
+                : BrushWithAlpha(_theme.CardBackground, 0x72);
             _pictureLibrarySurface.BorderBrush = BrushWithAlpha("#FFFFFFFF", 0xA0);
         }
 
         if (_aboutUsSurface is not null)
         {
-            _aboutUsSurface.Background = BrushWithAlpha(_theme.PanelBackground, 0xA0);
+            _aboutUsSurface.Background = IsLiquidGlassActive()
+                ? CreateLiquidGlassBrush(_theme.PanelBackground, 0.16, 0x98)
+                : BrushWithAlpha(_theme.PanelBackground, 0xA0);
             _aboutUsSurface.BorderBrush = BrushWithAlpha(_theme.Accent, 0x88);
         }
 
@@ -1129,7 +1275,7 @@ public sealed class MainWindow : Window
         for (var i = 0; i < _weekdayHeaderBorders.Count; i++)
         {
             _weekdayHeaderBorders[i].Background =
-                BrushWithAlpha(GetWeekdayColor(i), 0xB0);
+                CreateWeekdayHeaderBrush(GetWeekdayColor(i));
 
             _weekdayHeaderLabels[i].Foreground = i == 6
                 ? ThemeService.Brush(_theme.HolidayText)
@@ -1174,6 +1320,32 @@ public sealed class MainWindow : Window
             // WinUI template element disappeared while walking the visual tree.
             StartupDiagnostics.Log(
                 $"Theme traversal skipped transient element {root.GetType().Name}: {ex.Message}");
+        }
+    }
+
+    private async void GlassModeCheck_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            _settings.GlassMode = _glassModeCheck.IsChecked == true;
+            _settingsService.Save(_settings);
+
+            ApplyAppearanceBrushesOnly();
+            BuildCalendar();
+            await LoadSelectedDayAsync();
+            await ApplyBackgroundAsync();
+
+            StatusText.Text = _settings.GlassMode
+                ? "Glass Mode برای Zara Pastel فعال شد."
+                : "Glass Mode غیرفعال شد؛ Zara Pastel شفاف استاندارد فعال است.";
+        }
+        catch (Exception ex)
+        {
+            StartupDiagnostics.Log($"Glass Mode switch failed: {ex}");
+            _settings.GlassMode = false;
+            _glassModeCheck.IsChecked = false;
+            _settingsService.Save(_settings);
+            StatusText.Text = "Glass Mode اعمال نشد؛ حالت استاندارد Zara Pastel حفظ شد.";
         }
     }
 
@@ -1230,7 +1402,9 @@ public sealed class MainWindow : Window
             CornerRadius = new CornerRadius(14),
             BorderThickness = new Thickness(1)
         };
-        _pictureLibrarySurface.Background = BrushWithAlpha(_theme.CardBackground, 0x72);
+        _pictureLibrarySurface.Background = IsLiquidGlassActive()
+            ? CreateLiquidGlassBrush(_theme.CardBackground, 0.14, 0x90)
+            : BrushWithAlpha(_theme.CardBackground, 0x72);
         _pictureLibrarySurface.BorderBrush = BrushWithAlpha("#FFFFFFFF", 0xA0);
         if (_pictureLibrarySurface.Child is null)
             _pictureLibrarySurface.Child = _pictureLibraryPanel;
@@ -1610,9 +1784,13 @@ public sealed class MainWindow : Window
 
             _backgroundWash.Opacity = source is null
                 ? 0
-                : isCustom
-                    ? 0.16
-                    : 0.24;
+                : IsLiquidGlassActive()
+                    ? 0.08
+                    : IsZaraPastelActive()
+                        ? 0.12
+                        : isCustom
+                            ? 0.16
+                            : 0.24;
 
             _backgroundPathText.Text = label;
         }
@@ -1755,16 +1933,22 @@ public sealed class MainWindow : Window
                 MinHeight = 88,
                 Padding = new Thickness(6),
                 Opacity = cell.IsCurrentMonth ? 1 : 0.48,
-                Background = cell.Date == _selected
-                    ? BrushWithAlpha(_theme.SelectedDay, 0xC8)
-                    : BrushWithAlpha(GetWeekdayColor(i % 7), 0x76),
+                Background = CreateCalendarCellBrush(
+                    cell.Date == _selected
+                        ? _theme.SelectedDay
+                        : GetWeekdayColor(i % 7),
+                    cell.Date == _selected),
                 BorderBrush = cell.Date == _selected
-                    ? BrushWithAlpha(_theme.PrimaryText, 0x9A)
-                    : BrushWithAlpha("#FFFFFFFF", 0xB8),
+                    ? BrushWithAlpha(
+                        _theme.PrimaryText,
+                        IsLiquidGlassActive() ? (byte)0xB8 : (byte)0x9A)
+                    : BrushWithAlpha(
+                        "#FFFFFFFF",
+                        IsLiquidGlassActive() ? (byte)0xD8 : (byte)0xB8),
                 BorderThickness = cell.Date == _selected
-                    ? new Thickness(1.6)
+                    ? new Thickness(IsLiquidGlassActive() ? 2.0 : 1.6)
                     : new Thickness(1),
-                CornerRadius = new CornerRadius(14),
+                CornerRadius = new CornerRadius(IsLiquidGlassActive() ? 20 : 14),
                 Content = content
             };
 

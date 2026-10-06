@@ -25,4 +25,7 @@ public sealed class AppSettings
     public string? CustomBackgroundPath { get; set; }
     public double BackgroundOpacity { get; set; } = 0.22;
     public bool ShowOccasionPictures { get; set; } = true;
+
+    // Zara Pastel optional Liquid Glass presentation.
+    public bool GlassMode { get; set; }
 }
