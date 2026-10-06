@@ -708,6 +708,8 @@ public sealed class MainWindow : Window
         try
         {
             var items = await _repository.GetRecentActivitiesAsync(8);
+            var specialOccasions = (await _repository.GetSpecialOccasionsAsync())
+                .ToDictionary(x => x.Id, StringComparer.Ordinal);
             ActivityPanel.Children.Clear();
 
             if (items.Count == 0)
@@ -740,9 +742,21 @@ public sealed class MainWindow : Window
                     _ => item.Action
                 };
 
+                var localCreatedAt = item.CreatedAt.ToLocalTime();
+                var activityPersianDate = PersianDate.FromDateOnly(
+                    DateOnly.FromDateTime(localCreatedAt.DateTime));
+
+                var message = item.Message;
+                if (item.Action == "special-occasion-created" &&
+                    item.ItemId is not null &&
+                    specialOccasions.TryGetValue(item.ItemId, out var special))
+                {
+                    message = $"{special.Title} — {FormatSpecialOccasionDate(special)}";
+                }
+
                 ActivityPanel.Children.Add(new TextBlock
                 {
-                    Text = $"{action} · {item.CreatedAt.ToLocalTime():MM/dd HH:mm}\n{item.Message}",
+                    Text = $"{action} · {FormatPersianActivityTimestamp(activityPersianDate, localCreatedAt.TimeOfDay)}\n{message}",
                     TextWrapping = TextWrapping.Wrap,
                     Opacity = 0.82
                 });
@@ -760,4 +774,33 @@ public sealed class MainWindow : Window
         _ = LoadSelectedDayAsync();
         _ = LoadActivitiesAsync();
     }
+    private static string FormatSpecialOccasionDate(SpecialOccasion occasion)
+        => occasion.CalendarSystem switch
+        {
+            CalendarSystemKind.Persian =>
+                $"{ToPersianDigits(occasion.Day.ToString())} {PersianDate.MonthNames[occasion.Month - 1]} (سالانه)",
+            CalendarSystemKind.Gregorian =>
+                $"روز {ToPersianDigits(occasion.Day.ToString())} ماه {ToPersianDigits(occasion.Month.ToString())} میلادی (سالانه)",
+            CalendarSystemKind.Hijri =>
+                $"روز {ToPersianDigits(occasion.Day.ToString())} ماه {ToPersianDigits(occasion.Month.ToString())} قمری (سالانه)",
+            _ => $"{occasion.Month}/{occasion.Day}"
+        };
+
+    private static string FormatPersianActivityTimestamp(PersianDate date, TimeSpan time)
+        => $"{date.PersianDayOfWeek} {ToPersianDigits(date.Day.ToString())} {date.MonthName} {ToPersianDigits(date.Year.ToString())} · " +
+           $"{ToPersianDigits(((int)time.TotalHours).ToString("00"))}:{ToPersianDigits(time.Minutes.ToString("00"))}";
+
+    private static string ToPersianDigits(string value)
+        => value
+            .Replace('0', '۰')
+            .Replace('1', '۱')
+            .Replace('2', '۲')
+            .Replace('3', '۳')
+            .Replace('4', '۴')
+            .Replace('5', '۵')
+            .Replace('6', '۶')
+            .Replace('7', '۷')
+            .Replace('8', '۸')
+            .Replace('9', '۹');
+
 }
