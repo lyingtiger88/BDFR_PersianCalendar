@@ -1,0 +1,21 @@
+{
+  "id": "windows-light",
+  "displayName": "Windows Light",
+  "windowBackground": "#FFF5F6F8",
+  "panelBackground": "#F2FFFFFF",
+  "cardBackground": "#F8FFFFFF",
+  "primaryText": "#FF202631",
+  "secondaryText": "#FF697386",
+  "accent": "#FFD9E6F8",
+  "selectedDay": "#FF9DC7F5",
+  "holidayText": "#FFD34E5E",
+  "weekdayColors": [
+    "#FFF0F2F5",
+    "#FFF0F2F5",
+    "#FFF0F2F5",
+    "#FFF0F2F5",
+    "#FFF0F2F5",
+    "#FFF0F2F5",
+    "#FFF5E8EA"
+  ]
+}
