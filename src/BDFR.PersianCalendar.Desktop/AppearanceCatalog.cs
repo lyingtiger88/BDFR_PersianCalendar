@@ -16,14 +16,15 @@ public static class AppearanceCatalog
     public static readonly ThemeCatalogItem[] Themes =
     [
         new("zara-pastel", "Zara Pastel", "پاستلی رنگارنگ و روشن"),
-        new("windows-light", "Windows Light", "روشن، ساده و نزدیک به ظاهر ویندوز"),
-        new("azure-glass", "Azure Glass", "شیشه‌ای با طیف آبی"),
-        new("graphite-night", "Graphite Night", "تیره و خنثی برای استفاده شب"),
-        new("warm-sand", "Warm Sand", "کرم گرم و آرام")
+        new("windows-light", "Windows Light", "روشن و مینیمال با حس Fluent ویندوز"),
+        new("azure-glass", "Azure Glass", "شیشه‌ای با طیف آبی و پنل‌های سرد"),
+        new("graphite-night", "Graphite Night", "تیره، گرافیتی و مناسب استفاده شب"),
+        new("warm-sand", "Warm Sand", "کرم گرم، شنی و آرام")
     ];
 
     public static readonly ElenaAccentDefinition[] ElenaAccents =
     [
+        new("seasonal", "خودکار فصلی", "#FF4F8EDC", "#FF79B4F4"),
         new("azure", "آبی", "#FF4F8EDC", "#FF79B4F4"),
         new("violet", "بنفش", "#FF8B6FD8", "#FFA98FEA"),
         new("emerald", "سبز", "#FF3E9B78", "#FF67B995"),
@@ -32,8 +33,39 @@ public static class AppearanceCatalog
         new("graphite", "گرافیتی", "#FF667085", "#FF8B95A7")
     ];
 
-    public static ElenaAccentDefinition GetElenaAccent(string? id)
-        => ElenaAccents.FirstOrDefault(x =>
-               string.Equals(x.Id, id, StringComparison.OrdinalIgnoreCase))
-           ?? ElenaAccents[0];
+    public static ElenaAccentDefinition GetElenaAccent(string? id, int persianMonth)
+    {
+        if (string.IsNullOrWhiteSpace(id) ||
+            string.Equals(id, "seasonal", StringComparison.OrdinalIgnoreCase))
+            return GetSeasonalAccent(persianMonth);
+
+        return ElenaAccents.FirstOrDefault(x =>
+                   string.Equals(x.Id, id, StringComparison.OrdinalIgnoreCase))
+               ?? GetSeasonalAccent(persianMonth);
+    }
+
+    public static ElenaAccentDefinition GetSeasonalAccent(int persianMonth)
+        => persianMonth switch
+        {
+            <= 3 => new(
+                "seasonal",
+                "بهاری · شکوفه‌ای",
+                "#FFD46F9E",
+                "#FFF0A4C5"),
+            <= 6 => new(
+                "seasonal",
+                "تابستانی · آبی آسمانی",
+                "#FF2F8FCE",
+                "#FF68BDE8"),
+            <= 9 => new(
+                "seasonal",
+                "پاییزی · کهربایی",
+                "#FFC7772F",
+                "#FFE3A15C"),
+            _ => new(
+                "seasonal",
+                "زمستانی · آبی یخی",
+                "#FF5B75C8",
+                "#FF91A7E4")
+        };
 }

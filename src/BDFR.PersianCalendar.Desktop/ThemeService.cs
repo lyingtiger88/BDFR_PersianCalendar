@@ -22,39 +22,81 @@ public sealed class ThemeService
             ? "zara-pastel"
             : themeId.Trim().ToLowerInvariant();
 
+        var fallback = CreateBuiltInTheme(normalized);
         var path = Path.Combine(ThemesRoot, normalized, "theme.json");
+
         try
         {
             if (File.Exists(path))
             {
-                return JsonSerializer.Deserialize<ThemeDefinition>(
-                           File.ReadAllText(path),
-                           JsonOptions)
-                       ?? new ThemeDefinition();
+                var parsed = JsonSerializer.Deserialize<ThemeDefinition>(
+                    File.ReadAllText(path),
+                    JsonOptions);
+
+                if (parsed is not null &&
+                    string.Equals(parsed.Id, normalized, StringComparison.OrdinalIgnoreCase))
+                {
+                    StartupDiagnostics.Log(
+                        $"Theme loaded from packaged JSON: {parsed.Id} ({path})");
+                    return parsed;
+                }
+
+                StartupDiagnostics.Log(
+                    $"Theme JSON was invalid or had a mismatched id ({normalized}); built-in palette used.");
+            }
+            else
+            {
+                StartupDiagnostics.Log(
+                    $"Theme JSON not found ({path}); built-in palette used for {normalized}.");
             }
         }
         catch (Exception ex)
         {
-            StartupDiagnostics.Log($"Theme load failed ({normalized}): {ex}");
+            StartupDiagnostics.Log(
+                $"Theme load failed ({normalized}); built-in palette used: {ex}");
         }
 
-        return new ThemeDefinition();
+        return fallback;
     }
 
     public string ThemeRoot(ThemeDefinition theme)
         => Path.Combine(ThemesRoot, theme.Id);
 
-    public ThemeDefinition CreateElenaTheme(string? accentId)
+    public ThemeDefinition CreateElenaTheme(string? accentId, int persianMonth)
     {
-        var accent = AppearanceCatalog.GetElenaAccent(accentId);
+        var accent = AppearanceCatalog.GetElenaAccent(accentId, persianMonth);
+
+        var seasonalSurface = persianMonth switch
+        {
+            <= 3 => new[]
+            {
+                "#FFF8F2F5", "#D8FFFFFF", "#C8FFFFFF",
+                "#FFF6EAF0", "#FFF3EDF2", "#FFF7EEF3"
+            },
+            <= 6 => new[]
+            {
+                "#FFF0F7FB", "#D8FFFFFF", "#C8FFFFFF",
+                "#FFE9F4FA", "#FFE6F2F9", "#FFECF6FB"
+            },
+            <= 9 => new[]
+            {
+                "#FFFAF4EC", "#D8FFFFFF", "#C8FFFFFF",
+                "#FFF7EEE4", "#FFF5EBE0", "#FFF8F0E7"
+            },
+            _ => new[]
+            {
+                "#FFF1F4FA", "#D8FFFFFF", "#C8FFFFFF",
+                "#FFE9EEF8", "#FFE7ECF6", "#FFEDF1FA"
+            }
+        };
 
         return new ThemeDefinition
         {
             Id = "elena-neutral",
             DisplayName = "Elena Mode",
-            WindowBackground = "#FFF2F4F7",
-            PanelBackground = "#D8FFFFFF",
-            CardBackground = "#C8FFFFFF",
+            WindowBackground = seasonalSurface[0],
+            PanelBackground = seasonalSurface[1],
+            CardBackground = seasonalSurface[2],
             PrimaryText = "#FF202631",
             SecondaryText = "#FF697386",
             Accent = accent.Accent,
@@ -62,22 +104,119 @@ public sealed class ThemeService
             HolidayText = "#FFD34E5E",
             WeekdayColors =
             [
-                "#FFE8ECF1",
-                "#FFE6EAF0",
-                "#FFE9EDF2",
-                "#FFE7EBF0",
-                "#FFE8ECF1",
-                "#FFE6EAF0",
-                "#FFE9EDF2"
+                seasonalSurface[3],
+                seasonalSurface[4],
+                seasonalSurface[5],
+                seasonalSurface[3],
+                seasonalSurface[4],
+                seasonalSurface[5],
+                "#FFF6E7EA"
             ]
         };
     }
 
-    public ThemeDefinition ResolveAppearance(AppSettings settings)
+    public ThemeDefinition ResolveAppearance(AppSettings settings, int persianMonth)
         => string.Equals(settings.AppearanceMode, "elena", StringComparison.OrdinalIgnoreCase)
-            ? CreateElenaTheme(settings.ElenaAccentId)
+            ? CreateElenaTheme(settings.ElenaAccentId, persianMonth)
             : Load(settings.ThemeId);
 
+    public ThemeDefinition ResolveAppearance(AppSettings settings)
+        => ResolveAppearance(settings, PersianDate.Today().Month);
+
+    private static ThemeDefinition CreateBuiltInTheme(string id)
+        => id switch
+        {
+            "windows-light" => new ThemeDefinition
+            {
+                Id = "windows-light",
+                DisplayName = "Windows Light",
+                WindowBackground = "#FFF3F3F3",
+                PanelBackground = "#FFFFFFFF",
+                CardBackground = "#FFF9F9F9",
+                PrimaryText = "#FF1F1F1F",
+                SecondaryText = "#FF616161",
+                Accent = "#FF0F6CBD",
+                SelectedDay = "#FFD7E9F8",
+                HolidayText = "#FFC42B1C",
+                WeekdayColors =
+                [
+                    "#FFF5F5F5", "#FFF2F5F8", "#FFF5F5F5",
+                    "#FFF2F5F8", "#FFF5F5F5", "#FFF2F5F8", "#FFFBE9EA"
+                ]
+            },
+            "azure-glass" => new ThemeDefinition
+            {
+                Id = "azure-glass",
+                DisplayName = "Azure Glass",
+                WindowBackground = "#FFE4F3FF",
+                PanelBackground = "#CDEFF8FF",
+                CardBackground = "#B8D9EEFF",
+                PrimaryText = "#FF103753",
+                SecondaryText = "#FF587489",
+                Accent = "#FF2389C9",
+                SelectedDay = "#FF71C5F2",
+                HolidayText = "#FFD14F61",
+                WeekdayColors =
+                [
+                    "#FFCFEAFF", "#FFD9F0FF", "#FFCFEAFF",
+                    "#FFD9F0FF", "#FFCFEAFF", "#FFD9F0FF", "#FFF1D8E0"
+                ]
+            },
+            "graphite-night" => new ThemeDefinition
+            {
+                Id = "graphite-night",
+                DisplayName = "Graphite Night",
+                WindowBackground = "#FF15181D",
+                PanelBackground = "#F022272E",
+                CardBackground = "#E72C323B",
+                PrimaryText = "#FFF4F7FA",
+                SecondaryText = "#FFABB5C3",
+                Accent = "#FF71839B",
+                SelectedDay = "#FF435B76",
+                HolidayText = "#FFFF7A86",
+                WeekdayColors =
+                [
+                    "#FF29313A", "#FF303843", "#FF29313A",
+                    "#FF303843", "#FF29313A", "#FF303843", "#FF422F35"
+                ]
+            },
+            "warm-sand" => new ThemeDefinition
+            {
+                Id = "warm-sand",
+                DisplayName = "Warm Sand",
+                WindowBackground = "#FFF4E8D8",
+                PanelBackground = "#FFF8EEDF",
+                CardBackground = "#FFFFF8ED",
+                PrimaryText = "#FF49392B",
+                SecondaryText = "#FF7B6958",
+                Accent = "#FFC9915A",
+                SelectedDay = "#FFE4BB89",
+                HolidayText = "#FFC65B55",
+                WeekdayColors =
+                [
+                    "#FFF1DEC8", "#FFF5E5D1", "#FFF1DEC8",
+                    "#FFF5E5D1", "#FFF1DEC8", "#FFF5E5D1", "#FFF2D8D4"
+                ]
+            },
+            _ => new ThemeDefinition
+            {
+                Id = "zara-pastel",
+                DisplayName = "Zara Pastel",
+                WindowBackground = "#FFFDF9F6",
+                PanelBackground = "#E6FFFFFF",
+                CardBackground = "#EEFFFFFF",
+                PrimaryText = "#FF1E2A44",
+                SecondaryText = "#FF6B7280",
+                Accent = "#FFC9C3FF",
+                SelectedDay = "#FF7CC9F5",
+                HolidayText = "#FFD65A6F",
+                WeekdayColors =
+                [
+                    "#FFF9DDD3", "#FFF9EDC4", "#FFDDF0D9",
+                    "#FFD5EFEF", "#FFDCE9FA", "#FFE7E0FA", "#FFF8DCE5"
+                ]
+            }
+        };
 
     public string? GetSeasonalBackgroundPath(int persianMonth, double targetAspectRatio)
     {

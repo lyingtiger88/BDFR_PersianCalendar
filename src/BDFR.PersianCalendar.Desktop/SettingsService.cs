@@ -72,8 +72,16 @@ public sealed class SettingsService
         if (string.IsNullOrWhiteSpace(settings.ThemeId))
             settings.ThemeId = "zara-pastel";
 
+        // Versions before this migration only exposed fixed manual Elena accents.
+        // Move existing installations to the new automatic seasonal accent once.
+        if (settings.AppearanceSettingsVersion < 3)
+        {
+            settings.ElenaAccentId = "seasonal";
+            settings.AppearanceSettingsVersion = 3;
+        }
+
         if (string.IsNullOrWhiteSpace(settings.ElenaAccentId))
-            settings.ElenaAccentId = "azure";
+            settings.ElenaAccentId = "seasonal";
     }
 
     public void Save(AppSettings settings)

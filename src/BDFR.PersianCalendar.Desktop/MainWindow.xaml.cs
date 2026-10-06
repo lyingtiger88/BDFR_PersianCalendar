@@ -97,11 +97,12 @@ public sealed class MainWindow : Window
         _themeService = new ThemeService();
         _settings = _settingsService.Load();
         _settingsService.Save(_settings);
-        _theme = _themeService.ResolveAppearance(_settings);
-        _pictureService = new PictureService(_themeService);
 
         _year = _selected.Year;
         _month = _selected.Month;
+
+        _theme = _themeService.ResolveAppearance(_settings, _month);
+        _pictureService = new PictureService(_themeService);
 
         Title = "BDFR Persian Calendar";
         Content = BuildRoot();
@@ -234,7 +235,7 @@ public sealed class MainWindow : Window
         {
             Padding = new Thickness(12),
             CornerRadius = new CornerRadius(12),
-            Background = new SolidColorBrush(Windows.UI.Color.FromArgb(28, 45, 125, 255)),
+            Background = BrushWithAlpha(_theme.Accent, 0x24),
             Child = new TextBlock
             {
                 Text = "اطلاعات و مناسبت‌ها در SQLite به‌صورت محلی نگهداری می‌شوند و برنامه بدون اینترنت هم قابل استفاده است.",
@@ -614,7 +615,7 @@ public sealed class MainWindow : Window
 
         if (isElena)
         {
-            var accent = AppearanceCatalog.GetElenaAccent(_settings.ElenaAccentId);
+            var accent = AppearanceCatalog.GetElenaAccent(_settings.ElenaAccentId, _month);
             var accentToggle = MakeButton($"Accent Color ▾  ·  {accent.DisplayName}");
             accentToggle.Click += (_, _) =>
                 _accentSubmenuPanel.Visibility =
@@ -1016,7 +1017,7 @@ public sealed class MainWindow : Window
 
         try
         {
-            _theme = _themeService.ResolveAppearance(_settings);
+            _theme = _themeService.ResolveAppearance(_settings, _month);
             ApplyAppearanceBrushesOnly();
             BuildCalendar();
             await LoadSelectedDayAsync();
@@ -1043,7 +1044,7 @@ public sealed class MainWindow : Window
 
     private async Task ApplyAppearanceAsync()
     {
-        _theme = _themeService.ResolveAppearance(_settings);
+        _theme = _themeService.ResolveAppearance(_settings, _month);
         ApplyAppearanceBrushesOnly();
 
         // Dynamic controls are rebuilt only after their containers are detached/cleared.
@@ -1060,7 +1061,7 @@ public sealed class MainWindow : Window
             _settings.AppearanceMode,
             "elena",
             StringComparison.OrdinalIgnoreCase)
-            ? $"Elena Mode فعال شد · Accent: {AppearanceCatalog.GetElenaAccent(_settings.ElenaAccentId).DisplayName}"
+            ? $"Elena Mode فعال شد · Accent: {AppearanceCatalog.GetElenaAccent(_settings.ElenaAccentId, _month).DisplayName}"
             : $"Theme فعال شد: {_theme.DisplayName}";
     }
 
@@ -1151,6 +1152,12 @@ public sealed class MainWindow : Window
             else if (root is TextBlock text)
             {
                 text.Foreground = ThemeService.Brush(_theme.PrimaryText);
+            }
+            else if (root is TextBox textBox)
+            {
+                textBox.Background = BrushWithAlpha(_theme.CardBackground, 0xE8);
+                textBox.Foreground = ThemeService.Brush(_theme.PrimaryText);
+                textBox.BorderBrush = BrushWithAlpha(_theme.Accent, 0xB8);
             }
             else if (root is CheckBox checkBox)
             {
@@ -1650,8 +1657,33 @@ public sealed class MainWindow : Window
         MonthRightDecoration.Foreground = ThemeService.Brush(_theme.SecondaryText);
     }
 
+    private void RefreshElenaSeasonalPalette()
+    {
+        if (!string.Equals(
+                _settings.AppearanceMode,
+                "elena",
+                StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(
+                _settings.ElenaAccentId,
+                "seasonal",
+                StringComparison.OrdinalIgnoreCase))
+            return;
+
+        var updatedTheme = _themeService.ResolveAppearance(_settings, _month);
+        if (string.Equals(updatedTheme.Accent, _theme.Accent, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(updatedTheme.WindowBackground, _theme.WindowBackground, StringComparison.OrdinalIgnoreCase))
+            return;
+
+        _theme = updatedTheme;
+        ApplyAppearanceBrushesOnly();
+
+        StartupDiagnostics.Log(
+            $"Elena seasonal accent changed for Persian month {_month}: {_theme.Accent}");
+    }
+
     private void BuildCalendar()
     {
+        RefreshElenaSeasonalPalette();
         MonthTitle.Text = $"{PersianDate.MonthNames[_month - 1]} {_year}";
         UpdateMonthDecorations();
         CalendarGrid.Children.Clear();

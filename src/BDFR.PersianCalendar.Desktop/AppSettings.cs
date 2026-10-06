@@ -9,7 +9,11 @@ public sealed class AppSettings
     public string ThemeId { get; set; } = "zara-pastel";
 
     // Used only when AppearanceMode == "elena".
-    public string ElenaAccentId { get; set; } = "azure";
+    // "seasonal" follows the currently displayed Persian season automatically.
+    public string ElenaAccentId { get; set; } = "seasonal";
+
+    // Internal migration marker for appearance settings.
+    public int AppearanceSettingsVersion { get; set; }
 
     // Theme-mode wallpaper: "custom" or "none".
     // "elena" is accepted only as a legacy value and is migrated to AppearanceMode.
