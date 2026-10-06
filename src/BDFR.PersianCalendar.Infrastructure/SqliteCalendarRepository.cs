@@ -99,6 +99,14 @@ public sealed class SqliteCalendarRepository(string databasePath) : ICalendarRep
             item_id TEXT NULL,
             message TEXT NOT NULL
         );
+        CREATE INDEX IF NOT EXISTS ix_activity_log_created ON activity_log(created_at DESC);
+
+        CREATE TABLE IF NOT EXISTS source_sync(
+            source TEXT NOT NULL,
+            persian_year INTEGER NOT NULL,
+            synced_at TEXT NOT NULL,
+            PRIMARY KEY(source, persian_year)
+        );
         """;
         await cmd.ExecuteNonQueryAsync(cancellationToken);
     }
@@ -390,6 +398,56 @@ public sealed class SqliteCalendarRepository(string databasePath) : ICalendarRep
         cmd.Parameters.AddWithValue("$k", entry.ItemKind is null ? DBNull.Value : (object)(int)entry.ItemKind.Value);
         cmd.Parameters.AddWithValue("$item", (object?)entry.ItemId ?? DBNull.Value);
         cmd.Parameters.AddWithValue("$m", entry.Message);
+        await cmd.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    public async Task<ReminderSchedule?> GetReminderAsync(string reminderId, CancellationToken cancellationToken = default)
+    {
+        await using var db = await OpenAsync(cancellationToken);
+        var cmd = db.CreateCommand();
+        cmd.CommandText = "SELECT id,item_kind,item_id,fire_at_utc,state,title,body FROM reminders WHERE id=$id LIMIT 1";
+        cmd.Parameters.AddWithValue("$id", reminderId);
+        await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken)) return null;
+        return new ReminderSchedule(reader.GetString(0), (CalendarItemKind)reader.GetInt32(1), reader.GetString(2),
+            DateTimeOffset.Parse(reader.GetString(3)), (ReminderState)reader.GetInt32(4), reader.GetString(5), reader.GetString(6));
+    }
+
+    public async Task<IReadOnlyList<ActivityLogEntry>> GetRecentActivitiesAsync(int limit = 20, CancellationToken cancellationToken = default)
+    {
+        limit = Math.Clamp(limit, 1, 200);
+        await using var db = await OpenAsync(cancellationToken);
+        var cmd = db.CreateCommand();
+        cmd.CommandText = "SELECT id,created_at,action,item_kind,item_id,message FROM activity_log ORDER BY created_at DESC LIMIT $limit";
+        cmd.Parameters.AddWithValue("$limit", limit);
+        var list = new List<ActivityLogEntry>();
+        await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+            list.Add(new ActivityLogEntry(reader.GetString(0), DateTimeOffset.Parse(reader.GetString(1)), reader.GetString(2),
+                reader.IsDBNull(3) ? null : (CalendarItemKind)reader.GetInt32(3),
+                reader.IsDBNull(4) ? null : reader.GetString(4), reader.GetString(5)));
+        return list;
+    }
+
+    public async Task<DateTimeOffset?> GetLastOccasionSyncAsync(string source, int persianYear, CancellationToken cancellationToken = default)
+    {
+        await using var db = await OpenAsync(cancellationToken);
+        var cmd = db.CreateCommand();
+        cmd.CommandText = "SELECT synced_at FROM source_sync WHERE source=$s AND persian_year=$y LIMIT 1";
+        cmd.Parameters.AddWithValue("$s", source);
+        cmd.Parameters.AddWithValue("$y", persianYear);
+        var value = await cmd.ExecuteScalarAsync(cancellationToken);
+        return value is string text ? DateTimeOffset.Parse(text) : null;
+    }
+
+    public async Task SetLastOccasionSyncAsync(string source, int persianYear, DateTimeOffset syncedAt, CancellationToken cancellationToken = default)
+    {
+        await using var db = await OpenAsync(cancellationToken);
+        var cmd = db.CreateCommand();
+        cmd.CommandText = "INSERT INTO source_sync(source,persian_year,synced_at) VALUES($s,$y,$at) ON CONFLICT(source,persian_year) DO UPDATE SET synced_at=excluded.synced_at";
+        cmd.Parameters.AddWithValue("$s", source);
+        cmd.Parameters.AddWithValue("$y", persianYear);
+        cmd.Parameters.AddWithValue("$at", syncedAt.ToUniversalTime().ToString("O"));
         await cmd.ExecuteNonQueryAsync(cancellationToken);
     }
 
