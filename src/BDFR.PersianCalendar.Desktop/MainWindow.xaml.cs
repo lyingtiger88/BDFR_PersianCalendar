@@ -30,6 +30,8 @@ public sealed class MainWindow : Window
     private readonly CheckBox _occasionPicturesCheck = new();
     private readonly TextBox _backgroundOpacityBox = new();
     private readonly TextBlock _backgroundPathText = new();
+    private readonly StackPanel _pictureLibraryPanel = new();
+    private readonly TextBlock _pictureLibrarySummary = new();
 
     private readonly TextBlock MonthTitle = new();
     private readonly TextBlock MonthLeftDecoration = new();
@@ -145,9 +147,9 @@ public sealed class MainWindow : Window
 
         var center = new Border
         {
-            Background = ThemeService.Brush(_theme.CardBackground),
+            Background = BrushWithAlpha(_theme.CardBackground, 0x58),
             CornerRadius = new CornerRadius(18),
-            BorderBrush = ThemeService.Brush(_theme.Accent),
+            BorderBrush = BrushWithAlpha("#FFFFFFFF", 0xA8),
             BorderThickness = new Thickness(1),
             Child = BuildCalendarPanel()
         };
@@ -319,7 +321,7 @@ public sealed class MainWindow : Window
                 Margin = new Thickness(4),
                 Padding = new Thickness(8, 5, 8, 5),
                 CornerRadius = new CornerRadius(12),
-                Background = ThemeService.Brush(GetWeekdayColor(i)),
+                Background = BrushWithAlpha(GetWeekdayColor(i), 0xB0),
                 Child = new TextBlock
                 {
                     Text = names[i],
@@ -474,6 +476,13 @@ public sealed class MainWindow : Window
             BorderThickness = new Thickness(0)
         };
 
+    private static SolidColorBrush BrushWithAlpha(string color, byte alpha)
+    {
+        var parsed = ThemeService.ParseColor(color);
+        return new SolidColorBrush(
+            Windows.UI.Color.FromArgb(alpha, parsed.R, parsed.G, parsed.B));
+    }
+
     private string GetWeekdayColor(int column)
     {
         if (_theme.WeekdayColors is { Length: > 0 })
@@ -597,25 +606,22 @@ public sealed class MainWindow : Window
         };
         _settingsPanel.Children.Add(_occasionPicturesCheck);
 
-        var openPictures = MakeButton("باز کردن پوشه picture");
-        openPictures.Click += (_, _) =>
+        var pictureLibraryToggle = MakeButton("🖼 کتابخانه تصاویر");
+        pictureLibraryToggle.Click += async (_, _) =>
         {
-            try
-            {
-                var path = _themeService.PictureRoot;
-                if (Directory.Exists(path))
-                {
-                    Process.Start(new ProcessStartInfo("explorer.exe", path)
-                    {
-                        UseShellExecute = true
-                    });
-                }
-            }
-            catch (Exception ex)
-            {
-                StartupDiagnostics.Log($"Open picture folder failed: {ex}");
-            }
+            _pictureLibraryPanel.Visibility =
+                _pictureLibraryPanel.Visibility == Visibility.Visible
+                    ? Visibility.Collapsed
+                    : Visibility.Visible;
+
+            if (_pictureLibraryPanel.Visibility == Visibility.Visible)
+                await RefreshPictureLibraryAsync();
         };
+        _settingsPanel.Children.Add(pictureLibraryToggle);
+        _settingsPanel.Children.Add(BuildPictureLibraryPanel());
+
+        var openPictures = MakeButton("📁 باز کردن پوشه picture در Explorer");
+        openPictures.Click += (_, _) => OpenFolderInExplorer(_themeService.PictureRoot);
         _settingsPanel.Children.Add(openPictures);
 
         return new Border
@@ -626,6 +632,243 @@ public sealed class MainWindow : Window
             BorderThickness = new Thickness(1),
             Child = _settingsPanel
         };
+    }
+
+    private FrameworkElement BuildPictureLibraryPanel()
+    {
+        _pictureLibraryPanel.Spacing = 10;
+        _pictureLibraryPanel.Padding = new Thickness(10);
+        _pictureLibraryPanel.Visibility = Visibility.Collapsed;
+
+        _pictureLibrarySummary.Text = "برای مشاهده تصاویر، کتابخانه را باز کنید.";
+        _pictureLibrarySummary.TextWrapping = TextWrapping.Wrap;
+        _pictureLibrarySummary.FontSize = 11;
+        _pictureLibrarySummary.Foreground = ThemeService.Brush(_theme.SecondaryText);
+        _pictureLibraryPanel.Children.Add(_pictureLibrarySummary);
+
+        var refresh = MakeButton("↻ بازخوانی کتابخانه");
+        refresh.Click += async (_, _) => await RefreshPictureLibraryAsync();
+        _pictureLibraryPanel.Children.Add(refresh);
+
+        return new Border
+        {
+            Background = BrushWithAlpha(_theme.CardBackground, 0x72),
+            CornerRadius = new CornerRadius(14),
+            BorderBrush = BrushWithAlpha("#FFFFFFFF", 0xA0),
+            BorderThickness = new Thickness(1),
+            Child = _pictureLibraryPanel
+        };
+    }
+
+    private async Task RefreshPictureLibraryAsync()
+    {
+        try
+        {
+            _pictureLibraryPanel.Children.Clear();
+
+            _pictureLibraryPanel.Children.Add(new TextBlock
+            {
+                Text = "📁 picture",
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                FontSize = 15,
+                Foreground = ThemeService.Brush(_theme.PrimaryText)
+            });
+
+            var refresh = MakeButton("↻ بازخوانی کتابخانه");
+            refresh.Click += async (_, _) => await RefreshPictureLibraryAsync();
+            _pictureLibraryPanel.Children.Add(refresh);
+
+            var themeCount = await AddPictureFolderSectionAsync(
+                "🎨 Themes",
+                _themeService.ThemesRoot,
+                SearchOption.AllDirectories);
+
+            var eventCount = await AddPictureFolderSectionAsync(
+                "🖼 Event Pictures",
+                _pictureService.EventPicturesRoot,
+                SearchOption.TopDirectoryOnly);
+
+            var userCount = await AddPictureFolderSectionAsync(
+                "🌄 User Backgrounds",
+                _settingsService.UserBackgroundRoot,
+                SearchOption.TopDirectoryOnly);
+
+            _pictureLibraryPanel.Children.Insert(1, new TextBlock
+            {
+                Text = $"مجموع تصاویر: {ToPersianDigits((themeCount + eventCount + userCount).ToString())}",
+                FontSize = 11,
+                Opacity = 0.68,
+                Foreground = ThemeService.Brush(_theme.SecondaryText)
+            });
+        }
+        catch (Exception ex)
+        {
+            StartupDiagnostics.Log($"Picture library refresh failed: {ex}");
+            _pictureLibraryPanel.Children.Clear();
+            _pictureLibraryPanel.Children.Add(new TextBlock
+            {
+                Text = $"خواندن کتابخانه تصاویر انجام نشد: {ex.Message}",
+                TextWrapping = TextWrapping.Wrap,
+                Foreground = ThemeService.Brush(_theme.HolidayText)
+            });
+        }
+    }
+
+    private async Task<int> AddPictureFolderSectionAsync(
+        string title,
+        string folderPath,
+        SearchOption searchOption)
+    {
+        Directory.CreateDirectory(folderPath);
+
+        var extensions = new HashSet<string>(
+            [".png", ".jpg", ".jpeg", ".webp", ".svg"],
+            StringComparer.OrdinalIgnoreCase);
+
+        var files = Directory
+            .EnumerateFiles(folderPath, "*.*", searchOption)
+            .Where(path => extensions.Contains(Path.GetExtension(path)))
+            .OrderBy(path => Path.GetFileName(path), StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        var header = new Grid { ColumnSpacing = 8 };
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        var label = new TextBlock
+        {
+            Text = $"{title} · {ToPersianDigits(files.Length.ToString())}",
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Foreground = ThemeService.Brush(_theme.PrimaryText),
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        Grid.SetColumn(label, 0);
+        header.Children.Add(label);
+
+        var open = new Button
+        {
+            Content = "باز کردن",
+            Padding = new Thickness(9, 4, 9, 4),
+            Background = BrushWithAlpha(_theme.Accent, 0xB8),
+            Foreground = ThemeService.Brush(_theme.PrimaryText),
+            BorderThickness = new Thickness(0)
+        };
+        open.Click += (_, _) => OpenFolderInExplorer(folderPath);
+        Grid.SetColumn(open, 1);
+        header.Children.Add(open);
+
+        var section = new StackPanel { Spacing = 7 };
+        section.Children.Add(header);
+        section.Children.Add(new TextBlock
+        {
+            Text = folderPath,
+            FontSize = 9.5,
+            Opacity = 0.5,
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = ThemeService.Brush(_theme.SecondaryText)
+        });
+
+        if (files.Length == 0)
+        {
+            section.Children.Add(new TextBlock
+            {
+                Text = "تصویری در این پوشه نیست.",
+                FontSize = 11,
+                Opacity = 0.55
+            });
+        }
+        else
+        {
+            var previews = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Spacing = 7
+            };
+
+            foreach (var file in files.Take(12))
+            {
+                var source = await PictureService.LoadImageAsync(file);
+                var image = new Image
+                {
+                    Source = source,
+                    Width = 54,
+                    Height = 54,
+                    Stretch = Stretch.UniformToFill
+                };
+
+                var tile = new StackPanel
+                {
+                    Width = 66,
+                    Spacing = 3
+                };
+                tile.Children.Add(new Border
+                {
+                    Width = 58,
+                    Height = 58,
+                    CornerRadius = new CornerRadius(10),
+                    Background = BrushWithAlpha("#FFFFFFFF", 0x78),
+                    BorderBrush = BrushWithAlpha("#FFFFFFFF", 0xC0),
+                    BorderThickness = new Thickness(1),
+                    Child = image
+                });
+                tile.Children.Add(new TextBlock
+                {
+                    Text = Path.GetFileNameWithoutExtension(file),
+                    FontSize = 8.5,
+                    MaxLines = 2,
+                    TextTrimming = TextTrimming.CharacterEllipsis,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    TextAlignment = TextAlignment.Center,
+                    Foreground = ThemeService.Brush(_theme.SecondaryText)
+                });
+                previews.Children.Add(tile);
+            }
+
+            section.Children.Add(new ScrollViewer
+            {
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                Content = previews
+            });
+
+            if (files.Length > 12)
+            {
+                section.Children.Add(new TextBlock
+                {
+                    Text = $"+ {ToPersianDigits((files.Length - 12).ToString())} تصویر دیگر",
+                    FontSize = 10,
+                    Opacity = 0.55
+                });
+            }
+        }
+
+        _pictureLibraryPanel.Children.Add(new Border
+        {
+            Background = BrushWithAlpha(_theme.PanelBackground, 0x78),
+            CornerRadius = new CornerRadius(12),
+            BorderBrush = BrushWithAlpha("#FFFFFFFF", 0x98),
+            BorderThickness = new Thickness(1),
+            Padding = new Thickness(9),
+            Child = section
+        });
+
+        return files.Length;
+    }
+
+    private static void OpenFolderInExplorer(string path)
+    {
+        try
+        {
+            Directory.CreateDirectory(path);
+            Process.Start(new ProcessStartInfo("explorer.exe", path)
+            {
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            StartupDiagnostics.Log($"Open picture folder failed ({path}): {ex}");
+        }
     }
 
     private async void SelectCustomBackground_Click(object sender, RoutedEventArgs e)
@@ -670,6 +913,10 @@ public sealed class MainWindow : Window
 
             _settingsService.Save(_settings);
             await ApplyBackgroundAsync();
+
+            if (_pictureLibraryPanel.Visibility == Visibility.Visible)
+                await RefreshPictureLibraryAsync();
+
             StatusText.Text = "عکس زمینه دلخواه اعمال شد.";
         }
         catch (Exception ex)
@@ -848,14 +1095,17 @@ public sealed class MainWindow : Window
                 Margin = new Thickness(4),
                 MinHeight = 88,
                 Padding = new Thickness(6),
-                Opacity = cell.IsCurrentMonth ? 1 : 0.35,
+                Opacity = cell.IsCurrentMonth ? 1 : 0.48,
                 Background = cell.Date == _selected
-                    ? ThemeService.Brush(_theme.SelectedDay)
-                    : ThemeService.Brush(GetWeekdayColor(i % 7)),
+                    ? BrushWithAlpha(_theme.SelectedDay, 0xC8)
+                    : BrushWithAlpha(GetWeekdayColor(i % 7), 0x76),
                 BorderBrush = cell.Date == _selected
-                    ? ThemeService.Brush(_theme.PrimaryText)
-                    : ThemeService.Brush(_theme.Accent),
-                BorderThickness = cell.Date == _selected ? new Thickness(2) : new Thickness(0),
+                    ? BrushWithAlpha(_theme.PrimaryText, 0x9A)
+                    : BrushWithAlpha("#FFFFFFFF", 0xB8),
+                BorderThickness = cell.Date == _selected
+                    ? new Thickness(1.6)
+                    : new Thickness(1),
+                CornerRadius = new CornerRadius(14),
                 Content = content
             };
 
