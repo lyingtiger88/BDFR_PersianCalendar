@@ -78,7 +78,7 @@ public sealed class MainWindow : Window
         StartupDiagnostics.Log("MainWindow: programmatic UI ready.");
     }
 
-    private UIElement BuildRoot()
+    private FrameworkElement BuildRoot()
     {
         var root = new Grid
         {
@@ -103,7 +103,7 @@ public sealed class MainWindow : Window
         return root;
     }
 
-    private UIElement BuildLeftPanel()
+    private FrameworkElement BuildLeftPanel()
     {
         var stack = new StackPanel
         {
@@ -180,7 +180,7 @@ public sealed class MainWindow : Window
         };
     }
 
-    private UIElement BuildCalendarPanel()
+    private FrameworkElement BuildCalendarPanel()
     {
         var panel = new Grid { Padding = new Thickness(24) };
         panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -239,7 +239,7 @@ public sealed class MainWindow : Window
         return panel;
     }
 
-    private UIElement BuildRightPanel()
+    private FrameworkElement BuildRightPanel()
     {
         var stack = new StackPanel
         {
