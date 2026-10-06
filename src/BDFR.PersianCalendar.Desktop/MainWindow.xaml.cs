@@ -1627,7 +1627,17 @@ public sealed class MainWindow : Window
 
     private void UpdateMonthDecorations()
     {
-        if (!string.Equals(_theme.Id, "zara-pastel", StringComparison.OrdinalIgnoreCase))
+        var isZaraPastel = string.Equals(
+            _theme.Id,
+            "zara-pastel",
+            StringComparison.OrdinalIgnoreCase);
+
+        var isElena = string.Equals(
+            _settings.AppearanceMode,
+            "elena",
+            StringComparison.OrdinalIgnoreCase);
+
+        if (!isZaraPastel && !isElena)
         {
             MonthLeftDecoration.Text = "";
             MonthRightDecoration.Text = "";
@@ -1653,8 +1663,15 @@ public sealed class MainWindow : Window
 
         MonthLeftDecoration.Text = pair.Item1;
         MonthRightDecoration.Text = pair.Item2;
-        MonthLeftDecoration.Foreground = ThemeService.Brush(_theme.SecondaryText);
-        MonthRightDecoration.Foreground = ThemeService.Brush(_theme.SecondaryText);
+
+        // Zara keeps its softer secondary color; Elena follows its active
+        // seasonal/manual accent so month decorations match the current mode.
+        var decorationColor = isElena
+            ? _theme.Accent
+            : _theme.SecondaryText;
+
+        MonthLeftDecoration.Foreground = ThemeService.Brush(decorationColor);
+        MonthRightDecoration.Foreground = ThemeService.Brush(decorationColor);
     }
 
     private void RefreshElenaSeasonalPalette()
