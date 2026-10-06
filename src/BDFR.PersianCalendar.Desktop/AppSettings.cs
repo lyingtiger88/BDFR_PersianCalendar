@@ -1,5 +1,23 @@
 namespace BDFR.PersianCalendar.Desktop;
 
+public sealed class AppearanceColorOverrides
+{
+    public string? Accent { get; set; }
+    public string? SelectedDay { get; set; }
+    public string? Holiday { get; set; }
+    public string? Panel { get; set; }
+    public string? Card { get; set; }
+    public string? Calendar { get; set; }
+
+    public bool IsEmpty()
+        => string.IsNullOrWhiteSpace(Accent) &&
+           string.IsNullOrWhiteSpace(SelectedDay) &&
+           string.IsNullOrWhiteSpace(Holiday) &&
+           string.IsNullOrWhiteSpace(Panel) &&
+           string.IsNullOrWhiteSpace(Card) &&
+           string.IsNullOrWhiteSpace(Calendar);
+}
+
 public sealed class AppSettings
 {
     // AppearanceMode: "elena" or "theme".
@@ -44,4 +62,8 @@ public sealed class AppSettings
 
     // normal / italic.
     public string FontStyleMode { get; set; } = "normal";
+
+    // Per-appearance color overrides. Theme modes get their own palette and
+    // Elena gets one palette per season (spring/summer/autumn/winter).
+    public Dictionary<string, AppearanceColorOverrides> ColorOverrides { get; set; } = new();
 }

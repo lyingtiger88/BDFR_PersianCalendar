@@ -110,6 +110,8 @@ public sealed class SettingsService
             "italic" => "italic",
             _ => "normal"
         };
+
+        settings.ColorOverrides ??= new Dictionary<string, AppearanceColorOverrides>();
     }
 
     public void Save(AppSettings settings)
@@ -127,6 +129,16 @@ public sealed class SettingsService
             settings.FontStyleMode = (settings.FontStyleMode ?? "normal")
                 .Trim()
                 .ToLowerInvariant();
+            settings.ColorOverrides ??= new Dictionary<string, AppearanceColorOverrides>();
+
+            foreach (var emptyKey in settings.ColorOverrides
+                         .Where(x => x.Value is null || x.Value.IsEmpty())
+                         .Select(x => x.Key)
+                         .ToArray())
+            {
+                settings.ColorOverrides.Remove(emptyKey);
+            }
+
             Directory.CreateDirectory(DataRoot);
             File.WriteAllText(SettingsPath, JsonSerializer.Serialize(settings, JsonOptions));
         }

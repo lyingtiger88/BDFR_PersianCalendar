@@ -120,7 +120,7 @@ public sealed class ThemeService
         };
     }
 
-    public ThemeDefinition ResolveAppearance(AppSettings settings, int persianMonth)
+    public ThemeDefinition ResolveBaseAppearance(AppSettings settings, int persianMonth)
         => string.Equals(settings.AppearanceMode, "elena", StringComparison.OrdinalIgnoreCase)
             ? CreateElenaTheme(
                 settings.ElenaAccentId,
@@ -128,8 +128,96 @@ public sealed class ThemeService
                 persianMonth)
             : Load(settings.ThemeId);
 
+    public ThemeDefinition ResolveAppearance(AppSettings settings, int persianMonth)
+    {
+        var theme = ResolveBaseAppearance(settings, persianMonth);
+        ApplyColorOverrides(theme, settings, persianMonth);
+        return theme;
+    }
+
     public ThemeDefinition ResolveAppearance(AppSettings settings)
         => ResolveAppearance(settings, PersianDate.Today().Month);
+
+    public static string GetColorPaletteKey(AppSettings settings, int persianMonth)
+    {
+        if (string.Equals(
+                settings.AppearanceMode,
+                "elena",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            var season = persianMonth switch
+            {
+                <= 3 => "spring",
+                <= 6 => "summer",
+                <= 9 => "autumn",
+                _ => "winter"
+            };
+
+            return $"elena-{season}";
+        }
+
+        var themeId = string.IsNullOrWhiteSpace(settings.ThemeId)
+            ? "zara-pastel"
+            : settings.ThemeId.Trim().ToLowerInvariant();
+
+        return $"theme-{themeId}";
+    }
+
+    private static void ApplyColorOverrides(
+        ThemeDefinition theme,
+        AppSettings settings,
+        int persianMonth)
+    {
+        if (settings.ColorOverrides is null)
+            return;
+
+        var key = GetColorPaletteKey(settings, persianMonth);
+        if (!settings.ColorOverrides.TryGetValue(key, out var custom) ||
+            custom is null)
+            return;
+
+        if (IsHexColor(custom.Accent))
+            theme.Accent = NormalizeHexColor(custom.Accent!);
+
+        if (IsHexColor(custom.SelectedDay))
+            theme.SelectedDay = NormalizeHexColor(custom.SelectedDay!);
+
+        if (IsHexColor(custom.Holiday))
+            theme.HolidayText = NormalizeHexColor(custom.Holiday!);
+
+        if (IsHexColor(custom.Panel))
+            theme.PanelBackground = NormalizeHexColor(custom.Panel!);
+
+        if (IsHexColor(custom.Card))
+            theme.CardBackground = NormalizeHexColor(custom.Card!);
+
+        if (IsHexColor(custom.Calendar))
+        {
+            var calendar = NormalizeHexColor(custom.Calendar!);
+            theme.WeekdayColors = Enumerable.Repeat(calendar, 7).ToArray();
+        }
+    }
+
+    public static bool IsHexColor(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return false;
+
+        var hex = value.Trim().TrimStart('#');
+        return hex.Length is 6 or 8 &&
+               hex.All(Uri.IsHexDigit);
+    }
+
+    public static string NormalizeHexColor(string value)
+    {
+        var hex = value.Trim().TrimStart('#').ToUpperInvariant();
+        if (hex.Length == 6)
+            hex = "FF" + hex;
+        return "#" + hex;
+    }
+
+    public static string ColorToHex(Windows.UI.Color color)
+        => $"#{color.A:X2}{color.R:X2}{color.G:X2}{color.B:X2}";
 
     private static ThemeDefinition CreateBuiltInTheme(string id)
         => id switch

@@ -91,6 +91,7 @@ public sealed class MainWindow : Window
     private PersianDate _selected = PersianDate.Today();
     private int _year;
     private int _month;
+    private int _paletteEditorMonth;
 
     public MainWindow(
         ICalendarRepository repository,
@@ -767,6 +768,15 @@ public sealed class MainWindow : Window
             });
         }
 
+        _settingsPanel.Children.Add(new Border
+        {
+            Height = 1,
+            Margin = new Thickness(0, 6, 0, 4),
+            Background = BrushWithAlpha(_theme.SecondaryText, 0x30)
+        });
+
+        _settingsPanel.Children.Add(BuildUniversalColorPalettePanel());
+
         var isZaraPastel = !isElena &&
                           string.Equals(
                               _settings.ThemeId,
@@ -1038,6 +1048,425 @@ public sealed class MainWindow : Window
         if (_settingsSurface.Child is null)
             _settingsSurface.Child = _settingsPanel;
         return _settingsSurface;
+    }
+
+    private FrameworkElement BuildUniversalColorPalettePanel()
+    {
+        var root = new StackPanel
+        {
+            Spacing = 8,
+            Padding = new Thickness(8)
+        };
+
+        root.Children.Add(new TextBlock
+        {
+            Text = "🎨 پالت رنگ و Accent",
+            FontSize = 15,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Foreground = ThemeService.Brush(_theme.PrimaryText)
+        });
+
+        root.Children.Add(new TextBlock
+        {
+            Text = "رنگ‌های این بخش روی ظاهر انتخاب‌شده override می‌شوند. هر Theme پالت مستقل خودش را دارد و Elena برای هر فصل یک پالت جدا نگه می‌دارد.",
+            FontSize = 10.5,
+            TextWrapping = TextWrapping.Wrap,
+            Opacity = 0.64,
+            Foreground = ThemeService.Brush(_theme.SecondaryText)
+        });
+
+        var editorHost = new StackPanel { Spacing = 7 };
+
+        if (string.Equals(
+                _settings.AppearanceMode,
+                "elena",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            _paletteEditorMonth = _paletteEditorMonth switch
+            {
+                >= 1 and <= 3 => 1,
+                >= 4 and <= 6 => 4,
+                >= 7 and <= 9 => 7,
+                >= 10 and <= 12 => 10,
+                _ => _month switch
+                {
+                    <= 3 => 1,
+                    <= 6 => 4,
+                    <= 9 => 7,
+                    _ => 10
+                }
+            };
+
+            var seasonPicker = new ComboBox
+            {
+                Header = "پالت فصل",
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                ItemsSource = new[] { "بهار", "تابستان", "پاییز", "زمستان" },
+                SelectedIndex = _paletteEditorMonth switch
+                {
+                    1 => 0,
+                    4 => 1,
+                    7 => 2,
+                    _ => 3
+                }
+            };
+
+            seasonPicker.SelectionChanged += (_, _) =>
+            {
+                _paletteEditorMonth = seasonPicker.SelectedIndex switch
+                {
+                    0 => 1,
+                    1 => 4,
+                    2 => 7,
+                    _ => 10
+                };
+
+                BuildColorPaletteEditor(editorHost, _paletteEditorMonth);
+            };
+
+            root.Children.Add(seasonPicker);
+        }
+        else
+        {
+            _paletteEditorMonth = _month;
+        }
+
+        BuildColorPaletteEditor(editorHost, _paletteEditorMonth);
+        root.Children.Add(editorHost);
+
+        return new Border
+        {
+            Background = BrushWithAlpha(_theme.CardBackground, 0x84),
+            BorderBrush = BrushWithAlpha(_theme.Accent, 0x74),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(12),
+            Child = root
+        };
+    }
+
+    private void BuildColorPaletteEditor(
+        StackPanel host,
+        int paletteMonth)
+    {
+        host.Children.Clear();
+
+        var paletteKey = ThemeService.GetColorPaletteKey(
+            _settings,
+            paletteMonth);
+
+        var defaults = _themeService.ResolveBaseAppearance(
+            _settings,
+            paletteMonth);
+
+        var effective = _themeService.ResolveAppearance(
+            _settings,
+            paletteMonth);
+
+        var title = paletteKey switch
+        {
+            "elena-spring" => "Elena · بهار",
+            "elena-summer" => "Elena · تابستان",
+            "elena-autumn" => "Elena · پاییز",
+            "elena-winter" => "Elena · زمستان",
+            _ => defaults.DisplayName
+        };
+
+        host.Children.Add(new TextBlock
+        {
+            Text = $"پالت فعال: {title}",
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Foreground = ThemeService.Brush(_theme.PrimaryText)
+        });
+
+        host.Children.Add(CreateColorRoleEditor(
+            "Accent کلی رابط",
+            "accent",
+            effective.Accent,
+            defaults.Accent,
+            paletteKey,
+            paletteMonth));
+
+        host.Children.Add(CreateColorRoleEditor(
+            "روز انتخاب‌شده",
+            "selected-day",
+            effective.SelectedDay,
+            defaults.SelectedDay,
+            paletteKey,
+            paletteMonth));
+
+        host.Children.Add(CreateColorRoleEditor(
+            "تعطیلات رسمی",
+            "holiday",
+            effective.HolidayText,
+            defaults.HolidayText,
+            paletteKey,
+            paletteMonth));
+
+        host.Children.Add(CreateColorRoleEditor(
+            "پنل‌ها",
+            "panel",
+            effective.PanelBackground,
+            defaults.PanelBackground,
+            paletteKey,
+            paletteMonth));
+
+        host.Children.Add(CreateColorRoleEditor(
+            "کارت‌ها",
+            "card",
+            effective.CardBackground,
+            defaults.CardBackground,
+            paletteKey,
+            paletteMonth));
+
+        host.Children.Add(CreateColorRoleEditor(
+            "جدول و هدر روزهای تقویم",
+            "calendar",
+            effective.WeekdayColors.FirstOrDefault() ?? effective.CardBackground,
+            defaults.WeekdayColors.FirstOrDefault() ?? defaults.CardBackground,
+            paletteKey,
+            paletteMonth));
+
+        var resetAll = MakeButton("بازنشانی کل پالت این حالت");
+        resetAll.Click += async (_, _) =>
+        {
+            _settings.ColorOverrides.Remove(paletteKey);
+            _settingsService.Save(_settings);
+
+            if (string.Equals(
+                    ThemeService.GetColorPaletteKey(_settings, _month),
+                    paletteKey,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                await ApplyAppearanceAsync();
+            }
+            else
+            {
+                BuildColorPaletteEditor(host, paletteMonth);
+                StatusText.Text = $"پالت {title} به رنگ‌های پیش‌فرض بازگشت.";
+            }
+        };
+        host.Children.Add(resetAll);
+    }
+
+    private FrameworkElement CreateColorRoleEditor(
+        string label,
+        string role,
+        string effectiveColor,
+        string defaultColor,
+        string paletteKey,
+        int paletteMonth)
+    {
+        var row = new Grid { ColumnSpacing = 8 };
+        row.ColumnDefinitions.Add(
+            new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        row.ColumnDefinitions.Add(
+            new ColumnDefinition { Width = GridLength.Auto });
+
+        var labelBlock = new TextBlock
+        {
+            Text = label,
+            VerticalAlignment = VerticalAlignment.Center,
+            Foreground = ThemeService.Brush(_theme.PrimaryText)
+        };
+        Grid.SetColumn(labelBlock, 0);
+        row.Children.Add(labelBlock);
+
+        var colorButton = new Button
+        {
+            Content = ThemeService.NormalizeHexColor(effectiveColor),
+            MinWidth = 118,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Background = ThemeService.Brush(effectiveColor),
+            Foreground = ContrastBrush(effectiveColor),
+            BorderBrush = BrushWithAlpha(_theme.PrimaryText, 0x48),
+            BorderThickness = new Thickness(1)
+        };
+        Grid.SetColumn(colorButton, 1);
+        row.Children.Add(colorButton);
+
+        colorButton.Click += (_, _) =>
+        {
+            var picker = new ColorPicker
+            {
+                Color = ThemeService.ParseColor(effectiveColor),
+                IsAlphaEnabled = true,
+                IsColorSpectrumVisible = true,
+                IsColorSliderVisible = true,
+                IsColorPreviewVisible = true,
+                MinWidth = 320
+            };
+
+            var flyoutStack = new StackPanel
+            {
+                Spacing = 8,
+                Padding = new Thickness(8)
+            };
+
+            flyoutStack.Children.Add(new TextBlock
+            {
+                Text = label,
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
+            });
+            flyoutStack.Children.Add(picker);
+
+            var actions = new Grid { ColumnSpacing = 8 };
+            actions.ColumnDefinitions.Add(new ColumnDefinition());
+            actions.ColumnDefinitions.Add(new ColumnDefinition());
+
+            var apply = MakeButton("اعمال");
+            var reset = MakeButton("پیش‌فرض");
+
+            Grid.SetColumn(apply, 0);
+            Grid.SetColumn(reset, 1);
+            actions.Children.Add(apply);
+            actions.Children.Add(reset);
+            flyoutStack.Children.Add(actions);
+
+            var flyout = new Flyout { Content = flyoutStack };
+
+            apply.Click += async (_, _) =>
+            {
+                SetColorOverride(
+                    paletteKey,
+                    role,
+                    ThemeService.ColorToHex(picker.Color));
+
+                _settingsService.Save(_settings);
+                flyout.Hide();
+
+                if (string.Equals(
+                        ThemeService.GetColorPaletteKey(_settings, _month),
+                        paletteKey,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    await ApplyAppearanceAsync();
+                }
+                else
+                {
+                    StatusText.Text =
+                        $"رنگ «{label}» برای {paletteKey} ذخیره شد.";
+                }
+            };
+
+            reset.Click += async (_, _) =>
+            {
+                ClearColorOverride(paletteKey, role);
+                _settingsService.Save(_settings);
+                flyout.Hide();
+
+                if (string.Equals(
+                        ThemeService.GetColorPaletteKey(_settings, _month),
+                        paletteKey,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    await ApplyAppearanceAsync();
+                }
+                else
+                {
+                    StatusText.Text =
+                        $"رنگ «{label}» برای {paletteKey} به پیش‌فرض برگشت.";
+                }
+            };
+
+            flyout.ShowAt(colorButton);
+        };
+
+        ToolTipService.SetToolTip(
+            colorButton,
+            $"پیش‌فرض: {ThemeService.NormalizeHexColor(defaultColor)}");
+
+        return row;
+    }
+
+    private void SetColorOverride(
+        string paletteKey,
+        string role,
+        string color)
+    {
+        _settings.ColorOverrides ??=
+            new Dictionary<string, AppearanceColorOverrides>();
+
+        if (!_settings.ColorOverrides.TryGetValue(
+                paletteKey,
+                out var custom) ||
+            custom is null)
+        {
+            custom = new AppearanceColorOverrides();
+            _settings.ColorOverrides[paletteKey] = custom;
+        }
+
+        var normalized = ThemeService.NormalizeHexColor(color);
+
+        switch (role)
+        {
+            case "accent":
+                custom.Accent = normalized;
+                break;
+            case "selected-day":
+                custom.SelectedDay = normalized;
+                break;
+            case "holiday":
+                custom.Holiday = normalized;
+                break;
+            case "panel":
+                custom.Panel = normalized;
+                break;
+            case "card":
+                custom.Card = normalized;
+                break;
+            case "calendar":
+                custom.Calendar = normalized;
+                break;
+        }
+    }
+
+    private void ClearColorOverride(
+        string paletteKey,
+        string role)
+    {
+        if (_settings.ColorOverrides is null ||
+            !_settings.ColorOverrides.TryGetValue(
+                paletteKey,
+                out var custom) ||
+            custom is null)
+            return;
+
+        switch (role)
+        {
+            case "accent":
+                custom.Accent = null;
+                break;
+            case "selected-day":
+                custom.SelectedDay = null;
+                break;
+            case "holiday":
+                custom.Holiday = null;
+                break;
+            case "panel":
+                custom.Panel = null;
+                break;
+            case "card":
+                custom.Card = null;
+                break;
+            case "calendar":
+                custom.Calendar = null;
+                break;
+        }
+
+        if (custom.IsEmpty())
+            _settings.ColorOverrides.Remove(paletteKey);
+    }
+
+    private static SolidColorBrush ContrastBrush(string color)
+    {
+        var parsed = ThemeService.ParseColor(color);
+        var luminance =
+            (0.299 * parsed.R + 0.587 * parsed.G + 0.114 * parsed.B) / 255.0;
+
+        return new SolidColorBrush(
+            luminance > 0.58
+                ? Colors.Black
+                : Colors.White);
     }
 
     private FrameworkElement BuildElenaAccentSubmenu()
