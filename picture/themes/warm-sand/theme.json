@@ -1,0 +1,21 @@
+{
+  "id": "warm-sand",
+  "displayName": "Warm Sand",
+  "windowBackground": "#FFF8F3EA",
+  "panelBackground": "#F0FFF9F0",
+  "cardBackground": "#F7FFFDF8",
+  "primaryText": "#FF40362C",
+  "secondaryText": "#FF7C6D5F",
+  "accent": "#FFE5CCAA",
+  "selectedDay": "#FFDDB78B",
+  "holidayText": "#FFC95C57",
+  "weekdayColors": [
+    "#FFF1E6D7",
+    "#FFF0E4D3",
+    "#FFF2E7D9",
+    "#FFF0E4D3",
+    "#FFF1E6D7",
+    "#FFF0E4D3",
+    "#FFF6E1DF"
+  ]
+}
