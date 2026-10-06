@@ -2748,9 +2748,10 @@ public sealed class MainWindow : Window
             if (_settings.BackgroundOpacity < 0.45)
                 _settings.BackgroundOpacity = 0.72;
 
-            _backgroundOpacityBox.Text = _settings.BackgroundOpacity.ToString(
-                "0.00",
-                System.Globalization.CultureInfo.InvariantCulture);
+            _backgroundOpacitySlider.Value =
+                Math.Round(Math.Clamp(_settings.BackgroundOpacity, 0, 0.95) * 100);
+            _backgroundOpacityValue.Text =
+                $"{Math.Round(_backgroundOpacitySlider.Value):0}%";
 
             _settingsService.Save(_settings);
 
