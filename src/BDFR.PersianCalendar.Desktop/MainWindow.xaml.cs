@@ -35,6 +35,7 @@ public sealed partial class MainWindow : Window
 
         BuildCalendar();
         _ = LoadSelectedDayAsync();
+        _ = LoadActivitiesAsync();
     }
 
     private void BuildCalendar()
@@ -125,8 +126,14 @@ public sealed partial class MainWindow : Window
             {
                 if (sender is CheckBox cb && cb.Tag is string id)
                 {
-                    await _repository.SetTaskCompletedAsync(id, cb.IsChecked == true);
+                    var completed = cb.IsChecked == true;
+                    await _repository.SetTaskCompletedAsync(id, completed);
+                    await _repository.AddActivityAsync(new ActivityLogEntry(
+                        Guid.NewGuid().ToString("N"), DateTimeOffset.UtcNow,
+                        completed ? "task-completed" : "task-reopened",
+                        CalendarItemKind.Task, id, item.Title));
                     await LoadSelectedDayAsync();
+                    await LoadActivitiesAsync();
                 }
             };
             TasksPanel.Children.Add(checkbox);
@@ -160,8 +167,12 @@ public sealed partial class MainWindow : Window
     private async void SaveNote_Click(object sender, RoutedEventArgs e)
     {
         await _repository.UpsertNoteAsync(_selected, NoteBox.Text ?? string.Empty);
+        await _repository.AddActivityAsync(new ActivityLogEntry(
+            Guid.NewGuid().ToString("N"), DateTimeOffset.UtcNow,
+            "note-saved", CalendarItemKind.Note, null, $"یادداشت {_selected} ذخیره شد"));
         StatusText.Text = "یادداشت ذخیره شد.";
         await LoadSelectedDayAsync();
+        await LoadActivitiesAsync();
     }
 
     private async void AddEvent_Click(object sender, RoutedEventArgs e)
@@ -178,6 +189,7 @@ public sealed partial class MainWindow : Window
         EventTimeBox.Text = "";
         StatusText.Text = "رویداد و یادآور ثبت شد.";
         await LoadSelectedDayAsync();
+        await LoadActivitiesAsync();
     }
 
     private async void AddTask_Click(object sender, RoutedEventArgs e)
@@ -204,6 +216,7 @@ public sealed partial class MainWindow : Window
         TaskTimeBox.Text = "";
         StatusText.Text = "کار ثبت شد.";
         await LoadSelectedDayAsync();
+        await LoadActivitiesAsync();
     }
 
     private async void QuickAdd_Click(object sender, RoutedEventArgs e)
@@ -228,6 +241,7 @@ public sealed partial class MainWindow : Window
             BuildCalendar();
             await LoadSelectedDayAsync();
             StatusText.Text = "فعالیت با افزودن سریع ثبت شد.";
+            await LoadActivitiesAsync();
         }
         catch (Exception ex)
         {
@@ -254,12 +268,14 @@ public sealed partial class MainWindow : Window
 
         try
         {
-            await _specialOccasions.AddPersianAnnualAsync(
-                SpecialTitleBox.Text.Trim(), month, day,
+            var calendarSystem = (CalendarSystemKind)Math.Clamp(SpecialCalendarBox.SelectedIndex, 0, 2);
+            await _specialOccasions.AddAnnualAsync(
+                SpecialTitleBox.Text.Trim(), calendarSystem, month, day,
                 reminderDays.Length == 0 ? [7, 1, 0] : reminderDays,
                 new TimeOnly(9, 0));
             SpecialTitleBox.Text = "";
             StatusText.Text = "مناسبت شخصی و یادآورهای سالانه ثبت شد.";
+            await LoadActivitiesAsync();
         }
         catch (Exception ex)
         {
@@ -276,6 +292,7 @@ public sealed partial class MainWindow : Window
             var count = await _planner.SyncOccasionsAsync(_occasionSource, _year);
             StatusText.Text = $"{count} مناسبت برای سال {_year} همگام شد.";
             await LoadSelectedDayAsync();
+            await LoadActivitiesAsync();
         }
         catch (Exception ex)
         {
@@ -286,4 +303,58 @@ public sealed partial class MainWindow : Window
             SyncProgress.IsActive = false;
         }
     }
+    private async void RefreshActivities_Click(object sender, RoutedEventArgs e)
+        => await LoadActivitiesAsync();
+
+    private async Task LoadActivitiesAsync()
+    {
+        var items = await _repository.GetRecentActivitiesAsync(8);
+        ActivityPanel.Children.Clear();
+
+        if (items.Count == 0)
+        {
+            ActivityPanel.Children.Add(new TextBlock
+            {
+                Text = "هنوز فعالیتی ثبت نشده است.",
+                Opacity = 0.55,
+                TextWrapping = TextWrapping.Wrap
+            });
+            return;
+        }
+
+        foreach (var item in items)
+        {
+            var action = item.Action switch
+            {
+                "event-created" => "رویداد",
+                "task-created" => "کار جدید",
+                "task-completed" => "کار انجام شد",
+                "task-reopened" => "کار باز شد",
+                "note-saved" => "یادداشت",
+                "occasion-sync" => "همگام‌سازی مناسبت‌ها",
+                "special-occasion-created" => "مناسبت شخصی",
+                "notification-fired" => "اعلان",
+                "reminder-completed" => "یادآور انجام شد",
+                "reminder-snoozed" => "یادآور به تعویق افتاد",
+                "reminder-dismissed" => "یادآور رد شد",
+                "occasion-sync-failed" => "خطای همگام‌سازی",
+                _ => item.Action
+            };
+
+            ActivityPanel.Children.Add(new TextBlock
+            {
+                Text = $"{action} · {item.CreatedAt.ToLocalTime():MM/dd HH:mm}\n{item.Message}",
+                TextWrapping = TextWrapping.Wrap,
+                Opacity = 0.82
+            });
+        }
+    }
+
+    public void NotifyExternalChange(string message)
+    {
+        StatusText.Text = message;
+        _ = LoadSelectedDayAsync();
+        _ = LoadActivitiesAsync();
+    }
+
 }
