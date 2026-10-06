@@ -791,43 +791,156 @@ public sealed class MainWindow : Window
 
     private async Task SelectElenaModeAsync()
     {
-        _settings.AppearanceMode = "elena";
-        _settings.BackgroundMode = "none";
-        _settings.UseSeasonalBackground = true;
+        var snapshot = CaptureAppearanceSettings();
 
-        if (_settings.BackgroundOpacity < 0.45)
-            _settings.BackgroundOpacity = 0.62;
+        try
+        {
+            StartupDiagnostics.Log("Appearance switch requested: Elena Mode.");
 
-        _settingsService.Save(_settings);
-        await ApplyAppearanceAsync();
+            _settings.AppearanceMode = "elena";
+            _settings.BackgroundMode = "none";
+            _settings.UseSeasonalBackground = true;
+
+            if (_settings.BackgroundOpacity < 0.45)
+                _settings.BackgroundOpacity = 0.62;
+
+            _settingsService.Save(_settings);
+            await ApplyAppearanceAsync();
+
+            StartupDiagnostics.Log("Appearance switch completed: Elena Mode.");
+        }
+        catch (Exception ex)
+        {
+            await RecoverAppearanceAsync(snapshot, ex, "Elena Mode");
+        }
     }
 
     private async Task SelectElenaAccentAsync(string accentId)
     {
-        _settings.AppearanceMode = "elena";
-        _settings.ElenaAccentId = accentId;
-        _settings.UseSeasonalBackground = true;
-        _settingsService.Save(_settings);
-        await ApplyAppearanceAsync();
+        var snapshot = CaptureAppearanceSettings();
+
+        try
+        {
+            StartupDiagnostics.Log($"Elena accent switch requested: {accentId}.");
+
+            _settings.AppearanceMode = "elena";
+            _settings.ElenaAccentId = accentId;
+            _settings.UseSeasonalBackground = true;
+            _settingsService.Save(_settings);
+
+            await ApplyAppearanceAsync();
+
+            StartupDiagnostics.Log($"Elena accent switch completed: {accentId}.");
+        }
+        catch (Exception ex)
+        {
+            await RecoverAppearanceAsync(snapshot, ex, $"Accent {accentId}");
+        }
     }
 
     private async Task SelectThemeAsync(string themeId)
     {
-        _settings.AppearanceMode = "theme";
-        _settings.ThemeId = themeId;
-        _settings.UseSeasonalBackground = false;
+        var snapshot = CaptureAppearanceSettings();
 
-        if (string.Equals(_settings.BackgroundMode, "elena", StringComparison.OrdinalIgnoreCase))
-            _settings.BackgroundMode = "none";
+        try
+        {
+            StartupDiagnostics.Log($"Theme switch requested: {themeId}.");
 
-        _settingsService.Save(_settings);
-        await ApplyAppearanceAsync();
+            _settings.AppearanceMode = "theme";
+            _settings.ThemeId = themeId;
+            _settings.UseSeasonalBackground = false;
+
+            if (string.Equals(_settings.BackgroundMode, "elena", StringComparison.OrdinalIgnoreCase))
+                _settings.BackgroundMode = "none";
+
+            _settingsService.Save(_settings);
+            await ApplyAppearanceAsync();
+
+            StartupDiagnostics.Log($"Theme switch completed: {themeId}.");
+        }
+        catch (Exception ex)
+        {
+            await RecoverAppearanceAsync(snapshot, ex, $"Theme {themeId}");
+        }
     }
+
+    private AppearanceSettingsSnapshot CaptureAppearanceSettings()
+        => new(
+            _settings.AppearanceMode,
+            _settings.ThemeId,
+            _settings.ElenaAccentId,
+            _settings.BackgroundMode,
+            _settings.UseSeasonalBackground,
+            _settings.BackgroundOpacity);
+
+    private async Task RecoverAppearanceAsync(
+        AppearanceSettingsSnapshot snapshot,
+        Exception ex,
+        string requestedAppearance)
+    {
+        StartupDiagnostics.Log(
+            $"Appearance switch failed ({requestedAppearance}); rolling back: {ex}");
+
+        _settings.AppearanceMode = snapshot.AppearanceMode;
+        _settings.ThemeId = snapshot.ThemeId;
+        _settings.ElenaAccentId = snapshot.ElenaAccentId;
+        _settings.BackgroundMode = snapshot.BackgroundMode;
+        _settings.UseSeasonalBackground = snapshot.UseSeasonalBackground;
+        _settings.BackgroundOpacity = snapshot.BackgroundOpacity;
+        _settingsService.Save(_settings);
+
+        try
+        {
+            _theme = _themeService.ResolveAppearance(_settings);
+            ApplyAppearanceBrushesOnly();
+            BuildCalendar();
+            await LoadSelectedDayAsync();
+            await ApplyBackgroundAsync();
+
+            StatusText.Text =
+                $"اعمال {requestedAppearance} انجام نشد؛ ظاهر قبلی بازیابی شد.";
+        }
+        catch (Exception recoveryEx)
+        {
+            StartupDiagnostics.Log($"Appearance rollback UI refresh failed: {recoveryEx}");
+            StatusText.Text =
+                $"تعویض ظاهر انجام نشد. تنظیم قبلی حفظ شد. جزئیات در startup.log ثبت شد.";
+        }
+    }
+
+    private sealed record AppearanceSettingsSnapshot(
+        string AppearanceMode,
+        string ThemeId,
+        string ElenaAccentId,
+        string? BackgroundMode,
+        bool UseSeasonalBackground,
+        double BackgroundOpacity);
 
     private async Task ApplyAppearanceAsync()
     {
         _theme = _themeService.ResolveAppearance(_settings);
+        ApplyAppearanceBrushesOnly();
 
+        // Dynamic controls are rebuilt only after their containers are detached/cleared.
+        // BuildPictureLibraryPanel now clears its own children before reusing persistent
+        // UIElement instances.
+        BuildSettingsPanel();
+        BuildCalendar();
+
+        await LoadSelectedDayAsync();
+        await LoadActivitiesAsync();
+        await ApplyBackgroundAsync();
+
+        StatusText.Text = string.Equals(
+            _settings.AppearanceMode,
+            "elena",
+            StringComparison.OrdinalIgnoreCase)
+            ? $"Elena Mode فعال شد · Accent: {AppearanceCatalog.GetElenaAccent(_settings.ElenaAccentId).DisplayName}"
+            : $"Theme فعال شد: {_theme.DisplayName}";
+    }
+
+    private void ApplyAppearanceBrushesOnly()
+    {
         if (_rootSurface is not null)
         {
             _rootSurface.Background = ThemeService.Brush(_theme.WindowBackground);
@@ -857,25 +970,32 @@ public sealed class MainWindow : Window
             _rightPanelSurface.BorderBrush = ThemeService.Brush(_theme.Accent);
         }
 
+        if (_settingsSurface is not null)
+        {
+            _settingsSurface.Background = BrushWithAlpha(_theme.CardBackground, 0xE0);
+            _settingsSurface.BorderBrush = ThemeService.Brush(_theme.Accent);
+        }
+
+        if (_pictureLibrarySurface is not null)
+        {
+            _pictureLibrarySurface.Background = BrushWithAlpha(_theme.CardBackground, 0x72);
+            _pictureLibrarySurface.BorderBrush = BrushWithAlpha("#FFFFFFFF", 0xA0);
+        }
+
+        if (_aboutUsSurface is not null)
+        {
+            _aboutUsSurface.Background = BrushWithAlpha(_theme.PanelBackground, 0xA0);
+            _aboutUsSurface.BorderBrush = BrushWithAlpha(_theme.Accent, 0x88);
+        }
+
+        if (_accentSubmenuSurface is not null)
+            _accentSubmenuSurface.BorderBrush = BrushWithAlpha(_theme.Accent, 0x80);
+
         MonthTitle.Foreground = ThemeService.Brush(_theme.PrimaryText);
         SelectedDateTitle.Foreground = ThemeService.Brush(_theme.PrimaryText);
 
         ApplyGenericTheme(Content);
         UpdateWeekdayHeaderAppearance();
-
-        // Rebuild only dynamic surfaces whose children are safe to detach/recreate.
-        BuildSettingsPanel();
-        BuildCalendar();
-        await LoadSelectedDayAsync();
-        await LoadActivitiesAsync();
-        await ApplyBackgroundAsync();
-
-        StatusText.Text = string.Equals(
-            _settings.AppearanceMode,
-            "elena",
-            StringComparison.OrdinalIgnoreCase)
-            ? $"Elena Mode فعال شد · Accent: {AppearanceCatalog.GetElenaAccent(_settings.ElenaAccentId).DisplayName}"
-            : $"Theme فعال شد: {_theme.DisplayName}";
     }
 
     private void UpdateWeekdayHeaderAppearance()
@@ -896,23 +1016,33 @@ public sealed class MainWindow : Window
         if (root is null)
             return;
 
-        if (root is Button button)
+        try
         {
-            button.Background = ThemeService.Brush(_theme.Accent);
-            button.Foreground = ThemeService.Brush(_theme.PrimaryText);
-        }
-        else if (root is TextBlock text)
-        {
-            text.Foreground = ThemeService.Brush(_theme.PrimaryText);
-        }
-        else if (root is CheckBox checkBox)
-        {
-            checkBox.Foreground = ThemeService.Brush(_theme.PrimaryText);
-        }
+            if (root is Button button)
+            {
+                button.Background = ThemeService.Brush(_theme.Accent);
+                button.Foreground = ThemeService.Brush(_theme.PrimaryText);
+            }
+            else if (root is TextBlock text)
+            {
+                text.Foreground = ThemeService.Brush(_theme.PrimaryText);
+            }
+            else if (root is CheckBox checkBox)
+            {
+                checkBox.Foreground = ThemeService.Brush(_theme.PrimaryText);
+            }
 
-        var count = VisualTreeHelper.GetChildrenCount(root);
-        for (var i = 0; i < count; i++)
-            ApplyGenericTheme(VisualTreeHelper.GetChild(root, i));
+            var count = VisualTreeHelper.GetChildrenCount(root);
+            for (var i = 0; i < count; i++)
+                ApplyGenericTheme(VisualTreeHelper.GetChild(root, i));
+        }
+        catch (Exception ex)
+        {
+            // Theme changes must never terminate the application because a transient
+            // WinUI template element disappeared while walking the visual tree.
+            StartupDiagnostics.Log(
+                $"Theme traversal skipped transient element {root.GetType().Name}: {ex.Message}");
+        }
     }
 
     private async void BackgroundOpacityBox_LostFocus(object sender, RoutedEventArgs e)
@@ -944,6 +1074,11 @@ public sealed class MainWindow : Window
 
     private FrameworkElement BuildPictureLibraryPanel()
     {
+        // This panel contains persistent UIElement instances such as
+        // _pictureLibrarySummary. It MUST be cleared before a settings rebuild,
+        // otherwise WinUI attempts to parent the same element twice and throws
+        // COMException 0x800F1000.
+        _pictureLibraryPanel.Children.Clear();
         _pictureLibraryPanel.Spacing = 10;
         _pictureLibraryPanel.Padding = new Thickness(10);
         _pictureLibraryPanel.Visibility = Visibility.Collapsed;
