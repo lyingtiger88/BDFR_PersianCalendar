@@ -28,4 +28,7 @@ public sealed class AppSettings
 
     // Zara Pastel optional Liquid Glass presentation.
     public bool GlassMode { get; set; }
+
+    // Global UI font. Any installed Windows font family can be used.
+    public string FontFamilyName { get; set; } = "Segoe UI Variable";
 }

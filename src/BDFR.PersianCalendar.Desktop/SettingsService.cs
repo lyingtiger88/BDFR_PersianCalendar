@@ -82,6 +82,9 @@ public sealed class SettingsService
 
         if (string.IsNullOrWhiteSpace(settings.ElenaAccentId))
             settings.ElenaAccentId = "seasonal";
+
+        if (string.IsNullOrWhiteSpace(settings.FontFamilyName))
+            settings.FontFamilyName = "Segoe UI Variable";
     }
 
     public void Save(AppSettings settings)
@@ -89,6 +92,9 @@ public sealed class SettingsService
         try
         {
             settings.BackgroundOpacity = Math.Clamp(settings.BackgroundOpacity, 0, 0.95);
+            settings.FontFamilyName = string.IsNullOrWhiteSpace(settings.FontFamilyName)
+                ? "Segoe UI Variable"
+                : settings.FontFamilyName.Trim();
             Directory.CreateDirectory(DataRoot);
             File.WriteAllText(SettingsPath, JsonSerializer.Serialize(settings, JsonOptions));
         }

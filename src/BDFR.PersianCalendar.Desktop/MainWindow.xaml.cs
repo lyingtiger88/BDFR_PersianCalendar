@@ -31,6 +31,7 @@ public sealed class MainWindow : Window
     private readonly CheckBox _occasionPicturesCheck = new();
     private readonly CheckBox _glassModeCheck = new();
     private readonly TextBox _backgroundOpacityBox = new();
+    private readonly TextBox _fontFamilyBox = new();
     private readonly TextBlock _backgroundPathText = new();
     private readonly StackPanel _pictureLibraryPanel = new();
     private readonly TextBlock _pictureLibrarySummary = new();
@@ -74,6 +75,7 @@ public sealed class MainWindow : Window
     private readonly StackPanel ActivityPanel = new();
     private readonly Dictionary<PersianDate, StackPanel> _calendarOccasionPanels = new();
     private readonly Dictionary<PersianDate, TextBlock> _calendarDayNumberLabels = new();
+    private readonly Dictionary<PersianDate, Border> _calendarMourningRibbons = new();
     private readonly HashSet<int> _yearSyncInFlight = new();
     private readonly HashSet<int> _yearSyncedThisSession = new();
 
@@ -107,6 +109,7 @@ public sealed class MainWindow : Window
 
         Title = "Anahita";
         Content = BuildRoot();
+        ApplyUserFont(Content);
 
         Activated += (_, _) => StartupDiagnostics.Log("MainWindow Activated event fired.");
         Closed += (_, _) => StartupDiagnostics.Log("MainWindow Closed event fired.");
@@ -849,6 +852,42 @@ public sealed class MainWindow : Window
         _occasionPicturesCheck.Click += OccasionPicturesCheck_Click;
         _settingsPanel.Children.Add(_occasionPicturesCheck);
 
+        _settingsPanel.Children.Add(new Border
+        {
+            Height = 1,
+            Margin = new Thickness(0, 6, 0, 4),
+            Background = BrushWithAlpha(_theme.SecondaryText, 0x30)
+        });
+
+        _settingsPanel.Children.Add(new TextBlock
+        {
+            Text = "فونت رابط کاربری",
+            FontSize = 15,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Foreground = ThemeService.Brush(_theme.PrimaryText)
+        });
+
+        _settingsPanel.Children.Add(new TextBlock
+        {
+            Text = "نام هر فونت نصب‌شده در ویندوز را وارد کنید؛ مثل Segoe UI Variable، Tahoma، Vazirmatn یا B Nazanin.",
+            FontSize = 10.5,
+            TextWrapping = TextWrapping.Wrap,
+            Opacity = 0.65,
+            Foreground = ThemeService.Brush(_theme.SecondaryText)
+        });
+
+        _fontFamilyBox.Text = _settings.FontFamilyName;
+        _fontFamilyBox.PlaceholderText = "Segoe UI Variable";
+        _settingsPanel.Children.Add(_fontFamilyBox);
+
+        var applyFont = MakeButton("اعمال فونت");
+        applyFont.Click += ApplyFont_Click;
+        _settingsPanel.Children.Add(applyFont);
+
+        var resetFont = MakeButton("بازگشت به فونت پیش‌فرض");
+        resetFont.Click += ResetFont_Click;
+        _settingsPanel.Children.Add(resetFont);
+
         var pictureLibraryToggle = MakeButton("🖼 کتابخانه تصاویر");
         pictureLibraryToggle.Click += async (_, _) =>
         {
@@ -1290,6 +1329,13 @@ public sealed class MainWindow : Window
 
         try
         {
+            var userFont = ResolveUserFont();
+
+            if (root is Control fontControl)
+                fontControl.FontFamily = userFont;
+            if (root is TextBlock fontText)
+                fontText.FontFamily = userFont;
+
             if (root is Button button)
             {
                 button.Background = ThemeService.Brush(_theme.Accent);
@@ -1321,6 +1367,101 @@ public sealed class MainWindow : Window
             StartupDiagnostics.Log(
                 $"Theme traversal skipped transient element {root.GetType().Name}: {ex.Message}");
         }
+    }
+
+    private FontFamily ResolveUserFont()
+    {
+        var requested = string.IsNullOrWhiteSpace(_settings.FontFamilyName)
+            ? "Segoe UI Variable"
+            : _settings.FontFamilyName.Trim();
+
+        try
+        {
+            return new FontFamily(requested);
+        }
+        catch (Exception ex)
+        {
+            StartupDiagnostics.Log(
+                $"Font family '{requested}' could not be created; default used: {ex.Message}");
+            return new FontFamily("Segoe UI Variable");
+        }
+    }
+
+    private void ApplyUserFont(DependencyObject? root)
+    {
+        if (root is null)
+            return;
+
+        try
+        {
+            var font = ResolveUserFont();
+
+            if (root is Control control)
+                control.FontFamily = font;
+
+            if (root is TextBlock textBlock)
+                textBlock.FontFamily = font;
+
+            var count = VisualTreeHelper.GetChildrenCount(root);
+            for (var i = 0; i < count; i++)
+                ApplyUserFont(VisualTreeHelper.GetChild(root, i));
+        }
+        catch (Exception ex)
+        {
+            StartupDiagnostics.Log(
+                $"Font traversal skipped {root.GetType().Name}: {ex.Message}");
+        }
+    }
+
+    private void ApplyFont_Click(object sender, RoutedEventArgs e)
+    {
+        var requested = (_fontFamilyBox.Text ?? string.Empty).Trim();
+        _settings.FontFamilyName = string.IsNullOrWhiteSpace(requested)
+            ? "Segoe UI Variable"
+            : requested;
+
+        _settingsService.Save(_settings);
+        _fontFamilyBox.Text = _settings.FontFamilyName;
+        ApplyUserFont(Content);
+
+        StatusText.Text =
+            $"فونت رابط کاربری روی «{_settings.FontFamilyName}» تنظیم شد.";
+    }
+
+    private void ResetFont_Click(object sender, RoutedEventArgs e)
+    {
+        _settings.FontFamilyName = "Segoe UI Variable";
+        _settingsService.Save(_settings);
+        _fontFamilyBox.Text = _settings.FontFamilyName;
+        ApplyUserFont(Content);
+        StatusText.Text = "فونت رابط کاربری به حالت پیش‌فرض برگشت.";
+    }
+
+    private static bool IsMourningHolidayTitle(string? title)
+    {
+        if (string.IsNullOrWhiteSpace(title))
+            return false;
+
+        var normalized = title
+            .Replace('ي', 'ی')
+            .Replace('ك', 'ک')
+            .Replace("\u200c", " ")
+            .Trim();
+
+        string[] keywords =
+        [
+            "شهادت",
+            "رحلت",
+            "وفات",
+            "عاشورا",
+            "تاسوعا",
+            "اربعین",
+            "عزاداری",
+            "سوگواری"
+        ];
+
+        return keywords.Any(keyword =>
+            normalized.Contains(keyword, StringComparison.OrdinalIgnoreCase));
     }
 
     private async void GlassModeCheck_Click(object sender, RoutedEventArgs e)
@@ -1886,6 +2027,7 @@ public sealed class MainWindow : Window
         CalendarGrid.ColumnDefinitions.Clear();
         _calendarOccasionPanels.Clear();
         _calendarDayNumberLabels.Clear();
+        _calendarMourningRibbons.Clear();
 
         for (var i = 0; i < 7; i++)
             CalendarGrid.ColumnDefinitions.Add(new ColumnDefinition());
@@ -1923,6 +2065,34 @@ public sealed class MainWindow : Window
             content.Children.Add(dayNumber);
             content.Children.Add(occasionPanel);
 
+            // Diagonal black mourning ribbon. It stays hidden for normal holidays
+            // and becomes visible only for official mourning holidays.
+            var mourningRibbon = new Border
+            {
+                Width = 34,
+                Height = 8,
+                Background = new SolidColorBrush(Colors.Black),
+                CornerRadius = new CornerRadius(2),
+                HorizontalAlignment = HorizontalAlignment.Left,
+                VerticalAlignment = VerticalAlignment.Top,
+                Margin = new Thickness(-8, 7, 0, 0),
+                FlowDirection = FlowDirection.LeftToRight,
+                Visibility = Visibility.Collapsed,
+                IsHitTestVisible = false,
+                RenderTransformOrigin = new Windows.Foundation.Point(0.5, 0.5),
+                RenderTransform = new RotateTransform { Angle = -45 }
+            };
+            ToolTipService.SetToolTip(
+                mourningRibbon,
+                "تعطیل رسمی سوگواری");
+
+            var cellLayer = new Grid
+            {
+                HorizontalAlignment = HorizontalAlignment.Stretch
+            };
+            cellLayer.Children.Add(content);
+            cellLayer.Children.Add(mourningRibbon);
+
             var button = new Button
             {
                 HorizontalAlignment = HorizontalAlignment.Stretch,
@@ -1949,7 +2119,7 @@ public sealed class MainWindow : Window
                     ? new Thickness(IsLiquidGlassActive() ? 2.0 : 1.6)
                     : new Thickness(1),
                 CornerRadius = new CornerRadius(IsLiquidGlassActive() ? 20 : 14),
-                Content = content
+                Content = cellLayer
             };
 
             var captured = cell.Date;
@@ -1962,12 +2132,14 @@ public sealed class MainWindow : Window
 
             _calendarOccasionPanels[captured] = occasionPanel;
             _calendarDayNumberLabels[captured] = dayNumber;
+            _calendarMourningRibbons[captured] = mourningRibbon;
 
             Grid.SetRow(button, i / 7);
             Grid.SetColumn(button, i % 7);
             CalendarGrid.Children.Add(button);
         }
 
+        ApplyUserFont(CalendarGrid);
         _ = LoadCalendarCellOccasionsAsync(_year, _month);
         _ = EnsureYearOccasionsAsync(_year);
         _ = ApplyBackgroundAsync();
@@ -2024,11 +2196,26 @@ public sealed class MainWindow : Window
                     });
                 }
 
-                if (snapshot.IsHoliday &&
+                var hasOfficialHoliday = snapshot.Occasions.Any(x => x.IsHoliday);
+
+                if ((date.DayOfWeek == DayOfWeek.Friday || hasOfficialHoliday) &&
                     _calendarDayNumberLabels.TryGetValue(date, out var dayLabel))
                 {
                     dayLabel.Foreground = ThemeService.Brush(_theme.HolidayText);
+                    dayLabel.FontWeight = Microsoft.UI.Text.FontWeights.SemiBold;
                 }
+
+                var hasMourningHoliday = snapshot.Occasions.Any(
+                    x => x.IsHoliday && IsMourningHolidayTitle(x.Title));
+
+                if (_calendarMourningRibbons.TryGetValue(date, out var ribbon))
+                {
+                    ribbon.Visibility = hasMourningHoliday
+                        ? Visibility.Visible
+                        : Visibility.Collapsed;
+                }
+
+                ApplyUserFont(panel);
             }
         }
         catch (Exception ex)
@@ -2198,6 +2385,10 @@ public sealed class MainWindow : Window
             }
             if (snapshot.Tasks.Count == 0)
                 TasksPanel.Children.Add(new TextBlock { Text = "کاری ندارید", Opacity = 0.55 });
+
+            ApplyUserFont(OccasionsPanel);
+            ApplyUserFont(EventsPanel);
+            ApplyUserFont(TasksPanel);
         }
         catch (Exception ex)
         {
@@ -2475,6 +2666,8 @@ public sealed class MainWindow : Window
                     Opacity = 0.82
                 });
             }
+
+            ApplyUserFont(ActivityPanel);
         }
         catch (Exception ex)
         {
