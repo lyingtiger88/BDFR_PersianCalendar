@@ -459,6 +459,215 @@ public sealed class MainWindow : Window
     }
 
 
+    private FrameworkElement BuildSettingsPanel()
+    {
+        _settingsPanel.Spacing = 8;
+        _settingsPanel.Padding = new Thickness(10);
+        _settingsPanel.Visibility = Visibility.Collapsed;
+
+        _settingsPanel.Children.Add(new Border
+        {
+            Background = ThemeService.Brush(_theme.WeekdayColors.ElementAtOrDefault(4) ?? _theme.Accent),
+            CornerRadius = new CornerRadius(12),
+            Padding = new Thickness(10),
+            Child = new StackPanel
+            {
+                Spacing = 3,
+                Children =
+                {
+                    new TextBlock
+                    {
+                        Text = "Zara Pastel",
+                        FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                        Foreground = ThemeService.Brush(_theme.PrimaryText)
+                    },
+                    new TextBlock
+                    {
+                        Text = "تم اختصاصی پاستلی رنگارنگ",
+                        FontSize = 12,
+                        Opacity = 0.7,
+                        Foreground = ThemeService.Brush(_theme.SecondaryText)
+                    }
+                }
+            }
+        });
+
+        _seasonalBackgroundCheck.Content = "بک‌گراند فصلی";
+        _seasonalBackgroundCheck.IsChecked = _settings.UseSeasonalBackground;
+        _seasonalBackgroundCheck.Click += async (_, _) =>
+        {
+            _settings.UseSeasonalBackground = _seasonalBackgroundCheck.IsChecked == true;
+            _settingsService.Save(_settings);
+            await ApplyBackgroundAsync();
+        };
+        _settingsPanel.Children.Add(_seasonalBackgroundCheck);
+
+        var chooseBackground = MakeButton("انتخاب عکس زمینه دلخواه");
+        chooseBackground.Click += SelectCustomBackground_Click;
+        _settingsPanel.Children.Add(chooseBackground);
+
+        var clearBackground = MakeButton("حذف عکس زمینه دلخواه");
+        clearBackground.Click += async (_, _) =>
+        {
+            _settings.CustomBackgroundPath = null;
+            _settingsService.Save(_settings);
+            await ApplyBackgroundAsync();
+        };
+        _settingsPanel.Children.Add(clearBackground);
+
+        _backgroundPathText.TextWrapping = TextWrapping.Wrap;
+        _backgroundPathText.FontSize = 11;
+        _backgroundPathText.Opacity = 0.65;
+        _settingsPanel.Children.Add(_backgroundPathText);
+
+        _settingsPanel.Children.Add(new TextBlock
+        {
+            Text = "شدت عکس زمینه (۰ تا ۰٫۸۵)",
+            FontSize = 12,
+            Foreground = ThemeService.Brush(_theme.SecondaryText)
+        });
+
+        _backgroundOpacityBox.Text = _settings.BackgroundOpacity.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
+        _backgroundOpacityBox.PlaceholderText = "مثلاً 0.18";
+        _backgroundOpacityBox.LostFocus += async (_, _) =>
+        {
+            if (double.TryParse(
+                    PersianQuickAddParser.NormalizeDigits(_backgroundOpacityBox.Text ?? ""),
+                    System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out var opacity))
+            {
+                _settings.BackgroundOpacity = Math.Clamp(opacity, 0, 0.85);
+                _settingsService.Save(_settings);
+                await ApplyBackgroundAsync();
+            }
+            else
+            {
+                _backgroundOpacityBox.Text = _settings.BackgroundOpacity.ToString(
+                    "0.00",
+                    System.Globalization.CultureInfo.InvariantCulture);
+            }
+        };
+        _settingsPanel.Children.Add(_backgroundOpacityBox);
+
+        _occasionPicturesCheck.Content = "نمایش عکس برای مناسبت‌ها";
+        _occasionPicturesCheck.IsChecked = _settings.ShowOccasionPictures;
+        _occasionPicturesCheck.Click += async (_, _) =>
+        {
+            _settings.ShowOccasionPictures = _occasionPicturesCheck.IsChecked == true;
+            _settingsService.Save(_settings);
+            await LoadSelectedDayAsync();
+        };
+        _settingsPanel.Children.Add(_occasionPicturesCheck);
+
+        var openPictures = MakeButton("باز کردن پوشه picture");
+        openPictures.Click += (_, _) =>
+        {
+            try
+            {
+                var path = _themeService.PictureRoot;
+                if (Directory.Exists(path))
+                {
+                    Process.Start(new ProcessStartInfo("explorer.exe", path)
+                    {
+                        UseShellExecute = true
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                StartupDiagnostics.Log($"Open picture folder failed: {ex}");
+            }
+        };
+        _settingsPanel.Children.Add(openPictures);
+
+        return new Border
+        {
+            Background = ThemeService.Brush(_theme.CardBackground),
+            CornerRadius = new CornerRadius(14),
+            BorderBrush = ThemeService.Brush(_theme.Accent),
+            BorderThickness = new Thickness(1),
+            Child = _settingsPanel
+        };
+    }
+
+    private async void SelectCustomBackground_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var picker = new FileOpenPicker
+            {
+                SuggestedStartLocation = PickerLocationId.PicturesLibrary
+            };
+            picker.FileTypeFilter.Add(".jpg");
+            picker.FileTypeFilter.Add(".jpeg");
+            picker.FileTypeFilter.Add(".png");
+            picker.FileTypeFilter.Add(".webp");
+
+            var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+            WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
+
+            var file = await picker.PickSingleFileAsync();
+            if (file is null)
+                return;
+
+            var copied = await _settingsService.CopyCustomBackgroundAsync(file.Path);
+            if (copied is null)
+            {
+                StatusText.Text = "کپی تصویر زمینه انجام نشد.";
+                return;
+            }
+
+            _settings.CustomBackgroundPath = copied;
+            _settingsService.Save(_settings);
+            await ApplyBackgroundAsync();
+            StatusText.Text = "عکس زمینه دلخواه اعمال شد.";
+        }
+        catch (Exception ex)
+        {
+            StartupDiagnostics.Log($"Custom background picker failed: {ex}");
+            StatusText.Text = $"انتخاب عکس زمینه انجام نشد: {ex.Message}";
+        }
+    }
+
+    private async Task ApplyBackgroundAsync()
+    {
+        try
+        {
+            string? path = null;
+            var label = "بدون تصویر زمینه";
+
+            if (!string.IsNullOrWhiteSpace(_settings.CustomBackgroundPath) &&
+                File.Exists(_settings.CustomBackgroundPath))
+            {
+                path = _settings.CustomBackgroundPath;
+                label = $"سفارشی: {Path.GetFileName(path)}";
+            }
+            else if (_settings.UseSeasonalBackground)
+            {
+                path = _themeService.GetSeasonalBackgroundPath(_theme, _month);
+                var season = _month switch
+                {
+                    <= 3 => "بهار",
+                    <= 6 => "تابستان",
+                    <= 9 => "پاییز",
+                    _ => "زمستان"
+                };
+                label = $"فصلی: {season}";
+            }
+
+            _backgroundImage.Source = await PictureService.LoadImageAsync(path);
+            _backgroundImage.Opacity = Math.Clamp(_settings.BackgroundOpacity, 0, 0.85);
+            _backgroundPathText.Text = label;
+        }
+        catch (Exception ex)
+        {
+            StartupDiagnostics.Log($"ApplyBackgroundAsync failed: {ex}");
+            _backgroundImage.Source = null;
+            _backgroundPathText.Text = "بارگذاری تصویر زمینه انجام نشد.";
+        }
+    }
+
     private void BuildCalendar()
     {
         MonthTitle.Text = $"{PersianDate.MonthNames[_month - 1]} {_year}";
@@ -668,15 +877,63 @@ public sealed class MainWindow : Window
             OccasionsPanel.Children.Clear();
             foreach (var item in snapshot.Occasions)
             {
-                OccasionsPanel.Children.Add(new TextBlock
+                var text = new TextBlock
                 {
                     Text = $"{(item.IsHoliday ? "● " : "• ")}{item.Title}",
                     TextWrapping = TextWrapping.Wrap,
-                    Foreground = item.IsHoliday ? ThemeService.Brush(_theme.HolidayText) : null
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Foreground = item.IsHoliday
+                        ? ThemeService.Brush(_theme.HolidayText)
+                        : ThemeService.Brush(_theme.PrimaryText)
+                };
+
+                if (!_settings.ShowOccasionPictures)
+                {
+                    OccasionsPanel.Children.Add(text);
+                    continue;
+                }
+
+                var row = new Grid
+                {
+                    ColumnSpacing = 8,
+                    Padding = new Thickness(6)
+                };
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(48) });
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+                var image = new Image
+                {
+                    Width = 44,
+                    Height = 44,
+                    Stretch = Stretch.UniformToFill
+                };
+
+                var picturePath = _pictureService.ResolveOccasionPicture(item);
+                image.Source = await PictureService.LoadImageAsync(picturePath);
+
+                Grid.SetColumn(image, 0);
+                row.Children.Add(image);
+                Grid.SetColumn(text, 1);
+                row.Children.Add(text);
+
+                OccasionsPanel.Children.Add(new Border
+                {
+                    Background = ThemeService.Brush(_theme.CardBackground),
+                    CornerRadius = new CornerRadius(10),
+                    BorderBrush = item.IsHoliday
+                        ? ThemeService.Brush(_theme.HolidayText)
+                        : ThemeService.Brush(_theme.Accent),
+                    BorderThickness = new Thickness(1),
+                    Child = row
                 });
             }
             if (snapshot.Occasions.Count == 0)
-                OccasionsPanel.Children.Add(new TextBlock { Text = "مناسبتی ثبت نشده", Opacity = 0.55 });
+                OccasionsPanel.Children.Add(new TextBlock
+                {
+                    Text = "مناسبتی ثبت نشده",
+                    Opacity = 0.55,
+                    Foreground = ThemeService.Brush(_theme.SecondaryText)
+                });
 
             EventsPanel.Children.Clear();
             foreach (var item in snapshot.Events)
