@@ -1,3 +1,4 @@
+using System.Globalization;
 using BDFR.PersianCalendar.Core;
 using Microsoft.Data.Sqlite;
 
@@ -125,6 +126,33 @@ public sealed class SqliteCalendarRepository(string databasePath) : ICalendarRep
             while (await reader.ReadAsync(cancellationToken))
                 occasions.Add(new Occasion(reader.GetString(0), date, reader.GetString(1), reader.GetInt32(2) != 0,
                     reader.GetString(3), reader.IsDBNull(4) ? null : reader.GetString(4)));
+        }
+
+        await using (var cmd = db.CreateCommand())
+        {
+            cmd.CommandText = """
+                SELECT id,title,calendar_system,month,day
+                FROM special_occasions
+                ORDER BY month,day,title;
+                """;
+
+            await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                var calendarSystem = (CalendarSystemKind)reader.GetInt32(2);
+                var month = reader.GetInt32(3);
+                var day = reader.GetInt32(4);
+
+                if (!MatchesSpecialOccasion(date, calendarSystem, month, day))
+                    continue;
+
+                occasions.Add(new Occasion(
+                    reader.GetString(0),
+                    date,
+                    reader.GetString(1),
+                    false,
+                    "personal"));
+            }
         }
 
         var events = new List<CalendarEvent>();
@@ -475,4 +503,23 @@ public sealed class SqliteCalendarRepository(string databasePath) : ICalendarRep
 
         return new PersianDate(year, month, day);
     }
+    private static bool MatchesSpecialOccasion(
+        PersianDate selectedDate,
+        CalendarSystemKind calendarSystem,
+        int month,
+        int day)
+    {
+        if (calendarSystem == CalendarSystemKind.Persian)
+            return selectedDate.Month == month && selectedDate.Day == day;
+
+        var gregorian = selectedDate.ToDateOnly();
+
+        if (calendarSystem == CalendarSystemKind.Gregorian)
+            return gregorian.Month == month && gregorian.Day == day;
+
+        var hijri = new HijriCalendar();
+        var dt = gregorian.ToDateTime(TimeOnly.MinValue);
+        return hijri.GetMonth(dt) == month && hijri.GetDayOfMonth(dt) == day;
+    }
+
 }
