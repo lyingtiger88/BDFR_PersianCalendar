@@ -72,6 +72,7 @@ public sealed class PlannerService(
     {
         var items = await source.GetYearAsync(year, cancellationToken);
         await repository.UpsertOccasionsAsync(items, cancellationToken);
+        await repository.SetLastOccasionSyncAsync(source.Name, year, DateTimeOffset.UtcNow, cancellationToken);
         await repository.AddActivityAsync(new ActivityLogEntry(
             Guid.NewGuid().ToString("N"),
             DateTimeOffset.UtcNow,
