@@ -978,7 +978,6 @@ public sealed class MainWindow : Window
         _fontPreview.TextWrapping = TextWrapping.Wrap;
         _fontPreview.Margin = new Thickness(2, 6, 2, 6);
         _fontPreview.Padding = new Thickness(10);
-        _fontPreview.Background = BrushWithAlpha(_theme.CardBackground, 0xA0);
         _fontPreview.Foreground = ThemeService.Brush(_theme.PrimaryText);
         UpdateFontPreview();
         _settingsPanel.Children.Add(_fontPreview);
