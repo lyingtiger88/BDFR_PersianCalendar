@@ -44,6 +44,41 @@ public sealed class ThemeService
     public string ThemeRoot(ThemeDefinition theme)
         => Path.Combine(ThemesRoot, theme.Id);
 
+    public ThemeDefinition CreateElenaTheme(string? accentId)
+    {
+        var accent = AppearanceCatalog.GetElenaAccent(accentId);
+
+        return new ThemeDefinition
+        {
+            Id = "elena-neutral",
+            DisplayName = "Elena Mode",
+            WindowBackground = "#FFF2F4F7",
+            PanelBackground = "#D8FFFFFF",
+            CardBackground = "#C8FFFFFF",
+            PrimaryText = "#FF202631",
+            SecondaryText = "#FF697386",
+            Accent = accent.Accent,
+            SelectedDay = accent.SelectedDay,
+            HolidayText = "#FFD34E5E",
+            WeekdayColors =
+            [
+                "#FFE8ECF1",
+                "#FFE6EAF0",
+                "#FFE9EDF2",
+                "#FFE7EBF0",
+                "#FFE8ECF1",
+                "#FFE6EAF0",
+                "#FFE9EDF2"
+            ]
+        };
+    }
+
+    public ThemeDefinition ResolveAppearance(AppSettings settings)
+        => string.Equals(settings.AppearanceMode, "elena", StringComparison.OrdinalIgnoreCase)
+            ? CreateElenaTheme(settings.ElenaAccentId)
+            : Load(settings.ThemeId);
+
+
     public string? GetSeasonalBackgroundPath(int persianMonth, double targetAspectRatio)
     {
         var season = persianMonth switch
