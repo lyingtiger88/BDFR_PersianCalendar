@@ -15,6 +15,8 @@ public partial class App : Application
 
     public App()
     {
+        StartupDiagnostics.BeginSession();
+
         AppDomain.CurrentDomain.UnhandledException += (_, e) =>
             StartupDiagnostics.Log($"AppDomain unhandled exception (terminating={e.IsTerminating}): {e.ExceptionObject}");
 
