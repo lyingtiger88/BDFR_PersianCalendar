@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Windows.Storage;
 
 namespace BDFR.PersianCalendar.Desktop;
 
@@ -49,7 +50,7 @@ public sealed class SettingsService
     {
         try
         {
-            settings.BackgroundOpacity = Math.Clamp(settings.BackgroundOpacity, 0, 0.85);
+            settings.BackgroundOpacity = Math.Clamp(settings.BackgroundOpacity, 0, 0.95);
             Directory.CreateDirectory(DataRoot);
             File.WriteAllText(SettingsPath, JsonSerializer.Serialize(settings, JsonOptions));
         }
@@ -59,20 +60,47 @@ public sealed class SettingsService
         }
     }
 
-    public async Task<string?> CopyCustomBackgroundAsync(string sourcePath)
+    public async Task<string?> CopyCustomBackgroundAsync(StorageFile sourceFile)
     {
-        if (string.IsNullOrWhiteSpace(sourcePath) || !File.Exists(sourcePath))
-            return null;
-
         try
         {
             Directory.CreateDirectory(UserBackgroundRoot);
-            var extension = Path.GetExtension(sourcePath);
-            var target = Path.Combine(UserBackgroundRoot, $"custom-background{extension}");
-            await using var source = File.OpenRead(sourcePath);
-            await using var destination = File.Create(target);
-            await source.CopyToAsync(destination);
-            return target;
+
+            var destinationFolder =
+                await StorageFolder.GetFolderFromPathAsync(UserBackgroundRoot);
+
+            var extension = Path.GetExtension(sourceFile.Name);
+            if (string.IsNullOrWhiteSpace(extension))
+                extension = ".jpg";
+
+            var targetName =
+                $"custom-background-{DateTime.UtcNow:yyyyMMddHHmmssfff}{extension.ToLowerInvariant()}";
+
+            var copied = await sourceFile.CopyAsync(
+                destinationFolder,
+                targetName,
+                NameCollisionOption.ReplaceExisting);
+
+            // Keep only the newly selected background. Unique names also avoid image-cache reuse.
+            foreach (var oldPath in Directory.EnumerateFiles(
+                         UserBackgroundRoot,
+                         "custom-background-*",
+                         SearchOption.TopDirectoryOnly))
+            {
+                if (string.Equals(
+                        Path.GetFullPath(oldPath),
+                        Path.GetFullPath(copied.Path),
+                        StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                try { File.Delete(oldPath); }
+                catch (Exception ex)
+                {
+                    StartupDiagnostics.Log($"Old custom background cleanup skipped: {ex.Message}");
+                }
+            }
+
+            return copied.Path;
         }
         catch (Exception ex)
         {
