@@ -58,4 +58,52 @@ var republicDay = occasions.SingleOrDefault(x => x.Date == new PersianDate(1405,
 if (republicDay is null || republicDay.IsHoliday)
     throw new Exception("time.ir parser fixture failed for regular event.");
 
+var dbPath = Path.Combine(Path.GetTempPath(), $"bdfr-calendar-smoke-{Guid.NewGuid():N}.db");
+try
+{
+    var repository = new SqliteCalendarRepository(dbPath);
+    await repository.InitializeAsync();
+
+    var task = new CalendarTask(
+        "task-smoke",
+        "کار آزمایشی",
+        new PersianDate(1405, 7, 14),
+        new TimeOnly(12, 0));
+    await repository.AddTaskAsync(task);
+
+    var reminder = new ReminderSchedule(
+        "reminder-smoke",
+        CalendarItemKind.Task,
+        task.Id,
+        DateTimeOffset.UtcNow,
+        ReminderState.Fired,
+        task.Title,
+        "موعد آزمایشی");
+    await repository.ScheduleReminderAsync(reminder);
+
+    await new ReminderActionService(repository).HandleAsync(reminder.Id, "done");
+    if (!(await repository.GetDayAsync(task.Date)).Tasks.Single().Completed)
+        throw new Exception("Reminder done action did not complete the task.");
+
+    await repository.AddActivityAsync(new ActivityLogEntry(
+        "activity-smoke",
+        DateTimeOffset.UtcNow,
+        "smoke",
+        null,
+        null,
+        "activity"));
+    if ((await repository.GetRecentActivitiesAsync(10)).Count == 0)
+        throw new Exception("Activity center repository query failed.");
+
+    var syncAt = DateTimeOffset.UtcNow;
+    await repository.SetLastOccasionSyncAsync("time.ir", 1405, syncAt);
+    var loadedSyncAt = await repository.GetLastOccasionSyncAsync("time.ir", 1405);
+    if (loadedSyncAt is null || Math.Abs((loadedSyncAt.Value - syncAt).TotalSeconds) > 1)
+        throw new Exception("Occasion sync state persistence failed.");
+}
+finally
+{
+    try { File.Delete(dbPath); } catch { }
+}
+
 Console.WriteLine("BDFR Persian Calendar smoke checks passed.");
