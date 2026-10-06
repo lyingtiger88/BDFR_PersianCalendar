@@ -35,8 +35,8 @@ internal static class StartupDiagnostics
         {
             MessageBoxW(
                 IntPtr.Zero,
-                $"BDFR Persian Calendar failed to start.\n\n{ex.Message}\n\nLog:\n{LogPath}",
-                "BDFR Persian Calendar",
+                $"Anahita failed to start.\n\n{ex.Message}\n\nLog:\n{LogPath}",
+                "Anahita",
                 0x00000010);
         }
         catch { }

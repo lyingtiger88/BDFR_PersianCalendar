@@ -1,6 +1,6 @@
-# BDFR Persian Calendar
+# Anahita
 
-A native, Persian-first calendar, planner, occasions and reminder application for Windows 11.
+Anahita is a native, Persian-first calendar, planner, occasions and reminder application for Windows 11, created by BDFR.
 
 ## Current development build
 
@@ -83,7 +83,7 @@ Run smoke checks:
 dotnet run --project tools/BDFR.PersianCalendar.Smoke/BDFR.PersianCalendar.Smoke.csproj
 ```
 
-Every push to `main` runs GitHub Actions checks for the Core/Infrastructure and the Windows desktop application. The Windows job also publishes an x64 test build as the `BDFR_PersianCalendar-win-x64` workflow artifact.
+Every push to `main` runs GitHub Actions checks for the Core/Infrastructure and the Windows desktop application. The Windows job also publishes an x64 test build as the `Anahita-win-x64` workflow artifact.
 
 ## time.ir data
 

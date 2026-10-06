@@ -8,7 +8,7 @@ internal sealed class StartupFallbackWindow : Window
 {
     public StartupFallbackWindow(Exception exception)
     {
-        Title = "BDFR Persian Calendar - Safe Mode";
+        Title = "Anahita - Safe Mode";
 
         var openLogButton = new Button
         {
@@ -40,7 +40,7 @@ internal sealed class StartupFallbackWindow : Window
                 {
                     new TextBlock
                     {
-                        Text = "BDFR Persian Calendar",
+                        Text = "Anahita",
                         FontSize = 28,
                         FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
                     },

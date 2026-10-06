@@ -11,6 +11,11 @@
     <WindowsPackageType>None</WindowsPackageType>
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
     <PublishTrimmed>false</PublishTrimmed>
+    <AssemblyTitle>Anahita</AssemblyTitle>
+    <Product>Anahita</Product>
+    <Company>BDFR</Company>
+    <Authors>Behdad Badfar</Authors>
+    <Description>Persian calendar, planner, occasions and reminders for Windows.</Description>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../BDFR.PersianCalendar.Core/BDFR.PersianCalendar.Core.csproj" />

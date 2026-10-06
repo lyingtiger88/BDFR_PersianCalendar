@@ -105,7 +105,7 @@ public sealed class MainWindow : Window
         _theme = _themeService.ResolveAppearance(_settings, _month);
         _pictureService = new PictureService(_themeService);
 
-        Title = "BDFR Persian Calendar";
+        Title = "Anahita";
         Content = BuildRoot();
 
         Activated += (_, _) => StartupDiagnostics.Log("MainWindow Activated event fired.");
@@ -197,7 +197,7 @@ public sealed class MainWindow : Window
 
         stack.Children.Add(new TextBlock
         {
-            Text = "BDFR Persian Calendar",
+            Text = "Anahita",
             FontSize = 24,
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
             Foreground = ThemeService.Brush(_theme.PrimaryText)
@@ -966,7 +966,7 @@ public sealed class MainWindow : Window
 
         _aboutUsPanel.Children.Add(new TextBlock
         {
-            Text = $"BDFR Persian Calendar · Version {version}",
+            Text = $"Anahita · Version {version}",
             FontSize = 11,
             Opacity = 0.62,
             Foreground = ThemeService.Brush(_theme.SecondaryText)

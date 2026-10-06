@@ -1,11 +1,11 @@
 #ifndef MySourceDir
-  #define MySourceDir "..\\artifacts\\BDFR_PersianCalendar-win-x64"
+  #define MySourceDir "..\\artifacts\\Anahita-win-x64"
 #endif
 #ifndef MyOutputDir
   #define MyOutputDir "..\\artifacts"
 #endif
 
-#define MyAppName "BDFR Persian Calendar"
+#define MyAppName "Anahita"
 #define MyAppVersion "1.0-test"
 #define MyAppPublisher "BDFR"
 #define MyAppExeName "BDFR.PersianCalendar.Desktop.exe"
@@ -15,11 +15,11 @@ AppId={{5E8E4792-25B8-4C11-A87E-84687ED84E42}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
-DefaultDirName={localappdata}\\Programs\\BDFR Persian Calendar
+DefaultDirName={localappdata}\\Programs\\Anahita
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 OutputDir={#MyOutputDir}
-OutputBaseFilename=BDFR_PersianCalendar-Setup-x64
+OutputBaseFilename=Anahita-Setup-x64
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
