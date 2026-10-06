@@ -17,11 +17,5 @@
     "#FFDCE9FA",
     "#FFE7E0FA",
     "#FFF8DCE5"
-  ],
-  "seasonalBackgrounds": {
-    "spring": "backgrounds/spring.svg",
-    "summer": "backgrounds/summer.svg",
-    "autumn": "backgrounds/autumn.svg",
-    "winter": "backgrounds/winter.svg"
-  }
+  ]
 }
