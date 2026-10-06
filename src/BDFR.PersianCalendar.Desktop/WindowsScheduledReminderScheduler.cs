@@ -1,7 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
 using BDFR.PersianCalendar.Core;
-using Microsoft.Windows.AppNotifications.Builder;
 using Windows.Data.Xml.Dom;
 using Windows.UI.Notifications;
 
@@ -22,11 +21,7 @@ public sealed class WindowsScheduledReminderScheduler : IReminderScheduler
 
         try
         {
-            var appNotification = new AppNotificationBuilder()
-                .AddArgument("reminderId", reminder.Id)
-                .AddText(reminder.Title)
-                .AddText(reminder.Body)
-                .BuildNotification();
+            var appNotification = ReminderNotificationFactory.Build(reminder);
 
             var xml = new XmlDocument();
             xml.LoadXml(appNotification.Payload);
