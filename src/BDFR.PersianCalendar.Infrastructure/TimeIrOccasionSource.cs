@@ -45,24 +45,31 @@ public sealed class TimeIrOccasionSource(HttpClient httpClient) : IOccasionSourc
         var document = await parser.ParseDocumentAsync(html, cancellationToken);
         var result = new Dictionary<string, Occasion>(StringComparer.Ordinal);
 
+        // Pass 1: preferred structured month containers used by time.ir.
         for (var monthIndex = 0; monthIndex < 12; monthIndex++)
         {
-            var month = monthIndex + 1;
-            var monthName = PersianDate.MonthNames[monthIndex];
             var root = document.QuerySelector($"#Month_{monthIndex}");
-            if (root is null || !ContainsYear(root, persianYear)) continue;
+            if (root is null) continue;
 
-            var eventList = root.Children
-                .Where(x => x.LocalName.Equals("div", StringComparison.OrdinalIgnoreCase))
-                .Skip(1)
-                .FirstOrDefault();
+            ParseCandidateElements(
+                root.QuerySelectorAll("div,li,p,span"),
+                persianYear,
+                monthIndex + 1,
+                PersianDate.MonthNames[monthIndex],
+                result);
+        }
 
-            var nodes = eventList?.QuerySelectorAll("div > div > div")
-                        ?? root.QuerySelectorAll("div");
+        // Pass 2: resilient fallback for layout changes. The current site still exposes
+        // human-readable rows like "14 خرداد رحلت حضرت امام خمینی"; parse those
+        // regardless of wrapper ids/classes.
+        foreach (var element in document.QuerySelectorAll("div,li,p,span"))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var text = Collapse(element.TextContent);
 
-            foreach (var node in nodes)
+            for (var monthIndex = 0; monthIndex < PersianDate.MonthNames.Length; monthIndex++)
             {
-                var text = Collapse(node.TextContent);
+                var monthName = PersianDate.MonthNames[monthIndex];
                 var match = Regex.Match(
                     text,
                     $@"^(?<day>[0-9۰-۹٠-٩]{{1,2}})\s+{Regex.Escape(monthName)}\s+(?<title>.+)$",
@@ -70,41 +77,82 @@ public sealed class TimeIrOccasionSource(HttpClient httpClient) : IOccasionSourc
 
                 if (!match.Success) continue;
 
-                // Parent containers can inherit the concatenated text of multiple event rows.
-                // Keep the actual event row and ignore a div that contains another div
-                // which itself already looks like a valid event row for this month.
-                var containsNestedEventRow = node.Children
-                    .Where(child => child.LocalName.Equals("div", StringComparison.OrdinalIgnoreCase))
-                    .Any(child => Regex.IsMatch(
-                        Collapse(child.TextContent),
-                        $@"^[0-9۰-۹٠-٩]{{1,2}}\s+{Regex.Escape(monthName)}\s+.+$",
-                        RegexOptions.CultureInvariant));
-                if (containsNestedEventRow) continue;
+                AddOccasion(
+                    element,
+                    persianYear,
+                    monthIndex + 1,
+                    match,
+                    result);
 
-                var dayText = PersianQuickAddParser.NormalizeDigits(match.Groups["day"].Value);
-                if (!int.TryParse(dayText, out var day) ||
-                    day < 1 ||
-                    day > PersianDate.DaysInMonth(persianYear, month))
-                    continue;
-
-                var title = Collapse(match.Groups["title"].Value);
-                if (string.IsNullOrWhiteSpace(title)) continue;
-
-                var isHoliday = HasHolidayClass(node);
-                var date = new PersianDate(persianYear, month, day);
-                var hash = Convert.ToHexString(
-                    SHA256.HashData(Encoding.UTF8.GetBytes($"{date}|{title}|{isHoliday}")));
-
-                var id = $"timeir-{persianYear:0000}{month:00}{day:00}-{hash[..12].ToLowerInvariant()}";
-                result[$"{date}|{title}"] =
-                    new Occasion(id, date, title, isHoliday, "time.ir", hash);
+                break;
             }
         }
 
-        return result.Values
+        var items = result.Values
             .OrderBy(x => x.Date)
             .ThenBy(x => x.Title)
             .ToArray();
+
+        if (items.Length == 0)
+            throw new InvalidOperationException(
+                $"ساختار مناسبت‌های time.ir برای سال {persianYear} شناخته نشد.");
+
+        return items;
+    }
+
+    private static void ParseCandidateElements(
+        IEnumerable<IElement> elements,
+        int persianYear,
+        int month,
+        string monthName,
+        IDictionary<string, Occasion> result)
+    {
+        foreach (var node in elements)
+        {
+            var text = Collapse(node.TextContent);
+            var match = Regex.Match(
+                text,
+                $@"^(?<day>[0-9۰-۹٠-٩]{{1,2}})\s+{Regex.Escape(monthName)}\s+(?<title>.+)$",
+                RegexOptions.CultureInvariant);
+
+            if (!match.Success) continue;
+            AddOccasion(node, persianYear, month, match, result);
+        }
+    }
+
+    private static void AddOccasion(
+        IElement node,
+        int persianYear,
+        int month,
+        Match match,
+        IDictionary<string, Occasion> result)
+    {
+        // Skip wrapper elements that only duplicate a more specific nested event row.
+        var monthName = PersianDate.MonthNames[month - 1];
+        var containsNestedEventRow = node.Children.Any(child =>
+            Regex.IsMatch(
+                Collapse(child.TextContent),
+                $@"^[0-9۰-۹٠-٩]{{1,2}}\s+{Regex.Escape(monthName)}\s+.+$",
+                RegexOptions.CultureInvariant));
+        if (containsNestedEventRow) return;
+
+        var dayText = PersianQuickAddParser.NormalizeDigits(match.Groups["day"].Value);
+        if (!int.TryParse(dayText, out var day) ||
+            day < 1 ||
+            day > PersianDate.DaysInMonth(persianYear, month))
+            return;
+
+        var title = Collapse(match.Groups["title"].Value);
+        if (string.IsNullOrWhiteSpace(title)) return;
+
+        var isHoliday = HasHolidayClass(node);
+        var date = new PersianDate(persianYear, month, day);
+        var hash = Convert.ToHexString(
+            SHA256.HashData(Encoding.UTF8.GetBytes($"{date}|{title}|{isHoliday}")));
+
+        var id = $"timeir-{persianYear:0000}{month:00}{day:00}-{hash[..12].ToLowerInvariant()}";
+        result[$"{date}|{title}"] =
+            new Occasion(id, date, title, isHoliday, "time.ir", hash);
     }
 
     private static bool ContainsYear(IElement root, int year)
