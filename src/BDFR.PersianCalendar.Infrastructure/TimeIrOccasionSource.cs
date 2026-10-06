@@ -162,8 +162,22 @@ public sealed class TimeIrOccasionSource(HttpClient httpClient) : IOccasionSourc
     }
 
     private static bool HasHolidayClass(IElement node)
-        => node.ClassList.Any(c => c.Contains("holiday", StringComparison.OrdinalIgnoreCase))
-           || node.QuerySelector("[class*='holiday' i]") is not null;
+    {
+        IElement? current = node;
+        while (current is not null)
+        {
+            if (current.ClassList.Any(c =>
+                    c.Contains("holiday", StringComparison.OrdinalIgnoreCase)))
+                return true;
+
+            if (current.Id.StartsWith("Month_", StringComparison.OrdinalIgnoreCase))
+                break;
+
+            current = current.ParentElement;
+        }
+
+        return node.QuerySelector("[class*='holiday' i]") is not null;
+    }
 
     private static string Collapse(string value)
         => Regex.Replace(value.Replace('\u200c', ' '), @"\s+", " ").Trim();
