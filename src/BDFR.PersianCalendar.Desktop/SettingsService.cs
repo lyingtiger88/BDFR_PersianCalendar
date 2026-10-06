@@ -83,6 +83,9 @@ public sealed class SettingsService
         if (string.IsNullOrWhiteSpace(settings.ElenaAccentId))
             settings.ElenaAccentId = "seasonal";
 
+        if (string.IsNullOrWhiteSpace(settings.ElenaDayAccentId))
+            settings.ElenaDayAccentId = "seasonal";
+
         if (string.IsNullOrWhiteSpace(settings.FontFamilyName))
             settings.FontFamilyName = "Segoe UI Variable";
     }

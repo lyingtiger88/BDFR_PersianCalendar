@@ -6,6 +6,11 @@ public sealed record ElenaAccentDefinition(
     string Accent,
     string SelectedDay);
 
+public sealed record ElenaDayColorDefinition(
+    string Id,
+    string DisplayName,
+    string Color);
+
 public sealed record ThemeCatalogItem(
     string Id,
     string DisplayName,
@@ -33,6 +38,17 @@ public static class AppearanceCatalog
         new("graphite", "گرافیتی", "#FF667085", "#FF8B95A7")
     ];
 
+    public static readonly ElenaDayColorDefinition[] ElenaDayColors =
+    [
+        new("seasonal", "خودکار فصلی", "#FF67B995"),
+        new("azure", "آبی روشن", "#FF79B4F4"),
+        new("violet", "بنفش روشن", "#FFA98FEA"),
+        new("emerald", "سبز روشن", "#FF67B995"),
+        new("coral", "مرجانی روشن", "#FFEC918C"),
+        new("amber", "کهربایی روشن", "#FFE0B35F"),
+        new("graphite", "گرافیتی روشن", "#FF8B95A7")
+    ];
+
     public static ElenaAccentDefinition GetElenaAccent(string? id, int persianMonth)
     {
         if (string.IsNullOrWhiteSpace(id) ||
@@ -43,6 +59,26 @@ public static class AppearanceCatalog
                    string.Equals(x.Id, id, StringComparison.OrdinalIgnoreCase))
                ?? GetSeasonalAccent(persianMonth);
     }
+
+    public static ElenaDayColorDefinition GetElenaDayColor(string? id, int persianMonth)
+    {
+        if (string.IsNullOrWhiteSpace(id) ||
+            string.Equals(id, "seasonal", StringComparison.OrdinalIgnoreCase))
+            return GetSeasonalDayColor(persianMonth);
+
+        return ElenaDayColors.FirstOrDefault(x =>
+                   string.Equals(x.Id, id, StringComparison.OrdinalIgnoreCase))
+               ?? GetSeasonalDayColor(persianMonth);
+    }
+
+    public static ElenaDayColorDefinition GetSeasonalDayColor(int persianMonth)
+        => persianMonth switch
+        {
+            <= 3 => new("seasonal", "بهاری · سبز جوانه", "#FF6FB482"),
+            <= 6 => new("seasonal", "تابستانی · طلایی", "#FFF0C35A"),
+            <= 9 => new("seasonal", "پاییزی · سبز زیتونی", "#FF6E9278"),
+            _ => new("seasonal", "زمستانی · بنفش یخی", "#FFA08AD8")
+        };
 
     public static ElenaAccentDefinition GetSeasonalAccent(int persianMonth)
         => persianMonth switch

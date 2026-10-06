@@ -12,6 +12,9 @@ public sealed class AppSettings
     // "seasonal" follows the currently displayed Persian season automatically.
     public string ElenaAccentId { get; set; } = "seasonal";
 
+    // Selected-day color is independent from the general Elena accent.
+    public string ElenaDayAccentId { get; set; } = "seasonal";
+
     // Internal migration marker for appearance settings.
     public int AppearanceSettingsVersion { get; set; }
 

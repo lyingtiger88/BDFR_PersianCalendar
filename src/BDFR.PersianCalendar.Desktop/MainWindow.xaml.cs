@@ -708,7 +708,9 @@ public sealed class MainWindow : Window
         if (isElena)
         {
             var accent = AppearanceCatalog.GetElenaAccent(_settings.ElenaAccentId, _month);
-            var accentToggle = MakeButton($"Accent Color ▾  ·  {accent.DisplayName}");
+            var dayAccent = AppearanceCatalog.GetElenaDayColor(_settings.ElenaDayAccentId, _month);
+            var accentToggle = MakeButton(
+                $"Accent ▾  ·  کلی: {accent.DisplayName}  ·  روز: {dayAccent.DisplayName}");
             accentToggle.Click += (_, _) =>
                 _accentSubmenuPanel.Visibility =
                     _accentSubmenuPanel.Visibility == Visibility.Visible
@@ -936,6 +938,13 @@ public sealed class MainWindow : Window
         _accentSubmenuPanel.Padding = new Thickness(8);
         _accentSubmenuPanel.Visibility = Visibility.Collapsed;
 
+        _accentSubmenuPanel.Children.Add(new TextBlock
+        {
+            Text = "Accent کلی تم",
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Foreground = ThemeService.Brush(_theme.PrimaryText)
+        });
+
         foreach (var accent in AppearanceCatalog.ElenaAccents)
         {
             var active = string.Equals(
@@ -943,17 +952,76 @@ public sealed class MainWindow : Window
                 _settings.ElenaAccentId,
                 StringComparison.OrdinalIgnoreCase);
 
+            var previewColor = string.Equals(
+                    accent.Id,
+                    "seasonal",
+                    StringComparison.OrdinalIgnoreCase)
+                ? AppearanceCatalog.GetSeasonalAccent(_month).Accent
+                : accent.Accent;
+
             var button = new Button
             {
                 Content = $"{(active ? "✓ " : "")}{accent.DisplayName}",
                 HorizontalAlignment = HorizontalAlignment.Stretch,
-                Background = ThemeService.Brush(accent.Accent),
+                Background = ThemeService.Brush(previewColor),
                 Foreground = new SolidColorBrush(Colors.White),
                 BorderThickness = new Thickness(0)
             };
 
             var capturedId = accent.Id;
             button.Click += async (_, _) => await SelectElenaAccentAsync(capturedId);
+            _accentSubmenuPanel.Children.Add(button);
+        }
+
+        _accentSubmenuPanel.Children.Add(new Border
+        {
+            Height = 1,
+            Margin = new Thickness(0, 5, 0, 5),
+            Background = BrushWithAlpha(_theme.SecondaryText, 0x38)
+        });
+
+        _accentSubmenuPanel.Children.Add(new TextBlock
+        {
+            Text = "رنگ روز انتخاب‌شده",
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Foreground = ThemeService.Brush(_theme.PrimaryText)
+        });
+
+        _accentSubmenuPanel.Children.Add(new TextBlock
+        {
+            Text = "این رنگ مستقل از Accent کلی است و فقط خانه روز انتخاب‌شده را مشخص می‌کند.",
+            FontSize = 10.5,
+            TextWrapping = TextWrapping.Wrap,
+            Opacity = 0.62,
+            Foreground = ThemeService.Brush(_theme.SecondaryText)
+        });
+
+        foreach (var dayColor in AppearanceCatalog.ElenaDayColors)
+        {
+            var active = string.Equals(
+                dayColor.Id,
+                _settings.ElenaDayAccentId,
+                StringComparison.OrdinalIgnoreCase);
+
+            var previewColor = string.Equals(
+                    dayColor.Id,
+                    "seasonal",
+                    StringComparison.OrdinalIgnoreCase)
+                ? AppearanceCatalog.GetSeasonalDayColor(_month).Color
+                : dayColor.Color;
+
+            var button = new Button
+            {
+                Content = $"{(active ? "✓ " : "")}{dayColor.DisplayName}",
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                Background = ThemeService.Brush(previewColor),
+                Foreground = new SolidColorBrush(Colors.White),
+                BorderThickness = new Thickness(0)
+            };
+
+            var capturedId = dayColor.Id;
+            button.Click += async (_, _) =>
+                await SelectElenaDayAccentAsync(capturedId);
             _accentSubmenuPanel.Children.Add(button);
         }
 
@@ -1134,6 +1202,34 @@ public sealed class MainWindow : Window
         }
     }
 
+    private async Task SelectElenaDayAccentAsync(string dayAccentId)
+    {
+        var snapshot = CaptureAppearanceSettings();
+
+        try
+        {
+            StartupDiagnostics.Log(
+                $"Elena selected-day color switch requested: {dayAccentId}.");
+
+            _settings.AppearanceMode = "elena";
+            _settings.ElenaDayAccentId = dayAccentId;
+            _settings.UseSeasonalBackground = true;
+            _settingsService.Save(_settings);
+
+            await ApplyAppearanceAsync();
+
+            StartupDiagnostics.Log(
+                $"Elena selected-day color switch completed: {dayAccentId}.");
+        }
+        catch (Exception ex)
+        {
+            await RecoverAppearanceAsync(
+                snapshot,
+                ex,
+                $"Selected day color {dayAccentId}");
+        }
+    }
+
     private async Task SelectThemeAsync(string themeId)
     {
         var snapshot = CaptureAppearanceSettings();
@@ -1165,6 +1261,7 @@ public sealed class MainWindow : Window
             _settings.AppearanceMode,
             _settings.ThemeId,
             _settings.ElenaAccentId,
+            _settings.ElenaDayAccentId,
             _settings.BackgroundMode,
             _settings.UseSeasonalBackground,
             _settings.BackgroundOpacity);
@@ -1180,6 +1277,7 @@ public sealed class MainWindow : Window
         _settings.AppearanceMode = snapshot.AppearanceMode;
         _settings.ThemeId = snapshot.ThemeId;
         _settings.ElenaAccentId = snapshot.ElenaAccentId;
+        _settings.ElenaDayAccentId = snapshot.ElenaDayAccentId;
         _settings.BackgroundMode = snapshot.BackgroundMode;
         _settings.UseSeasonalBackground = snapshot.UseSeasonalBackground;
         _settings.BackgroundOpacity = snapshot.BackgroundOpacity;
@@ -1208,6 +1306,7 @@ public sealed class MainWindow : Window
         string AppearanceMode,
         string ThemeId,
         string ElenaAccentId,
+        string ElenaDayAccentId,
         string? BackgroundMode,
         bool UseSeasonalBackground,
         double BackgroundOpacity);
@@ -1231,7 +1330,7 @@ public sealed class MainWindow : Window
             _settings.AppearanceMode,
             "elena",
             StringComparison.OrdinalIgnoreCase)
-            ? $"Elena Mode فعال شد · Accent: {AppearanceCatalog.GetElenaAccent(_settings.ElenaAccentId, _month).DisplayName}"
+            ? $"Elena Mode فعال شد · Accent کلی: {AppearanceCatalog.GetElenaAccent(_settings.ElenaAccentId, _month).DisplayName} · رنگ روز: {AppearanceCatalog.GetElenaDayColor(_settings.ElenaDayAccentId, _month).DisplayName}"
             : $"Theme فعال شد: {_theme.DisplayName}";
     }
 
@@ -1995,18 +2094,27 @@ public sealed class MainWindow : Window
 
     private void RefreshElenaSeasonalPalette()
     {
-        if (!string.Equals(
-                _settings.AppearanceMode,
-                "elena",
-                StringComparison.OrdinalIgnoreCase) ||
-            !string.Equals(
-                _settings.ElenaAccentId,
-                "seasonal",
-                StringComparison.OrdinalIgnoreCase))
+        var isElena = string.Equals(
+            _settings.AppearanceMode,
+            "elena",
+            StringComparison.OrdinalIgnoreCase);
+
+        var generalIsSeasonal = string.Equals(
+            _settings.ElenaAccentId,
+            "seasonal",
+            StringComparison.OrdinalIgnoreCase);
+
+        var dayIsSeasonal = string.Equals(
+            _settings.ElenaDayAccentId,
+            "seasonal",
+            StringComparison.OrdinalIgnoreCase);
+
+        if (!isElena || (!generalIsSeasonal && !dayIsSeasonal))
             return;
 
         var updatedTheme = _themeService.ResolveAppearance(_settings, _month);
         if (string.Equals(updatedTheme.Accent, _theme.Accent, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(updatedTheme.SelectedDay, _theme.SelectedDay, StringComparison.OrdinalIgnoreCase) &&
             string.Equals(updatedTheme.WindowBackground, _theme.WindowBackground, StringComparison.OrdinalIgnoreCase))
             return;
 
@@ -2014,7 +2122,7 @@ public sealed class MainWindow : Window
         ApplyAppearanceBrushesOnly();
 
         StartupDiagnostics.Log(
-            $"Elena seasonal accent changed for Persian month {_month}: {_theme.Accent}");
+            $"Elena seasonal palette changed for Persian month {_month}: accent={_theme.Accent}, selectedDay={_theme.SelectedDay}");
     }
 
     private void BuildCalendar()

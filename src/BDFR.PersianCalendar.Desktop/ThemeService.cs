@@ -63,9 +63,13 @@ public sealed class ThemeService
     public string ThemeRoot(ThemeDefinition theme)
         => Path.Combine(ThemesRoot, theme.Id);
 
-    public ThemeDefinition CreateElenaTheme(string? accentId, int persianMonth)
+    public ThemeDefinition CreateElenaTheme(
+        string? accentId,
+        string? dayAccentId,
+        int persianMonth)
     {
         var accent = AppearanceCatalog.GetElenaAccent(accentId, persianMonth);
+        var dayAccent = AppearanceCatalog.GetElenaDayColor(dayAccentId, persianMonth);
 
         var seasonalSurface = persianMonth switch
         {
@@ -101,7 +105,7 @@ public sealed class ThemeService
             PrimaryText = "#FF202631",
             SecondaryText = "#FF697386",
             Accent = accent.Accent,
-            SelectedDay = accent.SelectedDay,
+            SelectedDay = dayAccent.Color,
             HolidayText = "#FFD34E5E",
             WeekdayColors =
             [
@@ -118,7 +122,10 @@ public sealed class ThemeService
 
     public ThemeDefinition ResolveAppearance(AppSettings settings, int persianMonth)
         => string.Equals(settings.AppearanceMode, "elena", StringComparison.OrdinalIgnoreCase)
-            ? CreateElenaTheme(settings.ElenaAccentId, persianMonth)
+            ? CreateElenaTheme(
+                settings.ElenaAccentId,
+                settings.ElenaDayAccentId,
+                persianMonth)
             : Load(settings.ThemeId);
 
     public ThemeDefinition ResolveAppearance(AppSettings settings)
