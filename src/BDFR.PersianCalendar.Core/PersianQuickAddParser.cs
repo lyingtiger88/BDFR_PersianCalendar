@@ -74,10 +74,13 @@ public sealed class PersianQuickAddParser
 
     private static RecurrenceKind ResolveRecurrence(string text)
     {
-        if (text.Contains("هر روز", StringComparison.Ordinal)) return RecurrenceKind.Daily;
+        if (text.Contains("هر روز", StringComparison.Ordinal) ||
+            text.Contains("روزانه", StringComparison.Ordinal)) return RecurrenceKind.Daily;
         if (text.Contains("هر هفته", StringComparison.Ordinal) ||
+            text.Contains("هفتگی", StringComparison.Ordinal) ||
             Weekdays.Any(d => text.Contains($"هر {d}", StringComparison.Ordinal))) return RecurrenceKind.Weekly;
-        if (text.Contains("هر ماه", StringComparison.Ordinal)) return RecurrenceKind.Monthly;
+        if (text.Contains("هر ماه", StringComparison.Ordinal) ||
+            text.Contains("ماهانه", StringComparison.Ordinal)) return RecurrenceKind.Monthly;
         if (text.Contains("هر سال", StringComparison.Ordinal) ||
             text.Contains("سالانه", StringComparison.Ordinal)) return RecurrenceKind.Yearly;
         return RecurrenceKind.None;
@@ -89,6 +92,7 @@ public sealed class PersianQuickAddParser
         text = Regex.Replace(text, @"\b1[34]\d{2}[\/\-]\d{1,2}[\/\-]\d{1,2}\b", "");
         text = Regex.Replace(text, @"(?:ساعت\s*)?\d{1,2}:\d{1,2}(?=\s|$)", "");
         text = Regex.Replace(text, @"\bهر\s+(روز|هفته|ماه|سال)\b", "");
+        text = Regex.Replace(text, @"\b(روزانه|هفتگی|ماهانه|سالانه)\b", "");
         foreach (var month in PersianDate.MonthNames)
             text = Regex.Replace(text, $@"\b\d{{1,2}}\s+{Regex.Escape(month)}\b", "");
         foreach (var weekday in Weekdays)
