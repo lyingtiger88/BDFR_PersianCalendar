@@ -10,7 +10,7 @@
             <ColumnDefinition Width="380"/>
         </Grid.ColumnDefinitions>
 
-        <Border Grid.Column="0" Padding="20" BorderThickness="0,0,1,0" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+        <Border Grid.Column="0" Padding="20" BorderThickness="0,0,1,0" BorderBrush="{StaticResource PanelStrokeBrush}">
             <StackPanel Spacing="14">
                 <TextBlock Text="BDFR Persian Calendar" FontSize="22" FontWeight="SemiBold"/>
                 <TextBlock Text="تقویم، برنامه‌ریز و یادآور فارسی ویندوز" Opacity="0.65" TextWrapping="Wrap"/>
@@ -73,7 +73,7 @@
             <Grid x:Name="CalendarGrid" Grid.Row="2"/>
         </Grid>
 
-        <Border Grid.Column="2" Padding="20" BorderThickness="1,0,0,0" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+        <Border Grid.Column="2" Padding="20" BorderThickness="1,0,0,0" BorderBrush="{StaticResource PanelStrokeBrush}">
             <ScrollViewer>
                 <StackPanel Spacing="12">
                     <TextBlock x:Name="SelectedDateTitle" FontSize="24" FontWeight="SemiBold"/>
