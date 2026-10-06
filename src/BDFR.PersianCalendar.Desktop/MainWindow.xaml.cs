@@ -38,6 +38,10 @@ public sealed class MainWindow : Window
     private readonly TextBlock StatusText = new();
     private readonly TextBlock SyncProgress = new();
     private readonly StackPanel ActivityPanel = new();
+    private readonly Dictionary<PersianDate, StackPanel> _calendarOccasionPanels = new();
+    private readonly Dictionary<PersianDate, TextBlock> _calendarDayNumberLabels = new();
+    private readonly HashSet<int> _yearSyncInFlight = new();
+    private readonly HashSet<int> _yearSyncedThisSession = new();
 
     private PersianDate _selected = PersianDate.Today();
     private int _year;
@@ -376,6 +380,8 @@ public sealed class MainWindow : Window
         CalendarGrid.Children.Clear();
         CalendarGrid.RowDefinitions.Clear();
         CalendarGrid.ColumnDefinitions.Clear();
+        _calendarOccasionPanels.Clear();
+        _calendarDayNumberLabels.Clear();
 
         for (var i = 0; i < 7; i++)
             CalendarGrid.ColumnDefinitions.Add(new ColumnDefinition());
@@ -386,26 +392,45 @@ public sealed class MainWindow : Window
         for (var i = 0; i < cells.Count; i++)
         {
             var cell = cells[i];
+            var dayNumber = new TextBlock
+            {
+                Text = ToPersianDigits(cell.Date.Day.ToString()),
+                FontSize = 17,
+                FontWeight = cell.IsToday
+                    ? Microsoft.UI.Text.FontWeights.Bold
+                    : Microsoft.UI.Text.FontWeights.Normal,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Foreground = cell.Date.DayOfWeek == DayOfWeek.Friday
+                    ? new SolidColorBrush(Colors.IndianRed)
+                    : null
+            };
+
+            var occasionPanel = new StackPanel
+            {
+                Spacing = 2,
+                Margin = new Thickness(2, 4, 2, 0)
+            };
+
+            var content = new StackPanel
+            {
+                Spacing = 2,
+                HorizontalAlignment = HorizontalAlignment.Stretch
+            };
+            content.Children.Add(dayNumber);
+            content.Children.Add(occasionPanel);
+
             var button = new Button
             {
                 HorizontalAlignment = HorizontalAlignment.Stretch,
                 VerticalAlignment = VerticalAlignment.Stretch,
+                HorizontalContentAlignment = HorizontalAlignment.Stretch,
+                VerticalContentAlignment = VerticalAlignment.Top,
                 Margin = new Thickness(4),
-                MinHeight = 72,
-                Opacity = cell.IsCurrentMonth ? 1 : 0.38,
-                Content = new TextBlock
-                {
-                    Text = cell.Date.Day.ToString(),
-                    FontSize = 18,
-                    FontWeight = cell.IsToday
-                        ? Microsoft.UI.Text.FontWeights.Bold
-                        : Microsoft.UI.Text.FontWeights.Normal,
-                    HorizontalAlignment = HorizontalAlignment.Center
-                }
+                MinHeight = 88,
+                Padding = new Thickness(5),
+                Opacity = cell.IsCurrentMonth ? 1 : 0.35,
+                Content = content
             };
-
-            if (cell.Date.DayOfWeek == DayOfWeek.Friday)
-                button.Foreground = new SolidColorBrush(Colors.IndianRed);
 
             var captured = cell.Date;
             button.Click += async (_, _) =>
@@ -414,9 +439,126 @@ public sealed class MainWindow : Window
                 await LoadSelectedDayAsync();
             };
 
+            _calendarOccasionPanels[captured] = occasionPanel;
+            _calendarDayNumberLabels[captured] = dayNumber;
+
             Grid.SetRow(button, i / 7);
             Grid.SetColumn(button, i % 7);
             CalendarGrid.Children.Add(button);
+        }
+
+        _ = LoadCalendarCellOccasionsAsync(_year, _month);
+        _ = EnsureYearOccasionsAsync(_year);
+    }
+
+    private async Task LoadCalendarCellOccasionsAsync(int year, int month)
+    {
+        try
+        {
+            var days = PersianDate.DaysInMonth(year, month);
+
+            for (var day = 1; day <= days; day++)
+            {
+                var date = new PersianDate(year, month, day);
+                var snapshot = await _repository.GetDayAsync(date);
+
+                if (year != _year || month != _month ||
+                    !_calendarOccasionPanels.TryGetValue(date, out var panel))
+                    return;
+
+                panel.Children.Clear();
+
+                var visible = snapshot.Occasions
+                    .OrderByDescending(x => x.IsHoliday)
+                    .ThenBy(x => x.Source == "personal" ? 0 : 1)
+                    .ThenBy(x => x.Title)
+                    .Take(3)
+                    .ToArray();
+
+                foreach (var occasion in visible)
+                {
+                    panel.Children.Add(new TextBlock
+                    {
+                        Text = occasion.Title,
+                        FontSize = 10.5,
+                        TextWrapping = TextWrapping.Wrap,
+                        MaxLines = 2,
+                        TextTrimming = TextTrimming.CharacterEllipsis,
+                        HorizontalAlignment = HorizontalAlignment.Stretch,
+                        Foreground = occasion.IsHoliday
+                            ? new SolidColorBrush(Colors.IndianRed)
+                            : null
+                    });
+                }
+
+                if (snapshot.Occasions.Count > visible.Length)
+                {
+                    panel.Children.Add(new TextBlock
+                    {
+                        Text = $"+{ToPersianDigits((snapshot.Occasions.Count - visible.Length).ToString())}",
+                        FontSize = 10,
+                        Opacity = 0.55,
+                        HorizontalAlignment = HorizontalAlignment.Center
+                    });
+                }
+
+                if (snapshot.IsHoliday &&
+                    _calendarDayNumberLabels.TryGetValue(date, out var dayLabel))
+                {
+                    dayLabel.Foreground = new SolidColorBrush(Colors.IndianRed);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            StartupDiagnostics.Log($"LoadCalendarCellOccasionsAsync failed: {ex}");
+        }
+    }
+
+    private async Task EnsureYearOccasionsAsync(int year)
+    {
+        if (_yearSyncedThisSession.Contains(year) || !_yearSyncInFlight.Add(year))
+            return;
+
+        try
+        {
+            var last = await _repository.GetLastOccasionSyncAsync(_occasionSource.Name, year);
+            var needsRefresh = last is null ||
+                               DateTimeOffset.UtcNow - last.Value >= TimeSpan.FromDays(7);
+
+            if (needsRefresh)
+            {
+                DispatcherQueue.TryEnqueue(() =>
+                    SyncProgress.Text = $"در حال به‌روزرسانی مناسبت‌های {ToPersianDigits(year.ToString())} از time.ir...");
+
+                var count = await _planner.SyncOccasionsAsync(_occasionSource, year);
+
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    StatusText.Text = $"{ToPersianDigits(count.ToString())} مناسبت سال {ToPersianDigits(year.ToString())} از time.ir به‌روزرسانی شد.";
+                    SyncProgress.Text = "";
+                });
+            }
+
+            _yearSyncedThisSession.Add(year);
+
+            if (year == _year)
+                await LoadCalendarCellOccasionsAsync(_year, _month);
+        }
+        catch (Exception ex)
+        {
+            StartupDiagnostics.Log($"Automatic time.ir sync for {year} failed: {ex}");
+
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                SyncProgress.Text = "";
+                StatusText.Text =
+                    $"به‌روزرسانی time.ir انجام نشد؛ آخرین اطلاعات محلی حفظ شد. {ex.Message}";
+            });
+        }
+        finally
+        {
+            _yearSyncInFlight.Remove(year);
         }
     }
 
@@ -685,9 +827,11 @@ public sealed class MainWindow : Window
         try
         {
             var count = await _planner.SyncOccasionsAsync(_occasionSource, _year);
-            StatusText.Text = $"{count} مناسبت برای سال {_year} همگام شد.";
+            _yearSyncedThisSession.Add(_year);
+            StatusText.Text = $"{ToPersianDigits(count.ToString())} مناسبت برای سال {ToPersianDigits(_year.ToString())} همگام شد.";
 
             await LoadSelectedDayAsync();
+            await LoadCalendarCellOccasionsAsync(_year, _month);
             await LoadActivitiesAsync();
         }
         catch (Exception ex)
