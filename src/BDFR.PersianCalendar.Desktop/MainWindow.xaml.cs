@@ -124,11 +124,14 @@ public sealed class MainWindow : Window
     {
         var outer = new Grid
         {
-            Background = ThemeService.Brush(_theme.WindowBackground)
+            Background = ThemeService.Brush(_theme.WindowBackground),
+            RequestedTheme = string.Equals(_theme.Id, "graphite-night", StringComparison.OrdinalIgnoreCase)
+                ? ElementTheme.Dark
+                : ElementTheme.Light
         };
 
         _backgroundImage.Stretch = Stretch.UniformToFill;
-        _backgroundImage.Opacity = Math.Clamp(_settings.BackgroundOpacity, 0, 0.85);
+        _backgroundImage.Opacity = Math.Clamp(_settings.BackgroundOpacity, 0, 0.95);
         outer.Children.Add(_backgroundImage);
 
         _backgroundWash.Background = ThemeService.Brush(_theme.WindowBackground);
@@ -1116,12 +1119,16 @@ public sealed class MainWindow : Window
                 return;
             }
 
+            var wasElena = string.Equals(
+                _settings.AppearanceMode,
+                "elena",
+                StringComparison.OrdinalIgnoreCase);
+
+            _settings.AppearanceMode = "theme";
             _settings.CustomBackgroundPath = copied;
             _settings.BackgroundMode = "custom";
             _settings.UseSeasonalBackground = false;
-            _seasonalBackgroundCheck.IsChecked = false;
 
-            // A custom photograph must be visibly applied on first selection.
             if (_settings.BackgroundOpacity < 0.45)
                 _settings.BackgroundOpacity = 0.72;
 
@@ -1130,39 +1137,22 @@ public sealed class MainWindow : Window
                 System.Globalization.CultureInfo.InvariantCulture);
 
             _settingsService.Save(_settings);
-            await ApplyBackgroundAsync();
+
+            if (wasElena)
+                await RebuildAppearanceAsync();
+            else
+                await ApplyBackgroundAsync();
 
             if (_pictureLibraryPanel.Visibility == Visibility.Visible)
                 await RefreshPictureLibraryAsync();
 
-            StatusText.Text = "عکس زمینه دلخواه اعمال شد.";
+            StatusText.Text = "عکس زمینه دلخواه در Theme Mode اعمال شد.";
         }
         catch (Exception ex)
         {
             StartupDiagnostics.Log($"Custom background picker failed: {ex}");
             StatusText.Text = $"انتخاب عکس زمینه انجام نشد: {ex.Message}";
         }
-    }
-
-    private string ResolveBackgroundMode()
-    {
-        if (!string.IsNullOrWhiteSpace(_settings.BackgroundMode))
-            return _settings.BackgroundMode.Trim().ToLowerInvariant();
-
-        // Migration for settings created before Elena/custom/none modes existed.
-        if (!string.IsNullOrWhiteSpace(_settings.CustomBackgroundPath) &&
-            File.Exists(_settings.CustomBackgroundPath))
-        {
-            _settings.BackgroundMode = "custom";
-            if (_settings.BackgroundOpacity < 0.30)
-                _settings.BackgroundOpacity = 0.72;
-            _settingsService.Save(_settings);
-            return "custom";
-        }
-
-        _settings.BackgroundMode = _settings.UseSeasonalBackground ? "elena" : "none";
-        _settingsService.Save(_settings);
-        return _settings.BackgroundMode;
     }
 
     private double GetDesktopAspectRatio()
@@ -1196,21 +1186,17 @@ public sealed class MainWindow : Window
         {
             string? path = null;
             var label = "بدون تصویر زمینه";
-            var mode = ResolveBackgroundMode();
+            var isElena = string.Equals(
+                _settings.AppearanceMode,
+                "elena",
+                StringComparison.OrdinalIgnoreCase);
             var isCustom = false;
 
-            if (mode == "custom" &&
-                !string.IsNullOrWhiteSpace(_settings.CustomBackgroundPath) &&
-                File.Exists(_settings.CustomBackgroundPath))
-            {
-                path = _settings.CustomBackgroundPath;
-                isCustom = true;
-                label = $"تصویر شخصی · {Path.GetFileName(path)}";
-            }
-            else if (mode == "elena")
+            if (isElena)
             {
                 var desktopAspectRatio = GetDesktopAspectRatio();
                 path = _themeService.GetSeasonalBackgroundPath(_month, desktopAspectRatio);
+
                 var season = _month switch
                 {
                     <= 3 => "بهار",
@@ -1218,43 +1204,53 @@ public sealed class MainWindow : Window
                     <= 9 => "پاییز",
                     _ => "زمستان"
                 };
+
                 var ratioLabel = ThemeService.FormatAspectRatioLabel(desktopAspectRatio);
                 label = path is null
                     ? $"Elena Mode · {season} · {ratioLabel} · تصویری پیدا نشد"
                     : $"Elena Mode · {season} · {ratioLabel} · {Path.GetFileName(path)}";
             }
+            else if (string.Equals(
+                         _settings.BackgroundMode,
+                         "custom",
+                         StringComparison.OrdinalIgnoreCase) &&
+                     !string.IsNullOrWhiteSpace(_settings.CustomBackgroundPath) &&
+                     File.Exists(_settings.CustomBackgroundPath))
+            {
+                path = _settings.CustomBackgroundPath;
+                isCustom = true;
+                label = $"تصویر شخصی · {Path.GetFileName(path)}";
+            }
 
             var source = await PictureService.LoadImageAsync(path);
 
-            // If a saved custom file disappears, gracefully fall back to Elena Mode.
-            if (mode == "custom" && source is null)
+            // Theme Mode must never silently jump into Elena Mode.
+            if (!isElena &&
+                string.Equals(_settings.BackgroundMode, "custom", StringComparison.OrdinalIgnoreCase) &&
+                source is null)
             {
-                _settings.BackgroundMode = "elena";
-                _settings.UseSeasonalBackground = true;
-                _seasonalBackgroundCheck.IsChecked = true;
+                _settings.BackgroundMode = "none";
+                _settings.CustomBackgroundPath = null;
                 _settingsService.Save(_settings);
-
-                var desktopAspectRatio = GetDesktopAspectRatio();
-                path = _themeService.GetSeasonalBackgroundPath(_month, desktopAspectRatio);
-                source = await PictureService.LoadImageAsync(path);
-                var ratioLabel = ThemeService.FormatAspectRatioLabel(desktopAspectRatio);
-                label = path is null
-                    ? $"Elena Mode · بازگشت خودکار · {ratioLabel}"
-                    : $"Elena Mode · بازگشت خودکار · {ratioLabel} · {Path.GetFileName(path)}";
-                isCustom = false;
+                label = "تصویر شخصی پیدا نشد؛ پس‌زمینه Theme استفاده می‌شود.";
             }
 
             _backgroundImage.Source = source;
             _backgroundImage.Opacity = Math.Clamp(_settings.BackgroundOpacity, 0, 0.95);
 
-            // Zara Pastel keeps Elena subtle, while a user photo is intentionally visible.
-            _backgroundWash.Opacity = isCustom ? 0.16 : 0.58;
+            _backgroundWash.Opacity = source is null
+                ? 0
+                : isCustom
+                    ? 0.16
+                    : 0.24;
+
             _backgroundPathText.Text = label;
         }
         catch (Exception ex)
         {
             StartupDiagnostics.Log($"ApplyBackgroundAsync failed: {ex}");
             _backgroundImage.Source = null;
+            _backgroundWash.Opacity = 0;
             _backgroundPathText.Text = "بارگذاری تصویر زمینه انجام نشد.";
         }
     }
