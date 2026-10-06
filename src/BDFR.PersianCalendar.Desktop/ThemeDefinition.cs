@@ -23,12 +23,4 @@ public sealed class ThemeDefinition
         "#FFF8DCE5"
     ];
 
-    public Dictionary<string, string> SeasonalBackgrounds { get; set; } =
-        new(StringComparer.OrdinalIgnoreCase)
-        {
-            ["spring"] = "backgrounds/spring.svg",
-            ["summer"] = "backgrounds/summer.svg",
-            ["autumn"] = "backgrounds/autumn.svg",
-            ["winter"] = "backgrounds/winter.svg"
-        };
 }
