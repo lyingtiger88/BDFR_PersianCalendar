@@ -13,13 +13,14 @@ The current `main` branch contains a working WinUI 3 foundation with:
 - Timed events
 - Tasks with completion state and optional due time
 - Multi-stage reminder model
-- Native Windows app notifications
+- Native Windows app notifications with Done / Snooze / Dismiss actions
 - Windows scheduled reminders for future delivery
-- Personal annual occasions such as birthdays and anniversaries
+- Personal annual occasions such as birthdays and anniversaries in Persian, Gregorian and Hijri calendars
 - Multiple advance reminders for personal occasions (for example 30, 7, 1 and 0 days)
 - Persian Quick Add input, e.g. `فردا ساعت 16:30 جلسه تیم`
 - time.ir occasions provider with holiday detection
-- Local activity log
+- Local activity log and in-app Activity Center
+- Automatic time.ir refresh when the annual cache is older than seven days
 - Mica / WinUI 3 Windows 11 desktop shell
 - Reusable Core and Infrastructure layers for future BDFR Lock integration
 
@@ -94,4 +95,4 @@ The Core/Infrastructure projects do not depend on the WinUI shell. This allows B
 
 ## Status
 
-**Development / local-test milestone.** Installer, tray flyout, richer notification actions, automatic annual source refresh and final BDFR Lock bridge are planned for subsequent milestones.
+**Test-ready milestone.** Core calendar/planner requirements are implemented and CI publishes a self-contained Windows x64 test build. Installer polish and the final BDFR Lock host integration are release-engineering follow-ups, not blockers for local functional testing.
