@@ -1,0 +1,27 @@
+{
+  "id": "zara-pastel",
+  "displayName": "Zara Pastel",
+  "windowBackground": "#FFFDF9F6",
+  "panelBackground": "#F2FFFFFF",
+  "cardBackground": "#FAFFFFFF",
+  "primaryText": "#FF1E2A44",
+  "secondaryText": "#FF6B7280",
+  "accent": "#FFC9C3FF",
+  "selectedDay": "#FF7CC9F5",
+  "holidayText": "#FFD65A6F",
+  "weekdayColors": [
+    "#FFF9DDD3",
+    "#FFF9EDC4",
+    "#FFDDF0D9",
+    "#FFD5EFEF",
+    "#FFDCE9FA",
+    "#FFE7E0FA",
+    "#FFF8DCE5"
+  ],
+  "seasonalBackgrounds": {
+    "spring": "backgrounds/spring.jpg",
+    "summer": "backgrounds/summer.jpg",
+    "autumn": "backgrounds/autumn.jpg",
+    "winter": "backgrounds/winter.jpg"
+  }
+}
