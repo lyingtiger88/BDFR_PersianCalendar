@@ -49,6 +49,8 @@ public sealed class MainWindow : Window
     private readonly TextBlock MonthLeftDecoration = new();
     private readonly TextBlock MonthRightDecoration = new();
     private readonly Grid CalendarGrid = new();
+    private readonly List<Border> _weekdayHeaderBorders = new();
+    private readonly List<TextBlock> _weekdayHeaderLabels = new();
     private readonly TextBlock SelectedDateTitle = new();
     private readonly TextBlock GregorianDateText = new();
     private readonly StackPanel OccasionsPanel = new();
@@ -333,25 +335,34 @@ public sealed class MainWindow : Window
         for (var i = 0; i < 7; i++)
             weekdays.ColumnDefinitions.Add(new ColumnDefinition());
 
+        _weekdayHeaderBorders.Clear();
+        _weekdayHeaderLabels.Clear();
+
         var names = new[] { "شنبه", "یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه" };
         for (var i = 0; i < names.Length; i++)
         {
+            var text = new TextBlock
+            {
+                Text = names[i],
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Foreground = i == 6
+                    ? ThemeService.Brush(_theme.HolidayText)
+                    : ThemeService.Brush(_theme.PrimaryText),
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
+            };
+
             var label = new Border
             {
                 Margin = new Thickness(4),
                 Padding = new Thickness(8, 5, 8, 5),
                 CornerRadius = new CornerRadius(12),
                 Background = BrushWithAlpha(GetWeekdayColor(i), 0xB0),
-                Child = new TextBlock
-                {
-                    Text = names[i],
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    Foreground = i == 6
-                        ? ThemeService.Brush(_theme.HolidayText)
-                        : ThemeService.Brush(_theme.PrimaryText),
-                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
-                }
+                Child = text
             };
+
+            _weekdayHeaderBorders.Add(label);
+            _weekdayHeaderLabels.Add(text);
+
             Grid.SetColumn(label, i);
             weekdays.Children.Add(label);
         }
@@ -850,6 +861,7 @@ public sealed class MainWindow : Window
         SelectedDateTitle.Foreground = ThemeService.Brush(_theme.PrimaryText);
 
         ApplyGenericTheme(Content);
+        UpdateWeekdayHeaderAppearance();
 
         // Rebuild only dynamic surfaces whose children are safe to detach/recreate.
         BuildSettingsPanel();
@@ -864,6 +876,19 @@ public sealed class MainWindow : Window
             StringComparison.OrdinalIgnoreCase)
             ? $"Elena Mode فعال شد · Accent: {AppearanceCatalog.GetElenaAccent(_settings.ElenaAccentId).DisplayName}"
             : $"Theme فعال شد: {_theme.DisplayName}";
+    }
+
+    private void UpdateWeekdayHeaderAppearance()
+    {
+        for (var i = 0; i < _weekdayHeaderBorders.Count; i++)
+        {
+            _weekdayHeaderBorders[i].Background =
+                BrushWithAlpha(GetWeekdayColor(i), 0xB0);
+
+            _weekdayHeaderLabels[i].Foreground = i == 6
+                ? ThemeService.Brush(_theme.HolidayText)
+                : ThemeService.Brush(_theme.PrimaryText);
+        }
     }
 
     private void ApplyGenericTheme(DependencyObject? root)
