@@ -544,18 +544,73 @@ public sealed class MainWindow : Window
             Foreground = ThemeService.Brush(_theme.PrimaryText)
         });
 
-        var elenaButton = MakeButton(isElena ? "✓ Elena Mode" : "Elena Mode");
+        var elenaButton = MakeButton(
+            isElena
+                ? "✓ Elena Mode — پس‌زمینه فصلی خودکار"
+                : "فعال‌سازی Elena Mode — پس‌زمینه فصلی خودکار");
         elenaButton.Click += async (_, _) => await SelectElenaModeAsync();
         _settingsPanel.Children.Add(elenaButton);
 
+        var seasonName = GetCurrentSeasonName();
+        var desktopAspect = ThemeService.FormatAspectRatioLabel(GetDesktopAspectRatio());
+        var seasonalFile = _themeService.GetSeasonalBackgroundPath(
+            _month,
+            GetDesktopAspectRatio());
+
+        _settingsPanel.Children.Add(new Border
+        {
+            Background = BrushWithAlpha(
+                isElena ? _theme.Accent : _theme.CardBackground,
+                isElena ? (byte)0x38 : (byte)0x60),
+            CornerRadius = new CornerRadius(12),
+            BorderBrush = BrushWithAlpha(_theme.Accent, 0x78),
+            BorderThickness = new Thickness(1),
+            Padding = new Thickness(10),
+            Child = new StackPanel
+            {
+                Spacing = 4,
+                Children =
+                {
+                    new TextBlock
+                    {
+                        Text = isElena
+                            ? $"Elena Mode فعال است · فصل: {seasonName}"
+                            : "Elena Mode غیرفعال است",
+                        FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                        Foreground = ThemeService.Brush(_theme.PrimaryText)
+                    },
+                    new TextBlock
+                    {
+                        Text = $"نسبت نمایشگر: {desktopAspect}",
+                        FontSize = 10.5,
+                        Foreground = ThemeService.Brush(_theme.SecondaryText)
+                    },
+                    new TextBlock
+                    {
+                        Text = seasonalFile is null
+                            ? "فایل فصل مناسب پیدا نشد."
+                            : $"فایل فصل: {Path.GetFileName(seasonalFile)}",
+                        FontSize = 10.5,
+                        TextWrapping = TextWrapping.Wrap,
+                        Foreground = ThemeService.Brush(_theme.SecondaryText)
+                    }
+                }
+            }
+        });
+
         _settingsPanel.Children.Add(new TextBlock
         {
-            Text = "در Elena Mode تصویر فصل به‌صورت خودکار از پوشه Season Backgrounds و متناسب با نسبت نمایشگر انتخاب می‌شود. این حالت تم پاستلی ندارد.",
+            Text = "Elena Mode تم نیست. فقط تصویر فصل را از picture\\theme\\season backgrounds انتخاب و روی کل برنامه اعمال می‌کند. رنگ Accent هم جداگانه قابل انتخاب است.",
             FontSize = 11,
             TextWrapping = TextWrapping.Wrap,
-            Opacity = 0.68,
+            Opacity = 0.72,
             Foreground = ThemeService.Brush(_theme.SecondaryText)
         });
+
+        var openSeasonFolder = MakeButton("📁 باز کردن پوشه Season Backgrounds");
+        openSeasonFolder.Click += (_, _) =>
+            OpenFolderInExplorer(_themeService.SeasonalBackgroundsRoot);
+        _settingsPanel.Children.Add(openSeasonFolder);
 
         if (isElena)
         {
@@ -1383,6 +1438,15 @@ public sealed class MainWindow : Window
             StatusText.Text = $"انتخاب عکس زمینه انجام نشد: {ex.Message}";
         }
     }
+
+    private string GetCurrentSeasonName()
+        => _month switch
+        {
+            <= 3 => "بهار",
+            <= 6 => "تابستان",
+            <= 9 => "پاییز",
+            _ => "زمستان"
+        };
 
     private double GetDesktopAspectRatio()
     {
