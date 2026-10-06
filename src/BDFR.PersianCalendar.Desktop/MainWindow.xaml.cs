@@ -22,7 +22,7 @@ public sealed class MainWindow : Window
     private readonly ThemeService _themeService;
     private readonly PictureService _pictureService;
     private readonly AppSettings _settings;
-    private readonly ThemeDefinition _theme;
+    private ThemeDefinition _theme;
 
     private readonly Image _backgroundImage = new();
     private readonly Border _backgroundWash = new();
@@ -33,6 +33,8 @@ public sealed class MainWindow : Window
     private readonly TextBlock _backgroundPathText = new();
     private readonly StackPanel _pictureLibraryPanel = new();
     private readonly TextBlock _pictureLibrarySummary = new();
+    private readonly StackPanel _accentSubmenuPanel = new();
+    private readonly StackPanel _aboutUsPanel = new();
 
     private readonly TextBlock MonthTitle = new();
     private readonly TextBlock MonthLeftDecoration = new();
@@ -83,7 +85,8 @@ public sealed class MainWindow : Window
         _settingsService = new SettingsService();
         _themeService = new ThemeService();
         _settings = _settingsService.Load();
-        _theme = _themeService.Load(_settings.ThemeId);
+        _settingsService.Save(_settings);
+        _theme = _themeService.ResolveAppearance(_settings);
         _pictureService = new PictureService(_themeService);
 
         _year = _selected.Year;
@@ -495,72 +498,119 @@ public sealed class MainWindow : Window
 
     private FrameworkElement BuildSettingsPanel()
     {
-        _settingsPanel.Spacing = 8;
+        _settingsPanel.Children.Clear();
+        _settingsPanel.Spacing = 9;
         _settingsPanel.Padding = new Thickness(10);
         _settingsPanel.Visibility = Visibility.Collapsed;
 
-        _settingsPanel.Children.Add(new Border
-        {
-            Background = ThemeService.Brush(_theme.WeekdayColors.ElementAtOrDefault(4) ?? _theme.Accent),
-            CornerRadius = new CornerRadius(12),
-            Padding = new Thickness(10),
-            Child = new StackPanel
-            {
-                Spacing = 3,
-                Children =
-                {
-                    new TextBlock
-                    {
-                        Text = "Zara Pastel",
-                        FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-                        Foreground = ThemeService.Brush(_theme.PrimaryText)
-                    },
-                    new TextBlock
-                    {
-                        Text = "تم اختصاصی پاستلی رنگارنگ",
-                        FontSize = 12,
-                        Opacity = 0.7,
-                        Foreground = ThemeService.Brush(_theme.SecondaryText)
-                    }
-                }
-            }
-        });
+        var isElena = string.Equals(
+            _settings.AppearanceMode,
+            "elena",
+            StringComparison.OrdinalIgnoreCase);
 
-        _seasonalBackgroundCheck.Content = "Elena Mode";
-        _seasonalBackgroundCheck.IsChecked =
-            string.Equals(ResolveBackgroundMode(), "elena", StringComparison.OrdinalIgnoreCase);
-        _seasonalBackgroundCheck.Click += async (_, _) =>
-        {
-            var enabled = _seasonalBackgroundCheck.IsChecked == true;
-            _settings.UseSeasonalBackground = enabled;
-            _settings.BackgroundMode = enabled ? "elena" : "none";
-            _settingsService.Save(_settings);
-            await ApplyBackgroundAsync();
-        };
-        _settingsPanel.Children.Add(_seasonalBackgroundCheck);
         _settingsPanel.Children.Add(new TextBlock
         {
-            Text = "پس‌زمینه فصلی خودکار؛ متناسب با ماه شمسی",
+            Text = "حالت ظاهری",
+            FontSize = 15,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Foreground = ThemeService.Brush(_theme.PrimaryText)
+        });
+
+        var elenaButton = MakeButton(isElena ? "✓ Elena Mode" : "Elena Mode");
+        elenaButton.Click += async (_, _) => await SelectElenaModeAsync();
+        _settingsPanel.Children.Add(elenaButton);
+
+        _settingsPanel.Children.Add(new TextBlock
+        {
+            Text = "در Elena Mode تصویر فصل به‌صورت خودکار از پوشه Season Backgrounds و متناسب با نسبت نمایشگر انتخاب می‌شود. این حالت تم پاستلی ندارد.",
             FontSize = 11,
-            Opacity = 0.65,
+            TextWrapping = TextWrapping.Wrap,
+            Opacity = 0.68,
             Foreground = ThemeService.Brush(_theme.SecondaryText)
         });
 
-        var chooseBackground = MakeButton("انتخاب عکس زمینه دلخواه");
-        chooseBackground.Click += SelectCustomBackground_Click;
-        _settingsPanel.Children.Add(chooseBackground);
-
-        var clearBackground = MakeButton("حذف عکس زمینه دلخواه");
-        clearBackground.Click += async (_, _) =>
+        if (isElena)
         {
-            _settings.CustomBackgroundPath = null;
-            _settings.BackgroundMode = "elena";
-            _settings.UseSeasonalBackground = true;
-            _seasonalBackgroundCheck.IsChecked = true;
-            _settingsService.Save(_settings);
-            await ApplyBackgroundAsync();
-        };
-        _settingsPanel.Children.Add(clearBackground);
+            var accent = AppearanceCatalog.GetElenaAccent(_settings.ElenaAccentId);
+            var accentToggle = MakeButton($"Accent Color ▾  ·  {accent.DisplayName}");
+            accentToggle.Click += (_, _) =>
+                _accentSubmenuPanel.Visibility =
+                    _accentSubmenuPanel.Visibility == Visibility.Visible
+                        ? Visibility.Collapsed
+                        : Visibility.Visible;
+            _settingsPanel.Children.Add(accentToggle);
+            _settingsPanel.Children.Add(BuildElenaAccentSubmenu());
+        }
+
+        _settingsPanel.Children.Add(new Border
+        {
+            Height = 1,
+            Margin = new Thickness(0, 4, 0, 4),
+            Background = BrushWithAlpha(_theme.SecondaryText, 0x30)
+        });
+
+        _settingsPanel.Children.Add(new TextBlock
+        {
+            Text = "Themes",
+            FontSize = 15,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Foreground = ThemeService.Brush(_theme.PrimaryText)
+        });
+
+        foreach (var item in AppearanceCatalog.Themes)
+        {
+            var active = !isElena &&
+                         string.Equals(
+                             _settings.ThemeId,
+                             item.Id,
+                             StringComparison.OrdinalIgnoreCase);
+
+            var button = MakeButton($"{(active ? "✓ " : "")}{item.DisplayName}");
+            var capturedId = item.Id;
+            button.Click += async (_, _) => await SelectThemeAsync(capturedId);
+            _settingsPanel.Children.Add(button);
+
+            _settingsPanel.Children.Add(new TextBlock
+            {
+                Text = item.Description,
+                FontSize = 10.5,
+                Margin = new Thickness(6, -4, 6, 2),
+                Opacity = 0.60,
+                Foreground = ThemeService.Brush(_theme.SecondaryText)
+            });
+        }
+
+        if (!isElena)
+        {
+            _settingsPanel.Children.Add(new Border
+            {
+                Height = 1,
+                Margin = new Thickness(0, 4, 0, 4),
+                Background = BrushWithAlpha(_theme.SecondaryText, 0x30)
+            });
+
+            _settingsPanel.Children.Add(new TextBlock
+            {
+                Text = "پس‌زمینه در Theme Mode",
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                Foreground = ThemeService.Brush(_theme.PrimaryText)
+            });
+
+            var chooseBackground = MakeButton("انتخاب عکس زمینه دلخواه");
+            chooseBackground.Click += SelectCustomBackground_Click;
+            _settingsPanel.Children.Add(chooseBackground);
+
+            var clearBackground = MakeButton("حذف عکس زمینه دلخواه");
+            clearBackground.Click += async (_, _) =>
+            {
+                _settings.CustomBackgroundPath = null;
+                _settings.BackgroundMode = "none";
+                _settings.UseSeasonalBackground = false;
+                _settingsService.Save(_settings);
+                await ApplyBackgroundAsync();
+            };
+            _settingsPanel.Children.Add(clearBackground);
+        }
 
         _backgroundPathText.TextWrapping = TextWrapping.Wrap;
         _backgroundPathText.FontSize = 11;
@@ -569,42 +619,23 @@ public sealed class MainWindow : Window
 
         _settingsPanel.Children.Add(new TextBlock
         {
-            Text = "شدت عکس زمینه (۰ تا ۰٫۹۵)",
+            Text = isElena ? "شدت تصویر فصلی (۰ تا ۰٫۹۵)" : "شدت عکس زمینه (۰ تا ۰٫۹۵)",
             FontSize = 12,
             Foreground = ThemeService.Brush(_theme.SecondaryText)
         });
 
-        _backgroundOpacityBox.Text = _settings.BackgroundOpacity.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
-        _backgroundOpacityBox.PlaceholderText = "مثلاً 0.18";
-        _backgroundOpacityBox.LostFocus += async (_, _) =>
-        {
-            if (double.TryParse(
-                    PersianQuickAddParser.NormalizeDigits(_backgroundOpacityBox.Text ?? ""),
-                    System.Globalization.NumberStyles.Float,
-                    System.Globalization.CultureInfo.InvariantCulture,
-                    out var opacity))
-            {
-                _settings.BackgroundOpacity = Math.Clamp(opacity, 0, 0.95);
-                _settingsService.Save(_settings);
-                await ApplyBackgroundAsync();
-            }
-            else
-            {
-                _backgroundOpacityBox.Text = _settings.BackgroundOpacity.ToString(
-                    "0.00",
-                    System.Globalization.CultureInfo.InvariantCulture);
-            }
-        };
+        _backgroundOpacityBox.Text = _settings.BackgroundOpacity.ToString(
+            "0.00",
+            System.Globalization.CultureInfo.InvariantCulture);
+        _backgroundOpacityBox.PlaceholderText = "مثلاً 0.65";
+        _backgroundOpacityBox.LostFocus -= BackgroundOpacityBox_LostFocus;
+        _backgroundOpacityBox.LostFocus += BackgroundOpacityBox_LostFocus;
         _settingsPanel.Children.Add(_backgroundOpacityBox);
 
         _occasionPicturesCheck.Content = "نمایش عکس برای مناسبت‌ها";
         _occasionPicturesCheck.IsChecked = _settings.ShowOccasionPictures;
-        _occasionPicturesCheck.Click += async (_, _) =>
-        {
-            _settings.ShowOccasionPictures = _occasionPicturesCheck.IsChecked == true;
-            _settingsService.Save(_settings);
-            await LoadSelectedDayAsync();
-        };
+        _occasionPicturesCheck.Click -= OccasionPicturesCheck_Click;
+        _occasionPicturesCheck.Click += OccasionPicturesCheck_Click;
         _settingsPanel.Children.Add(_occasionPicturesCheck);
 
         var pictureLibraryToggle = MakeButton("🖼 کتابخانه تصاویر");
@@ -625,14 +656,195 @@ public sealed class MainWindow : Window
         openPictures.Click += (_, _) => OpenFolderInExplorer(_themeService.PictureRoot);
         _settingsPanel.Children.Add(openPictures);
 
+        var aboutToggle = MakeButton("ℹ About Us");
+        aboutToggle.Click += (_, _) =>
+            _aboutUsPanel.Visibility =
+                _aboutUsPanel.Visibility == Visibility.Visible
+                    ? Visibility.Collapsed
+                    : Visibility.Visible;
+        _settingsPanel.Children.Add(aboutToggle);
+        _settingsPanel.Children.Add(BuildAboutUsPanel());
+
         return new Border
         {
-            Background = ThemeService.Brush(_theme.CardBackground),
+            Background = BrushWithAlpha(_theme.CardBackground, 0xE0),
             CornerRadius = new CornerRadius(14),
             BorderBrush = ThemeService.Brush(_theme.Accent),
             BorderThickness = new Thickness(1),
             Child = _settingsPanel
         };
+    }
+
+    private FrameworkElement BuildElenaAccentSubmenu()
+    {
+        _accentSubmenuPanel.Children.Clear();
+        _accentSubmenuPanel.Spacing = 6;
+        _accentSubmenuPanel.Padding = new Thickness(8);
+        _accentSubmenuPanel.Visibility = Visibility.Collapsed;
+
+        foreach (var accent in AppearanceCatalog.ElenaAccents)
+        {
+            var active = string.Equals(
+                accent.Id,
+                _settings.ElenaAccentId,
+                StringComparison.OrdinalIgnoreCase);
+
+            var button = new Button
+            {
+                Content = $"{(active ? "✓ " : "")}{accent.DisplayName}",
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                Background = ThemeService.Brush(accent.Accent),
+                Foreground = new SolidColorBrush(Colors.White),
+                BorderThickness = new Thickness(0)
+            };
+
+            var capturedId = accent.Id;
+            button.Click += async (_, _) => await SelectElenaAccentAsync(capturedId);
+            _accentSubmenuPanel.Children.Add(button);
+        }
+
+        return new Border
+        {
+            Background = BrushWithAlpha("#FFFFFFFF", 0x62),
+            CornerRadius = new CornerRadius(12),
+            BorderBrush = BrushWithAlpha(_theme.Accent, 0x80),
+            BorderThickness = new Thickness(1),
+            Child = _accentSubmenuPanel
+        };
+    }
+
+    private FrameworkElement BuildAboutUsPanel()
+    {
+        _aboutUsPanel.Children.Clear();
+        _aboutUsPanel.Spacing = 6;
+        _aboutUsPanel.Padding = new Thickness(10);
+        _aboutUsPanel.Visibility = Visibility.Collapsed;
+
+        var version = typeof(MainWindow).Assembly.GetName().Version?.ToString()
+                      ?? "development";
+
+        _aboutUsPanel.Children.Add(new TextBlock
+        {
+            Text = "BDFR Persian Calendar",
+            FontSize = 16,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Foreground = ThemeService.Brush(_theme.PrimaryText)
+        });
+        _aboutUsPanel.Children.Add(new TextBlock
+        {
+            Text = $"Version {version}",
+            FontSize = 11,
+            Opacity = 0.65,
+            Foreground = ThemeService.Brush(_theme.SecondaryText)
+        });
+        _aboutUsPanel.Children.Add(new TextBlock
+        {
+            Text = "این بخش برای متن معرفی، اعتبارها و اطلاعات تکمیلی پروژه آماده شده است. متن نهایی با محتوایی که بعداً می‌فرستی جایگزین می‌شود.",
+            TextWrapping = TextWrapping.Wrap,
+            FontSize = 12,
+            Foreground = ThemeService.Brush(_theme.PrimaryText)
+        });
+
+        return new Border
+        {
+            Background = BrushWithAlpha(_theme.PanelBackground, 0xA0),
+            CornerRadius = new CornerRadius(12),
+            BorderBrush = BrushWithAlpha(_theme.Accent, 0x88),
+            BorderThickness = new Thickness(1),
+            Child = _aboutUsPanel
+        };
+    }
+
+    private async Task SelectElenaModeAsync()
+    {
+        _settings.AppearanceMode = "elena";
+        _settings.BackgroundMode = "none";
+        _settings.UseSeasonalBackground = true;
+
+        if (_settings.BackgroundOpacity < 0.45)
+            _settings.BackgroundOpacity = 0.62;
+
+        _settingsService.Save(_settings);
+        await RebuildAppearanceAsync();
+    }
+
+    private async Task SelectElenaAccentAsync(string accentId)
+    {
+        _settings.AppearanceMode = "elena";
+        _settings.ElenaAccentId = accentId;
+        _settings.UseSeasonalBackground = true;
+        _settingsService.Save(_settings);
+        await RebuildAppearanceAsync();
+    }
+
+    private async Task SelectThemeAsync(string themeId)
+    {
+        _settings.AppearanceMode = "theme";
+        _settings.ThemeId = themeId;
+        _settings.UseSeasonalBackground = false;
+
+        if (string.Equals(_settings.BackgroundMode, "elena", StringComparison.OrdinalIgnoreCase))
+            _settings.BackgroundMode = "none";
+
+        _settingsService.Save(_settings);
+        await RebuildAppearanceAsync();
+    }
+
+    private async Task RebuildAppearanceAsync()
+    {
+        _theme = _themeService.ResolveAppearance(_settings);
+
+        Content = null;
+
+        _settingsPanel.Children.Clear();
+        _pictureLibraryPanel.Children.Clear();
+        _accentSubmenuPanel.Children.Clear();
+        _aboutUsPanel.Children.Clear();
+        CalendarGrid.Children.Clear();
+        OccasionsPanel.Children.Clear();
+        EventsPanel.Children.Clear();
+        TasksPanel.Children.Clear();
+        ActivityPanel.Children.Clear();
+
+        Content = BuildRoot();
+        BuildCalendar();
+        await LoadSelectedDayAsync();
+        await LoadActivitiesAsync();
+        await ApplyBackgroundAsync();
+
+        StatusText.Text = string.Equals(
+            _settings.AppearanceMode,
+            "elena",
+            StringComparison.OrdinalIgnoreCase)
+            ? $"Elena Mode فعال شد · Accent: {AppearanceCatalog.GetElenaAccent(_settings.ElenaAccentId).DisplayName}"
+            : $"Theme فعال شد: {_theme.DisplayName}";
+    }
+
+    private async void BackgroundOpacityBox_LostFocus(object sender, RoutedEventArgs e)
+    {
+        if (double.TryParse(
+                PersianQuickAddParser.NormalizeDigits(_backgroundOpacityBox.Text ?? ""),
+                System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out var opacity))
+        {
+            _settings.BackgroundOpacity = Math.Clamp(opacity, 0, 0.95);
+            _settingsService.Save(_settings);
+            await ApplyBackgroundAsync();
+        }
+        else
+        {
+            _backgroundOpacityBox.Text = _settings.BackgroundOpacity.ToString(
+                "0.00",
+                System.Globalization.CultureInfo.InvariantCulture);
+        }
+    }
+
+    private async void OccasionPicturesCheck_Click(object sender, RoutedEventArgs e)
+    {
+        _settings.ShowOccasionPictures = _occasionPicturesCheck.IsChecked == true;
+        _settingsService.Save(_settings);
+        await LoadSelectedDayAsync();
     }
 
     private FrameworkElement BuildPictureLibraryPanel()
