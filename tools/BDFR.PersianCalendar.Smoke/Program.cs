@@ -106,6 +106,31 @@ if (halfShaaban is null ||
     throw new Exception("time.ir current-markup parser failed for 4 Bahman 1405.");
 }
 
+var officialHolidayFallbackFixture = """
+<!doctype html>
+<html lang="fa">
+<body>
+  <section>
+    <div>22 بهمن پیروزی انقلاب اسلامی ایران</div>
+    <div>23 بهمن مناسبت آزمایشی عادی</div>
+  </section>
+</body>
+</html>
+""";
+
+var officialFallbackOccasions = await TimeIrOccasionSource.ParseAnnualHtmlAsync(
+    officialHolidayFallbackFixture,
+    1405);
+var revolutionDay = officialFallbackOccasions.SingleOrDefault(
+    x => x.Date == new PersianDate(1405, 11, 22));
+if (revolutionDay is null || !revolutionDay.IsHoliday)
+    throw new Exception("22 Bahman must remain an official holiday even without a holiday CSS class.");
+
+var ordinaryBahman = officialFallbackOccasions.SingleOrDefault(
+    x => x.Date == new PersianDate(1405, 11, 23));
+if (ordinaryBahman is null || ordinaryBahman.IsHoliday)
+    throw new Exception("Ordinary classless occasions must not be promoted to holidays.");
+
 var dbPath = Path.Combine(Path.GetTempPath(), $"bdfr-calendar-smoke-{Guid.NewGuid():N}.db");
 try
 {
