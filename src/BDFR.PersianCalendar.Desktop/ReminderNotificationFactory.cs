@@ -7,12 +7,21 @@ namespace BDFR.PersianCalendar.Desktop;
 internal static class ReminderNotificationFactory
 {
     public static AppNotification Build(ReminderSchedule reminder)
-        => new AppNotificationBuilder()
+    {
+        var title = reminder.Privacy == PrivacyLevel.Private
+            ? "🔒 یادآور خصوصی"
+            : reminder.Title;
+
+        var body = reminder.Privacy == PrivacyLevel.Private
+            ? "برای مشاهده جزئیات، برنامه Anahita را باز کنید."
+            : reminder.Body;
+
+        return new AppNotificationBuilder()
             .AddArgument("action", "open")
             .AddArgument("reminderId", reminder.Id)
-            .AddText(reminder.Title)
-            .AddText(reminder.Body)
-            .AddButton(new AppNotificationButton("انجام شد")
+            .AddText(title)
+            .AddText(body)
+            .AddButton(new AppNotificationButton("تأیید")
                 .AddArgument("action", "done")
                 .AddArgument("reminderId", reminder.Id))
             .AddButton(new AppNotificationButton("۱۰ دقیقه بعد")
@@ -22,4 +31,5 @@ internal static class ReminderNotificationFactory
                 .AddArgument("action", "dismiss")
                 .AddArgument("reminderId", reminder.Id))
             .BuildNotification();
+    }
 }
