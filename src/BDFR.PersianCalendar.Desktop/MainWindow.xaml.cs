@@ -1540,82 +1540,163 @@ public sealed class MainWindow : Window
             Foreground = ThemeService.Brush(_theme.SecondaryText)
         });
 
-        StartupDiagnostics.Log("Settings UI: populating Windows font library.");
-        PopulateFontLibrary();
-        _fontFamilyCombo.Header = "Font Family";
-        _fontFamilyCombo.HorizontalAlignment = HorizontalAlignment.Stretch;
-        _fontFamilyCombo.SelectionChanged -= FontTypographyPreview_Changed;
-        _fontFamilyCombo.SelectionChanged += FontTypographyPreview_Changed;
-        _settingsPanel.Children.Add(_fontFamilyCombo);
+        StartupDiagnostics.Log("Settings UI: building safe typography controls without font enumeration.");
 
-        var fontControls = new Grid { ColumnSpacing = 8 };
-        fontControls.ColumnDefinitions.Add(new ColumnDefinition());
-        fontControls.ColumnDefinitions.Add(new ColumnDefinition());
-
-        _fontSizeBox.Header = "اندازه پایه";
-        _fontSizeBox.Minimum = 10;
-        _fontSizeBox.Maximum = 24;
-        _fontSizeBox.SmallChange = 0.5;
-        _fontSizeBox.Value = _settings.FontSize;
-        _fontSizeBox.SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Inline;
-        _fontSizeBox.ValueChanged -= FontSizeBox_ValueChanged;
-        _fontSizeBox.ValueChanged += FontSizeBox_ValueChanged;
-        Grid.SetColumn(_fontSizeBox, 0);
-        fontControls.Children.Add(_fontSizeBox);
-
-        _fontWeightCombo.Header = "وزن";
-        _fontWeightCombo.ItemsSource = new[]
+        var fontFamilyBox = new TextBox
         {
-            "Light",
-            "Normal",
-            "SemiBold",
-            "Bold"
+            Header = "Font Family",
+            Text = string.IsNullOrWhiteSpace(_settings.FontFamilyName)
+                ? "Segoe UI Variable"
+                : _settings.FontFamilyName,
+            PlaceholderText = "مثلاً Segoe UI Variable یا Tahoma",
+            FlowDirection = FlowDirection.LeftToRight
         };
-        _fontWeightCombo.SelectedItem = FontWeightModeDisplayName(_settings.FontWeightMode);
-        _fontWeightCombo.SelectionChanged -= FontTypographyPreview_Changed;
-        _fontWeightCombo.SelectionChanged += FontTypographyPreview_Changed;
-        Grid.SetColumn(_fontWeightCombo, 1);
-        fontControls.Children.Add(_fontWeightCombo);
+        _settingsPanel.Children.Add(fontFamilyBox);
 
-        _settingsPanel.Children.Add(fontControls);
+        var fontSizeBox = new TextBox
+        {
+            Header = "اندازه پایه (10 تا 24)",
+            Text = Math.Clamp(_settings.FontSize, 10.0, 24.0)
+                .ToString("0.#", CultureInfo.InvariantCulture),
+            FlowDirection = FlowDirection.LeftToRight
+        };
+        _settingsPanel.Children.Add(fontSizeBox);
 
-        _fontStyleCombo.Header = "حالت نوشته";
-        _fontStyleCombo.ItemsSource = new[] { "Normal", "Italic" };
-        _fontStyleCombo.SelectedItem = string.Equals(
-            _settings.FontStyleMode,
-            "italic",
-            StringComparison.OrdinalIgnoreCase)
-            ? "Italic"
-            : "Normal";
-        _fontStyleCombo.SelectionChanged -= FontTypographyPreview_Changed;
-        _fontStyleCombo.SelectionChanged += FontTypographyPreview_Changed;
-        _settingsPanel.Children.Add(_fontStyleCombo);
+        var weightMode = NormalizeFontWeightMode(_settings.FontWeightMode);
+        var styleMode = NormalizeFontStyleMode(_settings.FontStyleMode);
 
-        _fontPreview.Text =
-            "آناهیتا · امروز یک روز تازه است — Anahita Calendar 1405";
-        _fontPreview.TextWrapping = TextWrapping.Wrap;
-        _fontPreview.Margin = new Thickness(2, 6, 2, 6);
-        _fontPreview.Padding = new Thickness(10);
-        _fontPreview.Foreground = ThemeService.Brush(_theme.PrimaryText);
-        UpdateFontPreview();
-        _settingsPanel.Children.Add(_fontPreview);
+        var modeRow = new Grid { ColumnSpacing = 8 };
+        modeRow.ColumnDefinitions.Add(new ColumnDefinition());
+        modeRow.ColumnDefinitions.Add(new ColumnDefinition());
+
+        var weightButton = MakeButton($"وزن: {FontWeightModeDisplayName(weightMode)}");
+        weightButton.Click += (_, _) =>
+        {
+            weightMode = weightMode switch
+            {
+                "light" => "normal",
+                "normal" => "semibold",
+                "semibold" => "bold",
+                _ => "light"
+            };
+            weightButton.Content = $"وزن: {FontWeightModeDisplayName(weightMode)}";
+        };
+        Grid.SetColumn(weightButton, 0);
+        modeRow.Children.Add(weightButton);
+
+        var styleButton = MakeButton(
+            $"حالت: {(styleMode == "italic" ? "Italic" : "Normal")}");
+        styleButton.Click += (_, _) =>
+        {
+            styleMode = styleMode == "italic" ? "normal" : "italic";
+            styleButton.Content = $"حالت: {(styleMode == "italic" ? "Italic" : "Normal")}";
+        };
+        Grid.SetColumn(styleButton, 1);
+        modeRow.Children.Add(styleButton);
+
+        _settingsPanel.Children.Add(modeRow);
+
+        var preview = new TextBlock
+        {
+            Text = "آناهیتا · امروز یک روز تازه است — Anahita Calendar 1405",
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(2, 6, 2, 6),
+            Padding = new Thickness(10),
+            Foreground = ThemeService.Brush(_theme.PrimaryText)
+        };
+        _settingsPanel.Children.Add(preview);
+
+        var previewButton = MakeButton("پیش‌نمایش");
+        previewButton.Click += (_, _) =>
+        {
+            var family = string.IsNullOrWhiteSpace(fontFamilyBox.Text)
+                ? "Segoe UI Variable"
+                : fontFamilyBox.Text.Trim();
+
+            var size = double.TryParse(
+                fontSizeBox.Text,
+                NumberStyles.Float,
+                CultureInfo.InvariantCulture,
+                out var parsedSize)
+                ? Math.Clamp(parsedSize, 10.0, 24.0)
+                : 14.0;
+
+            preview.FontFamily = ResolveUserFont(family);
+            preview.FontSize = size;
+            preview.FontWeight = ResolveUserFontWeight(
+                weightMode,
+                Microsoft.UI.Text.FontWeights.Normal);
+            preview.FontStyle = ResolveUserFontStyle(
+                styleMode,
+                Windows.UI.Text.FontStyle.Normal);
+        };
+        _settingsPanel.Children.Add(previewButton);
 
         var applyFont = MakeButton("اعمال تنظیمات فونت");
-        applyFont.Click += ApplyFont_Click;
+        applyFont.Click += (_, _) =>
+        {
+            var family = string.IsNullOrWhiteSpace(fontFamilyBox.Text)
+                ? "Segoe UI Variable"
+                : fontFamilyBox.Text.Trim();
+
+            var size = double.TryParse(
+                fontSizeBox.Text,
+                NumberStyles.Float,
+                CultureInfo.InvariantCulture,
+                out var parsedSize)
+                ? Math.Clamp(parsedSize, 10.0, 24.0)
+                : 14.0;
+
+            _settings.FontFamilyName = family;
+            _settings.FontSize = size;
+            _settings.FontWeightMode = weightMode;
+            _settings.FontStyleMode = styleMode;
+            _settingsService.Save(_settings);
+
+            ApplyUserFont(Content);
+            preview.FontFamily = ResolveUserFont(family);
+            preview.FontSize = size;
+            preview.FontWeight = ResolveUserFontWeight(
+                weightMode,
+                Microsoft.UI.Text.FontWeights.Normal);
+            preview.FontStyle = ResolveUserFontStyle(
+                styleMode,
+                Windows.UI.Text.FontStyle.Normal);
+
+            StatusText.Text =
+                $"فونت «{family}» · اندازه {size:0.#} · {FontWeightModeDisplayName(weightMode)} · {styleMode}";
+        };
         _settingsPanel.Children.Add(applyFont);
 
-        var refreshFonts = MakeButton("↻ بازخوانی کتابخانه فونت ویندوز");
-        refreshFonts.Click += (_, _) =>
-        {
-            PopulateFontLibrary();
-            UpdateFontPreview();
-            StatusText.Text = "کتابخانه فونت‌های ویندوز دوباره خوانده شد.";
-        };
-        _settingsPanel.Children.Add(refreshFonts);
-
         var resetFont = MakeButton("بازگشت تایپوگرافی به حالت پیش‌فرض");
-        resetFont.Click += ResetFont_Click;
+        resetFont.Click += (_, _) =>
+        {
+            _settings.FontFamilyName = "Segoe UI Variable";
+            _settings.FontSize = 14.0;
+            _settings.FontWeightMode = "normal";
+            _settings.FontStyleMode = "normal";
+            _settingsService.Save(_settings);
+
+            fontFamilyBox.Text = "Segoe UI Variable";
+            fontSizeBox.Text = "14";
+            weightMode = "normal";
+            styleMode = "normal";
+            weightButton.Content = "وزن: Normal";
+            styleButton.Content = "حالت: Normal";
+            ApplyUserFont(Content);
+
+            StatusText.Text = "فونت و تایپوگرافی به حالت پیش‌فرض برگشت.";
+        };
         _settingsPanel.Children.Add(resetFont);
+
+        _settingsPanel.Children.Add(new TextBlock
+        {
+            Text = "برای پایداری، اسکن خودکار کل Font Library و کنترل‌های NumberBox/ComboBox در این نسخه غیرفعال شده‌اند. نام هر فونت نصب‌شده را می‌توانید مستقیم وارد کنید.",
+            FontSize = 10.5,
+            TextWrapping = TextWrapping.Wrap,
+            Opacity = 0.62,
+            Foreground = ThemeService.Brush(_theme.SecondaryText)
+        });
 
         if (_settingsDiagnosticLevel <= 3)
         {
@@ -1878,126 +1959,129 @@ public sealed class MainWindow : Window
         string paletteKey,
         int paletteMonth)
     {
-        var row = new Grid { ColumnSpacing = 8 };
-        row.ColumnDefinitions.Add(
-            new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        row.ColumnDefinitions.Add(
-            new ColumnDefinition { Width = GridLength.Auto });
+        // Native WinUI ColorPicker/Flyout reproducibly terminates the compositor
+        // on the affected machine. Use a simple inline HEX editor instead.
+        var root = new StackPanel
+        {
+            Spacing = 5,
+            Margin = new Thickness(0, 2, 0, 4)
+        };
 
-        var labelBlock = new TextBlock
+        root.Children.Add(new TextBlock
         {
             Text = label,
-            VerticalAlignment = VerticalAlignment.Center,
             Foreground = ThemeService.Brush(_theme.PrimaryText)
-        };
-        Grid.SetColumn(labelBlock, 0);
-        row.Children.Add(labelBlock);
+        });
 
-        var colorButton = new Button
+        var row = new Grid { ColumnSpacing = 6 };
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        var hexBox = new TextBox
         {
-            Content = ThemeService.NormalizeHexColor(effectiveColor),
-            MinWidth = 118,
-            HorizontalAlignment = HorizontalAlignment.Right,
-            Background = ThemeService.Brush(effectiveColor),
-            Foreground = ContrastBrush(effectiveColor),
-            BorderBrush = BrushWithAlpha(_theme.PrimaryText, 0x48),
-            BorderThickness = new Thickness(1)
+            Text = ThemeService.NormalizeHexColor(effectiveColor),
+            PlaceholderText = "#RRGGBB یا #AARRGGBB",
+            FlowDirection = FlowDirection.LeftToRight,
+            HorizontalAlignment = HorizontalAlignment.Stretch
         };
-        Grid.SetColumn(colorButton, 1);
-        row.Children.Add(colorButton);
+        Grid.SetColumn(hexBox, 0);
+        row.Children.Add(hexBox);
 
-        colorButton.Click += (_, _) =>
+        var apply = MakeButton("اعمال");
+        Grid.SetColumn(apply, 1);
+        row.Children.Add(apply);
+
+        var reset = MakeButton("پیش‌فرض");
+        Grid.SetColumn(reset, 2);
+        row.Children.Add(reset);
+
+        apply.Click += async (_, _) =>
         {
-            var picker = new ColorPicker
+            if (!TryNormalizeHexInput(hexBox.Text, out var normalized))
             {
-                Color = ThemeService.ParseColor(effectiveColor),
-                IsAlphaEnabled = true,
-                IsColorSpectrumVisible = true,
-                IsColorSliderVisible = true,
-                IsColorPreviewVisible = true,
-                MinWidth = 320
-            };
+                StatusText.Text = "کد رنگ معتبر نیست. نمونه: #2E7D32 یا #FF2E7D32";
+                return;
+            }
 
-            var flyoutStack = new StackPanel
-            {
-                Spacing = 8,
-                Padding = new Thickness(8)
-            };
+            SetColorOverride(paletteKey, role, normalized);
+            _settingsService.Save(_settings);
+            hexBox.Text = normalized;
 
-            flyoutStack.Children.Add(new TextBlock
-            {
-                Text = label,
-                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
-            });
-            flyoutStack.Children.Add(picker);
+            await ApplyColorOverrideSafelyAsync(
+                paletteKey,
+                label,
+                paletteMonth);
+        };
 
-            var actions = new Grid { ColumnSpacing = 8 };
-            actions.ColumnDefinitions.Add(new ColumnDefinition());
-            actions.ColumnDefinitions.Add(new ColumnDefinition());
+        reset.Click += async (_, _) =>
+        {
+            ClearColorOverride(paletteKey, role);
+            _settingsService.Save(_settings);
+            hexBox.Text = ThemeService.NormalizeHexColor(defaultColor);
 
-            var apply = MakeButton("اعمال");
-            var reset = MakeButton("پیش‌فرض");
+            await ApplyColorOverrideSafelyAsync(
+                paletteKey,
+                label,
+                paletteMonth);
+        };
 
-            Grid.SetColumn(apply, 0);
-            Grid.SetColumn(reset, 1);
-            actions.Children.Add(apply);
-            actions.Children.Add(reset);
-            flyoutStack.Children.Add(actions);
+        root.Children.Add(row);
 
-            var flyout = new Flyout { Content = flyoutStack };
+        root.Children.Add(new TextBlock
+        {
+            Text = $"پیش‌فرض: {ThemeService.NormalizeHexColor(defaultColor)}",
+            FontSize = 9.5,
+            Opacity = 0.55,
+            Foreground = ThemeService.Brush(_theme.SecondaryText)
+        });
 
-            apply.Click += async (_, _) =>
-            {
-                SetColorOverride(
+        return root;
+    }
+
+    private static bool TryNormalizeHexInput(string? value, out string normalized)
+    {
+        normalized = string.Empty;
+        var raw = (value ?? string.Empty).Trim();
+
+        if (raw.StartsWith("#", StringComparison.Ordinal))
+            raw = raw[1..];
+
+        if (raw.Length is not (6 or 8) || raw.Any(ch => !Uri.IsHexDigit(ch)))
+            return false;
+
+        normalized = "#" + raw.ToUpperInvariant();
+        return true;
+    }
+
+    private async Task ApplyColorOverrideSafelyAsync(
+        string paletteKey,
+        string label,
+        int paletteMonth)
+    {
+        try
+        {
+            StartupDiagnostics.MarkPhase("safe-color-apply-start");
+
+            if (string.Equals(
+                    ThemeService.GetColorPaletteKey(_settings, _month),
                     paletteKey,
-                    role,
-                    ThemeService.ColorToHex(picker.Color));
-
-                _settingsService.Save(_settings);
-                flyout.Hide();
-
-                if (string.Equals(
-                        ThemeService.GetColorPaletteKey(_settings, _month),
-                        paletteKey,
-                        StringComparison.OrdinalIgnoreCase))
-                {
-                    await ApplyAppearanceAsync();
-                }
-                else
-                {
-                    StatusText.Text =
-                        $"رنگ «{label}» برای {paletteKey} ذخیره شد.";
-                }
-            };
-
-            reset.Click += async (_, _) =>
+                    StringComparison.OrdinalIgnoreCase))
             {
-                ClearColorOverride(paletteKey, role);
-                _settingsService.Save(_settings);
-                flyout.Hide();
+                _theme = _themeService.ResolveAppearance(_settings, _month);
+                ApplyAppearanceBrushesOnly();
+                BuildCalendar();
+                await LoadSelectedDayAsync();
+            }
 
-                if (string.Equals(
-                        ThemeService.GetColorPaletteKey(_settings, _month),
-                        paletteKey,
-                        StringComparison.OrdinalIgnoreCase))
-                {
-                    await ApplyAppearanceAsync();
-                }
-                else
-                {
-                    StatusText.Text =
-                        $"رنگ «{label}» برای {paletteKey} به پیش‌فرض برگشت.";
-                }
-            };
-
-            flyout.ShowAt(colorButton);
-        };
-
-        ToolTipService.SetToolTip(
-            colorButton,
-            $"پیش‌فرض: {ThemeService.NormalizeHexColor(defaultColor)}");
-
-        return row;
+            StartupDiagnostics.MarkPhase("safe-color-apply-complete");
+            StatusText.Text = $"رنگ «{label}» برای {paletteKey} ذخیره و اعمال شد.";
+        }
+        catch (Exception ex)
+        {
+            StartupDiagnostics.Log($"Safe color apply failed: {ex}");
+            StatusText.Text = "رنگ ذخیره شد، اما بازآرایی زنده انجام نشد؛ برنامه را دوباره باز کنید.";
+        }
     }
 
     private void SetColorOverride(
