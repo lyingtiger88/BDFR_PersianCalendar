@@ -19,7 +19,6 @@ public sealed class LogonUiBridgePublisher
         ICalendarRepository repository,
         CancellationToken cancellationToken = default)
     {
-        var now = DateTimeOffset.Now;
         var today = PersianDate.Today();
 
         var day = await repository.GetDayAsync(today, cancellationToken);
