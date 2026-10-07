@@ -6,11 +6,26 @@ public static class ReminderEngine
         CalendarEvent calendarEvent,
         TimeZoneInfo timeZone,
         params int[] minutesBefore)
+        => ForEvent(
+            calendarEvent,
+            timeZone,
+            repeatCount: 1,
+            repeatIntervalMinutes: 5,
+            minutesBefore);
+
+    public static IReadOnlyList<ReminderSchedule> ForEvent(
+        CalendarEvent calendarEvent,
+        TimeZoneInfo timeZone,
+        int repeatCount,
+        int repeatIntervalMinutes,
+        params int[] minutesBefore)
     {
         if (calendarEvent.AllDay || calendarEvent.StartTime is null) return [];
 
         var local = calendarEvent.Date.ToDateOnly().ToDateTime(calendarEvent.StartTime.Value, DateTimeKind.Unspecified);
         var eventUtc = TimeZoneInfo.ConvertTimeToUtc(local, timeZone);
+        repeatCount = Math.Clamp(repeatCount, 1, 20);
+        repeatIntervalMinutes = Math.Clamp(repeatIntervalMinutes, 1, 1440);
 
         return minutesBefore
             .Distinct()
@@ -23,7 +38,11 @@ public static class ReminderEngine
                 new DateTimeOffset(eventUtc, TimeSpan.Zero).AddMinutes(-offset),
                 ReminderState.Pending,
                 calendarEvent.Title,
-                offset == 0 ? "زمان شروع رویداد فرا رسیده است." : $"{offset} دقیقه تا شروع رویداد"))
+                offset == 0 ? "زمان شروع رویداد فرا رسیده است." : $"{offset} دقیقه تا شروع رویداد",
+                calendarEvent.Privacy,
+                repeatCount,
+                repeatIntervalMinutes,
+                0))
             .ToArray();
     }
 
