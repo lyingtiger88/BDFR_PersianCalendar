@@ -80,7 +80,7 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Build WinUI desktop app
-        run: dotnet build src/BDFR.PersianCalendar.Desktop/BDFR.PersianCalendar.Desktop.csproj -c Release -p:Platform=x64
+        run: dotnet build src/BDFR.PersianCalendar.Desktop/BDFR.PersianCalendar.Desktop.csproj -c Release -p:Platform=x64 -p:AnahitaGitCommit="${{ github.sha }}" -p:AnahitaBuildNumber="${{ github.run_number }}"
 
       - name: Publish Windows x64 test build
         shell: pwsh
@@ -92,6 +92,8 @@ jobs:
             -p:Platform=x64 `
             -p:WindowsAppSDKSelfContained=true `
             -p:PublishSingleFile=false `
+            -p:AnahitaGitCommit="${{ github.sha }}" `
+            -p:AnahitaBuildNumber="${{ github.run_number }}" `
             -o artifacts/Anahita-win-x64
 
       - name: Package portable test ZIP

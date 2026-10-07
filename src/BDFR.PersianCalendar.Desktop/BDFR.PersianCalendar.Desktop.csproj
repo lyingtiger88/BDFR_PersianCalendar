@@ -16,7 +16,14 @@
     <Company>BDFR</Company>
     <Authors>Behdad Badfar</Authors>
     <Description>Persian calendar, planner, occasions and reminders for Windows.</Description>
+    <AnahitaGitCommit Condition="'$(AnahitaGitCommit)' == ''">local</AnahitaGitCommit>
+    <AnahitaBuildNumber Condition="'$(AnahitaBuildNumber)' == ''">local</AnahitaBuildNumber>
+    <InformationalVersion>1.0.0+$(AnahitaGitCommit)</InformationalVersion>
   </PropertyGroup>
+  <ItemGroup>
+    <AssemblyMetadata Include="GitCommit" Value="$(AnahitaGitCommit)" />
+    <AssemblyMetadata Include="BuildNumber" Value="$(AnahitaBuildNumber)" />
+  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../BDFR.PersianCalendar.Core/BDFR.PersianCalendar.Core.csproj" />
     <ProjectReference Include="../BDFR.PersianCalendar.Infrastructure/BDFR.PersianCalendar.Infrastructure.csproj" />

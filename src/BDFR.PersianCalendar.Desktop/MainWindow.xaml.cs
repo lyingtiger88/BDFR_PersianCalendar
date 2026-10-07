@@ -92,6 +92,7 @@ public sealed class MainWindow : Window
     private int _year;
     private int _month;
     private int _paletteEditorMonth;
+    private bool _postActivationInitializationStarted;
 
     public MainWindow(
         ICalendarRepository repository,
@@ -110,6 +111,11 @@ public sealed class MainWindow : Window
         _themeService = new ThemeService();
         _settings = _settingsService.Load();
         _settingsService.Save(_settings);
+        StartupDiagnostics.Log(
+            $"Appearance settings: mode={_settings.AppearanceMode}; theme={_settings.ThemeId}; " +
+            $"glass={_settings.GlassMode}; font={_settings.FontFamilyName}/{_settings.FontSize:0.##}; " +
+            $"colorOverrides={_settings.ColorOverrides.Count}; backgroundMode={_settings.BackgroundMode}; " +
+            $"backgroundOpacity={_settings.BackgroundOpacity:0.##}.");
 
         _year = _selected.Year;
         _month = _selected.Month;
@@ -139,11 +145,67 @@ public sealed class MainWindow : Window
         }
 
         BuildCalendar();
-        _ = LoadSelectedDayAsync();
-        _ = LoadActivitiesAsync();
-        _ = ApplyBackgroundAsync();
-
+        StartupDiagnostics.Log("MainWindow: async UI startup work deferred until after activation.");
         StartupDiagnostics.Log("MainWindow: programmatic UI ready.");
+    }
+
+    public void StartPostActivationInitialization()
+    {
+        if (_postActivationInitializationStarted)
+        {
+            StartupDiagnostics.Log("Post-activation UI initialization request ignored; already started.");
+            return;
+        }
+
+        _postActivationInitializationStarted = true;
+        StartupDiagnostics.Log("Post-activation UI initialization enqueue requested.");
+
+        var queued = DispatcherQueue.TryEnqueue(() =>
+        {
+            StartupDiagnostics.Log("Post-activation UI initialization dispatcher callback entered.");
+            _ = RunPostActivationInitializationAsync();
+        });
+
+        StartupDiagnostics.Log($"Post-activation UI initialization enqueue result: {queued}.");
+
+        if (!queued)
+        {
+            StartupDiagnostics.Log("Post-activation UI initialization enqueue failed; starting directly on current UI context.");
+            _ = RunPostActivationInitializationAsync();
+        }
+    }
+
+    private async Task RunPostActivationInitializationAsync()
+    {
+        StartupDiagnostics.Log("Post-activation UI initialization started.");
+
+        try
+        {
+            StartupDiagnostics.Log("Post-activation: selected-day load starting.");
+            await LoadSelectedDayAsync();
+            StartupDiagnostics.Log("Post-activation: selected-day load completed.");
+
+            StartupDiagnostics.Log("Post-activation: activity load starting.");
+            await LoadActivitiesAsync();
+            StartupDiagnostics.Log("Post-activation: activity load completed.");
+
+            StartupDiagnostics.Log("Post-activation: calendar-cell occasion load starting.");
+            await LoadCalendarCellOccasionsAsync(_year, _month);
+            StartupDiagnostics.Log("Post-activation: calendar-cell occasion load completed.");
+
+            StartupDiagnostics.Log("Post-activation: background apply starting.");
+            await ApplyBackgroundAsync();
+            StartupDiagnostics.Log("Post-activation: background apply completed.");
+
+            StartupDiagnostics.Log("Post-activation: year occasion refresh queued.");
+            _ = EnsureYearOccasionsAsync(_year);
+
+            StartupDiagnostics.Log("Post-activation UI initialization completed.");
+        }
+        catch (Exception ex)
+        {
+            StartupDiagnostics.Log($"Post-activation UI initialization failed but app will remain open: {ex}");
+        }
     }
 
     private FrameworkElement BuildRoot()
@@ -3206,9 +3268,17 @@ public sealed class MainWindow : Window
         }
 
         ApplyUserFont(CalendarGrid);
-        _ = LoadCalendarCellOccasionsAsync(_year, _month);
-        _ = EnsureYearOccasionsAsync(_year);
-        _ = ApplyBackgroundAsync();
+
+        if (_postActivationInitializationStarted)
+        {
+            _ = LoadCalendarCellOccasionsAsync(_year, _month);
+            _ = EnsureYearOccasionsAsync(_year);
+            _ = ApplyBackgroundAsync();
+        }
+        else
+        {
+            StartupDiagnostics.Log("BuildCalendar: async refresh deferred until post-activation.");
+        }
     }
 
     private async Task LoadCalendarCellOccasionsAsync(int year, int month)

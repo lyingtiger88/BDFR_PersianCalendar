@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Runtime.InteropServices;
 
 namespace BDFR.PersianCalendar.Desktop;
@@ -13,7 +14,22 @@ internal static class StartupDiagnostics
 
     public static void BeginSession()
     {
-        Log($"========== SESSION START pid={Environment.ProcessId} version={typeof(StartupDiagnostics).Assembly.GetName().Version} ==========");
+        var assembly = typeof(StartupDiagnostics).Assembly;
+        var version = assembly.GetName().Version?.ToString() ?? "unknown";
+        var informationalVersion = assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
+            .InformationalVersion ?? "unknown";
+        var gitCommit = GetAssemblyMetadata(assembly, "GitCommit");
+        var buildNumber = GetAssemblyMetadata(assembly, "BuildNumber");
+        var executablePath = Environment.ProcessPath ?? "unknown";
+
+        Log($"========== SESSION START pid={Environment.ProcessId} version={version} informational={informationalVersion} build={buildNumber} commit={gitCommit} ==========");
+        Log($"Runtime: {RuntimeInformation.FrameworkDescription}; OS: {RuntimeInformation.OSDescription}; processArch={RuntimeInformation.ProcessArchitecture}; osArch={RuntimeInformation.OSArchitecture}.");
+        Log($"Executable: {executablePath}");
+        Log($"Base directory: {AppContext.BaseDirectory}");
+        Log($"Install kind hint: {DetectInstallKind(executablePath)}");
+        Log($"Data directory: {DirectoryPath}");
+        Log($"Settings path: {Path.Combine(DirectoryPath, "settings.json")}");
     }
 
     public static void Log(string message)
@@ -40,6 +56,33 @@ internal static class StartupDiagnostics
                 0x00000010);
         }
         catch { }
+    }
+
+    private static string GetAssemblyMetadata(Assembly assembly, string key)
+        => assembly
+            .GetCustomAttributes<AssemblyMetadataAttribute>()
+            .FirstOrDefault(x => string.Equals(x.Key, key, StringComparison.OrdinalIgnoreCase))?
+            .Value ?? "unknown";
+
+    private static string DetectInstallKind(string executablePath)
+    {
+        if (string.IsNullOrWhiteSpace(executablePath) || executablePath == "unknown")
+            return "unknown";
+
+        foreach (var folder in new[]
+                 {
+                     Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                     Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86)
+                 })
+        {
+            if (!string.IsNullOrWhiteSpace(folder) &&
+                executablePath.StartsWith(folder, StringComparison.OrdinalIgnoreCase))
+            {
+                return "installed-program-files";
+            }
+        }
+
+        return "portable-or-custom-location";
     }
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]

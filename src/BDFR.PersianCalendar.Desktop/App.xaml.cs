@@ -115,14 +115,19 @@ public partial class App : Application
 
             StartupDiagnostics.Log("Activating MainWindow.");
             _window.Activate();
-            StartupDiagnostics.Log("MainWindow activated.");
+            StartupDiagnostics.Log("MainWindow activated; requesting deferred UI initialization.");
 
+            mainWindow.StartPostActivationInitialization();
+            StartupDiagnostics.Log("Post-activation UI initialization requested.");
+
+            StartupDiagnostics.Log("Scheduling background initialization task.");
             _ = InitializeBackgroundServicesAsync(
                 repository,
                 planner,
                 source,
                 specialOccasions,
                 mainWindow);
+            StartupDiagnostics.Log("Background initialization task scheduled.");
         }
         catch (Exception ex)
         {
@@ -137,15 +142,18 @@ public partial class App : Application
         SpecialOccasionService specialOccasions,
         MainWindow mainWindow)
     {
+        StartupDiagnostics.Log("Background initialization task entered; first-frame delay starting.");
+
         try
         {
             // Allow the first frame to render before any optional background work.
             await Task.Delay(750);
-            StartupDiagnostics.Log("Background initialization starting.");
+            StartupDiagnostics.Log("Background initialization starting after first-frame delay.");
 
             var notificationsAvailable = false;
             WindowsScheduledReminderScheduler? scheduler = null;
 
+            StartupDiagnostics.Log("Notification initialization starting.");
             try
             {
                 _notificationManager = AppNotificationManager.Default;
@@ -167,6 +175,7 @@ public partial class App : Application
             }
 
             // Always persist personal-occasion reminders locally.
+            StartupDiagnostics.Log("Local reminder initialization starting.");
             try
             {
                 await specialOccasions.EnsureUpcomingRemindersAsync(new TimeOnly(9, 0));
@@ -178,6 +187,7 @@ public partial class App : Application
             }
 
             // Touch Windows notification APIs only after registration succeeded.
+            StartupDiagnostics.Log($"Windows reminder scheduling check: notificationsAvailable={notificationsAvailable}.");
             if (notificationsAvailable && scheduler is not null)
             {
                 try
@@ -210,6 +220,7 @@ public partial class App : Application
                 StartupDiagnostics.Log("Windows reminder scheduling/polling skipped because notifications are unavailable.");
             }
 
+            StartupDiagnostics.Log("time.ir background sync check starting.");
             await AutoSyncOccasionsAsync(repository, planner, source, mainWindow);
             StartupDiagnostics.Log("Background initialization completed.");
         }
