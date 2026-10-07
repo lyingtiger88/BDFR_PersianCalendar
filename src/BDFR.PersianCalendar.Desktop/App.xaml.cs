@@ -12,6 +12,9 @@ public partial class App : Application
     private ReminderActionService? _reminderActions;
     private HttpClient? _http;
     private AppNotificationManager? _notificationManager;
+    private LogonUiBridgePublisher? _logonUiBridge;
+    private CancellationTokenSource? _logonUiBridgeCts;
+    private Task? _logonUiBridgeTask;
 
     public App()
     {
@@ -98,6 +101,26 @@ public partial class App : Application
                 if (_reminders is not null)
                     await _reminders.DisposeAsync();
 
+                if (_logonUiBridgeCts is not null)
+                {
+                    _logonUiBridgeCts.Cancel();
+
+                    if (_logonUiBridgeTask is not null)
+                    {
+                        try
+                        {
+                            await _logonUiBridgeTask;
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            // Normal bridge shutdown.
+                        }
+                    }
+
+                    _logonUiBridgeCts.Dispose();
+                    _logonUiBridgeCts = null;
+                }
+
                 _http?.Dispose();
 
                 if (_notificationManager is not null)
@@ -125,6 +148,17 @@ public partial class App : Application
             StartupDiagnostics.MarkPhase("after-post-activation-ui-init-request");
             StartupDiagnostics.Log("Post-activation UI initialization requested.");
 
+            // The LogonUI bridge is deliberately local-only and does not touch
+            // WinRT notification APIs or the network. It only publishes a bounded,
+            // privacy-tagged snapshot through a current-user named pipe.
+            _logonUiBridge = new LogonUiBridgePublisher();
+            _logonUiBridgeCts = new CancellationTokenSource();
+            _logonUiBridgeTask = RunLogonUiBridgeAsync(
+                repository,
+                _logonUiBridge,
+                _logonUiBridgeCts.Token);
+            StartupDiagnostics.Log("Local BDFR LogonUI bridge loop started.");
+
             // Stability quarantine:
             // The affected Windows 10 machine reaches a fully visible/initialized
             // MainWindow and then terminates natively without ProcessExit or a
@@ -141,6 +175,42 @@ public partial class App : Application
         catch (Exception ex)
         {
             StartupDiagnostics.ShowFatal(ex);
+        }
+    }
+
+    private static async Task RunLogonUiBridgeAsync(
+        ICalendarRepository repository,
+        LogonUiBridgePublisher publisher,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(1.5), cancellationToken);
+
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                try
+                {
+                    var published = await publisher.PublishAsync(repository, cancellationToken);
+
+                    if (published)
+                        StartupDiagnostics.Log("LogonUI bridge snapshot published.");
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    StartupDiagnostics.Log($"LogonUI bridge publish failed: {ex.Message}");
+                }
+
+                await Task.Delay(TimeSpan.FromSeconds(30), cancellationToken);
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Normal shutdown.
         }
     }
 
