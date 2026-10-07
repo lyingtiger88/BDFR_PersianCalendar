@@ -55,8 +55,8 @@ if (newYear is null || !newYear.IsHoliday || newYear.Title != "نوروز")
     throw new Exception("time.ir parser fixture failed for holiday event.");
 
 var republicDay = occasions.SingleOrDefault(x => x.Date == new PersianDate(1405, 1, 12));
-if (republicDay is null || republicDay.IsHoliday)
-    throw new Exception("time.ir parser fixture failed for regular event.");
+if (republicDay is null || !republicDay.IsHoliday)
+    throw new Exception("12 Farvardin must be classified as an official holiday.");
 
 var timeIrFallbackFixture = """
 <!doctype html>
