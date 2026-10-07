@@ -84,6 +84,11 @@ public sealed class MainWindow : Window
     private readonly TextBlock StatusText = new();
     private readonly TextBlock SyncProgress = new();
     private readonly StackPanel ActivityPanel = new();
+    private StackPanel? _inAppReminderHost;
+    private Microsoft.UI.Dispatching.DispatcherQueueTimer? _inAppReminderTimer;
+    private readonly Dictionary<string, Border> _visibleReminderCards =
+        new(StringComparer.Ordinal);
+    private bool _inAppReminderPollRunning;
     private readonly Dictionary<PersianDate, StackPanel> _calendarOccasionPanels = new();
     private readonly Dictionary<PersianDate, TextBlock> _calendarDayNumberLabels = new();
     private readonly Dictionary<PersianDate, TextBlock> _calendarGregorianDayLabels = new();
@@ -165,7 +170,11 @@ public sealed class MainWindow : Window
         }
 
         Activated += (_, _) => StartupDiagnostics.Log("MainWindow Activated event fired.");
-        Closed += (_, _) => StartupDiagnostics.Log("MainWindow Closed event fired.");
+        Closed += (_, _) =>
+        {
+            _inAppReminderTimer?.Stop();
+            StartupDiagnostics.Log("MainWindow Closed event fired.");
+        };
         AppWindow.Changed += (_, e) =>
         {
             if (e.DidVisibilityChange)
@@ -261,8 +270,10 @@ public sealed class MainWindow : Window
             StartupDiagnostics.Log(
                 "Post-activation: automatic year occasion refresh suppressed by startup quarantine.");
 
+            StartInAppReminderPolling();
             StartupDiagnostics.MarkPhase("startup-ui-stable-quarantine");
-            StartupDiagnostics.Log("Post-activation UI initialization completed.");
+            StartupDiagnostics.Log(
+                "Post-activation UI initialization completed; safe in-app reminder polling active.");
         }
         catch (Exception ex)
         {
@@ -693,6 +704,20 @@ public sealed class MainWindow : Window
         root.Children.Add(right);
 
         outer.Children.Add(root);
+
+        _inAppReminderHost = new StackPanel
+        {
+            Spacing = 8,
+            Margin = new Thickness(24, 18, 24, 0),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Top,
+            MaxWidth = 520,
+            FlowDirection = FlowDirection.RightToLeft
+        };
+        Panel.SetZIndex(_inAppReminderHost, 1000);
+        outer.Children.Add(_inAppReminderHost);
+        _visibleReminderCards.Clear();
+
         return outer;
     }
 
@@ -962,20 +987,16 @@ public sealed class MainWindow : Window
         saveNote.Click += SaveNote_Click;
         stack.Children.Add(saveNote);
 
-        stack.Children.Add(SectionTitle("رویداد جدید"));
+        stack.Children.Add(SectionTitle("رویداد و یادآور"));
 
-        EventTitleBox.PlaceholderText = "عنوان رویداد";
-        stack.Children.Add(EventTitleBox);
+        stack.Children.Add(new TextBlock
+        {
+            Text = "ثبت رویداد در یک کادر جدا انجام می‌شود؛ نوع عمومی/خصوصی، زمان و تعداد تکرار یادآوری همان‌جا مشخص می‌شود.",
+            TextWrapping = TextWrapping.Wrap,
+            Opacity = 0.68
+        });
 
-        EventTimeBox.PlaceholderText = "زمان، مثل 14:30";
-        stack.Children.Add(EventTimeBox);
-
-        stack.Children.Add(new TextBlock { Text = "یادآوری چند دقیقه قبل؟", Opacity = 0.7 });
-        ReminderMinutesBox.Text = "10";
-        ReminderMinutesBox.PlaceholderText = "مثلاً 10";
-        stack.Children.Add(ReminderMinutesBox);
-
-        var addEvent = MakeButton("ثبت رویداد و یادآور");
+        var addEvent = MakeButton("＋ ثبت رویداد / یادآور");
         addEvent.Click += AddEvent_Click;
         stack.Children.Add(addEvent);
 
@@ -5040,7 +5061,7 @@ public sealed class MainWindow : Window
             {
                 EventsPanel.Children.Add(new TextBlock
                 {
-                    Text = $"{(item.StartTime is null ? "تمام‌روز" : item.StartTime.Value.ToString("HH:mm"))}  {item.Title}",
+                    Text = $"{(item.Privacy == PrivacyLevel.Private ? "🔒 " : "")}{(item.StartTime is null ? "تمام‌روز" : item.StartTime.Value.ToString("HH:mm"))}  {item.Title}",
                     TextWrapping = TextWrapping.Wrap
                 });
             }
@@ -5132,31 +5153,145 @@ public sealed class MainWindow : Window
 
     private async void AddEvent_Click(object sender, RoutedEventArgs e)
     {
-        if (string.IsNullOrWhiteSpace(EventTitleBox.Text) ||
-            !TimeOnly.TryParse(EventTimeBox.Text, out var time))
+        try
         {
-            StatusText.Text = "برای رویداد عنوان و زمان معتبر وارد کنید.";
-            return;
+            var titleBox = new TextBox
+            {
+                Header = "عنوان رویداد",
+                PlaceholderText = "مثلاً جلسه تیم"
+            };
+
+            var timeBox = new TextBox
+            {
+                Header = "زمان",
+                Text = "09:00",
+                PlaceholderText = "مثلاً 14:30",
+                FlowDirection = FlowDirection.LeftToRight
+            };
+
+            var privateCheck = new CheckBox
+            {
+                Content = "خصوصی — جزئیات در اعلان ویندوز نمایش داده نشود",
+                IsChecked = false
+            };
+
+            var reminderBeforeBox = new TextBox
+            {
+                Header = "چند دقیقه قبل یادآوری شود؟",
+                Text = "10",
+                FlowDirection = FlowDirection.LeftToRight
+            };
+
+            var repeatCountBox = new TextBox
+            {
+                Header = "تعداد دفعات هشدار در صورت تأیید نشدن",
+                Text = "3",
+                FlowDirection = FlowDirection.LeftToRight
+            };
+
+            var repeatIntervalBox = new TextBox
+            {
+                Header = "فاصله بین هشدارها (دقیقه)",
+                Text = "5",
+                FlowDirection = FlowDirection.LeftToRight
+            };
+
+            var form = new StackPanel
+            {
+                Spacing = 10,
+                Width = 420
+            };
+            form.Children.Add(new TextBlock
+            {
+                Text = $"تاریخ: {_selected.ToLongPersianString()}",
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
+            });
+            form.Children.Add(titleBox);
+            form.Children.Add(timeBox);
+            form.Children.Add(privateCheck);
+            form.Children.Add(reminderBeforeBox);
+            form.Children.Add(repeatCountBox);
+            form.Children.Add(repeatIntervalBox);
+            form.Children.Add(new TextBlock
+            {
+                Text = "یادآور داخل برنامه تا زمانی که «متوجه شدم» را بزنید روی صفحه می‌ماند. اگر تأیید نکنید، مطابق تعداد و فاصله بالا دوباره هشدار می‌دهد.",
+                TextWrapping = TextWrapping.Wrap,
+                Opacity = 0.68
+            });
+
+            var dialog = new ContentDialog
+            {
+                Title = "ثبت رویداد و یادآور",
+                Content = new ScrollViewer
+                {
+                    Content = form,
+                    MaxHeight = 520,
+                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto
+                },
+                PrimaryButtonText = "ثبت",
+                CloseButtonText = "انصراف",
+                DefaultButton = ContentDialogButton.Primary
+            };
+
+            if (Content is FrameworkElement root && root.XamlRoot is not null)
+                dialog.XamlRoot = root.XamlRoot;
+
+            var result = await dialog.ShowAsync();
+            if (result != ContentDialogResult.Primary)
+                return;
+
+            if (string.IsNullOrWhiteSpace(titleBox.Text) ||
+                !TimeOnly.TryParse(
+                    PersianQuickAddParser.NormalizeDigits(timeBox.Text ?? string.Empty),
+                    out var time))
+            {
+                StatusText.Text = "عنوان یا زمان رویداد معتبر نیست.";
+                return;
+            }
+
+            var reminderBefore = int.TryParse(
+                PersianQuickAddParser.NormalizeDigits(reminderBeforeBox.Text ?? "10"),
+                out var reminderValue)
+                ? Math.Clamp(reminderValue, 0, 10080)
+                : 10;
+
+            var repeatCount = int.TryParse(
+                PersianQuickAddParser.NormalizeDigits(repeatCountBox.Text ?? "3"),
+                out var repeatValue)
+                ? Math.Clamp(repeatValue, 1, 20)
+                : 3;
+
+            var repeatInterval = int.TryParse(
+                PersianQuickAddParser.NormalizeDigits(repeatIntervalBox.Text ?? "5"),
+                out var intervalValue)
+                ? Math.Clamp(intervalValue, 1, 1440)
+                : 5;
+
+            var privacy = privateCheck.IsChecked == true
+                ? PrivacyLevel.Private
+                : PrivacyLevel.Public;
+
+            await _planner.AddEventAsync(
+                titleBox.Text.Trim(),
+                _selected,
+                time,
+                reminderMinutes: [reminderBefore],
+                privacy: privacy,
+                reminderRepeatCount: repeatCount,
+                reminderRepeatIntervalMinutes: repeatInterval);
+
+            StatusText.Text =
+                $"رویداد {(privacy == PrivacyLevel.Private ? "خصوصی" : "عمومی")} ثبت شد · {repeatCount} بار هشدار با فاصله {repeatInterval} دقیقه.";
+
+            await LoadSelectedDayAsync();
+            await LoadActivitiesAsync();
+            await PollInAppRemindersAsync();
         }
-
-        var reminder = int.TryParse(
-            PersianQuickAddParser.NormalizeDigits(ReminderMinutesBox.Text ?? "10"),
-            out var parsedReminder)
-            ? Math.Clamp(parsedReminder, 0, 10080)
-            : 10;
-
-        await _planner.AddEventAsync(
-            EventTitleBox.Text,
-            _selected,
-            time,
-            reminderMinutes: [reminder]);
-
-        EventTitleBox.Text = "";
-        EventTimeBox.Text = "";
-        StatusText.Text = "رویداد و یادآور ثبت شد.";
-
-        await LoadSelectedDayAsync();
-        await LoadActivitiesAsync();
+        catch (Exception ex)
+        {
+            StartupDiagnostics.Log($"Event/reminder dialog failed: {ex}");
+            StatusText.Text = $"ثبت رویداد انجام نشد: {ex.Message}";
+        }
     }
 
     private async void AddTask_Click(object sender, RoutedEventArgs e)
@@ -5274,6 +5409,226 @@ public sealed class MainWindow : Window
         }
     }
 
+    private void StartInAppReminderPolling()
+    {
+        if (_inAppReminderTimer is not null)
+            return;
+
+        _inAppReminderTimer = DispatcherQueue.CreateTimer();
+        _inAppReminderTimer.Interval = TimeSpan.FromSeconds(12);
+        _inAppReminderTimer.IsRepeating = true;
+        _inAppReminderTimer.Tick += async (_, _) => await PollInAppRemindersAsync();
+        _inAppReminderTimer.Start();
+
+        _ = PollInAppRemindersAsync();
+        StartupDiagnostics.Log("Safe in-app reminder polling started.");
+    }
+
+    private async Task PollInAppRemindersAsync()
+    {
+        if (_inAppReminderPollRunning || _safeShellMode)
+            return;
+
+        _inAppReminderPollRunning = true;
+        try
+        {
+            var awaiting =
+                await _repository.GetAwaitingAcknowledgementRemindersAsync();
+
+            foreach (var reminder in awaiting)
+            {
+                if (!_visibleReminderCards.ContainsKey(reminder.Id))
+                    await ShowInAppReminderAsync(
+                        reminder,
+                        Math.Max(1, reminder.Attempt),
+                        playSound: false);
+            }
+
+            var due = await _repository.GetDueRemindersAsync(DateTimeOffset.UtcNow);
+            foreach (var reminder in due)
+            {
+                var attempt = Math.Clamp(
+                    reminder.Attempt + 1,
+                    1,
+                    Math.Max(1, reminder.RepeatCount));
+
+                await ShowInAppReminderAsync(
+                    reminder,
+                    attempt,
+                    playSound: true);
+
+                if (attempt < Math.Max(1, reminder.RepeatCount))
+                {
+                    var next = DateTimeOffset.UtcNow.AddMinutes(
+                        Math.Clamp(reminder.RepeatIntervalMinutes, 1, 1440));
+
+                    await _repository.UpdateReminderDeliveryAsync(
+                        reminder.Id,
+                        ReminderState.Pending,
+                        attempt,
+                        next);
+                }
+                else
+                {
+                    await _repository.UpdateReminderDeliveryAsync(
+                        reminder.Id,
+                        ReminderState.Fired,
+                        attempt);
+                }
+
+                await _repository.AddActivityAsync(new ActivityLogEntry(
+                    Guid.NewGuid().ToString("N"),
+                    DateTimeOffset.UtcNow,
+                    "notification-fired",
+                    reminder.ItemKind,
+                    reminder.ItemId,
+                    reminder.Privacy == PrivacyLevel.Private
+                        ? "یادآور خصوصی نمایش داده شد"
+                        : reminder.Title));
+            }
+        }
+        catch (Exception ex)
+        {
+            StartupDiagnostics.Log($"In-app reminder poll failed: {ex}");
+        }
+        finally
+        {
+            _inAppReminderPollRunning = false;
+        }
+    }
+
+    private async Task ShowInAppReminderAsync(
+        ReminderSchedule reminder,
+        int attempt,
+        bool playSound)
+    {
+        if (_inAppReminderHost is null)
+            return;
+
+        if (_visibleReminderCards.TryGetValue(reminder.Id, out var previous))
+        {
+            _inAppReminderHost.Children.Remove(previous);
+            _visibleReminderCards.Remove(reminder.Id);
+        }
+
+        var header = new Grid { ColumnSpacing = 8 };
+        header.ColumnDefinitions.Add(
+            new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        header.ColumnDefinitions.Add(
+            new ColumnDefinition { Width = GridLength.Auto });
+
+        var title = new TextBlock
+        {
+            Text = $"{(reminder.Privacy == PrivacyLevel.Private ? "🔒" : "🔔")} {reminder.Title}",
+            FontSize = 17,
+            FontWeight = Microsoft.UI.Text.FontWeights.Bold,
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = ThemeService.Brush(_theme.PrimaryText)
+        };
+        Grid.SetColumn(title, 0);
+        header.Children.Add(title);
+
+        var privacyBadge = new Border
+        {
+            Padding = new Thickness(7, 3, 7, 3),
+            CornerRadius = new CornerRadius(8),
+            Background = BrushWithAlpha(_theme.Accent, 0x34),
+            Child = new TextBlock
+            {
+                Text = reminder.Privacy == PrivacyLevel.Private
+                    ? "خصوصی"
+                    : "عمومی",
+                FontSize = 10.5
+            }
+        };
+        Grid.SetColumn(privacyBadge, 1);
+        header.Children.Add(privacyBadge);
+
+        var acknowledge = MakeButton("✓ متوجه شدم");
+
+        var body = new StackPanel
+        {
+            Spacing = 7
+        };
+        body.Children.Add(header);
+        body.Children.Add(new TextBlock
+        {
+            Text = reminder.Body,
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = ThemeService.Brush(_theme.PrimaryText)
+        });
+        body.Children.Add(new TextBlock
+        {
+            Text = $"هشدار {ToPersianDigits(attempt.ToString())} از {ToPersianDigits(Math.Max(1, reminder.RepeatCount).ToString())}" +
+                   (attempt < reminder.RepeatCount
+                       ? $" · اگر تأیید نشود، {ToPersianDigits(reminder.RepeatIntervalMinutes.ToString())} دقیقه بعد دوباره هشدار می‌دهد."
+                       : " · آخرین هشدار؛ تا تأیید شما روی صفحه می‌ماند."),
+            TextWrapping = TextWrapping.Wrap,
+            FontSize = 11,
+            Opacity = 0.7
+        });
+        body.Children.Add(acknowledge);
+
+        var card = new Border
+        {
+            Width = 500,
+            MaxWidth = 500,
+            Padding = new Thickness(14),
+            CornerRadius = new CornerRadius(14),
+            Background = BrushWithAlpha(_theme.PanelBackground, 0xF2),
+            BorderBrush = ThemeService.Brush(_theme.Accent),
+            BorderThickness = new Thickness(2),
+            Child = body
+        };
+
+        acknowledge.Click += async (_, _) =>
+        {
+            try
+            {
+                await _repository.UpdateReminderDeliveryAsync(
+                    reminder.Id,
+                    ReminderState.Acknowledged,
+                    attempt);
+
+                if (_inAppReminderHost is not null)
+                    _inAppReminderHost.Children.Remove(card);
+                _visibleReminderCards.Remove(reminder.Id);
+
+                await _repository.AddActivityAsync(new ActivityLogEntry(
+                    Guid.NewGuid().ToString("N"),
+                    DateTimeOffset.UtcNow,
+                    "reminder-acknowledged",
+                    reminder.ItemKind,
+                    reminder.ItemId,
+                    reminder.Privacy == PrivacyLevel.Private
+                        ? "یادآور خصوصی تأیید شد"
+                        : $"{reminder.Title} — تأیید شد"));
+
+                StatusText.Text = "یادآور تأیید و بسته شد.";
+                await LoadActivitiesAsync();
+            }
+            catch (Exception ex)
+            {
+                StartupDiagnostics.Log($"Reminder acknowledgement failed: {ex}");
+            }
+        };
+
+        _visibleReminderCards[reminder.Id] = card;
+        _inAppReminderHost.Children.Insert(0, card);
+
+        if (playSound)
+        {
+            try
+            {
+                ElementSoundPlayer.Play(ElementSoundKind.Invoke);
+            }
+            catch (Exception ex)
+            {
+                StartupDiagnostics.Log($"In-app reminder sound skipped: {ex.Message}");
+            }
+        }
+    }
+
     private async void Sync_Click(object sender, RoutedEventArgs e)
     {
         SyncProgress.Text = "در حال دریافت مناسبت‌ها...";
@@ -5368,6 +5723,7 @@ public sealed class MainWindow : Window
                     "reminder-completed" => "یادآور انجام شد",
                     "reminder-snoozed" => "یادآور به تعویق افتاد",
                     "reminder-dismissed" => "یادآور رد شد",
+                    "reminder-acknowledged" => "یادآور تأیید شد",
                     "occasion-sync-failed" => "خطای همگام‌سازی",
                     _ => item.Action
                 };
