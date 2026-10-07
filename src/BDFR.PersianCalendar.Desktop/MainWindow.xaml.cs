@@ -139,7 +139,24 @@ public sealed class MainWindow : Window
         _pictureService = new PictureService(_themeService);
 
         Title = "Anahita";
-        Content = BuildStartupSafeShell();
+
+        try
+        {
+            _safeShellMode = false;
+            _settingsDiagnosticLevel = 4;
+            StartupDiagnostics.MarkPhase("startup-full-ui-build-start");
+            Content = BuildRoot();
+            ApplyUserFont(Content);
+            BuildCalendar();
+            StartupDiagnostics.MarkPhase("startup-full-ui-build-complete");
+            StartupDiagnostics.Log("MainWindow: stable full UI selected as startup interface.");
+        }
+        catch (Exception ex)
+        {
+            StartupDiagnostics.Log($"Full UI construction failed; safe shell fallback used: {ex}");
+            _safeShellMode = true;
+            Content = BuildStartupSafeShell();
+        }
 
         Activated += (_, _) => StartupDiagnostics.Log("MainWindow Activated event fired.");
         Closed += (_, _) => StartupDiagnostics.Log("MainWindow Closed event fired.");
@@ -158,8 +175,12 @@ public sealed class MainWindow : Window
             StartupDiagnostics.Log($"Window resize skipped: {ex.Message}");
         }
 
-        StartupDiagnostics.MarkPhase("startup-safe-shell-built");
-        StartupDiagnostics.Log("MainWindow: safe shell UI ready; advanced interface not mounted at startup.");
+        StartupDiagnostics.MarkPhase(
+            _safeShellMode ? "startup-safe-shell-built" : "startup-stable-full-ui-ready");
+        StartupDiagnostics.Log(
+            _safeShellMode
+                ? "MainWindow: safe shell UI ready."
+                : "MainWindow: stable full UI ready.");
         StartupDiagnostics.Log("MainWindow: programmatic UI ready.");
     }
 
@@ -1416,37 +1437,54 @@ public sealed class MainWindow : Window
             });
         }
 
-        if (!isElena)
+        _settingsPanel.Children.Add(new Border
         {
-            _settingsPanel.Children.Add(new Border
-            {
-                Height = 1,
-                Margin = new Thickness(0, 4, 0, 4),
-                Background = BrushWithAlpha(_theme.SecondaryText, 0x30)
-            });
+            Height = 1,
+            Margin = new Thickness(0, 4, 0, 4),
+            Background = BrushWithAlpha(_theme.SecondaryText, 0x30)
+        });
 
-            _settingsPanel.Children.Add(new TextBlock
-            {
-                Text = "پس‌زمینه در Theme Mode",
-                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-                Foreground = ThemeService.Brush(_theme.PrimaryText)
-            });
+        _settingsPanel.Children.Add(new TextBlock
+        {
+            Text = "تصویر زمینه",
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Foreground = ThemeService.Brush(_theme.PrimaryText)
+        });
 
-            var chooseBackground = MakeButton("انتخاب عکس زمینه دلخواه");
-            chooseBackground.Click += SelectCustomBackground_Click;
-            _settingsPanel.Children.Add(chooseBackground);
-
-            var clearBackground = MakeButton("حذف عکس زمینه دلخواه");
-            clearBackground.Click += async (_, _) =>
+        if (isElena)
+        {
+            var applySeasonalBackground = MakeButton(
+                _settings.UseSeasonalBackground
+                    ? "↻ اعمال دوباره تصویر فصلی"
+                    : "🌦 اعمال تصویر فصلی Elena");
+            applySeasonalBackground.Click += async (_, _) =>
             {
-                _settings.CustomBackgroundPath = null;
-                _settings.BackgroundMode = "none";
-                _settings.UseSeasonalBackground = false;
+                _settings.UseSeasonalBackground = true;
+                _settings.BackgroundMode = "elena";
                 _settingsService.Save(_settings);
                 await ApplyBackgroundAsync();
+                StatusText.Text = "تصویر فصلی Elena اعمال شد.";
             };
-            _settingsPanel.Children.Add(clearBackground);
+            _settingsPanel.Children.Add(applySeasonalBackground);
         }
+
+        var chooseBackground = MakeButton("🖼 انتخاب عکس زمینه دلخواه");
+        chooseBackground.Click += SelectCustomBackground_Click;
+        _settingsPanel.Children.Add(chooseBackground);
+
+        var clearBackground = MakeButton("حذف / خاموش کردن تصویر زمینه");
+        clearBackground.Click += (_, _) =>
+        {
+            _settings.CustomBackgroundPath = null;
+            _settings.BackgroundMode = "none";
+            _settings.UseSeasonalBackground = false;
+            _settingsService.Save(_settings);
+            _backgroundImage.Source = null;
+            _backgroundWash.Opacity = 0;
+            _backgroundPathText.Text = "بدون تصویر زمینه";
+            StatusText.Text = "تصویر زمینه خاموش شد.";
+        };
+        _settingsPanel.Children.Add(clearBackground);
 
         _backgroundPathText.TextWrapping = TextWrapping.Wrap;
         _backgroundPathText.FontSize = 11;
@@ -1540,18 +1578,152 @@ public sealed class MainWindow : Window
             Foreground = ThemeService.Brush(_theme.SecondaryText)
         });
 
-        StartupDiagnostics.Log("Settings UI: building safe typography controls without font enumeration.");
+        StartupDiagnostics.Log("Settings UI: building lazy safe font dropdown.");
 
-        var fontFamilyBox = new TextBox
+        var selectedFontFamily = string.IsNullOrWhiteSpace(_settings.FontFamilyName)
+            ? "Segoe UI Variable"
+            : _settings.FontFamilyName.Trim();
+
+        var fontDropdownButton = MakeButton($"فونت: {selectedFontFamily}  ▾");
+        _settingsPanel.Children.Add(fontDropdownButton);
+
+        var fontDropdownHost = new StackPanel
         {
-            Header = "Font Family",
-            Text = string.IsNullOrWhiteSpace(_settings.FontFamilyName)
-                ? "Segoe UI Variable"
-                : _settings.FontFamilyName,
-            PlaceholderText = "مثلاً Segoe UI Variable یا Tahoma",
+            Spacing = 6,
+            Padding = new Thickness(8),
+            Visibility = Visibility.Collapsed
+        };
+
+        var fontSearchBox = new TextBox
+        {
+            PlaceholderText = "جستجوی فونت...",
             FlowDirection = FlowDirection.LeftToRight
         };
-        _settingsPanel.Children.Add(fontFamilyBox);
+        fontDropdownHost.Children.Add(fontSearchBox);
+
+        var fontItemsPanel = new StackPanel { Spacing = 3 };
+        var fontScroll = new ScrollViewer
+        {
+            MaxHeight = 240,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            Content = fontItemsPanel
+        };
+        fontDropdownHost.Children.Add(fontScroll);
+
+        var fontDropdownSurface = new Border
+        {
+            Background = BrushWithAlpha(_theme.CardBackground, 0xF0),
+            BorderBrush = BrushWithAlpha(_theme.Accent, 0x90),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(10),
+            Child = fontDropdownHost
+        };
+        _settingsPanel.Children.Add(fontDropdownSurface);
+
+        string[]? cachedInstalledFonts = null;
+
+        void RenderFontChoices(string? filter)
+        {
+            fontItemsPanel.Children.Clear();
+
+            var fonts = cachedInstalledFonts ?? [selectedFontFamily];
+            var query = (filter ?? string.Empty).Trim();
+
+            var matches = fonts
+                .Where(name =>
+                    string.IsNullOrWhiteSpace(query) ||
+                    name.Contains(query, StringComparison.CurrentCultureIgnoreCase))
+                .Take(80)
+                .ToArray();
+
+            foreach (var familyName in matches)
+            {
+                var item = MakeButton(
+                    string.Equals(
+                        familyName,
+                        selectedFontFamily,
+                        StringComparison.CurrentCultureIgnoreCase)
+                        ? $"✓ {familyName}"
+                        : familyName);
+
+                item.HorizontalContentAlignment = HorizontalAlignment.Left;
+                var capturedFamily = familyName;
+                item.Click += (_, _) =>
+                {
+                    selectedFontFamily = capturedFamily;
+                    fontDropdownButton.Content = $"فونت: {selectedFontFamily}  ▾";
+                    fontDropdownHost.Visibility = Visibility.Collapsed;
+                };
+                fontItemsPanel.Children.Add(item);
+            }
+
+            if (matches.Length == 0)
+            {
+                fontItemsPanel.Children.Add(new TextBlock
+                {
+                    Text = "فونتی پیدا نشد.",
+                    Opacity = 0.6,
+                    Foreground = ThemeService.Brush(_theme.SecondaryText)
+                });
+            }
+        }
+
+        fontSearchBox.TextChanged += (_, _) => RenderFontChoices(fontSearchBox.Text);
+
+        fontDropdownButton.Click += async (_, _) =>
+        {
+            if (fontDropdownHost.Visibility == Visibility.Visible)
+            {
+                fontDropdownHost.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            fontDropdownHost.Visibility = Visibility.Visible;
+
+            if (cachedInstalledFonts is null)
+            {
+                fontItemsPanel.Children.Clear();
+                fontItemsPanel.Children.Add(new TextBlock
+                {
+                    Text = "در حال خواندن فونت‌های نصب‌شده...",
+                    Foreground = ThemeService.Brush(_theme.SecondaryText)
+                });
+
+                try
+                {
+                    StartupDiagnostics.MarkPhase("font-dropdown-lazy-load-start");
+                    cachedInstalledFonts = await Task.Run(GetInstalledFontFamilies);
+
+                    if (!cachedInstalledFonts.Contains(
+                            selectedFontFamily,
+                            StringComparer.CurrentCultureIgnoreCase))
+                    {
+                        cachedInstalledFonts = cachedInstalledFonts
+                            .Append(selectedFontFamily)
+                            .Distinct(StringComparer.CurrentCultureIgnoreCase)
+                            .OrderBy(x => x, StringComparer.CurrentCultureIgnoreCase)
+                            .ToArray();
+                    }
+
+                    StartupDiagnostics.MarkPhase("font-dropdown-lazy-load-complete");
+                }
+                catch (Exception ex)
+                {
+                    StartupDiagnostics.Log($"Lazy font list load failed: {ex}");
+                    cachedInstalledFonts =
+                    [
+                        selectedFontFamily,
+                        "Segoe UI Variable",
+                        "Segoe UI",
+                        "Tahoma",
+                        "Arial",
+                        "Times New Roman"
+                    ];
+                }
+            }
+
+            RenderFontChoices(fontSearchBox.Text);
+        };
 
         var fontSizeBox = new TextBox
         {
@@ -1593,7 +1765,6 @@ public sealed class MainWindow : Window
         };
         Grid.SetColumn(styleButton, 1);
         modeRow.Children.Add(styleButton);
-
         _settingsPanel.Children.Add(modeRow);
 
         var preview = new TextBlock
@@ -1606,13 +1777,8 @@ public sealed class MainWindow : Window
         };
         _settingsPanel.Children.Add(preview);
 
-        var previewButton = MakeButton("پیش‌نمایش");
-        previewButton.Click += (_, _) =>
+        void UpdateSafeFontPreview()
         {
-            var family = string.IsNullOrWhiteSpace(fontFamilyBox.Text)
-                ? "Segoe UI Variable"
-                : fontFamilyBox.Text.Trim();
-
             var size = double.TryParse(
                 fontSizeBox.Text,
                 NumberStyles.Float,
@@ -1621,7 +1787,7 @@ public sealed class MainWindow : Window
                 ? Math.Clamp(parsedSize, 10.0, 24.0)
                 : 14.0;
 
-            preview.FontFamily = ResolveUserFont(family);
+            preview.FontFamily = ResolveUserFont(selectedFontFamily);
             preview.FontSize = size;
             preview.FontWeight = ResolveUserFontWeight(
                 weightMode,
@@ -1629,16 +1795,15 @@ public sealed class MainWindow : Window
             preview.FontStyle = ResolveUserFontStyle(
                 styleMode,
                 Windows.UI.Text.FontStyle.Normal);
-        };
+        }
+
+        var previewButton = MakeButton("پیش‌نمایش");
+        previewButton.Click += (_, _) => UpdateSafeFontPreview();
         _settingsPanel.Children.Add(previewButton);
 
         var applyFont = MakeButton("اعمال تنظیمات فونت");
         applyFont.Click += (_, _) =>
         {
-            var family = string.IsNullOrWhiteSpace(fontFamilyBox.Text)
-                ? "Segoe UI Variable"
-                : fontFamilyBox.Text.Trim();
-
             var size = double.TryParse(
                 fontSizeBox.Text,
                 NumberStyles.Float,
@@ -1647,43 +1812,38 @@ public sealed class MainWindow : Window
                 ? Math.Clamp(parsedSize, 10.0, 24.0)
                 : 14.0;
 
-            _settings.FontFamilyName = family;
+            _settings.FontFamilyName = selectedFontFamily;
             _settings.FontSize = size;
             _settings.FontWeightMode = weightMode;
             _settings.FontStyleMode = styleMode;
             _settingsService.Save(_settings);
 
             ApplyUserFont(Content);
-            preview.FontFamily = ResolveUserFont(family);
-            preview.FontSize = size;
-            preview.FontWeight = ResolveUserFontWeight(
-                weightMode,
-                Microsoft.UI.Text.FontWeights.Normal);
-            preview.FontStyle = ResolveUserFontStyle(
-                styleMode,
-                Windows.UI.Text.FontStyle.Normal);
+            UpdateSafeFontPreview();
 
             StatusText.Text =
-                $"فونت «{family}» · اندازه {size:0.#} · {FontWeightModeDisplayName(weightMode)} · {styleMode}";
+                $"فونت «{selectedFontFamily}» · اندازه {size:0.#} · {FontWeightModeDisplayName(weightMode)} · {styleMode}";
         };
         _settingsPanel.Children.Add(applyFont);
 
         var resetFont = MakeButton("بازگشت تایپوگرافی به حالت پیش‌فرض");
         resetFont.Click += (_, _) =>
         {
-            _settings.FontFamilyName = "Segoe UI Variable";
+            selectedFontFamily = "Segoe UI Variable";
+            _settings.FontFamilyName = selectedFontFamily;
             _settings.FontSize = 14.0;
             _settings.FontWeightMode = "normal";
             _settings.FontStyleMode = "normal";
             _settingsService.Save(_settings);
 
-            fontFamilyBox.Text = "Segoe UI Variable";
+            fontDropdownButton.Content = $"فونت: {selectedFontFamily}  ▾";
             fontSizeBox.Text = "14";
             weightMode = "normal";
             styleMode = "normal";
             weightButton.Content = "وزن: Normal";
             styleButton.Content = "حالت: Normal";
             ApplyUserFont(Content);
+            UpdateSafeFontPreview();
 
             StatusText.Text = "فونت و تایپوگرافی به حالت پیش‌فرض برگشت.";
         };
@@ -1691,7 +1851,7 @@ public sealed class MainWindow : Window
 
         _settingsPanel.Children.Add(new TextBlock
         {
-            Text = "برای پایداری، اسکن خودکار کل Font Library و کنترل‌های NumberBox/ComboBox در این نسخه غیرفعال شده‌اند. نام هر فونت نصب‌شده را می‌توانید مستقیم وارد کنید.",
+            Text = "لیست فونت‌ها فقط هنگام بازکردن منو خوانده می‌شود تا Settings و startup سبک و پایدار بمانند.",
             FontSize = 10.5,
             TextWrapping = TextWrapping.Wrap,
             Opacity = 0.62,
@@ -2414,6 +2574,7 @@ public sealed class MainWindow : Window
 
             _settingsService.Save(_settings);
             await ApplyAppearanceAsync();
+            await ApplyBackgroundAsync();
 
             StartupDiagnostics.Log("Appearance switch completed: Elena Mode.");
         }
@@ -2533,7 +2694,6 @@ public sealed class MainWindow : Window
             ApplyAppearanceBrushesOnly();
             BuildCalendar();
             await LoadSelectedDayAsync();
-            await ApplyBackgroundAsync();
 
             StatusText.Text =
                 $"اعمال {requestedAppearance} انجام نشد؛ ظاهر قبلی بازیابی شد.";
@@ -2568,7 +2728,6 @@ public sealed class MainWindow : Window
 
         await LoadSelectedDayAsync();
         await LoadActivitiesAsync();
-        await ApplyBackgroundAsync();
 
         StatusText.Text = string.Equals(
             _settings.AppearanceMode,
@@ -3098,7 +3257,6 @@ public sealed class MainWindow : Window
             ApplyAppearanceBrushesOnly();
             BuildCalendar();
             await LoadSelectedDayAsync();
-            await ApplyBackgroundAsync();
 
             StatusText.Text = _settings.GlassMode
                 ? "Glass Mode برای Zara Pastel فعال شد."
@@ -3462,9 +3620,14 @@ public sealed class MainWindow : Window
             _settingsService.Save(_settings);
 
             if (wasElena)
-                await ApplyAppearanceAsync();
-            else
-                await ApplyBackgroundAsync();
+            {
+                _theme = _themeService.ResolveAppearance(_settings, _month);
+                ApplyAppearanceBrushesOnly();
+                BuildCalendar();
+                await LoadSelectedDayAsync();
+            }
+
+            await ApplyBackgroundAsync();
 
             if (_pictureLibraryPanel.Visibility == Visibility.Visible)
                 await RefreshPictureLibraryAsync();
@@ -3524,8 +3687,9 @@ public sealed class MainWindow : Window
                 StringComparison.OrdinalIgnoreCase);
             var isCustom = false;
 
-            if (isElena)
+            if (isElena && _settings.UseSeasonalBackground)
             {
+                StartupDiagnostics.MarkPhase("manual-background-seasonal-resolve");
                 var desktopAspectRatio = GetDesktopAspectRatio();
                 path = _themeService.GetSeasonalBackgroundPath(_month, desktopAspectRatio);
 
@@ -3554,7 +3718,11 @@ public sealed class MainWindow : Window
                 label = $"تصویر شخصی · {Path.GetFileName(path)}";
             }
 
-            var source = await PictureService.LoadImageAsync(path);
+            StartupDiagnostics.Log(
+                $"Background image load requested: mode={_settings.BackgroundMode}; elena={isElena}; path={(path is null ? "<none>" : Path.GetFileName(path))}.");
+            StartupDiagnostics.MarkPhase("manual-background-decode-start");
+            var source = await PictureService.LoadImageAsync(path, decodePixelWidth: 1920);
+            StartupDiagnostics.MarkPhase("manual-background-decode-complete");
 
             // Theme Mode must never silently jump into Elena Mode.
             if (!isElena &&
@@ -3581,6 +3749,7 @@ public sealed class MainWindow : Window
                             : 0.24;
 
             _backgroundPathText.Text = label;
+            StartupDiagnostics.MarkPhase("manual-background-apply-complete");
         }
         catch (Exception ex)
         {
