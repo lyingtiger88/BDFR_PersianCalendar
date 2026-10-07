@@ -203,9 +203,19 @@ public sealed class MainWindow : Window
             await LoadCalendarCellOccasionsAsync(_year, _month);
             StartupDiagnostics.Log("Post-activation: calendar-cell occasion load completed.");
 
-            StartupDiagnostics.Log("Post-activation: background apply starting.");
-            await ApplyBackgroundAsync();
-            StartupDiagnostics.Log("Post-activation: background apply completed.");
+            // Startup stability quarantine:
+            // Do not decode/apply any seasonal or custom background image during
+            // launch. On the affected Windows 11 machine the process terminates
+            // natively inside ApplyBackgroundAsync after the work-area probe,
+            // without a managed exception or ProcessExit marker.
+            //
+            // Theme colors remain active. Background images can still be applied
+            // later through the appearance controls after the window is stable.
+            _backgroundImage.Source = null;
+            _backgroundWash.Opacity = 0;
+            _backgroundPathText.Text = "تصویر زمینه در شروع برنامه برای پایداری موقتاً غیرفعال است.";
+            StartupDiagnostics.MarkPhase("startup-background-image-quarantined");
+            StartupDiagnostics.Log("Post-activation: background image application suppressed by startup quarantine.");
 
             // Do not start automatic year refresh during startup in the stability
             // build. The manual Sync action remains available and cached occasions
