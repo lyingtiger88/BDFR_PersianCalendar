@@ -96,3 +96,6 @@ The Core/Infrastructure projects do not depend on the WinUI shell. This allows B
 ## Status
 
 **Test-ready milestone.** Core calendar/planner requirements are implemented and CI publishes a self-contained Windows x64 test build. Installer polish and the final BDFR Lock host integration are release-engineering follow-ups, not blockers for local functional testing.
+
+
+> Startup stability quarantine: automatic notification registration, reminder polling, and automatic time.ir refresh are temporarily disabled at launch while a native Windows 10 termination is being isolated. Manual sync and local cached calendar data remain available.
