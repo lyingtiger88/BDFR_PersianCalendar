@@ -1620,13 +1620,13 @@ public sealed class MainWindow : Window
         };
         _settingsPanel.Children.Add(fontDropdownSurface);
 
-        string[]? cachedInstalledFonts = null;
+        IReadOnlyList<string>? cachedInstalledFonts = null;
 
         void RenderFontChoices(string? filter)
         {
             fontItemsPanel.Children.Clear();
 
-            var fonts = cachedInstalledFonts ?? [selectedFontFamily];
+            IEnumerable<string> fonts = cachedInstalledFonts ?? new[] { selectedFontFamily };
             var query = (filter ?? string.Empty).Trim();
 
             var matches = fonts
