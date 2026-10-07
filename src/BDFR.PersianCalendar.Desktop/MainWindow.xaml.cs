@@ -276,7 +276,7 @@ public sealed class MainWindow : Window
                 ? Visibility.Collapsed
                 : Visibility.Visible;
         stack.Children.Add(settingsButton);
-        stack.Children.Add(BuildSettingsPanel());
+        stack.Children.Add(BuildSettingsPanelSafe());
 
         _leftPanelSurface = new Border
         {
@@ -627,8 +627,120 @@ public sealed class MainWindow : Window
     }
 
 
+    private FrameworkElement BuildSettingsPanelSafe()
+    {
+        try
+        {
+            StartupDiagnostics.Log("Settings UI: build starting.");
+            var result = BuildSettingsPanel();
+            StartupDiagnostics.Log("Settings UI: build completed.");
+            return result;
+        }
+        catch (Exception ex)
+        {
+            StartupDiagnostics.Log($"Settings UI build failed; safe settings panel used: {ex}");
+
+            try
+            {
+                _settingsPanel.Children.Clear();
+                _settingsPanel.Spacing = 10;
+                _settingsPanel.Padding = new Thickness(12);
+                _settingsPanel.Visibility = Visibility.Collapsed;
+
+                _settingsPanel.Children.Add(new TextBlock
+                {
+                    Text = "تنظیمات در حالت بازیابی",
+                    FontSize = 18,
+                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                    Foreground = ThemeService.Brush(_theme.PrimaryText)
+                });
+
+                _settingsPanel.Children.Add(new TextBlock
+                {
+                    Text = "یکی از بخش‌های تنظیمات پیشرفته هنگام بارگذاری خطا داد. خود تقویم می‌تواند ادامه دهد و خطا در startup.log ثبت شده است.",
+                    TextWrapping = TextWrapping.Wrap,
+                    Foreground = ThemeService.Brush(_theme.SecondaryText)
+                });
+
+                var reset = MakeButton("بازنشانی تنظیمات ظاهری و تایپوگرافی");
+                reset.Click += async (_, _) =>
+                {
+                    try
+                    {
+                        _settings.ColorOverrides?.Clear();
+                        _settings.FontFamilyName = "Segoe UI Variable";
+                        _settings.FontSize = 14.0;
+                        _settings.FontWeightMode = "normal";
+                        _settings.FontStyleMode = "normal";
+                        _settings.GlassMode = false;
+                        _settings.ElenaAccentId = "seasonal";
+                        _settings.ElenaDayAccentId = "seasonal";
+                        _settings.BackgroundOpacity = 0.22;
+                        _settingsService.Save(_settings);
+
+                        await ApplyAppearanceAsync();
+                        StatusText.Text = "تنظیمات ظاهری بازنشانی شد.";
+                    }
+                    catch (Exception resetEx)
+                    {
+                        StartupDiagnostics.Log($"Safe settings reset failed: {resetEx}");
+                        StatusText.Text = "بازنشانی تنظیمات انجام نشد؛ startup.log را بررسی کنید.";
+                    }
+                };
+                _settingsPanel.Children.Add(reset);
+
+                var openLog = MakeButton("باز کردن پوشه startup.log");
+                openLog.Click += (_, _) =>
+                {
+                    try
+                    {
+                        var folder = Path.GetDirectoryName(StartupDiagnostics.LogPath);
+                        if (!string.IsNullOrWhiteSpace(folder))
+                        {
+                            Process.Start(new ProcessStartInfo("explorer.exe", folder)
+                            {
+                                UseShellExecute = true
+                            });
+                        }
+                    }
+                    catch { }
+                };
+                _settingsPanel.Children.Add(openLog);
+
+                _settingsSurface ??= new Border
+                {
+                    CornerRadius = new CornerRadius(14),
+                    BorderThickness = new Thickness(1)
+                };
+
+                _settingsSurface.Background = BrushWithAlpha(_theme.CardBackground, 0xE0);
+                _settingsSurface.BorderBrush = ThemeService.Brush(_theme.Accent);
+
+                if (!ReferenceEquals(_settingsSurface.Child, _settingsPanel))
+                    _settingsSurface.Child = _settingsPanel;
+
+                return _settingsSurface;
+            }
+            catch (Exception fallbackEx)
+            {
+                StartupDiagnostics.Log($"Safe settings panel itself failed: {fallbackEx}");
+
+                return new Border
+                {
+                    Padding = new Thickness(10),
+                    Child = new TextBlock
+                    {
+                        Text = "Settings unavailable — see startup.log",
+                        TextWrapping = TextWrapping.Wrap
+                    }
+                };
+            }
+        }
+    }
+
     private FrameworkElement BuildSettingsPanel()
     {
+        StartupDiagnostics.Log("Settings UI: clearing previous children.");
         _settingsPanel.Children.Clear();
         _settingsPanel.Spacing = 9;
         _settingsPanel.Padding = new Thickness(10);
@@ -775,6 +887,7 @@ public sealed class MainWindow : Window
             Background = BrushWithAlpha(_theme.SecondaryText, 0x30)
         });
 
+        StartupDiagnostics.Log("Settings UI: building universal color palette.");
         _settingsPanel.Children.Add(BuildUniversalColorPalettePanel());
 
         var isZaraPastel = !isElena &&
@@ -933,6 +1046,7 @@ public sealed class MainWindow : Window
             Foreground = ThemeService.Brush(_theme.SecondaryText)
         });
 
+        StartupDiagnostics.Log("Settings UI: populating Windows font library.");
         PopulateFontLibrary();
         _fontFamilyCombo.Header = "Font Family";
         _fontFamilyCombo.HorizontalAlignment = HorizontalAlignment.Stretch;
@@ -1021,6 +1135,7 @@ public sealed class MainWindow : Window
                 await RefreshPictureLibraryAsync();
         };
         _settingsPanel.Children.Add(pictureLibraryToggle);
+        StartupDiagnostics.Log("Settings UI: building picture library panel.");
         _settingsPanel.Children.Add(BuildPictureLibraryPanel());
 
         var openPictures = MakeButton("📁 باز کردن پوشه picture در Explorer");
@@ -1034,6 +1149,7 @@ public sealed class MainWindow : Window
                     ? Visibility.Collapsed
                     : Visibility.Visible;
         _settingsPanel.Children.Add(aboutToggle);
+        StartupDiagnostics.Log("Settings UI: building About panel.");
         _settingsPanel.Children.Add(BuildAboutUsPanel());
 
         _settingsSurface ??= new Border
@@ -1857,7 +1973,7 @@ public sealed class MainWindow : Window
         // Dynamic controls are rebuilt only after their containers are detached/cleared.
         // BuildPictureLibraryPanel now clears its own children before reusing persistent
         // UIElement instances.
-        BuildSettingsPanel();
+        BuildSettingsPanelSafe();
         BuildCalendar();
 
         await LoadSelectedDayAsync();

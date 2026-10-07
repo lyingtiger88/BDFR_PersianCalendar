@@ -224,9 +224,24 @@ public partial class App : Application
 
     private void OnUnhandledException(object sender, Microsoft.UI.Xaml.UnhandledExceptionEventArgs e)
     {
-        StartupDiagnostics.Log($"WinUI unhandled exception: {e.Exception}");
-        StartupDiagnostics.ShowFatal(e.Exception);
-        e.Handled = false;
+        StartupDiagnostics.Log($"WinUI unhandled exception (handled to keep app alive): {e.Exception}");
+
+        try
+        {
+            if (_window is MainWindow main)
+            {
+                main.NotifyExternalChange(
+                    "یک خطای رابط کاربری مهار شد؛ برنامه باز مانده است. جزئیات در startup.log ثبت شد.");
+            }
+        }
+        catch (Exception notifyEx)
+        {
+            StartupDiagnostics.Log($"Unable to surface handled UI exception: {notifyEx}");
+        }
+
+        // WinUI UI-thread exceptions should not tear down the entire calendar.
+        // Fatal CLR/AppDomain exceptions are still recorded by the AppDomain handler.
+        e.Handled = true;
     }
 
     private void OnNotificationInvoked(
