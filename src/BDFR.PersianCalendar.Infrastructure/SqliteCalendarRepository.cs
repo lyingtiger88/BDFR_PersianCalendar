@@ -34,7 +34,8 @@ public sealed class SqliteCalendarRepository(string databasePath) : ICalendarRep
             description TEXT NULL,
             category TEXT NULL,
             location TEXT NULL,
-            recurrence INTEGER NOT NULL DEFAULT 0
+            recurrence INTEGER NOT NULL DEFAULT 0,
+            privacy INTEGER NOT NULL DEFAULT 0
         );
         CREATE INDEX IF NOT EXISTS ix_events_date ON events(persian_date);
 
@@ -88,7 +89,11 @@ public sealed class SqliteCalendarRepository(string databasePath) : ICalendarRep
             fire_at_utc TEXT NOT NULL,
             state INTEGER NOT NULL DEFAULT 0,
             title TEXT NOT NULL,
-            body TEXT NOT NULL
+            body TEXT NOT NULL,
+            privacy INTEGER NOT NULL DEFAULT 0,
+            repeat_count INTEGER NOT NULL DEFAULT 1,
+            repeat_interval_minutes INTEGER NOT NULL DEFAULT 5,
+            attempt INTEGER NOT NULL DEFAULT 0
         );
         CREATE INDEX IF NOT EXISTS ix_reminders_due ON reminders(state, fire_at_utc);
 
@@ -110,6 +115,12 @@ public sealed class SqliteCalendarRepository(string databasePath) : ICalendarRep
         );
         """;
         await cmd.ExecuteNonQueryAsync(cancellationToken);
+
+        await EnsureColumnAsync(db, "events", "privacy", "INTEGER NOT NULL DEFAULT 0", cancellationToken);
+        await EnsureColumnAsync(db, "reminders", "privacy", "INTEGER NOT NULL DEFAULT 0", cancellationToken);
+        await EnsureColumnAsync(db, "reminders", "repeat_count", "INTEGER NOT NULL DEFAULT 1", cancellationToken);
+        await EnsureColumnAsync(db, "reminders", "repeat_interval_minutes", "INTEGER NOT NULL DEFAULT 5", cancellationToken);
+        await EnsureColumnAsync(db, "reminders", "attempt", "INTEGER NOT NULL DEFAULT 0", cancellationToken);
     }
 
     public async Task<DaySnapshot> GetDayAsync(PersianDate date, CancellationToken cancellationToken = default)
@@ -159,7 +170,7 @@ public sealed class SqliteCalendarRepository(string databasePath) : ICalendarRep
         await using (var cmd = db.CreateCommand())
         {
             cmd.CommandText = """
-                SELECT id,title,persian_date,start_time,end_time,all_day,description,category,location,recurrence
+                SELECT id,title,persian_date,start_time,end_time,all_day,description,category,location,recurrence,privacy
                 FROM events
                 WHERE persian_date=$d OR (recurrence<>0 AND persian_date <= $d)
                 ORDER BY all_day DESC,start_time;
@@ -176,7 +187,8 @@ public sealed class SqliteCalendarRepository(string databasePath) : ICalendarRep
                     reader.GetString(0), reader.GetString(1), date,
                     ParseTime(reader, 3), ParseTime(reader, 4), reader.GetInt32(5) != 0,
                     ReadNullable(reader, 6), ReadNullable(reader, 7), ReadNullable(reader, 8),
-                    recurrence));
+                    recurrence,
+                    (PrivacyLevel)reader.GetInt32(10)));
             }
         }
 
@@ -256,8 +268,8 @@ public sealed class SqliteCalendarRepository(string databasePath) : ICalendarRep
         await using var db = await OpenAsync(cancellationToken);
         var cmd = db.CreateCommand();
         cmd.CommandText = """
-            INSERT INTO events(id,title,persian_date,start_time,end_time,all_day,description,category,location,recurrence)
-            VALUES($id,$t,$d,$s,$e,$a,$desc,$cat,$loc,$r);
+            INSERT INTO events(id,title,persian_date,start_time,end_time,all_day,description,category,location,recurrence,privacy)
+            VALUES($id,$t,$d,$s,$e,$a,$desc,$cat,$loc,$r,$privacy);
             """;
         cmd.Parameters.AddWithValue("$id", calendarEvent.Id);
         cmd.Parameters.AddWithValue("$t", calendarEvent.Title);
@@ -269,6 +281,7 @@ public sealed class SqliteCalendarRepository(string databasePath) : ICalendarRep
         cmd.Parameters.AddWithValue("$cat", (object?)calendarEvent.Category ?? DBNull.Value);
         cmd.Parameters.AddWithValue("$loc", (object?)calendarEvent.Location ?? DBNull.Value);
         cmd.Parameters.AddWithValue("$r", (int)calendarEvent.Recurrence);
+        cmd.Parameters.AddWithValue("$privacy", (int)calendarEvent.Privacy);
         await cmd.ExecuteNonQueryAsync(cancellationToken);
     }
 
@@ -391,8 +404,10 @@ public sealed class SqliteCalendarRepository(string databasePath) : ICalendarRep
         await using var db = await OpenAsync(cancellationToken);
         var cmd = db.CreateCommand();
         cmd.CommandText = """
-            INSERT OR REPLACE INTO reminders(id,item_kind,item_id,fire_at_utc,state,title,body)
-            VALUES($id,$k,$item,$fire,$state,$title,$body);
+            INSERT OR REPLACE INTO reminders(
+                id,item_kind,item_id,fire_at_utc,state,title,body,privacy,
+                repeat_count,repeat_interval_minutes,attempt)
+            VALUES($id,$k,$item,$fire,$state,$title,$body,$privacy,$repeat,$interval,$attempt);
             """;
         cmd.Parameters.AddWithValue("$id", reminder.Id);
         cmd.Parameters.AddWithValue("$k", (int)reminder.ItemKind);
@@ -401,6 +416,10 @@ public sealed class SqliteCalendarRepository(string databasePath) : ICalendarRep
         cmd.Parameters.AddWithValue("$state", (int)reminder.State);
         cmd.Parameters.AddWithValue("$title", reminder.Title);
         cmd.Parameters.AddWithValue("$body", reminder.Body);
+        cmd.Parameters.AddWithValue("$privacy", (int)reminder.Privacy);
+        cmd.Parameters.AddWithValue("$repeat", Math.Clamp(reminder.RepeatCount, 1, 20));
+        cmd.Parameters.AddWithValue("$interval", Math.Clamp(reminder.RepeatIntervalMinutes, 1, 1440));
+        cmd.Parameters.AddWithValue("$attempt", Math.Max(0, reminder.Attempt));
         await cmd.ExecuteNonQueryAsync(cancellationToken);
     }
 
@@ -409,7 +428,7 @@ public sealed class SqliteCalendarRepository(string databasePath) : ICalendarRep
         await using var db = await OpenAsync(cancellationToken);
         var cmd = db.CreateCommand();
         cmd.CommandText = """
-            SELECT id,item_kind,item_id,fire_at_utc,state,title,body
+            SELECT id,item_kind,item_id,fire_at_utc,state,title,body,privacy,repeat_count,repeat_interval_minutes,attempt
             FROM reminders WHERE state=$pending AND fire_at_utc <= $now ORDER BY fire_at_utc LIMIT 32;
             """;
         cmd.Parameters.AddWithValue("$pending", (int)ReminderState.Pending);
@@ -417,8 +436,27 @@ public sealed class SqliteCalendarRepository(string databasePath) : ICalendarRep
         var list = new List<ReminderSchedule>();
         await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
-            list.Add(new ReminderSchedule(reader.GetString(0), (CalendarItemKind)reader.GetInt32(1), reader.GetString(2),
-                DateTimeOffset.Parse(reader.GetString(3)), (ReminderState)reader.GetInt32(4), reader.GetString(5), reader.GetString(6)));
+            list.Add(ReadReminder(reader));
+        return list;
+    }
+
+    public async Task<IReadOnlyList<ReminderSchedule>> GetAwaitingAcknowledgementRemindersAsync(
+        CancellationToken cancellationToken = default)
+    {
+        await using var db = await OpenAsync(cancellationToken);
+        var cmd = db.CreateCommand();
+        cmd.CommandText = """
+            SELECT id,item_kind,item_id,fire_at_utc,state,title,body,privacy,repeat_count,repeat_interval_minutes,attempt
+            FROM reminders
+            WHERE state=$fired AND attempt > 0
+            ORDER BY fire_at_utc DESC
+            LIMIT 16;
+            """;
+        cmd.Parameters.AddWithValue("$fired", (int)ReminderState.Fired);
+        var list = new List<ReminderSchedule>();
+        await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+            list.Add(ReadReminder(reader));
         return list;
     }
 
@@ -430,7 +468,7 @@ public sealed class SqliteCalendarRepository(string databasePath) : ICalendarRep
         await using var db = await OpenAsync(cancellationToken);
         var cmd = db.CreateCommand();
         cmd.CommandText = """
-            SELECT id,item_kind,item_id,fire_at_utc,state,title,body
+            SELECT id,item_kind,item_id,fire_at_utc,state,title,body,privacy,repeat_count,repeat_interval_minutes,attempt
             FROM reminders
             WHERE state=$pending AND fire_at_utc > $from AND fire_at_utc <= $to
             ORDER BY fire_at_utc LIMIT 512;
@@ -442,11 +480,28 @@ public sealed class SqliteCalendarRepository(string databasePath) : ICalendarRep
         var list = new List<ReminderSchedule>();
         await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
-            list.Add(new ReminderSchedule(
-                reader.GetString(0), (CalendarItemKind)reader.GetInt32(1), reader.GetString(2),
-                DateTimeOffset.Parse(reader.GetString(3)), (ReminderState)reader.GetInt32(4),
-                reader.GetString(5), reader.GetString(6)));
+            list.Add(ReadReminder(reader));
         return list;
+    }
+
+    public async Task UpdateReminderDeliveryAsync(
+        string reminderId,
+        ReminderState state,
+        int attempt,
+        DateTimeOffset? newFireAtUtc = null,
+        CancellationToken cancellationToken = default)
+    {
+        await using var db = await OpenAsync(cancellationToken);
+        var cmd = db.CreateCommand();
+        cmd.CommandText = newFireAtUtc is null
+            ? "UPDATE reminders SET state=$s, attempt=$attempt WHERE id=$id"
+            : "UPDATE reminders SET state=$s, attempt=$attempt, fire_at_utc=$fire WHERE id=$id";
+        cmd.Parameters.AddWithValue("$s", (int)state);
+        cmd.Parameters.AddWithValue("$attempt", Math.Max(0, attempt));
+        cmd.Parameters.AddWithValue("$id", reminderId);
+        if (newFireAtUtc is not null)
+            cmd.Parameters.AddWithValue("$fire", newFireAtUtc.Value.ToUniversalTime().ToString("O"));
+        await cmd.ExecuteNonQueryAsync(cancellationToken);
     }
 
     public async Task SetReminderStateAsync(string reminderId, ReminderState state, DateTimeOffset? newFireAtUtc = null, CancellationToken cancellationToken = default)
@@ -488,12 +543,11 @@ public sealed class SqliteCalendarRepository(string databasePath) : ICalendarRep
     {
         await using var db = await OpenAsync(cancellationToken);
         var cmd = db.CreateCommand();
-        cmd.CommandText = "SELECT id,item_kind,item_id,fire_at_utc,state,title,body FROM reminders WHERE id=$id LIMIT 1";
+        cmd.CommandText = "SELECT id,item_kind,item_id,fire_at_utc,state,title,body,privacy,repeat_count,repeat_interval_minutes,attempt FROM reminders WHERE id=$id LIMIT 1";
         cmd.Parameters.AddWithValue("$id", reminderId);
         await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
         if (!await reader.ReadAsync(cancellationToken)) return null;
-        return new ReminderSchedule(reader.GetString(0), (CalendarItemKind)reader.GetInt32(1), reader.GetString(2),
-            DateTimeOffset.Parse(reader.GetString(3)), (ReminderState)reader.GetInt32(4), reader.GetString(5), reader.GetString(6));
+        return ReadReminder(reader);
     }
 
     public async Task<IReadOnlyList<ActivityLogEntry>> GetRecentActivitiesAsync(int limit = 20, CancellationToken cancellationToken = default)
@@ -532,6 +586,51 @@ public sealed class SqliteCalendarRepository(string databasePath) : ICalendarRep
         cmd.Parameters.AddWithValue("$y", persianYear);
         cmd.Parameters.AddWithValue("$at", syncedAt.ToUniversalTime().ToString("O"));
         await cmd.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private static ReminderSchedule ReadReminder(SqliteDataReader reader)
+        => new(
+            reader.GetString(0),
+            (CalendarItemKind)reader.GetInt32(1),
+            reader.GetString(2),
+            DateTimeOffset.Parse(reader.GetString(3)),
+            (ReminderState)reader.GetInt32(4),
+            reader.GetString(5),
+            reader.GetString(6),
+            (PrivacyLevel)reader.GetInt32(7),
+            Math.Max(1, reader.GetInt32(8)),
+            Math.Max(1, reader.GetInt32(9)),
+            Math.Max(0, reader.GetInt32(10)));
+
+    private static async Task EnsureColumnAsync(
+        SqliteConnection db,
+        string table,
+        string column,
+        string definition,
+        CancellationToken cancellationToken)
+    {
+        var pragma = db.CreateCommand();
+        pragma.CommandText = $"PRAGMA table_info({table})";
+
+        var exists = false;
+        await using (var reader = await pragma.ExecuteReaderAsync(cancellationToken))
+        {
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                if (string.Equals(reader.GetString(1), column, StringComparison.OrdinalIgnoreCase))
+                {
+                    exists = true;
+                    break;
+                }
+            }
+        }
+
+        if (exists)
+            return;
+
+        var alter = db.CreateCommand();
+        alter.CommandText = $"ALTER TABLE {table} ADD COLUMN {column} {definition}";
+        await alter.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private async Task<SqliteConnection> OpenAsync(CancellationToken cancellationToken)
