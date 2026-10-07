@@ -1,7 +1,8 @@
 namespace BDFR.PersianCalendar.Core;
 
 public enum CalendarItemKind { Event, Task, Note, SpecialOccasion }
-public enum ReminderState { Pending = 0, Scheduled = 1, Fired = 2, Snoozed = 3, Dismissed = 4, Completed = 5 }
+public enum ReminderState { Pending = 0, Scheduled = 1, Fired = 2, Snoozed = 3, Dismissed = 4, Completed = 5, Acknowledged = 6 }
+public enum PrivacyLevel { Public = 0, Private = 1 }
 public enum CalendarSystemKind { Persian, Gregorian, Hijri }
 public enum RecurrenceKind { None, Daily, Weekly, Monthly, Yearly }
 
@@ -15,7 +16,8 @@ public sealed record CalendarEvent(
     string? Description = null,
     string? Category = null,
     string? Location = null,
-    RecurrenceKind Recurrence = RecurrenceKind.None);
+    RecurrenceKind Recurrence = RecurrenceKind.None,
+    PrivacyLevel Privacy = PrivacyLevel.Public);
 
 public sealed record CalendarTask(
     string Id,
@@ -60,7 +62,11 @@ public sealed record ReminderSchedule(
     DateTimeOffset FireAtUtc,
     ReminderState State,
     string Title,
-    string Body);
+    string Body,
+    PrivacyLevel Privacy = PrivacyLevel.Public,
+    int RepeatCount = 1,
+    int RepeatIntervalMinutes = 5,
+    int Attempt = 0);
 
 public sealed record ActivityLogEntry(
     string Id,
