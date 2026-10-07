@@ -36,7 +36,9 @@ public sealed class PictureService(ThemeService themeService)
         return Path.Combine(EventPicturesRoot, "default.svg");
     }
 
-    public static async Task<ImageSource?> LoadImageAsync(string? path)
+    public static async Task<ImageSource?> LoadImageAsync(
+        string? path,
+        int decodePixelWidth = 0)
     {
         if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
             return null;
@@ -53,6 +55,8 @@ public sealed class PictureService(ThemeService themeService)
             }
 
             var bitmap = new BitmapImage();
+            if (decodePixelWidth > 0)
+                bitmap.DecodePixelWidth = decodePixelWidth;
             await bitmap.SetSourceAsync(stream);
             return bitmap;
         }
