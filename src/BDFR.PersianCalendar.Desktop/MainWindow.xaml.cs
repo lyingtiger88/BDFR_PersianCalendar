@@ -89,6 +89,12 @@ public sealed class MainWindow : Window
     private readonly Dictionary<PersianDate, TextBlock> _calendarGregorianDayLabels = new();
     private readonly Dictionary<PersianDate, TextBlock> _calendarHijriDayLabels = new();
     private readonly Dictionary<PersianDate, Border> _calendarMourningRibbons = new();
+    private readonly Dictionary<PersianDate, Button> _calendarCellButtons = new();
+    private readonly HashSet<PersianDate> _calendarHolidayDates = new();
+    private readonly List<TextBlock> _calendarHolidayOccasionLabels = new();
+    private readonly List<TextBlock> _selectedHolidayOccasionLabels = new();
+    private readonly List<(Border Card, bool IsHoliday)> _selectedOccasionCards = new();
+    private long _lastLiveColorPreviewTick;
     private readonly HashSet<int> _yearSyncInFlight = new();
     private readonly HashSet<int> _yearSyncedThisSession = new();
 
@@ -2398,6 +2404,7 @@ public sealed class MainWindow : Window
             preview.Background = new SolidColorBrush(currentColor);
 
             var hex = ThemeService.ColorToHex(currentColor);
+            PreviewColorOverrideLive(paletteKey, role, hex);
             colorButton.Content = hex;
             colorButton.Background = new SolidColorBrush(currentColor);
             colorButton.Foreground = ContrastBrush(hex);
@@ -2461,11 +2468,19 @@ public sealed class MainWindow : Window
             if (svDragging)
                 UpdateSvFromPoint(e.GetCurrentPoint(svCanvas).Position);
         };
-        svCanvas.PointerReleased += (_, e) =>
+        svCanvas.PointerReleased += async (_, e) =>
         {
             svDragging = false;
             svCanvas.ReleasePointerCapture(e.Pointer);
             UpdateSvFromPoint(e.GetCurrentPoint(svCanvas).Position);
+
+            var normalized = ThemeService.ColorToHex(currentColor);
+            SetColorOverride(paletteKey, role, normalized);
+            _settingsService.Save(_settings);
+            await ApplyColorOverrideSafelyAsync(
+                paletteKey,
+                label,
+                paletteMonth);
         };
         svCanvas.PointerCanceled += (_, e) =>
         {
@@ -2484,11 +2499,19 @@ public sealed class MainWindow : Window
             if (hueDragging)
                 UpdateHueFromPoint(e.GetCurrentPoint(hueCanvas).Position);
         };
-        hueCanvas.PointerReleased += (_, e) =>
+        hueCanvas.PointerReleased += async (_, e) =>
         {
             hueDragging = false;
             hueCanvas.ReleasePointerCapture(e.Pointer);
             UpdateHueFromPoint(e.GetCurrentPoint(hueCanvas).Position);
+
+            var normalized = ThemeService.ColorToHex(currentColor);
+            SetColorOverride(paletteKey, role, normalized);
+            _settingsService.Save(_settings);
+            await ApplyColorOverrideSafelyAsync(
+                paletteKey,
+                label,
+                paletteMonth);
         };
         hueCanvas.PointerCanceled += (_, e) =>
         {
@@ -2651,7 +2674,7 @@ public sealed class MainWindow : Window
         return true;
     }
 
-    private async Task ApplyColorOverrideSafelyAsync(
+    private Task ApplyColorOverrideSafelyAsync(
         string paletteKey,
         string label,
         int paletteMonth)
@@ -2667,8 +2690,7 @@ public sealed class MainWindow : Window
             {
                 _theme = _themeService.ResolveAppearance(_settings, _month);
                 ApplyAppearanceBrushesOnly();
-                BuildCalendar();
-                await LoadSelectedDayAsync();
+                RefreshLiveCalendarTheme();
             }
 
             StartupDiagnostics.MarkPhase("safe-color-apply-complete");
@@ -2677,7 +2699,180 @@ public sealed class MainWindow : Window
         catch (Exception ex)
         {
             StartupDiagnostics.Log($"Safe color apply failed: {ex}");
-            StatusText.Text = "رنگ ذخیره شد، اما بازآرایی زنده انجام نشد؛ برنامه را دوباره باز کنید.";
+            StatusText.Text =
+                "رنگ ذخیره شد، اما بازآرایی زنده انجام نشد؛ برنامه را دوباره باز کنید.";
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private void PreviewColorOverrideLive(
+        string paletteKey,
+        string role,
+        string color)
+    {
+        if (!string.Equals(
+                ThemeService.GetColorPaletteKey(_settings, _month),
+                paletteKey,
+                StringComparison.OrdinalIgnoreCase))
+            return;
+
+        var now = Environment.TickCount64;
+        if (now - _lastLiveColorPreviewTick < 32)
+            return;
+        _lastLiveColorPreviewTick = now;
+
+        var normalized = ThemeService.NormalizeHexColor(color);
+
+        switch (role)
+        {
+            case "accent":
+                _theme.Accent = normalized;
+                break;
+            case "selected-day":
+                _theme.SelectedDay = normalized;
+                break;
+            case "holiday":
+                _theme.HolidayText = normalized;
+                break;
+            case "panel":
+                _theme.PanelBackground = normalized;
+                break;
+            case "card":
+                _theme.CardBackground = normalized;
+                break;
+            case "calendar":
+                _theme.WeekdayColors = Enumerable.Repeat(normalized, 7).ToArray();
+                break;
+        }
+
+        RefreshLiveColorRole(role);
+    }
+
+    private void RefreshLiveColorRole(string role)
+    {
+        try
+        {
+            switch (role)
+            {
+                case "accent":
+                    if (_leftPanelSurface is not null)
+                        _leftPanelSurface.BorderBrush = ThemeService.Brush(_theme.Accent);
+                    if (_rightPanelSurface is not null)
+                        _rightPanelSurface.BorderBrush = ThemeService.Brush(_theme.Accent);
+                    if (_settingsSurface is not null)
+                        _settingsSurface.BorderBrush = ThemeService.Brush(_theme.Accent);
+                    if (_accentSubmenuSurface is not null)
+                        _accentSubmenuSurface.BorderBrush =
+                            BrushWithAlpha(_theme.Accent, 0x80);
+                    ApplyGenericTheme(Content);
+                    RefreshLiveCalendarTheme();
+                    break;
+
+                case "selected-day":
+                    RefreshLiveCalendarTheme();
+                    break;
+
+                case "holiday":
+                    foreach (var label in _weekdayHeaderLabels.Select((x, i) => (x, i)))
+                        if (label.i == 6)
+                            label.x.Foreground = ThemeService.Brush(_theme.HolidayText);
+
+                    foreach (var pair in _calendarDayNumberLabels)
+                    {
+                        var holiday =
+                            pair.Key.DayOfWeek == DayOfWeek.Friday ||
+                            _calendarHolidayDates.Contains(pair.Key);
+                        if (holiday)
+                            pair.Value.Foreground = ThemeService.Brush(_theme.HolidayText);
+                    }
+
+                    foreach (var text in _calendarHolidayOccasionLabels)
+                        text.Foreground = ThemeService.Brush(_theme.HolidayText);
+                    foreach (var text in _selectedHolidayOccasionLabels)
+                        text.Foreground = ThemeService.Brush(_theme.HolidayText);
+                    foreach (var (card, isHoliday) in _selectedOccasionCards)
+                        if (isHoliday)
+                            card.BorderBrush = ThemeService.Brush(_theme.HolidayText);
+                    break;
+
+                case "panel":
+                    if (_leftPanelSurface is not null)
+                        _leftPanelSurface.Background = CreateSideSurfaceBrush();
+                    if (_rightPanelSurface is not null)
+                        _rightPanelSurface.Background = CreateSideSurfaceBrush();
+                    if (_aboutUsSurface is not null)
+                        _aboutUsSurface.Background =
+                            BrushWithAlpha(_theme.PanelBackground, 0xA0);
+                    break;
+
+                case "card":
+                    if (_settingsSurface is not null)
+                        _settingsSurface.Background =
+                            BrushWithAlpha(_theme.CardBackground, 0xE0);
+                    if (_pictureLibrarySurface is not null)
+                        _pictureLibrarySurface.Background =
+                            BrushWithAlpha(_theme.CardBackground, 0x72);
+                    foreach (var (card, _) in _selectedOccasionCards)
+                        card.Background = ThemeService.Brush(_theme.CardBackground);
+                    break;
+
+                case "calendar":
+                    RefreshLiveCalendarTheme();
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            StartupDiagnostics.Log($"Live color repaint skipped: {ex.Message}");
+        }
+    }
+
+    private void RefreshLiveCalendarTheme()
+    {
+        UpdateWeekdayHeaderAppearance();
+
+        foreach (var pair in _calendarCellButtons)
+        {
+            var date = pair.Key;
+            var button = pair.Value;
+            var column = Grid.GetColumn(button);
+            var selected = date == _selected;
+
+            button.Background = CreateCalendarCellBrush(
+                selected ? _theme.SelectedDay : GetWeekdayColor(column),
+                selected);
+
+            if (_calendarDayNumberLabels.TryGetValue(date, out var dayLabel))
+            {
+                var holiday =
+                    date.DayOfWeek == DayOfWeek.Friday ||
+                    _calendarHolidayDates.Contains(date);
+                dayLabel.Foreground = ThemeService.Brush(
+                    holiday ? _theme.HolidayText : _theme.PrimaryText);
+                dayLabel.FontWeight = holiday
+                    ? Microsoft.UI.Text.FontWeights.SemiBold
+                    : date == PersianDate.Today()
+                        ? Microsoft.UI.Text.FontWeights.Bold
+                        : Microsoft.UI.Text.FontWeights.Normal;
+            }
+
+            if (_calendarGregorianDayLabels.TryGetValue(date, out var gregorian))
+                gregorian.Foreground = ThemeService.Brush(_theme.SecondaryText);
+            if (_calendarHijriDayLabels.TryGetValue(date, out var hijri))
+                hijri.Foreground = ThemeService.Brush(_theme.SecondaryText);
+        }
+
+        foreach (var text in _calendarHolidayOccasionLabels)
+            text.Foreground = ThemeService.Brush(_theme.HolidayText);
+        foreach (var text in _selectedHolidayOccasionLabels)
+            text.Foreground = ThemeService.Brush(_theme.HolidayText);
+
+        foreach (var (card, isHoliday) in _selectedOccasionCards)
+        {
+            card.Background = ThemeService.Brush(_theme.CardBackground);
+            card.BorderBrush = ThemeService.Brush(
+                isHoliday ? _theme.HolidayText : _theme.Accent);
         }
     }
 
@@ -3657,16 +3852,124 @@ public sealed class MainWindow : Window
         StatusText.Text = "فونت و تایپوگرافی به حالت پیش‌فرض برگشت.";
     }
 
+    private static bool IsOfficialHolidayOccasion(
+        PersianDate date,
+        Occasion occasion)
+    {
+        if (occasion.IsHoliday)
+            return true;
+
+        // Fixed official holidays in the Persian calendar. This also protects
+        // against markup/class changes on time.ir where the holiday flag can be
+        // lost even though the date itself is an official holiday.
+        if (date.Month == 1 && date.Day is >= 1 and <= 4)
+            return true;
+        if (date.Month == 1 && date.Day is 12 or 13)
+            return true;
+        if (date.Month == 3 && date.Day is 14 or 15)
+            return true;
+        if (date.Month == 11 && date.Day == 22)
+            return true;
+        if (date.Month == 12 && date.Day == 29)
+            return true;
+
+        var normalized = NormalizeOccasionTitle(occasion.Title);
+
+        string[] officialReligiousKeywords =
+        [
+            "عید فطر",
+            "عید سعید فطر",
+            "عید قربان",
+            "عید غدیر",
+            "مبعث",
+            "نیمه شعبان",
+            "ولادت حضرت قائم",
+            "ولادت امام علی",
+            "میلاد امام علی",
+            "میلاد پیامبر",
+            "ولادت پیامبر",
+            "امام جعفر صادق",
+            "شهادت امام علی",
+            "شهادت امام صادق",
+            "شهادت حضرت فاطمه",
+            "رحلت رسول اکرم",
+            "رحلت پیامبر",
+            "شهادت امام حسن",
+            "شهادت امام رضا",
+            "تاسوعا",
+            "عاشورا",
+            "اربعین"
+        ];
+
+        return officialReligiousKeywords.Any(keyword =>
+            normalized.Contains(keyword, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string GetOccasionBadge(
+        string? title,
+        bool isHoliday,
+        bool isMourning)
+    {
+        var normalized = NormalizeOccasionTitle(title);
+
+        if (isMourning)
+            return "🖤";
+        if (normalized.Contains("نوروز", StringComparison.OrdinalIgnoreCase))
+            return "🌱";
+        if (normalized.Contains("فطر", StringComparison.OrdinalIgnoreCase))
+            return "🌙";
+        if (normalized.Contains("قربان", StringComparison.OrdinalIgnoreCase))
+            return "🕋";
+        if (normalized.Contains("غدیر", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("مبعث", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("نیمه شعبان", StringComparison.OrdinalIgnoreCase))
+            return "✨";
+        if (normalized.Contains("یلدا", StringComparison.OrdinalIgnoreCase))
+            return "🍉";
+        if (normalized.Contains("چله تابستان", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("چله تموز", StringComparison.OrdinalIgnoreCase))
+            return "☀️";
+        if (normalized.Contains("سپندارمذگان", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("سپندرمذگان", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("اسفندگان", StringComparison.OrdinalIgnoreCase))
+            return "💞";
+        if (normalized.Contains("مهرگان", StringComparison.OrdinalIgnoreCase))
+            return "🍂";
+        if (normalized.Contains("تیرگان", StringComparison.OrdinalIgnoreCase))
+            return "💧";
+        if (normalized.Contains("سده", StringComparison.OrdinalIgnoreCase))
+            return "🔥";
+        if (normalized.Contains("سیزده بدر", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("روز طبیعت", StringComparison.OrdinalIgnoreCase))
+            return "🌿";
+        if (normalized.Contains("انقلاب اسلامی", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("22 بهمن", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("۲۲ بهمن", StringComparison.OrdinalIgnoreCase))
+            return "🇮🇷";
+        if (normalized.Contains("تولد", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("میلاد", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("ولادت", StringComparison.OrdinalIgnoreCase))
+            return "🎉";
+        if (isHoliday)
+            return "🔴";
+
+        return string.Empty;
+    }
+
+    private static string NormalizeOccasionTitle(string? title)
+        => (title ?? string.Empty)
+            .Replace('ي', 'ی')
+            .Replace('ك', 'ک')
+            .Replace('‌', ' ')
+            .Replace('‏', ' ')
+            .Trim();
+
     private static bool IsMourningHolidayTitle(string? title)
     {
         if (string.IsNullOrWhiteSpace(title))
             return false;
 
-        var normalized = title
-            .Replace('ي', 'ی')
-            .Replace('ك', 'ک')
-            .Replace("\u200c", " ")
-            .Trim();
+        var normalized = NormalizeOccasionTitle(title);
 
         string[] keywords =
         [
@@ -3677,7 +3980,8 @@ public sealed class MainWindow : Window
             "تاسوعا",
             "اربعین",
             "عزاداری",
-            "سوگواری"
+            "سوگواری",
+            "سالروز درگذشت"
         ];
 
         return keywords.Any(keyword =>
@@ -4292,6 +4596,9 @@ public sealed class MainWindow : Window
         _calendarGregorianDayLabels.Clear();
         _calendarHijriDayLabels.Clear();
         _calendarMourningRibbons.Clear();
+        _calendarCellButtons.Clear();
+        _calendarHolidayDates.Clear();
+        _calendarHolidayOccasionLabels.Clear();
 
         for (var i = 0; i < 7; i++)
             CalendarGrid.ColumnDefinitions.Add(new ColumnDefinition());
@@ -4455,6 +4762,7 @@ public sealed class MainWindow : Window
             _calendarGregorianDayLabels[captured] = gregorianDayNumber;
             _calendarHijriDayLabels[captured] = hijriDayNumber;
             _calendarMourningRibbons[captured] = mourningRibbon;
+            _calendarCellButtons[captured] = button;
 
             Grid.SetRow(button, i / 7);
             Grid.SetColumn(button, i % 7);
@@ -4502,18 +4810,28 @@ public sealed class MainWindow : Window
 
                 foreach (var occasion in visible)
                 {
-                    panel.Children.Add(new TextBlock
+                    var effectiveHoliday = IsOfficialHolidayOccasion(date, occasion);
+                    var mourning = IsMourningHolidayTitle(occasion.Title);
+                    var badge = GetOccasionBadge(occasion.Title, effectiveHoliday, mourning);
+
+                    var occasionLabel = new TextBlock
                     {
-                        Text = occasion.Title,
+                        Text = string.IsNullOrWhiteSpace(badge)
+                            ? occasion.Title
+                            : $"{badge} {occasion.Title}",
                         FontSize = 10.5,
                         TextWrapping = TextWrapping.Wrap,
                         MaxLines = 2,
                         TextTrimming = TextTrimming.CharacterEllipsis,
                         HorizontalAlignment = HorizontalAlignment.Stretch,
-                        Foreground = occasion.IsHoliday
+                        Foreground = effectiveHoliday
                             ? ThemeService.Brush(_theme.HolidayText)
-                            : null
-                    });
+                            : ThemeService.Brush(_theme.PrimaryText)
+                    };
+
+                    panel.Children.Add(occasionLabel);
+                    if (effectiveHoliday)
+                        _calendarHolidayOccasionLabels.Add(occasionLabel);
                 }
 
                 if (snapshot.Occasions.Count > visible.Length)
@@ -4527,7 +4845,13 @@ public sealed class MainWindow : Window
                     });
                 }
 
-                var hasOfficialHoliday = snapshot.Occasions.Any(x => x.IsHoliday);
+                var hasOfficialHoliday = snapshot.Occasions.Any(
+                    x => IsOfficialHolidayOccasion(date, x));
+
+                if (hasOfficialHoliday)
+                    _calendarHolidayDates.Add(date);
+                else
+                    _calendarHolidayDates.Remove(date);
 
                 if ((date.DayOfWeek == DayOfWeek.Friday || hasOfficialHoliday) &&
                     _calendarDayNumberLabels.TryGetValue(date, out var dayLabel))
@@ -4537,7 +4861,7 @@ public sealed class MainWindow : Window
                 }
 
                 var hasMourningHoliday = snapshot.Occasions.Any(
-                    x => x.IsHoliday && IsMourningHolidayTitle(x.Title));
+                    x => IsMourningHolidayTitle(x.Title));
 
                 if (_calendarMourningRibbons.TryGetValue(date, out var ribbon))
                 {
@@ -4614,17 +4938,26 @@ public sealed class MainWindow : Window
             NoteBox.Text = snapshot.Note?.Text ?? string.Empty;
 
             OccasionsPanel.Children.Clear();
+            _selectedHolidayOccasionLabels.Clear();
+            _selectedOccasionCards.Clear();
             foreach (var item in snapshot.Occasions)
             {
+                var effectiveHoliday = IsOfficialHolidayOccasion(_selected, item);
+                var mourning = IsMourningHolidayTitle(item.Title);
+                var badge = GetOccasionBadge(item.Title, effectiveHoliday, mourning);
+
                 var text = new TextBlock
                 {
-                    Text = $"{(item.IsHoliday ? "● " : "• ")}{item.Title}",
+                    Text = $"{(effectiveHoliday ? "●" : "•")} {(string.IsNullOrWhiteSpace(badge) ? "" : badge + " ")}{item.Title}",
                     TextWrapping = TextWrapping.Wrap,
                     VerticalAlignment = VerticalAlignment.Center,
-                    Foreground = item.IsHoliday
+                    Foreground = effectiveHoliday
                         ? ThemeService.Brush(_theme.HolidayText)
                         : ThemeService.Brush(_theme.PrimaryText)
                 };
+
+                if (effectiveHoliday)
+                    _selectedHolidayOccasionLabels.Add(text);
 
                 if (!_settings.ShowOccasionPictures)
                 {
@@ -4655,16 +4988,18 @@ public sealed class MainWindow : Window
                 Grid.SetColumn(text, 1);
                 row.Children.Add(text);
 
-                OccasionsPanel.Children.Add(new Border
+                var occasionCard = new Border
                 {
                     Background = ThemeService.Brush(_theme.CardBackground),
                     CornerRadius = new CornerRadius(10),
-                    BorderBrush = item.IsHoliday
+                    BorderBrush = effectiveHoliday
                         ? ThemeService.Brush(_theme.HolidayText)
                         : ThemeService.Brush(_theme.Accent),
                     BorderThickness = new Thickness(1),
                     Child = row
-                });
+                };
+                _selectedOccasionCards.Add((occasionCard, effectiveHoliday));
+                OccasionsPanel.Children.Add(occasionCard);
             }
             if (snapshot.Occasions.Count == 0)
                 OccasionsPanel.Children.Add(new TextBlock
