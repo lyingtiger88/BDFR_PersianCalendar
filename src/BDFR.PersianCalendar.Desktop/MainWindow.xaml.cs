@@ -117,6 +117,12 @@ public sealed class MainWindow : Window
             $"colorOverrides={_settings.ColorOverrides.Count}; backgroundMode={_settings.BackgroundMode}; " +
             $"backgroundOpacity={_settings.BackgroundOpacity:0.##}.");
 
+        if (_settings.GlassMode)
+        {
+            StartupDiagnostics.Log(
+                "Glass Mode is enabled in saved settings; native Acrylic rendering is suppressed in this stability build.");
+        }
+
         _year = _selected.Year;
         _month = _selected.Month;
 
@@ -610,26 +616,17 @@ public sealed class MainWindow : Window
         double tintOpacity = 0.20,
         byte fallbackAlpha = 0xA8)
     {
-        var tint = ThemeService.ParseColor(tintHex);
-
-        try
-        {
-            return new AcrylicBrush
-            {
-                TintColor = tint,
-                TintOpacity = tintOpacity,
-                FallbackColor = Windows.UI.Color.FromArgb(
-                    fallbackAlpha,
-                    tint.R,
-                    tint.G,
-                    tint.B)
-            };
-        }
-        catch (Exception ex)
-        {
-            StartupDiagnostics.Log($"Acrylic brush fallback used: {ex.Message}");
-            return BrushWithAlpha(tintHex, fallbackAlpha);
-        }
+        // Stability renderer:
+        // The unpackaged WinUI build has shown a native termination immediately
+        // after Window.Activate on the affected machine. That failure bypasses
+        // managed exception handlers, which makes compositor-backed Acrylic a
+        // prime suspect. Preserve the Glass Mode layout/opacity semantics while
+        // rendering with a plain SolidColorBrush until native stability is proven.
+        //
+        // Keep tintOpacity in the signature for compatibility with existing call
+        // sites; fallbackAlpha defines the safe translucent replacement.
+        _ = tintOpacity;
+        return BrushWithAlpha(tintHex, fallbackAlpha);
     }
 
     private Brush CreateCenterSurfaceBrush()
@@ -974,7 +971,7 @@ public sealed class MainWindow : Window
                 Foreground = ThemeService.Brush(_theme.PrimaryText)
             });
 
-            _glassModeCheck.Content = "Glass Mode · Liquid Glass";
+            _glassModeCheck.Content = "Glass Mode · Compatibility Glass";
             _glassModeCheck.IsChecked = _settings.GlassMode;
             _glassModeCheck.Click -= GlassModeCheck_Click;
             _glassModeCheck.Click += GlassModeCheck_Click;
@@ -982,7 +979,7 @@ public sealed class MainWindow : Window
 
             _settingsPanel.Children.Add(new TextBlock
             {
-                Text = "شفافیت بیشتر جدول‌ها و پنل‌های Acrylic شیشه‌ای؛ برای دیده‌شدن بهتر تصویر زمینه.",
+                Text = "در این نسخه برای پایداری، جلوه شیشه‌ای با شفافیت امن رندر می‌شود و Acrylic بومی موقتاً غیرفعال است.",
                 FontSize = 10.5,
                 TextWrapping = TextWrapping.Wrap,
                 Opacity = 0.62,

@@ -73,6 +73,7 @@ public partial class App : Application
             _http = new HttpClient { Timeout = TimeSpan.FromSeconds(35) };
             var source = new TimeIrOccasionSource(_http);
 
+            StartupDiagnostics.MarkPhase("before-main-window-construction");
             StartupDiagnostics.Log("Creating MainWindow.");
             MainWindow mainWindow;
             try
@@ -113,11 +114,15 @@ public partial class App : Application
                 }
             };
 
+            StartupDiagnostics.MarkPhase("before-window-activate");
             StartupDiagnostics.Log("Activating MainWindow.");
             _window.Activate();
+            StartupDiagnostics.MarkPhase("after-window-activate");
             StartupDiagnostics.Log("MainWindow activated; requesting deferred UI initialization.");
 
+            StartupDiagnostics.MarkPhase("before-post-activation-ui-init");
             mainWindow.StartPostActivationInitialization();
+            StartupDiagnostics.MarkPhase("after-post-activation-ui-init-request");
             StartupDiagnostics.Log("Post-activation UI initialization requested.");
 
             StartupDiagnostics.Log("Scheduling background initialization task.");
@@ -142,6 +147,7 @@ public partial class App : Application
         SpecialOccasionService specialOccasions,
         MainWindow mainWindow)
     {
+        StartupDiagnostics.MarkPhase("background-task-entered");
         StartupDiagnostics.Log("Background initialization task entered; first-frame delay starting.");
 
         try

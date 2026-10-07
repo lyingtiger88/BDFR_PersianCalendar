@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Runtime.InteropServices;
+using Microsoft.Win32;
 
 namespace BDFR.PersianCalendar.Desktop;
 
@@ -14,6 +15,8 @@ internal static class StartupDiagnostics
 
     public static void BeginSession()
     {
+        TryEnableLocalCrashDumps();
+
         var assembly = typeof(StartupDiagnostics).Assembly;
         var version = assembly.GetName().Version?.ToString() ?? "unknown";
         var informationalVersion = assembly
@@ -44,8 +47,23 @@ internal static class StartupDiagnostics
         catch { }
     }
 
+    public static void MarkPhase(string phase)
+    {
+        try
+        {
+            Directory.CreateDirectory(DirectoryPath);
+            File.WriteAllText(
+                Path.Combine(DirectoryPath, "last-startup-phase.txt"),
+                $"[{DateTimeOffset.Now:O}] {phase}{Environment.NewLine}");
+        }
+        catch { }
+
+        Log($"PHASE: {phase}");
+    }
+
     public static void ShowFatal(Exception ex)
     {
+        MarkPhase("fatal-managed-exception");
         Log($"FATAL: {ex}");
         try
         {
@@ -56,6 +74,30 @@ internal static class StartupDiagnostics
                 0x00000010);
         }
         catch { }
+    }
+
+    private static void TryEnableLocalCrashDumps()
+    {
+        try
+        {
+            var dumpFolder = Path.Combine(DirectoryPath, "CrashDumps");
+            Directory.CreateDirectory(dumpFolder);
+
+            using var key = Registry.CurrentUser.CreateSubKey(
+                @"Software\Microsoft\Windows\Windows Error Reporting\LocalDumps\BDFR.PersianCalendar.Desktop.exe",
+                writable: true);
+
+            if (key is null)
+                return;
+
+            key.SetValue("DumpFolder", dumpFolder, RegistryValueKind.ExpandString);
+            key.SetValue("DumpType", 2, RegistryValueKind.DWord);
+            key.SetValue("DumpCount", 10, RegistryValueKind.DWord);
+        }
+        catch
+        {
+            // Diagnostics must never become a startup dependency.
+        }
     }
 
     private static string GetAssemblyMetadata(Assembly assembly, string key)
