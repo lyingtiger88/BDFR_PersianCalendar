@@ -4613,9 +4613,7 @@ public sealed class MainWindow : Window
             {
                 Text = ToPersianDigits(cell.Date.Day.ToString()),
                 FontSize = 17,
-                FontWeight = cell.IsToday
-                    ? Microsoft.UI.Text.FontWeights.Bold
-                    : Microsoft.UI.Text.FontWeights.Normal,
+                FontWeight = Microsoft.UI.Text.FontWeights.Bold,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 Foreground = cell.Date.DayOfWeek == DayOfWeek.Friday
                     ? ThemeService.Brush(_theme.HolidayText)
@@ -4630,9 +4628,10 @@ public sealed class MainWindow : Window
                 FontFamily = new FontFamily("Segoe UI Variable"),
                 FlowDirection = FlowDirection.LeftToRight,
                 HorizontalAlignment = HorizontalAlignment.Left,
-                VerticalAlignment = VerticalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Bottom,
+                Margin = new Thickness(2, 0, 0, 1),
                 Foreground = ThemeService.Brush(_theme.SecondaryText),
-                Opacity = 0.78
+                Opacity = 0.82
             };
 
             var gregorianDateTime = gregorianDate.ToDateTime(TimeOnly.MinValue);
@@ -4667,12 +4666,11 @@ public sealed class MainWindow : Window
                 HorizontalAlignment = HorizontalAlignment.Stretch,
                 FlowDirection = FlowDirection.LeftToRight
             };
-            dateHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            // Equal side gutters keep the bold Persian day visually centered.
+            dateHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(30) });
             dateHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            dateHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            dateHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(30) });
 
-            Grid.SetColumn(gregorianDayNumber, 0);
-            dateHeader.Children.Add(gregorianDayNumber);
             Grid.SetColumn(dayNumber, 1);
             dateHeader.Children.Add(dayNumber);
             Grid.SetColumn(hijriDayNumber, 2);
@@ -4692,17 +4690,16 @@ public sealed class MainWindow : Window
             content.Children.Add(dateHeader);
             content.Children.Add(occasionPanel);
 
-            // Diagonal black mourning ribbon. It stays hidden for normal holidays
-            // and becomes visible only for official mourning holidays.
+            // Diagonal black mourning ribbon anchored to the top-left corner.
             var mourningRibbon = new Border
             {
-                Width = 34,
+                Width = 38,
                 Height = 8,
                 Background = new SolidColorBrush(Colors.Black),
                 CornerRadius = new CornerRadius(2),
                 HorizontalAlignment = HorizontalAlignment.Left,
                 VerticalAlignment = VerticalAlignment.Top,
-                Margin = new Thickness(-8, 7, 0, 0),
+                Margin = new Thickness(-6, 7, 0, 0),
                 FlowDirection = FlowDirection.LeftToRight,
                 Visibility = Visibility.Collapsed,
                 IsHitTestVisible = false,
@@ -4715,9 +4712,14 @@ public sealed class MainWindow : Window
 
             var cellLayer = new Grid
             {
-                HorizontalAlignment = HorizontalAlignment.Stretch
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                VerticalAlignment = VerticalAlignment.Stretch,
+                MinHeight = 74
             };
             cellLayer.Children.Add(content);
+
+            // Gregorian day is rendered independently at the bottom-left corner.
+            cellLayer.Children.Add(gregorianDayNumber);
             cellLayer.Children.Add(mourningRibbon);
 
             var button = new Button
@@ -4725,7 +4727,7 @@ public sealed class MainWindow : Window
                 HorizontalAlignment = HorizontalAlignment.Stretch,
                 VerticalAlignment = VerticalAlignment.Stretch,
                 HorizontalContentAlignment = HorizontalAlignment.Stretch,
-                VerticalContentAlignment = VerticalAlignment.Top,
+                VerticalContentAlignment = VerticalAlignment.Stretch,
                 Margin = new Thickness(4),
                 MinHeight = 88,
                 Padding = new Thickness(6),
