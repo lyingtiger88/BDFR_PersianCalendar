@@ -6,7 +6,6 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Media;
-using Microsoft.UI.Xaml.Shapes;
 using Windows.Graphics;
 using Windows.Storage.Pickers;
 using System.Diagnostics;
@@ -2269,7 +2268,7 @@ public sealed class MainWindow : Window
         Canvas.SetTop(blackLayer, 0);
         svCanvas.Children.Add(blackLayer);
 
-        var svMarker = new Ellipse
+        var svMarker = new Microsoft.UI.Xaml.Shapes.Ellipse
         {
             Width = markerSize,
             Height = markerSize,
