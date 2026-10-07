@@ -11,6 +11,7 @@ using Windows.Storage.Pickers;
 using System.Diagnostics;
 using Microsoft.Win32;
 using System.Runtime.CompilerServices;
+using System.Globalization;
 
 namespace BDFR.PersianCalendar.Desktop;
 
@@ -64,6 +65,7 @@ public sealed class MainWindow : Window
     private readonly List<TextBlock> _weekdayHeaderLabels = new();
     private readonly TextBlock SelectedDateTitle = new();
     private readonly TextBlock GregorianDateText = new();
+    private readonly TextBlock HijriDateText = new();
     private readonly StackPanel OccasionsPanel = new();
     private readonly StackPanel EventsPanel = new();
     private readonly StackPanel TasksPanel = new();
@@ -84,6 +86,8 @@ public sealed class MainWindow : Window
     private readonly StackPanel ActivityPanel = new();
     private readonly Dictionary<PersianDate, StackPanel> _calendarOccasionPanels = new();
     private readonly Dictionary<PersianDate, TextBlock> _calendarDayNumberLabels = new();
+    private readonly Dictionary<PersianDate, TextBlock> _calendarGregorianDayLabels = new();
+    private readonly Dictionary<PersianDate, TextBlock> _calendarHijriDayLabels = new();
     private readonly Dictionary<PersianDate, Border> _calendarMourningRibbons = new();
     private readonly HashSet<int> _yearSyncInFlight = new();
     private readonly HashSet<int> _yearSyncedThisSession = new();
@@ -477,7 +481,14 @@ public sealed class MainWindow : Window
         stack.Children.Add(SelectedDateTitle);
 
         GregorianDateText.Opacity = 0.65;
+        GregorianDateText.FlowDirection = FlowDirection.LeftToRight;
+        GregorianDateText.FontFamily = new FontFamily("Segoe UI Variable");
         stack.Children.Add(GregorianDateText);
+
+        HijriDateText.Opacity = 0.65;
+        HijriDateText.FlowDirection = FlowDirection.RightToLeft;
+        HijriDateText.FontFamily = new FontFamily("Traditional Arabic");
+        stack.Children.Add(HijriDateText);
 
         stack.Children.Add(SectionTitle("مناسبت‌ها"));
         OccasionsPanel.Spacing = 6;
@@ -3156,6 +3167,8 @@ public sealed class MainWindow : Window
         CalendarGrid.ColumnDefinitions.Clear();
         _calendarOccasionPanels.Clear();
         _calendarDayNumberLabels.Clear();
+        _calendarGregorianDayLabels.Clear();
+        _calendarHijriDayLabels.Clear();
         _calendarMourningRibbons.Clear();
 
         for (var i = 0; i < 7; i++)
@@ -3180,6 +3193,62 @@ public sealed class MainWindow : Window
                     : ThemeService.Brush(_theme.PrimaryText)
             };
 
+            var gregorianDate = cell.Date.ToDateOnly();
+            var gregorianDayNumber = new TextBlock
+            {
+                Text = gregorianDate.Day.ToString(CultureInfo.InvariantCulture),
+                FontSize = 10.5,
+                FontFamily = new FontFamily("Segoe UI Variable"),
+                FlowDirection = FlowDirection.LeftToRight,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                VerticalAlignment = VerticalAlignment.Center,
+                Foreground = ThemeService.Brush(_theme.SecondaryText),
+                Opacity = 0.78
+            };
+
+            var gregorianDateTime = gregorianDate.ToDateTime(TimeOnly.MinValue);
+            var hijriCalendar = new HijriCalendar();
+            var hijriDay = hijriCalendar.GetDayOfMonth(gregorianDateTime);
+            var hijriMonth = hijriCalendar.GetMonth(gregorianDateTime);
+            var hijriYear = hijriCalendar.GetYear(gregorianDateTime);
+
+            var hijriDayNumber = new TextBlock
+            {
+                Text = ToArabicIndicDigits(hijriDay.ToString(CultureInfo.InvariantCulture)),
+                FontSize = 11.5,
+                FontFamily = new FontFamily("Traditional Arabic"),
+                FlowDirection = FlowDirection.RightToLeft,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Center,
+                Foreground = ThemeService.Brush(_theme.SecondaryText),
+                Opacity = 0.82
+            };
+
+            ToolTipService.SetToolTip(
+                gregorianDayNumber,
+                $"میلادی: {gregorianDate:yyyy-MM-dd}");
+            ToolTipService.SetToolTip(
+                hijriDayNumber,
+                $"قمری: {ToArabicIndicDigits(hijriYear.ToString(CultureInfo.InvariantCulture))}/" +
+                $"{ToArabicIndicDigits(hijriMonth.ToString("00", CultureInfo.InvariantCulture))}/" +
+                $"{ToArabicIndicDigits(hijriDay.ToString("00", CultureInfo.InvariantCulture))}");
+
+            var dateHeader = new Grid
+            {
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                FlowDirection = FlowDirection.LeftToRight
+            };
+            dateHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            dateHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            dateHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            Grid.SetColumn(gregorianDayNumber, 0);
+            dateHeader.Children.Add(gregorianDayNumber);
+            Grid.SetColumn(dayNumber, 1);
+            dateHeader.Children.Add(dayNumber);
+            Grid.SetColumn(hijriDayNumber, 2);
+            dateHeader.Children.Add(hijriDayNumber);
+
             var occasionPanel = new StackPanel
             {
                 Spacing = 2,
@@ -3191,7 +3260,7 @@ public sealed class MainWindow : Window
                 Spacing = 2,
                 HorizontalAlignment = HorizontalAlignment.Stretch
             };
-            content.Children.Add(dayNumber);
+            content.Children.Add(dateHeader);
             content.Children.Add(occasionPanel);
 
             // Diagonal black mourning ribbon. It stays hidden for normal holidays
@@ -3261,6 +3330,8 @@ public sealed class MainWindow : Window
 
             _calendarOccasionPanels[captured] = occasionPanel;
             _calendarDayNumberLabels[captured] = dayNumber;
+            _calendarGregorianDayLabels[captured] = gregorianDayNumber;
+            _calendarHijriDayLabels[captured] = hijriDayNumber;
             _calendarMourningRibbons[captured] = mourningRibbon;
 
             Grid.SetRow(button, i / 7);
@@ -3269,6 +3340,7 @@ public sealed class MainWindow : Window
         }
 
         ApplyUserFont(CalendarGrid);
+        ApplySecondaryCalendarTypography();
 
         if (_postActivationInitializationStarted)
         {
@@ -3414,7 +3486,9 @@ public sealed class MainWindow : Window
         {
             var snapshot = await _repository.GetDayAsync(_selected);
             SelectedDateTitle.Text = _selected.ToLongPersianString();
-            GregorianDateText.Text = _selected.ToDateOnly().ToString("yyyy-MM-dd");
+            var selectedGregorian = _selected.ToDateOnly();
+            GregorianDateText.Text = $"Gregorian · {selectedGregorian:yyyy-MM-dd}";
+            HijriDateText.Text = $"هجری قمری · {FormatHijriDate(selectedGregorian)}";
             NoteBox.Text = snapshot.Note?.Text ?? string.Empty;
 
             OccasionsPanel.Children.Clear();
@@ -3829,6 +3903,57 @@ public sealed class MainWindow : Window
                 $"روز {ToPersianDigits(occasion.Day.ToString())} ماه {ToPersianDigits(occasion.Month.ToString())} قمری (سالانه)",
             _ => $"{occasion.Month}/{occasion.Day}"
         };
+
+    private void ApplySecondaryCalendarTypography()
+    {
+        var scale = Math.Clamp(_settings.FontSize / 14.0, 0.72, 1.72);
+
+        foreach (var label in _calendarGregorianDayLabels.Values)
+        {
+            label.FontFamily = new FontFamily("Segoe UI Variable");
+            label.FontSize = Math.Clamp(10.5 * scale, 8.5, 18.0);
+            label.FlowDirection = FlowDirection.LeftToRight;
+            label.Foreground = ThemeService.Brush(_theme.SecondaryText);
+        }
+
+        foreach (var label in _calendarHijriDayLabels.Values)
+        {
+            label.FontFamily = new FontFamily("Traditional Arabic");
+            label.FontSize = Math.Clamp(11.5 * scale, 9.0, 19.0);
+            label.FlowDirection = FlowDirection.RightToLeft;
+            label.Foreground = ThemeService.Brush(_theme.SecondaryText);
+        }
+
+        GregorianDateText.FontFamily = new FontFamily("Segoe UI Variable");
+        GregorianDateText.FlowDirection = FlowDirection.LeftToRight;
+        HijriDateText.FontFamily = new FontFamily("Traditional Arabic");
+        HijriDateText.FlowDirection = FlowDirection.RightToLeft;
+    }
+
+    private static string FormatHijriDate(DateOnly gregorianDate)
+    {
+        var dateTime = gregorianDate.ToDateTime(TimeOnly.MinValue);
+        var calendar = new HijriCalendar();
+
+        var year = ToArabicIndicDigits(calendar.GetYear(dateTime).ToString(CultureInfo.InvariantCulture));
+        var month = ToArabicIndicDigits(calendar.GetMonth(dateTime).ToString("00", CultureInfo.InvariantCulture));
+        var day = ToArabicIndicDigits(calendar.GetDayOfMonth(dateTime).ToString("00", CultureInfo.InvariantCulture));
+
+        return $"{year}/{month}/{day} هـ";
+    }
+
+    private static string ToArabicIndicDigits(string value)
+        => value
+            .Replace('0', '٠')
+            .Replace('1', '١')
+            .Replace('2', '٢')
+            .Replace('3', '٣')
+            .Replace('4', '٤')
+            .Replace('5', '٥')
+            .Replace('6', '٦')
+            .Replace('7', '٧')
+            .Replace('8', '٨')
+            .Replace('9', '٩');
 
     private static string FormatPersianActivityTimestamp(PersianDate date, TimeSpan time)
         => $"{date.PersianDayOfWeek} {ToPersianDigits(date.Day.ToString())} {date.MonthName} {ToPersianDigits(date.Year.ToString())} · " +
