@@ -330,13 +330,34 @@ public sealed class MainWindow : Window
         };
         footer.Children.Add(_safeSelectedDateText);
 
+        var centerButton = new Button
+        {
+            Content = "۱ · تقویم مرکزی"
+        };
+        centerButton.Click += (_, _) => ActivateDiagnosticStage("center");
+        footer.Children.Add(centerButton);
+
+        var rightButton = new Button
+        {
+            Content = "۲ · تقویم + پنل راست"
+        };
+        rightButton.Click += (_, _) => ActivateDiagnosticStage("center-right");
+        footer.Children.Add(rightButton);
+
+        var leftButton = new Button
+        {
+            Content = "۳ · تقویم + پنل چپ"
+        };
+        leftButton.Click += (_, _) => ActivateDiagnosticStage("center-left");
+        footer.Children.Add(leftButton);
+
         var fullUiButton = new Button
         {
-            Content = "نمای کامل آزمایشی"
+            Content = "۴ · رابط کامل"
         };
         ToolTipService.SetToolTip(
             fullUiButton,
-            "رابط کامل فقط پس از اجرای پایدار حالت امن بارگذاری می‌شود.");
+            "اگر مراحل قبلی پایدار بودند، رابط کامل را برای مقایسه بارگذاری کنید.");
         fullUiButton.Click += (_, _) => ActivateFullInterfaceFromSafeShell();
         footer.Children.Add(fullUiButton);
 
@@ -444,6 +465,81 @@ public sealed class MainWindow : Window
         }
     }
 
+    private void ActivateDiagnosticStage(string stage)
+    {
+        try
+        {
+            StartupDiagnostics.MarkPhase($"diagnostic-stage-{stage}-requested");
+            StartupDiagnostics.Log($"Safe shell: diagnostic stage requested: {stage}.");
+
+            _safeShellMode = false;
+            _postActivationInitializationStarted = false;
+
+            var root = new Grid
+            {
+                Background = new SolidColorBrush(Colors.White),
+                Padding = new Thickness(12),
+                ColumnSpacing = 12,
+                FlowDirection = FlowDirection.RightToLeft
+            };
+
+            if (stage == "center")
+            {
+                root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+                var center = new Border
+                {
+                    Background = new SolidColorBrush(Colors.White),
+                    BorderBrush = new SolidColorBrush(Colors.LightGray),
+                    BorderThickness = new Thickness(1),
+                    CornerRadius = new CornerRadius(12),
+                    Child = BuildCalendarPanel()
+                };
+                Grid.SetColumn(center, 0);
+                root.Children.Add(center);
+            }
+            else
+            {
+                root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(320) });
+                root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+                var center = new Border
+                {
+                    Background = new SolidColorBrush(Colors.White),
+                    BorderBrush = new SolidColorBrush(Colors.LightGray),
+                    BorderThickness = new Thickness(1),
+                    CornerRadius = new CornerRadius(12),
+                    Child = BuildCalendarPanel()
+                };
+                Grid.SetColumn(center, 1);
+                root.Children.Add(center);
+
+                FrameworkElement side = stage == "center-left"
+                    ? BuildLeftPanel()
+                    : BuildRightPanel();
+
+                Grid.SetColumn(side, 0);
+                root.Children.Add(side);
+            }
+
+            Content = root;
+            BuildCalendar();
+
+            StartupDiagnostics.MarkPhase($"diagnostic-stage-{stage}-mounted");
+            StartupDiagnostics.Log($"Safe shell: diagnostic stage mounted: {stage}.");
+
+            StartPostActivationInitialization();
+        }
+        catch (Exception ex)
+        {
+            _safeShellMode = true;
+            StartupDiagnostics.Log($"Diagnostic stage {stage} failed: {ex}");
+            Content = BuildStartupSafeShell();
+            if (_safeSelectedDateText is not null)
+                _safeSelectedDateText.Text = $"مرحله {stage} بارگذاری نشد؛ حالت امن فعال ماند. {ex.Message}";
+        }
+    }
+
     private void ActivateFullInterfaceFromSafeShell()
     {
         try
@@ -452,8 +548,12 @@ public sealed class MainWindow : Window
             StartupDiagnostics.Log("Safe shell: user requested advanced interface mount.");
 
             _safeShellMode = false;
+            _postActivationInitializationStarted = false;
+            StartupDiagnostics.MarkPhase("full-ui-buildroot-start");
             Content = BuildRoot();
+            StartupDiagnostics.MarkPhase("full-ui-buildroot-complete");
             ApplyUserFont(Content);
+            StartupDiagnostics.MarkPhase("full-ui-font-apply-complete");
             BuildCalendar();
 
             StartupDiagnostics.MarkPhase("safe-shell-full-ui-mounted");
