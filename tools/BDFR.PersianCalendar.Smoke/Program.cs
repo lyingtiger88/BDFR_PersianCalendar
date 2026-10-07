@@ -172,6 +172,60 @@ try
     if ((await repository.GetRecentActivitiesAsync(10)).Count != 0)
         throw new Exception("Activity center clear did not remove activity_log rows.");
 
+    var privateEvent = new CalendarEvent(
+        "event-private-smoke",
+        "رویداد خصوصی",
+        new PersianDate(1405, 7, 14),
+        new TimeOnly(15, 30),
+        new TimeOnly(16, 30),
+        false,
+        Privacy: PrivacyLevel.Private);
+    await repository.AddEventAsync(privateEvent);
+
+    var privateEventLoaded = (await repository.GetDayAsync(privateEvent.Date))
+        .Events.Single(x => x.Id == privateEvent.Id);
+    if (privateEventLoaded.Privacy != PrivacyLevel.Private)
+        throw new Exception("Event privacy persistence failed.");
+
+    var repeatingReminder = new ReminderSchedule(
+        "reminder-retry-smoke",
+        CalendarItemKind.Event,
+        privateEvent.Id,
+        DateTimeOffset.UtcNow.AddMinutes(-1),
+        ReminderState.Pending,
+        privateEvent.Title,
+        "تست یادآور",
+        PrivacyLevel.Private,
+        3,
+        7,
+        0);
+    await repository.ScheduleReminderAsync(repeatingReminder);
+
+    var dueRepeat = (await repository.GetDueRemindersAsync(DateTimeOffset.UtcNow))
+        .Single(x => x.Id == repeatingReminder.Id);
+    if (dueRepeat.Privacy != PrivacyLevel.Private ||
+        dueRepeat.RepeatCount != 3 ||
+        dueRepeat.RepeatIntervalMinutes != 7)
+        throw new Exception("Reminder privacy/repeat persistence failed.");
+
+    await repository.UpdateReminderDeliveryAsync(
+        repeatingReminder.Id,
+        ReminderState.Fired,
+        3);
+
+    var awaitingAck = await repository.GetAwaitingAcknowledgementRemindersAsync();
+    if (!awaitingAck.Any(x => x.Id == repeatingReminder.Id && x.Attempt == 3))
+        throw new Exception("Awaiting-acknowledgement reminder query failed.");
+
+    await repository.UpdateReminderDeliveryAsync(
+        repeatingReminder.Id,
+        ReminderState.Acknowledged,
+        3);
+
+    if ((await repository.GetAwaitingAcknowledgementRemindersAsync())
+        .Any(x => x.Id == repeatingReminder.Id))
+        throw new Exception("Reminder acknowledgement state failed.");
+
     var personalOccasion = new SpecialOccasion(
         "special-smoke",
         "تولد آزمایشی",
