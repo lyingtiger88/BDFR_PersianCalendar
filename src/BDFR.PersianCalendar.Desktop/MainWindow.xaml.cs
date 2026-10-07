@@ -97,6 +97,10 @@ public sealed class MainWindow : Window
     private int _month;
     private int _paletteEditorMonth;
     private bool _postActivationInitializationStarted;
+    private bool _safeShellMode = true;
+    private Grid? _safeCalendarGrid;
+    private TextBlock? _safeMonthTitle;
+    private TextBlock? _safeSelectedDateText;
 
     public MainWindow(
         ICalendarRepository repository,
@@ -134,8 +138,7 @@ public sealed class MainWindow : Window
         _pictureService = new PictureService(_themeService);
 
         Title = "Anahita";
-        Content = BuildRoot();
-        ApplyUserFont(Content);
+        Content = BuildStartupSafeShell();
 
         Activated += (_, _) => StartupDiagnostics.Log("MainWindow Activated event fired.");
         Closed += (_, _) => StartupDiagnostics.Log("MainWindow Closed event fired.");
@@ -154,13 +157,20 @@ public sealed class MainWindow : Window
             StartupDiagnostics.Log($"Window resize skipped: {ex.Message}");
         }
 
-        BuildCalendar();
-        StartupDiagnostics.Log("MainWindow: async UI startup work deferred until after activation.");
+        StartupDiagnostics.MarkPhase("startup-safe-shell-built");
+        StartupDiagnostics.Log("MainWindow: safe shell UI ready; advanced interface not mounted at startup.");
         StartupDiagnostics.Log("MainWindow: programmatic UI ready.");
     }
 
     public void StartPostActivationInitialization()
     {
+        if (_safeShellMode)
+        {
+            StartupDiagnostics.MarkPhase("startup-safe-shell-active");
+            StartupDiagnostics.Log("Post-activation advanced initialization skipped because safe shell is active.");
+            return;
+        }
+
         if (_postActivationInitializationStarted)
         {
             StartupDiagnostics.Log("Post-activation UI initialization request ignored; already started.");
@@ -229,6 +239,234 @@ public sealed class MainWindow : Window
         catch (Exception ex)
         {
             StartupDiagnostics.Log($"Post-activation UI initialization failed but app will remain open: {ex}");
+        }
+    }
+
+    private FrameworkElement BuildStartupSafeShell()
+    {
+        StartupDiagnostics.Log("Safe shell: building minimal startup UI.");
+
+        var root = new Grid
+        {
+            Background = new SolidColorBrush(Colors.White),
+            Padding = new Thickness(20),
+            RowSpacing = 12
+        };
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+        var title = new TextBlock
+        {
+            Text = "Anahita · Safe Mode",
+            FontSize = 24,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Foreground = new SolidColorBrush(Colors.Black),
+            HorizontalAlignment = HorizontalAlignment.Center
+        };
+        Grid.SetRow(title, 0);
+        root.Children.Add(title);
+
+        var navigation = new Grid { ColumnSpacing = 8 };
+        navigation.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        navigation.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        navigation.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        var previous = new Button { Content = "‹", MinWidth = 48 };
+        previous.Click += (_, _) =>
+        {
+            _month--;
+            if (_month == 0) { _month = 12; _year--; }
+            RebuildSafeCalendar();
+        };
+        Grid.SetColumn(previous, 0);
+        navigation.Children.Add(previous);
+
+        _safeMonthTitle = new TextBlock
+        {
+            FontSize = 20,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Foreground = new SolidColorBrush(Colors.Black),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        Grid.SetColumn(_safeMonthTitle, 1);
+        navigation.Children.Add(_safeMonthTitle);
+
+        var next = new Button { Content = "›", MinWidth = 48 };
+        next.Click += (_, _) =>
+        {
+            _month++;
+            if (_month == 13) { _month = 1; _year++; }
+            RebuildSafeCalendar();
+        };
+        Grid.SetColumn(next, 2);
+        navigation.Children.Add(next);
+
+        Grid.SetRow(navigation, 1);
+        root.Children.Add(navigation);
+
+        _safeCalendarGrid = new Grid
+        {
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            VerticalAlignment = VerticalAlignment.Stretch
+        };
+        Grid.SetRow(_safeCalendarGrid, 2);
+        root.Children.Add(_safeCalendarGrid);
+
+        var footer = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 12,
+            HorizontalAlignment = HorizontalAlignment.Center
+        };
+
+        _safeSelectedDateText = new TextBlock
+        {
+            Text = "تقویم پایه در حالت امن اجرا شده است.",
+            Foreground = new SolidColorBrush(Colors.Black),
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        footer.Children.Add(_safeSelectedDateText);
+
+        var fullUiButton = new Button
+        {
+            Content = "نمای کامل آزمایشی"
+        };
+        ToolTipService.SetToolTip(
+            fullUiButton,
+            "رابط کامل فقط پس از اجرای پایدار حالت امن بارگذاری می‌شود.");
+        fullUiButton.Click += (_, _) => ActivateFullInterfaceFromSafeShell();
+        footer.Children.Add(fullUiButton);
+
+        Grid.SetRow(footer, 3);
+        root.Children.Add(footer);
+
+        RebuildSafeCalendar();
+        StartupDiagnostics.Log("Safe shell: minimal startup UI built.");
+        return root;
+    }
+
+    private void RebuildSafeCalendar()
+    {
+        if (_safeCalendarGrid is null || _safeMonthTitle is null)
+            return;
+
+        _safeMonthTitle.Text = $"{PersianDate.MonthNames[_month - 1]} {ToPersianDigits(_year.ToString())}";
+
+        _safeCalendarGrid.Children.Clear();
+        _safeCalendarGrid.RowDefinitions.Clear();
+        _safeCalendarGrid.ColumnDefinitions.Clear();
+
+        for (var i = 0; i < 7; i++)
+            _safeCalendarGrid.ColumnDefinitions.Add(new ColumnDefinition());
+
+        _safeCalendarGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        for (var i = 0; i < 6; i++)
+            _safeCalendarGrid.RowDefinitions.Add(new RowDefinition());
+
+        var weekdayNames = new[] { "شنبه", "یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه" };
+        for (var i = 0; i < weekdayNames.Length; i++)
+        {
+            var label = new TextBlock
+            {
+                Text = weekdayNames[i],
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                Foreground = new SolidColorBrush(i == 6 ? Colors.DarkRed : Colors.Black),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Margin = new Thickness(2, 4, 2, 8)
+            };
+            Grid.SetRow(label, 0);
+            Grid.SetColumn(label, i);
+            _safeCalendarGrid.Children.Add(label);
+        }
+
+        var cells = MonthGridBuilder.Build(_year, _month);
+        for (var i = 0; i < cells.Count; i++)
+        {
+            var cell = cells[i];
+            var gregorian = cell.Date.ToDateOnly();
+            var dt = gregorian.ToDateTime(TimeOnly.MinValue);
+            var hijri = new HijriCalendar();
+            var hijriDay = ToArabicIndicDigits(hijri.GetDayOfMonth(dt).ToString(CultureInfo.InvariantCulture));
+
+            var stack = new StackPanel
+            {
+                Spacing = 1,
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
+            stack.Children.Add(new TextBlock
+            {
+                Text = ToPersianDigits(cell.Date.Day.ToString(CultureInfo.InvariantCulture)),
+                FontSize = 18,
+                FontWeight = cell.IsToday
+                    ? Microsoft.UI.Text.FontWeights.Bold
+                    : Microsoft.UI.Text.FontWeights.Normal,
+                Foreground = new SolidColorBrush(cell.Date.DayOfWeek == DayOfWeek.Friday ? Colors.DarkRed : Colors.Black),
+                HorizontalAlignment = HorizontalAlignment.Center
+            });
+            stack.Children.Add(new TextBlock
+            {
+                Text = $"{gregorian.Day}  ·  {hijriDay}",
+                FontSize = 10,
+                Foreground = new SolidColorBrush(Colors.DimGray),
+                FlowDirection = FlowDirection.LeftToRight,
+                HorizontalAlignment = HorizontalAlignment.Center
+            });
+
+            var button = new Button
+            {
+                Content = stack,
+                Margin = new Thickness(2),
+                Padding = new Thickness(4),
+                MinHeight = 64,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                VerticalAlignment = VerticalAlignment.Stretch,
+                Opacity = cell.IsCurrentMonth ? 1 : 0.45
+            };
+
+            var captured = cell.Date;
+            button.Click += (_, _) =>
+            {
+                _selected = captured;
+                if (_safeSelectedDateText is not null)
+                {
+                    var g = captured.ToDateOnly();
+                    _safeSelectedDateText.Text =
+                        $"{captured.ToLongPersianString()}  |  {g:yyyy-MM-dd}  |  {FormatHijriDate(g)}";
+                }
+            };
+
+            Grid.SetRow(button, (i / 7) + 1);
+            Grid.SetColumn(button, i % 7);
+            _safeCalendarGrid.Children.Add(button);
+        }
+    }
+
+    private void ActivateFullInterfaceFromSafeShell()
+    {
+        try
+        {
+            StartupDiagnostics.MarkPhase("safe-shell-full-ui-requested");
+            StartupDiagnostics.Log("Safe shell: user requested advanced interface mount.");
+
+            _safeShellMode = false;
+            Content = BuildRoot();
+            ApplyUserFont(Content);
+            BuildCalendar();
+
+            StartupDiagnostics.MarkPhase("safe-shell-full-ui-mounted");
+            StartupDiagnostics.Log("Safe shell: advanced interface mounted; starting deferred initialization.");
+            StartPostActivationInitialization();
+        }
+        catch (Exception ex)
+        {
+            _safeShellMode = true;
+            StartupDiagnostics.Log($"Safe shell: advanced interface mount failed: {ex}");
+            Content = BuildStartupSafeShell();
+            if (_safeSelectedDateText is not null)
+                _safeSelectedDateText.Text = $"نمای کامل بارگذاری نشد؛ حالت امن فعال ماند. {ex.Message}";
         }
     }
 
