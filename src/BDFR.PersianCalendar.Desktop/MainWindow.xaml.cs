@@ -203,9 +203,13 @@ public sealed class MainWindow : Window
             await ApplyBackgroundAsync();
             StartupDiagnostics.Log("Post-activation: background apply completed.");
 
-            StartupDiagnostics.Log("Post-activation: year occasion refresh queued.");
-            _ = EnsureYearOccasionsAsync(_year);
+            // Do not start automatic year refresh during startup in the stability
+            // build. The manual Sync action remains available and cached occasions
+            // are still rendered normally.
+            StartupDiagnostics.Log(
+                "Post-activation: automatic year occasion refresh suppressed by startup quarantine.");
 
+            StartupDiagnostics.MarkPhase("startup-ui-stable-quarantine");
             StartupDiagnostics.Log("Post-activation UI initialization completed.");
         }
         catch (Exception ex)

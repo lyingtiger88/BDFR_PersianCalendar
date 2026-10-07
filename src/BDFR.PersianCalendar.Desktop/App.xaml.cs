@@ -125,14 +125,18 @@ public partial class App : Application
             StartupDiagnostics.MarkPhase("after-post-activation-ui-init-request");
             StartupDiagnostics.Log("Post-activation UI initialization requested.");
 
-            StartupDiagnostics.Log("Scheduling background initialization task.");
-            _ = InitializeBackgroundServicesAsync(
-                repository,
-                planner,
-                source,
-                specialOccasions,
-                mainWindow);
-            StartupDiagnostics.Log("Background initialization task scheduled.");
+            // Stability quarantine:
+            // The affected Windows 10 machine reaches a fully visible/initialized
+            // MainWindow and then terminates natively without ProcessExit or a
+            // managed exception. Keep every optional background subsystem out of
+            // the startup path until the crash source is isolated.
+            //
+            // Manual occasion sync remains available from the UI. Local calendar,
+            // notes, events and cached occasions continue to work.
+            StartupDiagnostics.MarkPhase("startup-background-services-quarantined");
+            StartupDiagnostics.Log(
+                "Startup quarantine active: notification registration, reminder polling, " +
+                "automatic time.ir sync and other background services were not started.");
         }
         catch (Exception ex)
         {
