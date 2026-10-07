@@ -6,6 +6,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Shapes;
 using Windows.Graphics;
 using Windows.Storage.Pickers;
 using System.Diagnostics;
@@ -2119,54 +2120,417 @@ public sealed class MainWindow : Window
         string paletteKey,
         int paletteMonth)
     {
-        // Native WinUI ColorPicker/Flyout reproducibly terminates the compositor
-        // on the affected machine. Use a simple inline HEX editor instead.
+        // Do not use the native WinUI ColorPicker here. It previously caused a
+        // native compositor termination on the affected machine. This picker is
+        // fully custom and uses only Canvas/Border/gradient primitives.
+        const double svWidth = 210;
+        const double svHeight = 145;
+        const double hueWidth = 20;
+        const double markerSize = 14;
+
+        var normalizedInitial = ThemeService.NormalizeHexColor(effectiveColor);
+        var initialColor = ThemeService.ParseColor(normalizedInitial);
+        var (hue, saturation, value) = ColorToHsv(initialColor);
+        var alpha = initialColor.A;
+        var currentColor = initialColor;
+        var suppressHexChange = false;
+        var svDragging = false;
+        var hueDragging = false;
+
         var root = new StackPanel
         {
-            Spacing = 5,
-            Margin = new Thickness(0, 2, 0, 4)
+            Spacing = 6,
+            Margin = new Thickness(0, 3, 0, 6)
         };
 
-        root.Children.Add(new TextBlock
+        var header = new Grid { ColumnSpacing = 8 };
+        header.ColumnDefinitions.Add(
+            new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        header.ColumnDefinitions.Add(
+            new ColumnDefinition { Width = GridLength.Auto });
+
+        var labelBlock = new TextBlock
         {
             Text = label,
+            VerticalAlignment = VerticalAlignment.Center,
             Foreground = ThemeService.Brush(_theme.PrimaryText)
-        });
+        };
+        Grid.SetColumn(labelBlock, 0);
+        header.Children.Add(labelBlock);
 
-        var row = new Grid { ColumnSpacing = 6 };
-        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var colorButton = new Button
+        {
+            Content = normalizedInitial,
+            MinWidth = 126,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Background = new SolidColorBrush(initialColor),
+            Foreground = ContrastBrush(normalizedInitial),
+            BorderBrush = BrushWithAlpha(_theme.PrimaryText, 0x48),
+            BorderThickness = new Thickness(1)
+        };
+        ToolTipService.SetToolTip(
+            colorButton,
+            "باز کردن انتخاب‌گر رنگ");
+        Grid.SetColumn(colorButton, 1);
+        header.Children.Add(colorButton);
+        root.Children.Add(header);
+
+        var pickerPanel = new StackPanel
+        {
+            Spacing = 8,
+            Padding = new Thickness(9),
+            Visibility = Visibility.Collapsed
+        };
+
+        var pickerGrid = new Grid
+        {
+            ColumnSpacing = 10,
+            HorizontalAlignment = HorizontalAlignment.Left
+        };
+        pickerGrid.ColumnDefinitions.Add(
+            new ColumnDefinition { Width = new GridLength(svWidth) });
+        pickerGrid.ColumnDefinitions.Add(
+            new ColumnDefinition { Width = new GridLength(hueWidth) });
+
+        var svCanvas = new Canvas
+        {
+            Width = svWidth,
+            Height = svHeight,
+            HorizontalAlignment = HorizontalAlignment.Left
+        };
+
+        var hueBase = new Border
+        {
+            Width = svWidth,
+            Height = svHeight,
+            CornerRadius = new CornerRadius(6),
+            Background = new SolidColorBrush(
+                HsvToColor(hue, 1, 1, 255))
+        };
+        Canvas.SetLeft(hueBase, 0);
+        Canvas.SetTop(hueBase, 0);
+        svCanvas.Children.Add(hueBase);
+
+        var whiteGradient = new LinearGradientBrush
+        {
+            StartPoint = new Windows.Foundation.Point(0, 0),
+            EndPoint = new Windows.Foundation.Point(1, 0)
+        };
+        whiteGradient.GradientStops.Add(
+            new GradientStop
+            {
+                Color = Windows.UI.Color.FromArgb(255, 255, 255, 255),
+                Offset = 0
+            });
+        whiteGradient.GradientStops.Add(
+            new GradientStop
+            {
+                Color = Windows.UI.Color.FromArgb(0, 255, 255, 255),
+                Offset = 1
+            });
+
+        var whiteLayer = new Border
+        {
+            Width = svWidth,
+            Height = svHeight,
+            CornerRadius = new CornerRadius(6),
+            Background = whiteGradient
+        };
+        Canvas.SetLeft(whiteLayer, 0);
+        Canvas.SetTop(whiteLayer, 0);
+        svCanvas.Children.Add(whiteLayer);
+
+        var blackGradient = new LinearGradientBrush
+        {
+            StartPoint = new Windows.Foundation.Point(0, 0),
+            EndPoint = new Windows.Foundation.Point(0, 1)
+        };
+        blackGradient.GradientStops.Add(
+            new GradientStop
+            {
+                Color = Windows.UI.Color.FromArgb(0, 0, 0, 0),
+                Offset = 0
+            });
+        blackGradient.GradientStops.Add(
+            new GradientStop
+            {
+                Color = Windows.UI.Color.FromArgb(255, 0, 0, 0),
+                Offset = 1
+            });
+
+        var blackLayer = new Border
+        {
+            Width = svWidth,
+            Height = svHeight,
+            CornerRadius = new CornerRadius(6),
+            Background = blackGradient
+        };
+        Canvas.SetLeft(blackLayer, 0);
+        Canvas.SetTop(blackLayer, 0);
+        svCanvas.Children.Add(blackLayer);
+
+        var svMarker = new Ellipse
+        {
+            Width = markerSize,
+            Height = markerSize,
+            Fill = new SolidColorBrush(Windows.UI.Color.FromArgb(18, 0, 0, 0)),
+            Stroke = new SolidColorBrush(Colors.White),
+            StrokeThickness = 2
+        };
+        svCanvas.Children.Add(svMarker);
+
+        Grid.SetColumn(svCanvas, 0);
+        pickerGrid.Children.Add(svCanvas);
+
+        var hueCanvas = new Canvas
+        {
+            Width = hueWidth,
+            Height = svHeight,
+            HorizontalAlignment = HorizontalAlignment.Left
+        };
+
+        var hueGradient = new LinearGradientBrush
+        {
+            StartPoint = new Windows.Foundation.Point(0, 0),
+            EndPoint = new Windows.Foundation.Point(0, 1)
+        };
+
+        var hueStops = new[]
+        {
+            (0.0,   Windows.UI.Color.FromArgb(255, 255, 0, 0)),
+            (1.0/6, Windows.UI.Color.FromArgb(255, 255, 255, 0)),
+            (2.0/6, Windows.UI.Color.FromArgb(255, 0, 255, 0)),
+            (3.0/6, Windows.UI.Color.FromArgb(255, 0, 255, 255)),
+            (4.0/6, Windows.UI.Color.FromArgb(255, 0, 0, 255)),
+            (5.0/6, Windows.UI.Color.FromArgb(255, 255, 0, 255)),
+            (1.0,   Windows.UI.Color.FromArgb(255, 255, 0, 0))
+        };
+        foreach (var (offset, color) in hueStops)
+            hueGradient.GradientStops.Add(
+                new GradientStop { Color = color, Offset = offset });
+
+        var hueStrip = new Border
+        {
+            Width = hueWidth,
+            Height = svHeight,
+            CornerRadius = new CornerRadius(6),
+            Background = hueGradient
+        };
+        Canvas.SetLeft(hueStrip, 0);
+        Canvas.SetTop(hueStrip, 0);
+        hueCanvas.Children.Add(hueStrip);
+
+        var hueMarker = new Border
+        {
+            Width = hueWidth + 8,
+            Height = 5,
+            CornerRadius = new CornerRadius(2),
+            Background = new SolidColorBrush(Colors.White),
+            BorderBrush = new SolidColorBrush(Colors.Black),
+            BorderThickness = new Thickness(1)
+        };
+        Canvas.SetLeft(hueMarker, -4);
+        hueCanvas.Children.Add(hueMarker);
+
+        Grid.SetColumn(hueCanvas, 1);
+        pickerGrid.Children.Add(hueCanvas);
+        pickerPanel.Children.Add(pickerGrid);
+
+        var valueRow = new Grid { ColumnSpacing = 8 };
+        valueRow.ColumnDefinitions.Add(
+            new ColumnDefinition { Width = GridLength.Auto });
+        valueRow.ColumnDefinitions.Add(
+            new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+        var preview = new Border
+        {
+            Width = 42,
+            Height = 34,
+            CornerRadius = new CornerRadius(7),
+            Background = new SolidColorBrush(currentColor),
+            BorderBrush = BrushWithAlpha(_theme.PrimaryText, 0x55),
+            BorderThickness = new Thickness(1)
+        };
+        Grid.SetColumn(preview, 0);
+        valueRow.Children.Add(preview);
 
         var hexBox = new TextBox
         {
-            Text = ThemeService.NormalizeHexColor(effectiveColor),
+            Text = normalizedInitial,
+            Header = "HEX",
             PlaceholderText = "#RRGGBB یا #AARRGGBB",
             FlowDirection = FlowDirection.LeftToRight,
             HorizontalAlignment = HorizontalAlignment.Stretch
         };
-        Grid.SetColumn(hexBox, 0);
-        row.Children.Add(hexBox);
+        Grid.SetColumn(hexBox, 1);
+        valueRow.Children.Add(hexBox);
+        pickerPanel.Children.Add(valueRow);
 
-        var apply = MakeButton("اعمال");
-        Grid.SetColumn(apply, 1);
-        row.Children.Add(apply);
+        var actionRow = new Grid { ColumnSpacing = 8 };
+        actionRow.ColumnDefinitions.Add(new ColumnDefinition());
+        actionRow.ColumnDefinitions.Add(new ColumnDefinition());
+
+        var apply = MakeButton("اعمال رنگ");
+        Grid.SetColumn(apply, 0);
+        actionRow.Children.Add(apply);
 
         var reset = MakeButton("پیش‌فرض");
-        Grid.SetColumn(reset, 2);
-        row.Children.Add(reset);
+        Grid.SetColumn(reset, 1);
+        actionRow.Children.Add(reset);
+        pickerPanel.Children.Add(actionRow);
+
+        var pickerSurface = new Border
+        {
+            Background = BrushWithAlpha(_theme.CardBackground, 0xF4),
+            BorderBrush = BrushWithAlpha(_theme.Accent, 0x88),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(12),
+            Child = pickerPanel
+        };
+        root.Children.Add(pickerSurface);
+
+        void UpdateVisuals(bool updateHex = true)
+        {
+            currentColor = HsvToColor(hue, saturation, value, alpha);
+
+            hueBase.Background = new SolidColorBrush(
+                HsvToColor(hue, 1, 1, 255));
+
+            preview.Background = new SolidColorBrush(currentColor);
+
+            var hex = ThemeService.ColorToHex(currentColor);
+            colorButton.Content = hex;
+            colorButton.Background = new SolidColorBrush(currentColor);
+            colorButton.Foreground = ContrastBrush(hex);
+
+            Canvas.SetLeft(
+                svMarker,
+                Math.Clamp(
+                    saturation * svWidth - markerSize / 2,
+                    -1,
+                    svWidth - markerSize + 1));
+            Canvas.SetTop(
+                svMarker,
+                Math.Clamp(
+                    (1 - value) * svHeight - markerSize / 2,
+                    -1,
+                    svHeight - markerSize + 1));
+
+            Canvas.SetTop(
+                hueMarker,
+                Math.Clamp(
+                    (hue / 360.0) * svHeight - 2.5,
+                    -1,
+                    svHeight - 4));
+
+            if (updateHex)
+            {
+                suppressHexChange = true;
+                hexBox.Text = hex;
+                suppressHexChange = false;
+            }
+        }
+
+        void SetFromColor(Windows.UI.Color color)
+        {
+            alpha = color.A;
+            (hue, saturation, value) = ColorToHsv(color);
+            UpdateVisuals();
+        }
+
+        void UpdateSvFromPoint(Windows.Foundation.Point point)
+        {
+            saturation = Math.Clamp(point.X / svWidth, 0, 1);
+            value = 1 - Math.Clamp(point.Y / svHeight, 0, 1);
+            UpdateVisuals();
+        }
+
+        void UpdateHueFromPoint(Windows.Foundation.Point point)
+        {
+            hue = Math.Clamp(point.Y / svHeight, 0, 1) * 359.999;
+            UpdateVisuals();
+        }
+
+        svCanvas.PointerPressed += (_, e) =>
+        {
+            svDragging = true;
+            svCanvas.CapturePointer(e.Pointer);
+            UpdateSvFromPoint(e.GetCurrentPoint(svCanvas).Position);
+        };
+        svCanvas.PointerMoved += (_, e) =>
+        {
+            if (svDragging)
+                UpdateSvFromPoint(e.GetCurrentPoint(svCanvas).Position);
+        };
+        svCanvas.PointerReleased += (_, e) =>
+        {
+            svDragging = false;
+            svCanvas.ReleasePointerCapture(e.Pointer);
+            UpdateSvFromPoint(e.GetCurrentPoint(svCanvas).Position);
+        };
+        svCanvas.PointerCanceled += (_, e) =>
+        {
+            svDragging = false;
+            svCanvas.ReleasePointerCapture(e.Pointer);
+        };
+
+        hueCanvas.PointerPressed += (_, e) =>
+        {
+            hueDragging = true;
+            hueCanvas.CapturePointer(e.Pointer);
+            UpdateHueFromPoint(e.GetCurrentPoint(hueCanvas).Position);
+        };
+        hueCanvas.PointerMoved += (_, e) =>
+        {
+            if (hueDragging)
+                UpdateHueFromPoint(e.GetCurrentPoint(hueCanvas).Position);
+        };
+        hueCanvas.PointerReleased += (_, e) =>
+        {
+            hueDragging = false;
+            hueCanvas.ReleasePointerCapture(e.Pointer);
+            UpdateHueFromPoint(e.GetCurrentPoint(hueCanvas).Position);
+        };
+        hueCanvas.PointerCanceled += (_, e) =>
+        {
+            hueDragging = false;
+            hueCanvas.ReleasePointerCapture(e.Pointer);
+        };
+
+        hexBox.TextChanged += (_, _) =>
+        {
+            if (suppressHexChange)
+                return;
+
+            if (!TryNormalizeHexInput(hexBox.Text, out var normalized))
+                return;
+
+            SetFromColor(ThemeService.ParseColor(normalized));
+        };
+
+        colorButton.Click += (_, _) =>
+        {
+            pickerPanel.Visibility =
+                pickerPanel.Visibility == Visibility.Visible
+                    ? Visibility.Collapsed
+                    : Visibility.Visible;
+
+            if (pickerPanel.Visibility == Visibility.Visible)
+                UpdateVisuals();
+        };
 
         apply.Click += async (_, _) =>
         {
             if (!TryNormalizeHexInput(hexBox.Text, out var normalized))
             {
-                StatusText.Text = "کد رنگ معتبر نیست. نمونه: #2E7D32 یا #FF2E7D32";
+                StatusText.Text =
+                    "کد رنگ معتبر نیست. نمونه: #2E7D32 یا #FF2E7D32";
                 return;
             }
 
             SetColorOverride(paletteKey, role, normalized);
             _settingsService.Save(_settings);
-            hexBox.Text = normalized;
+            SetFromColor(ThemeService.ParseColor(normalized));
 
             await ApplyColorOverrideSafelyAsync(
                 paletteKey,
@@ -2178,15 +2542,14 @@ public sealed class MainWindow : Window
         {
             ClearColorOverride(paletteKey, role);
             _settingsService.Save(_settings);
-            hexBox.Text = ThemeService.NormalizeHexColor(defaultColor);
+
+            SetFromColor(ThemeService.ParseColor(defaultColor));
 
             await ApplyColorOverrideSafelyAsync(
                 paletteKey,
                 label,
                 paletteMonth);
         };
-
-        root.Children.Add(row);
 
         root.Children.Add(new TextBlock
         {
@@ -2196,7 +2559,82 @@ public sealed class MainWindow : Window
             Foreground = ThemeService.Brush(_theme.SecondaryText)
         });
 
+        UpdateVisuals();
         return root;
+    }
+
+    private static (double Hue, double Saturation, double Value) ColorToHsv(
+        Windows.UI.Color color)
+    {
+        var r = color.R / 255.0;
+        var g = color.G / 255.0;
+        var b = color.B / 255.0;
+
+        var max = Math.Max(r, Math.Max(g, b));
+        var min = Math.Min(r, Math.Min(g, b));
+        var delta = max - min;
+
+        double hue;
+        if (delta < 0.000001)
+        {
+            hue = 0;
+        }
+        else if (Math.Abs(max - r) < 0.000001)
+        {
+            hue = 60 * (((g - b) / delta) % 6);
+        }
+        else if (Math.Abs(max - g) < 0.000001)
+        {
+            hue = 60 * (((b - r) / delta) + 2);
+        }
+        else
+        {
+            hue = 60 * (((r - g) / delta) + 4);
+        }
+
+        if (hue < 0)
+            hue += 360;
+
+        var saturation = max <= 0 ? 0 : delta / max;
+        return (hue, saturation, max);
+    }
+
+    private static Windows.UI.Color HsvToColor(
+        double hue,
+        double saturation,
+        double value,
+        byte alpha = 255)
+    {
+        hue = ((hue % 360) + 360) % 360;
+        saturation = Math.Clamp(saturation, 0, 1);
+        value = Math.Clamp(value, 0, 1);
+
+        var chroma = value * saturation;
+        var x = chroma * (1 - Math.Abs((hue / 60.0 % 2) - 1));
+        var m = value - chroma;
+
+        double r1;
+        double g1;
+        double b1;
+
+        if (hue < 60)
+            (r1, g1, b1) = (chroma, x, 0);
+        else if (hue < 120)
+            (r1, g1, b1) = (x, chroma, 0);
+        else if (hue < 180)
+            (r1, g1, b1) = (0, chroma, x);
+        else if (hue < 240)
+            (r1, g1, b1) = (0, x, chroma);
+        else if (hue < 300)
+            (r1, g1, b1) = (x, 0, chroma);
+        else
+            (r1, g1, b1) = (chroma, 0, x);
+
+        return Windows.UI.Color.FromArgb(
+            alpha,
+            (byte)Math.Round((r1 + m) * 255),
+            (byte)Math.Round((g1 + m) * 255),
+            (byte)Math.Round((b1 + m) * 255));
     }
 
     private static bool TryNormalizeHexInput(string? value, out string normalized)
