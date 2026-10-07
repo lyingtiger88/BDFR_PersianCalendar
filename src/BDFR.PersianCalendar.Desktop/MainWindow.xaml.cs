@@ -344,12 +344,19 @@ public sealed class MainWindow : Window
         rightButton.Click += (_, _) => ActivateDiagnosticStage("center-right");
         footer.Children.Add(rightButton);
 
-        var leftButton = new Button
+        var leftBasicButton = new Button
         {
-            Content = "۳ · تقویم + پنل چپ"
+            Content = "۳A · پنل چپ بدون تنظیمات"
         };
-        leftButton.Click += (_, _) => ActivateDiagnosticStage("center-left");
-        footer.Children.Add(leftButton);
+        leftBasicButton.Click += (_, _) => ActivateDiagnosticStage("center-left-basic");
+        footer.Children.Add(leftBasicButton);
+
+        var leftSettingsButton = new Button
+        {
+            Content = "۳B · پنل چپ با تنظیمات"
+        };
+        leftSettingsButton.Click += (_, _) => ActivateDiagnosticStage("center-left-settings");
+        footer.Children.Add(leftSettingsButton);
 
         var fullUiButton = new Button
         {
@@ -514,9 +521,12 @@ public sealed class MainWindow : Window
                 Grid.SetColumn(center, 1);
                 root.Children.Add(center);
 
-                FrameworkElement side = stage == "center-left"
-                    ? BuildLeftPanel()
-                    : BuildRightPanel();
+                FrameworkElement side = stage switch
+                {
+                    "center-left-basic" => BuildLeftPanel(includeSettings: false),
+                    "center-left-settings" => BuildLeftPanel(includeSettings: true),
+                    _ => BuildRightPanel()
+                };
 
                 Grid.SetColumn(side, 0);
                 root.Children.Add(side);
@@ -624,7 +634,7 @@ public sealed class MainWindow : Window
         return outer;
     }
 
-    private FrameworkElement BuildLeftPanel()
+    private FrameworkElement BuildLeftPanel(bool includeSettings = true)
     {
         var stack = new StackPanel
         {
@@ -694,13 +704,28 @@ public sealed class MainWindow : Window
         ActivityPanel.Spacing = 6;
         stack.Children.Add(ActivityPanel);
 
-        var settingsButton = MakeButton("⚙ تنظیمات");
-        settingsButton.Click += (_, _) =>
-            _settingsPanel.Visibility = _settingsPanel.Visibility == Visibility.Visible
-                ? Visibility.Collapsed
-                : Visibility.Visible;
-        stack.Children.Add(settingsButton);
-        stack.Children.Add(BuildSettingsPanelSafe());
+        if (includeSettings)
+        {
+            StartupDiagnostics.MarkPhase("left-panel-settings-build-start");
+            var settingsButton = MakeButton("⚙ تنظیمات");
+            settingsButton.Click += (_, _) =>
+                _settingsPanel.Visibility = _settingsPanel.Visibility == Visibility.Visible
+                    ? Visibility.Collapsed
+                    : Visibility.Visible;
+            stack.Children.Add(settingsButton);
+            stack.Children.Add(BuildSettingsPanelSafe());
+            StartupDiagnostics.MarkPhase("left-panel-settings-build-complete");
+        }
+        else
+        {
+            StartupDiagnostics.MarkPhase("left-panel-settings-skipped");
+            stack.Children.Add(new TextBlock
+            {
+                Text = "تنظیمات در این تست بارگذاری نشده است.",
+                Opacity = 0.55,
+                Foreground = ThemeService.Brush(_theme.SecondaryText)
+            });
+        }
 
         _leftPanelSurface = new Border
         {
