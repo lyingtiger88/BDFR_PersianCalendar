@@ -168,6 +168,10 @@ try
     if ((await repository.GetRecentActivitiesAsync(10)).Count == 0)
         throw new Exception("Activity center repository query failed.");
 
+    await repository.ClearActivitiesAsync();
+    if ((await repository.GetRecentActivitiesAsync(10)).Count != 0)
+        throw new Exception("Activity center clear did not remove activity_log rows.");
+
     var personalOccasion = new SpecialOccasion(
         "special-smoke",
         "تولد آزمایشی",

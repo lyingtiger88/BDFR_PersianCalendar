@@ -759,9 +759,24 @@ public sealed class MainWindow : Window
 
         stack.Children.Add(SectionTitle("مرکز فعالیت"));
 
+        var activityActions = new Grid { ColumnSpacing = 6 };
+        activityActions.ColumnDefinitions.Add(new ColumnDefinition());
+        activityActions.ColumnDefinitions.Add(new ColumnDefinition());
+
         var refresh = MakeButton("تازه‌سازی فعالیت‌ها");
         refresh.Click += RefreshActivities_Click;
-        stack.Children.Add(refresh);
+        Grid.SetColumn(refresh, 0);
+        activityActions.Children.Add(refresh);
+
+        var clearActivities = MakeButton("🗑 پاکسازی فعالیت‌ها");
+        clearActivities.Click += ClearActivities_Click;
+        ToolTipService.SetToolTip(
+            clearActivities,
+            "فقط تاریخچه مرکز فعالیت پاک می‌شود؛ یادداشت‌ها، رویدادها، کارها و مناسبت‌ها حذف نمی‌شوند.");
+        Grid.SetColumn(clearActivities, 1);
+        activityActions.Children.Add(clearActivities);
+
+        stack.Children.Add(activityActions);
 
         ActivityPanel.Spacing = 6;
         stack.Children.Add(ActivityPanel);
@@ -4718,9 +4733,18 @@ public sealed class MainWindow : Window
             };
             cellLayer.Children.Add(content);
 
-            // Gregorian day is rendered independently at the bottom-left corner.
-            cellLayer.Children.Add(gregorianDayNumber);
-            cellLayer.Children.Add(mourningRibbon);
+            // Physical overlay: force LTR coordinates so "Left" always means the
+            // actual left edge even though the rest of the calendar is RTL.
+            var physicalOverlay = new Grid
+            {
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                VerticalAlignment = VerticalAlignment.Stretch,
+                FlowDirection = FlowDirection.LeftToRight,
+                IsHitTestVisible = false
+            };
+            physicalOverlay.Children.Add(gregorianDayNumber);
+            physicalOverlay.Children.Add(mourningRibbon);
+            cellLayer.Children.Add(physicalOverlay);
 
             var button = new Button
             {
@@ -5277,6 +5301,37 @@ public sealed class MainWindow : Window
 
     private async void RefreshActivities_Click(object sender, RoutedEventArgs e)
         => await LoadActivitiesAsync();
+
+    private async void ClearActivities_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var dialog = new ContentDialog
+            {
+                Title = "پاکسازی مرکز فعالیت",
+                Content = "فقط تاریخچه فعالیت‌ها پاک می‌شود. یادداشت‌ها، رویدادها، کارها، مناسبت‌ها و یادآورها دست‌نخورده می‌مانند.",
+                PrimaryButtonText = "پاکسازی",
+                CloseButtonText = "انصراف",
+                DefaultButton = ContentDialogButton.Close
+            };
+
+            if (Content is FrameworkElement root && root.XamlRoot is not null)
+                dialog.XamlRoot = root.XamlRoot;
+
+            var result = await dialog.ShowAsync();
+            if (result != ContentDialogResult.Primary)
+                return;
+
+            await _repository.ClearActivitiesAsync();
+            await LoadActivitiesAsync();
+            StatusText.Text = "تاریخچه مرکز فعالیت پاک شد.";
+        }
+        catch (Exception ex)
+        {
+            StartupDiagnostics.Log($"Clear activities failed: {ex}");
+            StatusText.Text = "پاکسازی فعالیت‌ها انجام نشد.";
+        }
+    }
 
     private async Task LoadActivitiesAsync()
     {

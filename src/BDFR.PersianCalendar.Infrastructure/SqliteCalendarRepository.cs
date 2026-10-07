@@ -476,6 +476,14 @@ public sealed class SqliteCalendarRepository(string databasePath) : ICalendarRep
         await cmd.ExecuteNonQueryAsync(cancellationToken);
     }
 
+    public async Task ClearActivitiesAsync(CancellationToken cancellationToken = default)
+    {
+        await using var db = await OpenAsync(cancellationToken);
+        var cmd = db.CreateCommand();
+        cmd.CommandText = "DELETE FROM activity_log";
+        await cmd.ExecuteNonQueryAsync(cancellationToken);
+    }
+
     public async Task<ReminderSchedule?> GetReminderAsync(string reminderId, CancellationToken cancellationToken = default)
     {
         await using var db = await OpenAsync(cancellationToken);
