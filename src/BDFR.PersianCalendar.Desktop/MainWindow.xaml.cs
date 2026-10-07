@@ -98,6 +98,7 @@ public sealed class MainWindow : Window
     private int _paletteEditorMonth;
     private bool _postActivationInitializationStarted;
     private bool _safeShellMode = true;
+    private int _settingsDiagnosticLevel = 4;
     private Grid? _safeCalendarGrid;
     private TextBlock? _safeMonthTitle;
     private TextBlock? _safeSelectedDateText;
@@ -351,12 +352,33 @@ public sealed class MainWindow : Window
         leftBasicButton.Click += (_, _) => ActivateDiagnosticStage("center-left-basic");
         footer.Children.Add(leftBasicButton);
 
-        var leftSettingsButton = new Button
+        var settingsAppearanceButton = new Button
         {
-            Content = "۳B · پنل چپ با تنظیمات"
+            Content = "۳B1 · ظاهر"
         };
-        leftSettingsButton.Click += (_, _) => ActivateDiagnosticStage("center-left-settings");
-        footer.Children.Add(leftSettingsButton);
+        settingsAppearanceButton.Click += (_, _) => ActivateDiagnosticStage("center-left-settings-appearance");
+        footer.Children.Add(settingsAppearanceButton);
+
+        var settingsColorsButton = new Button
+        {
+            Content = "۳B2 · + رنگ"
+        };
+        settingsColorsButton.Click += (_, _) => ActivateDiagnosticStage("center-left-settings-colors");
+        footer.Children.Add(settingsColorsButton);
+
+        var settingsFontsButton = new Button
+        {
+            Content = "۳B3 · + فونت"
+        };
+        settingsFontsButton.Click += (_, _) => ActivateDiagnosticStage("center-left-settings-fonts");
+        footer.Children.Add(settingsFontsButton);
+
+        var settingsMediaButton = new Button
+        {
+            Content = "۳B4 · + تصاویر/About"
+        };
+        settingsMediaButton.Click += (_, _) => ActivateDiagnosticStage("center-left-settings-media");
+        footer.Children.Add(settingsMediaButton);
 
         var fullUiButton = new Button
         {
@@ -481,6 +503,15 @@ public sealed class MainWindow : Window
 
             _safeShellMode = false;
             _postActivationInitializationStarted = false;
+            _settingsDiagnosticLevel = stage switch
+            {
+                "center-left-settings-appearance" => 1,
+                "center-left-settings-colors" => 2,
+                "center-left-settings-fonts" => 3,
+                "center-left-settings-media" => 4,
+                _ => 4
+            };
+            StartupDiagnostics.Log($"Settings diagnostic level: {_settingsDiagnosticLevel}.");
 
             var root = new Grid
             {
@@ -524,7 +555,10 @@ public sealed class MainWindow : Window
                 FrameworkElement side = stage switch
                 {
                     "center-left-basic" => BuildLeftPanel(includeSettings: false),
-                    "center-left-settings" => BuildLeftPanel(includeSettings: true),
+                    "center-left-settings-appearance" => BuildLeftPanel(includeSettings: true),
+                    "center-left-settings-colors" => BuildLeftPanel(includeSettings: true),
+                    "center-left-settings-fonts" => BuildLeftPanel(includeSettings: true),
+                    "center-left-settings-media" => BuildLeftPanel(includeSettings: true),
                     _ => BuildRightPanel()
                 };
 
@@ -559,6 +593,7 @@ public sealed class MainWindow : Window
 
             _safeShellMode = false;
             _postActivationInitializationStarted = false;
+            _settingsDiagnosticLevel = 4;
             StartupDiagnostics.MarkPhase("full-ui-buildroot-start");
             Content = BuildRoot();
             StartupDiagnostics.MarkPhase("full-ui-buildroot-complete");
@@ -1334,6 +1369,12 @@ public sealed class MainWindow : Window
             Background = BrushWithAlpha(_theme.SecondaryText, 0x30)
         });
 
+        if (_settingsDiagnosticLevel <= 1)
+        {
+            StartupDiagnostics.MarkPhase("settings-diagnostic-appearance-complete");
+            return FinalizeSettingsSurface();
+        }
+
         StartupDiagnostics.Log("Settings UI: building universal color palette.");
         _settingsPanel.Children.Add(BuildUniversalColorPalettePanel());
 
@@ -1476,6 +1517,12 @@ public sealed class MainWindow : Window
             Background = BrushWithAlpha(_theme.SecondaryText, 0x30)
         });
 
+        if (_settingsDiagnosticLevel <= 2)
+        {
+            StartupDiagnostics.MarkPhase("settings-diagnostic-colors-complete");
+            return FinalizeSettingsSurface();
+        }
+
         _settingsPanel.Children.Add(new TextBlock
         {
             Text = "فونت و تایپوگرافی",
@@ -1570,6 +1617,12 @@ public sealed class MainWindow : Window
         resetFont.Click += ResetFont_Click;
         _settingsPanel.Children.Add(resetFont);
 
+        if (_settingsDiagnosticLevel <= 3)
+        {
+            StartupDiagnostics.MarkPhase("settings-diagnostic-fonts-complete");
+            return FinalizeSettingsSurface();
+        }
+
         var pictureLibraryToggle = MakeButton("🖼 کتابخانه تصاویر");
         pictureLibraryToggle.Click += async (_, _) =>
         {
@@ -1599,6 +1652,12 @@ public sealed class MainWindow : Window
         StartupDiagnostics.Log("Settings UI: building About panel.");
         _settingsPanel.Children.Add(BuildAboutUsPanel());
 
+        StartupDiagnostics.MarkPhase("settings-diagnostic-media-complete");
+        return FinalizeSettingsSurface();
+    }
+
+    private FrameworkElement FinalizeSettingsSurface()
+    {
         _settingsSurface ??= new Border
         {
             CornerRadius = new CornerRadius(14),
@@ -1608,7 +1667,7 @@ public sealed class MainWindow : Window
             ? CreateLiquidGlassBrush(_theme.CardBackground, 0.18, 0xA8)
             : BrushWithAlpha(_theme.CardBackground, 0xE0);
         _settingsSurface.BorderBrush = ThemeService.Brush(_theme.Accent);
-        if (_settingsSurface.Child is null)
+        if (!ReferenceEquals(_settingsSurface.Child, _settingsPanel))
             _settingsSurface.Child = _settingsPanel;
         return _settingsSurface;
     }
