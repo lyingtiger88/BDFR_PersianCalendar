@@ -714,7 +714,7 @@ public sealed class MainWindow : Window
             MaxWidth = 520,
             FlowDirection = FlowDirection.RightToLeft
         };
-        Panel.SetZIndex(_inAppReminderHost, 1000);
+        Canvas.SetZIndex(_inAppReminderHost, 1000);
         outer.Children.Add(_inAppReminderHost);
         _visibleReminderCards.Clear();
 
