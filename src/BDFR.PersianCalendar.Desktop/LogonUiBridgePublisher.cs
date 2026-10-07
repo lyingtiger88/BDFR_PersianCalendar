@@ -48,7 +48,7 @@ public sealed class LogonUiBridgePublisher
             agenda.Add(new BridgeAgendaItem(
                 item.Id,
                 "event",
-                item.Title,
+                item.Privacy == PrivacyLevel.Private ? "رویداد خصوصی" : item.Title,
                 item.AllDay || item.StartTime is null
                     ? null
                     : ToDateTimeOffset(item.Date, item.StartTime.Value),
@@ -56,7 +56,9 @@ public sealed class LogonUiBridgePublisher
                     ? null
                     : ToDateTimeOffset(item.Date, item.EndTime.Value),
                 item.AllDay,
-                BridgePrivacy.Private));
+                item.Privacy == PrivacyLevel.Private
+                    ? BridgePrivacy.Private
+                    : BridgePrivacy.Public));
         }
 
         foreach (var task in day.Tasks.Where(x => !x.Completed).Take(16))
@@ -79,9 +81,11 @@ public sealed class LogonUiBridgePublisher
             .Take(32)
             .Select(x => new BridgeReminderItem(
                 x.Id,
-                x.Title,
+                x.Privacy == PrivacyLevel.Private ? "یادآور خصوصی" : x.Title,
                 x.FireAtUtc,
-                BridgePrivacy.Private))
+                x.Privacy == PrivacyLevel.Private
+                    ? BridgePrivacy.Private
+                    : BridgePrivacy.Public))
             .ToArray();
 
         var snapshot = new BridgeCalendarSnapshot(
