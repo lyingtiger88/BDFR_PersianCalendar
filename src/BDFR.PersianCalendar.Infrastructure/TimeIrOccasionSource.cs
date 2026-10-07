@@ -284,8 +284,10 @@ public sealed class TimeIrOccasionSource(HttpClient httpClient) : IOccasionSourc
         if (string.IsNullOrWhiteSpace(title))
             return;
 
-        var isHoliday = (node is not null && HasHolidayClass(node)) || LooksLikeHolidayTitle(title);
         var date = new PersianDate(persianYear, month, day);
+        var isHoliday =
+            (node is not null && HasHolidayClass(node)) ||
+            LooksLikeOfficialHoliday(date, title);
         var hash = Convert.ToHexString(
             SHA256.HashData(Encoding.UTF8.GetBytes($"{date}|{title}|{isHoliday}")));
 
@@ -348,8 +350,58 @@ public sealed class TimeIrOccasionSource(HttpClient httpClient) : IOccasionSourc
         return node.QuerySelector("[class*='holiday' i]") is not null;
     }
 
-    private static bool LooksLikeHolidayTitle(string title)
-        => title.Contains("تعطیل", StringComparison.OrdinalIgnoreCase);
+    private static bool LooksLikeOfficialHoliday(
+        PersianDate date,
+        string title)
+    {
+        var normalized = Collapse(title)
+            .Replace('ي', 'ی')
+            .Replace('ك', 'ک');
+
+        if (normalized.Contains("تعطیل", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        // Fixed official holidays in the Persian calendar. Keep these here so
+        // holiday detection survives future time.ir markup/class changes.
+        if (date.Month == 1 && date.Day is >= 1 and <= 4)
+            return true;
+        if (date.Month == 1 && date.Day is 12 or 13)
+            return true;
+        if (date.Month == 3 && date.Day is 14 or 15)
+            return true;
+        if (date.Month == 11 && date.Day == 22)
+            return true;
+        if (date.Month == 12 && date.Day == 29)
+            return true;
+
+        string[] officialReligiousKeywords =
+        [
+            "عید فطر",
+            "عید سعید فطر",
+            "عید قربان",
+            "عید غدیر",
+            "مبعث",
+            "نیمه شعبان",
+            "ولادت حضرت قائم",
+            "ولادت امام علی",
+            "میلاد امام علی",
+            "میلاد پیامبر",
+            "ولادت پیامبر",
+            "شهادت امام علی",
+            "شهادت امام صادق",
+            "شهادت حضرت فاطمه",
+            "رحلت رسول اکرم",
+            "رحلت پیامبر",
+            "شهادت امام حسن",
+            "شهادت امام رضا",
+            "تاسوعا",
+            "عاشورا",
+            "اربعین"
+        ];
+
+        return officialReligiousKeywords.Any(keyword =>
+            normalized.Contains(keyword, StringComparison.OrdinalIgnoreCase));
+    }
 
     private static string Collapse(string value)
         => Regex.Replace(
