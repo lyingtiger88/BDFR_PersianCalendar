@@ -39,7 +39,9 @@ public sealed class LogonUiBridgePublisher
                 null,
                 null,
                 true,
-                BridgePrivacy.Public));
+                string.Equals(occasion.Source, "personal", StringComparison.OrdinalIgnoreCase)
+                    ? BridgePrivacy.Private
+                    : BridgePrivacy.Public));
         }
 
         foreach (var item in day.Events.Take(24))
