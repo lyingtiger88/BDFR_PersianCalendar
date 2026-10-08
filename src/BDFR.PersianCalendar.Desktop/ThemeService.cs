@@ -314,92 +314,89 @@ public sealed class ThemeService
             }
         };
 
-    public string? GetSeasonalBackgroundPath(int persianMonth, double targetAspectRatio)
+    public IReadOnlyList<string> GetSeasonalBackgroundPaths(int persianMonth)
     {
-        var season = persianMonth switch
+        var season = GetSeasonKey(persianMonth);
+
+        if (!Directory.Exists(SeasonalBackgroundsRoot))
+            return [];
+
+        var allowedExtensions = new HashSet<string>(
+            [".svg", ".png", ".jpg", ".jpeg", ".webp"],
+            StringComparer.OrdinalIgnoreCase);
+
+        var numbered = new List<(int Index, string Path)>();
+        string? legacyFallback = null;
+
+        foreach (var path in Directory.EnumerateFiles(
+                     SeasonalBackgroundsRoot,
+                     "*.*",
+                     SearchOption.TopDirectoryOnly))
+        {
+            if (!allowedExtensions.Contains(Path.GetExtension(path)))
+                continue;
+
+            var name = Path.GetFileNameWithoutExtension(path);
+
+            // Backward-compatible single-image fallback: spring.svg, summer.svg...
+            if (string.Equals(name, season, StringComparison.OrdinalIgnoreCase))
+            {
+                legacyFallback ??= path;
+                continue;
+            }
+
+            // Season Carousel convention:
+            // Spring_1.jpg, Spring_2.webp, ... / Summer_N / Autumn_N / Winter_N
+            // Legacy aspect-ratio files such as Spring_16x9.svg are intentionally
+            // ignored because the Image control already uses UniformToFill.
+            var match = Regex.Match(
+                name,
+                $@"^{Regex.Escape(season)}_(?<index>\d+)$",
+                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+            if (!match.Success ||
+                !int.TryParse(match.Groups["index"].Value, out var index) ||
+                index < 1)
+                continue;
+
+            numbered.Add((index, path));
+        }
+
+        if (numbered.Count > 0)
+        {
+            return numbered
+                .OrderBy(x => x.Index)
+                .ThenBy(x => Path.GetFileName(x.Path), StringComparer.OrdinalIgnoreCase)
+                .GroupBy(x => x.Index)
+                .Select(group => group.First().Path)
+                .ToArray();
+        }
+
+        return legacyFallback is null
+            ? []
+            : [legacyFallback];
+    }
+
+    public string? GetSeasonalBackgroundPath(
+        int persianMonth,
+        int carouselIndex = 0)
+    {
+        var paths = GetSeasonalBackgroundPaths(persianMonth);
+        if (paths.Count == 0)
+            return null;
+
+        var normalizedIndex = ((carouselIndex % paths.Count) + paths.Count) % paths.Count;
+        return paths[normalizedIndex];
+    }
+
+    public static string GetSeasonKey(int persianMonth)
+        => persianMonth switch
         {
             <= 3 => "spring",
             <= 6 => "summer",
             <= 9 => "autumn",
             _ => "winter"
         };
-
-        if (!Directory.Exists(SeasonalBackgroundsRoot))
-            return null;
-
-        var allowedExtensions = new HashSet<string>(
-            [".svg", ".png", ".jpg", ".jpeg", ".webp"],
-            StringComparer.OrdinalIgnoreCase);
-
-        var files = Directory
-            .EnumerateFiles(SeasonalBackgroundsRoot, "*.*", SearchOption.TopDirectoryOnly)
-            .Where(path => allowedExtensions.Contains(Path.GetExtension(path)))
-            .ToArray();
-
-        var candidates = new List<(string Path, double Ratio, bool HasRatio)>();
-
-        foreach (var path in files)
-        {
-            var name = Path.GetFileNameWithoutExtension(path);
-            if (string.Equals(name, season, StringComparison.OrdinalIgnoreCase))
-            {
-                candidates.Add((path, 0, false));
-                continue;
-            }
-
-            var match = Regex.Match(
-                name,
-                $@"^{Regex.Escape(season)}[_\-\s]?(?<w>\d{{1,3}})x(?<h>\d{{1,3}})$",
-                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-
-            if (!match.Success ||
-                !double.TryParse(match.Groups["w"].Value, out var width) ||
-                !double.TryParse(match.Groups["h"].Value, out var height) ||
-                width <= 0 ||
-                height <= 0)
-                continue;
-
-            candidates.Add((path, width / height, true));
-        }
-
-        if (candidates.Count == 0)
-            return null;
-
-        targetAspectRatio = targetAspectRatio > 0
-            ? targetAspectRatio
-            : 16d / 9d;
-
-        var ratioCandidates = candidates
-            .Where(x => x.HasRatio)
-            .OrderBy(x => Math.Abs(x.Ratio - targetAspectRatio))
-            .ThenBy(x => Path.GetExtension(x.Path).Equals(".svg", StringComparison.OrdinalIgnoreCase) ? 1 : 0)
-            .ToArray();
-
-        if (ratioCandidates.Length > 0)
-            return ratioCandidates[0].Path;
-
-        return candidates.FirstOrDefault(x => !x.HasRatio).Path;
-    }
-
-    public static string FormatAspectRatioLabel(double aspectRatio)
-    {
-        var known = new (int W, int H)[]
-        {
-            (32, 9),
-            (21, 9),
-            (16, 9),
-            (16, 10),
-            (3, 2),
-            (4, 3),
-            (5, 4)
-        };
-
-        var best = known
-            .OrderBy(x => Math.Abs((double)x.W / x.H - aspectRatio))
-            .First();
-
-        return $"{best.W}x{best.H}";
-    }
 
     public static SolidColorBrush Brush(string value, string fallback = "#FFFFFFFF")
         => new(ParseColor(value, fallback));
