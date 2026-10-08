@@ -140,6 +140,16 @@ jobs:
               Copy-Item -Destination $patch -Force
           }
 
+          # Seasonal carousel assets are first-party content too. Include them
+          # in the lightweight patch so Season_N additions/renames do not require
+          # downloading the full self-contained portable package.
+          $seasonSource = Join-Path $publish "picture\theme\season backgrounds"
+          $seasonPatch = Join-Path $patch "picture\theme\season backgrounds"
+          if (Test-Path $seasonSource) {
+            New-Item -ItemType Directory -Force -Path $seasonPatch | Out-Null
+            Copy-Item -Path "$seasonSource\*" -Destination $seasonPatch -Force
+          }
+
           @"
           Anahita lightweight debug patch
           ===============================
