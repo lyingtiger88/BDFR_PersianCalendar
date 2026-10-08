@@ -35,7 +35,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Materialize optional seasonal background assets
+      - name: Materialize optional seasonal carousel assets
         if: github.event_name == 'push'
         shell: pwsh
         run: |
@@ -59,8 +59,530 @@ jobs:
           $target = Join-Path $env:GITHUB_WORKSPACE "picture\theme\season backgrounds"
           New-Item -ItemType Directory -Force -Path $target | Out-Null
 
+          # Remove only the old aspect-ratio naming scheme. Numbered
+          # carousel files such as Spring_1.jpg / Spring_2.webp must survive.
           Get-ChildItem $target -File |
-            Where-Object { $_.Name -match '^(Spring|Summer|Autumn|Winter)_.+\.(svg|png|jpg|jpeg|webp)$' } |
+            Where-Object { $_.Name -match '^(Spring|Summer|Autumn|Winter)[_-]\d{1,3}x\d{1,3}\.(svg|png|jpg|jpeg|webp)
+            $payload = Join-Path $payloadDir "$season.b64"
+            $zip = Join-Path $env:RUNNER_TEMP "$season.zip"
+
+            [IO.File]::WriteAllBytes(
+              $zip,
+              [Convert]::FromBase64String((Get-Content $payload -Raw).Trim())
+            )
+
+            Expand-Archive -Path $zip -DestinationPath $target -Force
+          }
+
+          # Older payload bundles may still contain aspect-ratio variants.
+          # Ignore/remove those after extraction; the app now uses UniformToFill
+          # and the Season_N carousel convention instead.
+          Get-ChildItem $target -File |
+            Where-Object { $_.Name -match '^(Spring|Summer|Autumn|Winter)[_-]\d{1,3}x\d{1,3}\.(svg|png|jpg|jpeg|webp)
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Build WinUI desktop app
+        run: dotnet build src/BDFR.PersianCalendar.Desktop/BDFR.PersianCalendar.Desktop.csproj -c Release -p:Platform=x64 -p:AnahitaGitCommit="${{ github.sha }}" -p:AnahitaBuildNumber="${{ github.run_number }}"
+
+      - name: Publish Windows x64 test build
+        shell: pwsh
+        run: |
+          dotnet publish src/BDFR.PersianCalendar.Desktop/BDFR.PersianCalendar.Desktop.csproj `
+            -c Release `
+            -r win-x64 `
+            --self-contained true `
+            -p:Platform=x64 `
+            -p:WindowsAppSDKSelfContained=true `
+            -p:PublishSingleFile=false `
+            -p:AnahitaGitCommit="${{ github.sha }}" `
+            -p:AnahitaBuildNumber="${{ github.run_number }}" `
+            -o artifacts/Anahita-win-x64
+
+      - name: Package portable test ZIP
+        shell: pwsh
+        run: |
+          Compress-Archive `
+            -Path artifacts/Anahita-win-x64/* `
+            -DestinationPath artifacts/Anahita-win-x64.zip `
+            -Force
+
+          (Get-FileHash artifacts/Anahita-win-x64.zip -Algorithm SHA256).Hash |
+            Out-File artifacts/Anahita-win-x64.zip.sha256 -Encoding ascii
+
+      - name: Package lightweight debug patch
+        if: github.event_name == 'push'
+        shell: pwsh
+        run: |
+          $publish = Join-Path $env:GITHUB_WORKSPACE "artifacts\Anahita-win-x64"
+          $patch = Join-Path $env:GITHUB_WORKSPACE "artifacts\Anahita-DebugPatch-x64"
+          New-Item -ItemType Directory -Force -Path $patch | Out-Null
+
+          # First-party binaries carry the code we are changing during the
+          # stability/debug cycle. Keep the self-contained .NET/WinUI runtime
+          # in the user's existing full portable folder instead of shipping it
+          # again for every tiny code change.
+          $patterns = @(
+            "BDFR.PersianCalendar.Desktop.exe",
+            "BDFR.PersianCalendar.Desktop.dll",
+            "BDFR.PersianCalendar.Desktop.pdb",
+            "BDFR.PersianCalendar.Desktop.deps.json",
+            "BDFR.PersianCalendar.Desktop.runtimeconfig.json",
+            "BDFR.PersianCalendar.Core.dll",
+            "BDFR.PersianCalendar.Core.pdb",
+            "BDFR.PersianCalendar.Infrastructure.dll",
+            "BDFR.PersianCalendar.Infrastructure.pdb",
+            "*.pri"
+          )
+
+          foreach ($pattern in $patterns) {
+            Get-ChildItem -Path $publish -Filter $pattern -File -ErrorAction SilentlyContinue |
+              Copy-Item -Destination $patch -Force
+          }
+
+          @"
+          Anahita lightweight debug patch
+          ===============================
+          Base requirement:
+          - Keep one recent full Anahita portable build already extracted.
+          - Close Anahita completely.
+          - Extract this ZIP directly over that existing folder and replace files.
+          - Do NOT delete the existing .NET / Windows App SDK runtime files.
+
+          This patch is intended for rapid debug builds where package/runtime
+          dependencies did not change. If a future release changes NuGet/runtime
+          dependencies, use that release's full portable ZIP once, then continue
+          with lightweight patches again.
+          "@ | Out-File (Join-Path $patch "PATCH-README.txt") -Encoding utf8
+
+          Compress-Archive `
+            -Path "$patch\*" `
+            -DestinationPath artifacts/Anahita-DebugPatch-x64.zip `
+            -Force
+
+          (Get-FileHash artifacts/Anahita-DebugPatch-x64.zip -Algorithm SHA256).Hash |
+            Out-File artifacts/Anahita-DebugPatch-x64.zip.sha256 -Encoding ascii
+
+          $fullSize = (Get-Item artifacts/Anahita-win-x64.zip).Length
+          $patchSize = (Get-Item artifacts/Anahita-DebugPatch-x64.zip).Length
+          Write-Host ("Full portable: {0:N2} MB" -f ($fullSize / 1MB))
+          Write-Host ("Debug patch:   {0:N2} MB" -f ($patchSize / 1MB))
+
+      - name: Install Inno Setup
+        if: github.event_name == 'push'
+        shell: pwsh
+        run: choco install innosetup -y --no-progress
+
+      - name: Build Windows installer
+        if: github.event_name == 'push'
+        shell: pwsh
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" `
+            /DMySourceDir="${{ github.workspace }}\artifacts\Anahita-win-x64" `
+            /DMyOutputDir="${{ github.workspace }}\artifacts" `
+            installer\BDFR_PersianCalendar.iss
+
+          (Get-FileHash artifacts/Anahita-Setup-x64.exe -Algorithm SHA256).Hash |
+            Out-File artifacts/Anahita-Setup-x64.exe.sha256 -Encoding ascii
+
+      - name: Upload portable test artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Anahita-win-x64
+          path: |
+            artifacts/Anahita-win-x64.zip
+            artifacts/Anahita-win-x64.zip.sha256
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload lightweight debug patch artifact
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Anahita-DebugPatch-x64
+          path: |
+            artifacts/Anahita-DebugPatch-x64.zip
+            artifacts/Anahita-DebugPatch-x64.zip.sha256
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload installer artifact
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Anahita-Setup-x64
+          path: |
+            artifacts/Anahita-Setup-x64.exe
+            artifacts/Anahita-Setup-x64.exe.sha256
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publish GitHub test pre-release
+        if: github.event_name == 'push'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "test-${{ github.run_number }}"
+          $title = "Anahita Test Build #${{ github.run_number }}"
+          $releaseTarget = (git rev-parse HEAD).Trim()
+          $notes = "Automated Anahita Windows x64 test build from main. Commit: $releaseTarget. Includes portable ZIP, installer EXE and SHA256 checksums."
+
+          gh release create $tag `
+            artifacts/Anahita-win-x64.zip `
+            artifacts/Anahita-win-x64.zip.sha256 `
+            artifacts/Anahita-DebugPatch-x64.zip `
+            artifacts/Anahita-DebugPatch-x64.zip.sha256 `
+            artifacts/Anahita-Setup-x64.exe `
+            artifacts/Anahita-Setup-x64.exe.sha256 `
+            --repo "${{ github.repository }}" `
+            --target $releaseTarget `
+            --title $title `
+            --notes $notes `
+            --prerelease
+ } |
+            Remove-Item -Force
+
+          foreach ($season in @("spring", "summer", "autumn", "winter")) {
+            $payload = Join-Path $payloadDir "$season.b64"
+            $zip = Join-Path $env:RUNNER_TEMP "$season.zip"
+
+            [IO.File]::WriteAllBytes(
+              $zip,
+              [Convert]::FromBase64String((Get-Content $payload -Raw).Trim())
+            )
+
+            Expand-Archive -Path $zip -DestinationPath $target -Force
+          }
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Build WinUI desktop app
+        run: dotnet build src/BDFR.PersianCalendar.Desktop/BDFR.PersianCalendar.Desktop.csproj -c Release -p:Platform=x64 -p:AnahitaGitCommit="${{ github.sha }}" -p:AnahitaBuildNumber="${{ github.run_number }}"
+
+      - name: Publish Windows x64 test build
+        shell: pwsh
+        run: |
+          dotnet publish src/BDFR.PersianCalendar.Desktop/BDFR.PersianCalendar.Desktop.csproj `
+            -c Release `
+            -r win-x64 `
+            --self-contained true `
+            -p:Platform=x64 `
+            -p:WindowsAppSDKSelfContained=true `
+            -p:PublishSingleFile=false `
+            -p:AnahitaGitCommit="${{ github.sha }}" `
+            -p:AnahitaBuildNumber="${{ github.run_number }}" `
+            -o artifacts/Anahita-win-x64
+
+      - name: Package portable test ZIP
+        shell: pwsh
+        run: |
+          Compress-Archive `
+            -Path artifacts/Anahita-win-x64/* `
+            -DestinationPath artifacts/Anahita-win-x64.zip `
+            -Force
+
+          (Get-FileHash artifacts/Anahita-win-x64.zip -Algorithm SHA256).Hash |
+            Out-File artifacts/Anahita-win-x64.zip.sha256 -Encoding ascii
+
+      - name: Package lightweight debug patch
+        if: github.event_name == 'push'
+        shell: pwsh
+        run: |
+          $publish = Join-Path $env:GITHUB_WORKSPACE "artifacts\Anahita-win-x64"
+          $patch = Join-Path $env:GITHUB_WORKSPACE "artifacts\Anahita-DebugPatch-x64"
+          New-Item -ItemType Directory -Force -Path $patch | Out-Null
+
+          # First-party binaries carry the code we are changing during the
+          # stability/debug cycle. Keep the self-contained .NET/WinUI runtime
+          # in the user's existing full portable folder instead of shipping it
+          # again for every tiny code change.
+          $patterns = @(
+            "BDFR.PersianCalendar.Desktop.exe",
+            "BDFR.PersianCalendar.Desktop.dll",
+            "BDFR.PersianCalendar.Desktop.pdb",
+            "BDFR.PersianCalendar.Desktop.deps.json",
+            "BDFR.PersianCalendar.Desktop.runtimeconfig.json",
+            "BDFR.PersianCalendar.Core.dll",
+            "BDFR.PersianCalendar.Core.pdb",
+            "BDFR.PersianCalendar.Infrastructure.dll",
+            "BDFR.PersianCalendar.Infrastructure.pdb",
+            "*.pri"
+          )
+
+          foreach ($pattern in $patterns) {
+            Get-ChildItem -Path $publish -Filter $pattern -File -ErrorAction SilentlyContinue |
+              Copy-Item -Destination $patch -Force
+          }
+
+          @"
+          Anahita lightweight debug patch
+          ===============================
+          Base requirement:
+          - Keep one recent full Anahita portable build already extracted.
+          - Close Anahita completely.
+          - Extract this ZIP directly over that existing folder and replace files.
+          - Do NOT delete the existing .NET / Windows App SDK runtime files.
+
+          This patch is intended for rapid debug builds where package/runtime
+          dependencies did not change. If a future release changes NuGet/runtime
+          dependencies, use that release's full portable ZIP once, then continue
+          with lightweight patches again.
+          "@ | Out-File (Join-Path $patch "PATCH-README.txt") -Encoding utf8
+
+          Compress-Archive `
+            -Path "$patch\*" `
+            -DestinationPath artifacts/Anahita-DebugPatch-x64.zip `
+            -Force
+
+          (Get-FileHash artifacts/Anahita-DebugPatch-x64.zip -Algorithm SHA256).Hash |
+            Out-File artifacts/Anahita-DebugPatch-x64.zip.sha256 -Encoding ascii
+
+          $fullSize = (Get-Item artifacts/Anahita-win-x64.zip).Length
+          $patchSize = (Get-Item artifacts/Anahita-DebugPatch-x64.zip).Length
+          Write-Host ("Full portable: {0:N2} MB" -f ($fullSize / 1MB))
+          Write-Host ("Debug patch:   {0:N2} MB" -f ($patchSize / 1MB))
+
+      - name: Install Inno Setup
+        if: github.event_name == 'push'
+        shell: pwsh
+        run: choco install innosetup -y --no-progress
+
+      - name: Build Windows installer
+        if: github.event_name == 'push'
+        shell: pwsh
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" `
+            /DMySourceDir="${{ github.workspace }}\artifacts\Anahita-win-x64" `
+            /DMyOutputDir="${{ github.workspace }}\artifacts" `
+            installer\BDFR_PersianCalendar.iss
+
+          (Get-FileHash artifacts/Anahita-Setup-x64.exe -Algorithm SHA256).Hash |
+            Out-File artifacts/Anahita-Setup-x64.exe.sha256 -Encoding ascii
+
+      - name: Upload portable test artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Anahita-win-x64
+          path: |
+            artifacts/Anahita-win-x64.zip
+            artifacts/Anahita-win-x64.zip.sha256
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload lightweight debug patch artifact
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Anahita-DebugPatch-x64
+          path: |
+            artifacts/Anahita-DebugPatch-x64.zip
+            artifacts/Anahita-DebugPatch-x64.zip.sha256
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload installer artifact
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Anahita-Setup-x64
+          path: |
+            artifacts/Anahita-Setup-x64.exe
+            artifacts/Anahita-Setup-x64.exe.sha256
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publish GitHub test pre-release
+        if: github.event_name == 'push'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "test-${{ github.run_number }}"
+          $title = "Anahita Test Build #${{ github.run_number }}"
+          $releaseTarget = (git rev-parse HEAD).Trim()
+          $notes = "Automated Anahita Windows x64 test build from main. Commit: $releaseTarget. Includes portable ZIP, installer EXE and SHA256 checksums."
+
+          gh release create $tag `
+            artifacts/Anahita-win-x64.zip `
+            artifacts/Anahita-win-x64.zip.sha256 `
+            artifacts/Anahita-DebugPatch-x64.zip `
+            artifacts/Anahita-DebugPatch-x64.zip.sha256 `
+            artifacts/Anahita-Setup-x64.exe `
+            artifacts/Anahita-Setup-x64.exe.sha256 `
+            --repo "${{ github.repository }}" `
+            --target $releaseTarget `
+            --title $title `
+            --notes $notes `
+            --prerelease
+ } |
+            Remove-Item -Force
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Build WinUI desktop app
+        run: dotnet build src/BDFR.PersianCalendar.Desktop/BDFR.PersianCalendar.Desktop.csproj -c Release -p:Platform=x64 -p:AnahitaGitCommit="${{ github.sha }}" -p:AnahitaBuildNumber="${{ github.run_number }}"
+
+      - name: Publish Windows x64 test build
+        shell: pwsh
+        run: |
+          dotnet publish src/BDFR.PersianCalendar.Desktop/BDFR.PersianCalendar.Desktop.csproj `
+            -c Release `
+            -r win-x64 `
+            --self-contained true `
+            -p:Platform=x64 `
+            -p:WindowsAppSDKSelfContained=true `
+            -p:PublishSingleFile=false `
+            -p:AnahitaGitCommit="${{ github.sha }}" `
+            -p:AnahitaBuildNumber="${{ github.run_number }}" `
+            -o artifacts/Anahita-win-x64
+
+      - name: Package portable test ZIP
+        shell: pwsh
+        run: |
+          Compress-Archive `
+            -Path artifacts/Anahita-win-x64/* `
+            -DestinationPath artifacts/Anahita-win-x64.zip `
+            -Force
+
+          (Get-FileHash artifacts/Anahita-win-x64.zip -Algorithm SHA256).Hash |
+            Out-File artifacts/Anahita-win-x64.zip.sha256 -Encoding ascii
+
+      - name: Package lightweight debug patch
+        if: github.event_name == 'push'
+        shell: pwsh
+        run: |
+          $publish = Join-Path $env:GITHUB_WORKSPACE "artifacts\Anahita-win-x64"
+          $patch = Join-Path $env:GITHUB_WORKSPACE "artifacts\Anahita-DebugPatch-x64"
+          New-Item -ItemType Directory -Force -Path $patch | Out-Null
+
+          # First-party binaries carry the code we are changing during the
+          # stability/debug cycle. Keep the self-contained .NET/WinUI runtime
+          # in the user's existing full portable folder instead of shipping it
+          # again for every tiny code change.
+          $patterns = @(
+            "BDFR.PersianCalendar.Desktop.exe",
+            "BDFR.PersianCalendar.Desktop.dll",
+            "BDFR.PersianCalendar.Desktop.pdb",
+            "BDFR.PersianCalendar.Desktop.deps.json",
+            "BDFR.PersianCalendar.Desktop.runtimeconfig.json",
+            "BDFR.PersianCalendar.Core.dll",
+            "BDFR.PersianCalendar.Core.pdb",
+            "BDFR.PersianCalendar.Infrastructure.dll",
+            "BDFR.PersianCalendar.Infrastructure.pdb",
+            "*.pri"
+          )
+
+          foreach ($pattern in $patterns) {
+            Get-ChildItem -Path $publish -Filter $pattern -File -ErrorAction SilentlyContinue |
+              Copy-Item -Destination $patch -Force
+          }
+
+          @"
+          Anahita lightweight debug patch
+          ===============================
+          Base requirement:
+          - Keep one recent full Anahita portable build already extracted.
+          - Close Anahita completely.
+          - Extract this ZIP directly over that existing folder and replace files.
+          - Do NOT delete the existing .NET / Windows App SDK runtime files.
+
+          This patch is intended for rapid debug builds where package/runtime
+          dependencies did not change. If a future release changes NuGet/runtime
+          dependencies, use that release's full portable ZIP once, then continue
+          with lightweight patches again.
+          "@ | Out-File (Join-Path $patch "PATCH-README.txt") -Encoding utf8
+
+          Compress-Archive `
+            -Path "$patch\*" `
+            -DestinationPath artifacts/Anahita-DebugPatch-x64.zip `
+            -Force
+
+          (Get-FileHash artifacts/Anahita-DebugPatch-x64.zip -Algorithm SHA256).Hash |
+            Out-File artifacts/Anahita-DebugPatch-x64.zip.sha256 -Encoding ascii
+
+          $fullSize = (Get-Item artifacts/Anahita-win-x64.zip).Length
+          $patchSize = (Get-Item artifacts/Anahita-DebugPatch-x64.zip).Length
+          Write-Host ("Full portable: {0:N2} MB" -f ($fullSize / 1MB))
+          Write-Host ("Debug patch:   {0:N2} MB" -f ($patchSize / 1MB))
+
+      - name: Install Inno Setup
+        if: github.event_name == 'push'
+        shell: pwsh
+        run: choco install innosetup -y --no-progress
+
+      - name: Build Windows installer
+        if: github.event_name == 'push'
+        shell: pwsh
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" `
+            /DMySourceDir="${{ github.workspace }}\artifacts\Anahita-win-x64" `
+            /DMyOutputDir="${{ github.workspace }}\artifacts" `
+            installer\BDFR_PersianCalendar.iss
+
+          (Get-FileHash artifacts/Anahita-Setup-x64.exe -Algorithm SHA256).Hash |
+            Out-File artifacts/Anahita-Setup-x64.exe.sha256 -Encoding ascii
+
+      - name: Upload portable test artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Anahita-win-x64
+          path: |
+            artifacts/Anahita-win-x64.zip
+            artifacts/Anahita-win-x64.zip.sha256
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload lightweight debug patch artifact
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Anahita-DebugPatch-x64
+          path: |
+            artifacts/Anahita-DebugPatch-x64.zip
+            artifacts/Anahita-DebugPatch-x64.zip.sha256
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload installer artifact
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Anahita-Setup-x64
+          path: |
+            artifacts/Anahita-Setup-x64.exe
+            artifacts/Anahita-Setup-x64.exe.sha256
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publish GitHub test pre-release
+        if: github.event_name == 'push'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "test-${{ github.run_number }}"
+          $title = "Anahita Test Build #${{ github.run_number }}"
+          $releaseTarget = (git rev-parse HEAD).Trim()
+          $notes = "Automated Anahita Windows x64 test build from main. Commit: $releaseTarget. Includes portable ZIP, installer EXE and SHA256 checksums."
+
+          gh release create $tag `
+            artifacts/Anahita-win-x64.zip `
+            artifacts/Anahita-win-x64.zip.sha256 `
+            artifacts/Anahita-DebugPatch-x64.zip `
+            artifacts/Anahita-DebugPatch-x64.zip.sha256 `
+            artifacts/Anahita-Setup-x64.exe `
+            artifacts/Anahita-Setup-x64.exe.sha256 `
+            --repo "${{ github.repository }}" `
+            --target $releaseTarget `
+            --title $title `
+            --notes $notes `
+            --prerelease
+ } |
             Remove-Item -Force
 
           foreach ($season in @("spring", "summer", "autumn", "winter")) {
