@@ -89,6 +89,12 @@ public sealed class MainWindow : Window
     private readonly Dictionary<string, Border> _visibleReminderCards =
         new(StringComparer.Ordinal);
     private bool _inAppReminderPollRunning;
+
+    private Microsoft.UI.Dispatching.DispatcherQueueTimer? _seasonCarouselTimer;
+    private int _seasonCarouselIndex;
+    private string? _seasonCarouselSeasonKey;
+    private bool _seasonCarouselBusy;
+
     private readonly Dictionary<PersianDate, StackPanel> _calendarOccasionPanels = new();
     private readonly Dictionary<PersianDate, TextBlock> _calendarDayNumberLabels = new();
     private readonly Dictionary<PersianDate, TextBlock> _calendarGregorianDayLabels = new();
@@ -173,6 +179,7 @@ public sealed class MainWindow : Window
         Closed += (_, _) =>
         {
             _inAppReminderTimer?.Stop();
+            _seasonCarouselTimer?.Stop();
             StartupDiagnostics.Log("MainWindow Closed event fired.");
         };
         AppWindow.Changed += (_, e) =>
@@ -1312,10 +1319,10 @@ public sealed class MainWindow : Window
         _settingsPanel.Children.Add(elenaButton);
 
         var seasonName = GetCurrentSeasonName();
-        var desktopAspect = ThemeService.FormatAspectRatioLabel(GetDesktopAspectRatio());
-        var seasonalFile = _themeService.GetSeasonalBackgroundPath(
-            _month,
-            GetDesktopAspectRatio());
+        var seasonalFiles = _themeService.GetSeasonalBackgroundPaths(_month);
+        var seasonalFile = seasonalFiles.Count == 0
+            ? null
+            : seasonalFiles[Math.Clamp(_seasonCarouselIndex, 0, seasonalFiles.Count - 1)];
 
         _settingsPanel.Children.Add(new Border
         {
@@ -1341,15 +1348,17 @@ public sealed class MainWindow : Window
                     },
                     new TextBlock
                     {
-                        Text = $"نسبت نمایشگر: {desktopAspect}",
+                        Text = seasonalFiles.Count == 0
+                            ? "Season Carousel: تصویری برای این فصل پیدا نشد."
+                            : $"Season Carousel: {ToPersianDigits(seasonalFiles.Count.ToString())} تصویر · تعویض خودکار هر ۶۰ ثانیه",
                         FontSize = 10.5,
                         Foreground = ThemeService.Brush(_theme.SecondaryText)
                     },
                     new TextBlock
                     {
                         Text = seasonalFile is null
-                            ? "فایل فصل مناسب پیدا نشد."
-                            : $"فایل فصل: {Path.GetFileName(seasonalFile)}",
+                            ? "الگو: Spring_1 / Summer_1 / Autumn_1 / Winter_1"
+                            : $"تصویر فعلی: {Path.GetFileName(seasonalFile)}",
                         FontSize = 10.5,
                         TextWrapping = TextWrapping.Wrap,
                         Foreground = ThemeService.Brush(_theme.SecondaryText)
@@ -1360,7 +1369,7 @@ public sealed class MainWindow : Window
 
         _settingsPanel.Children.Add(new TextBlock
         {
-            Text = "Elena Mode تم نیست. فقط تصویر فصل را از picture\\theme\\season backgrounds انتخاب و روی کل برنامه اعمال می‌کند. رنگ Accent هم جداگانه قابل انتخاب است.",
+            Text = "Elena Mode تصویرهای فصل را از picture\\theme\\season backgrounds می‌خواند. فایل‌ها را با الگوی Spring_1، Spring_2 و ... (یا Summer/Autumn/Winter) نام‌گذاری کنید؛ برنامه خودش تصویر را متناسب با پنجره Fit می‌کند.",
             FontSize = 11,
             TextWrapping = TextWrapping.Wrap,
             Opacity = 0.72,
@@ -1504,8 +1513,9 @@ public sealed class MainWindow : Window
                 _settings.UseSeasonalBackground = true;
                 _settings.BackgroundMode = "elena";
                 _settingsService.Save(_settings);
+                ResetSeasonCarouselPosition();
                 await ApplyBackgroundAsync();
-                StatusText.Text = "تصویر فصلی Elena اعمال شد.";
+                StatusText.Text = "Season Carousel فصلی Elena فعال شد.";
             };
             _settingsPanel.Children.Add(applySeasonalBackground);
         }
@@ -1521,6 +1531,7 @@ public sealed class MainWindow : Window
             _settings.BackgroundMode = "none";
             _settings.UseSeasonalBackground = false;
             _settingsService.Save(_settings);
+            StopSeasonCarousel();
             _backgroundImage.Source = null;
             _backgroundWash.Opacity = 0;
             _backgroundPathText.Text = "بدون تصویر زمینه";
@@ -3242,6 +3253,7 @@ public sealed class MainWindow : Window
 
             _settingsService.Save(_settings);
             await ApplyAppearanceAsync();
+            ResetSeasonCarouselPosition();
             await ApplyBackgroundAsync();
 
             StartupDiagnostics.Log("Appearance switch completed: Elena Mode.");
@@ -3319,6 +3331,7 @@ public sealed class MainWindow : Window
                 _settings.BackgroundMode = "none";
 
             _settingsService.Save(_settings);
+            StopSeasonCarousel();
             await ApplyAppearanceAsync();
 
             StartupDiagnostics.Log($"Theme switch completed: {themeId}.");
@@ -4381,6 +4394,7 @@ public sealed class MainWindow : Window
                 "elena",
                 StringComparison.OrdinalIgnoreCase);
 
+            StopSeasonCarousel();
             _settings.AppearanceMode = "theme";
             _settings.CustomBackgroundPath = copied;
             _settings.BackgroundMode = "custom";
@@ -4427,29 +4441,99 @@ public sealed class MainWindow : Window
             _ => "زمستان"
         };
 
-    private double GetDesktopAspectRatio()
+    private void ResetSeasonCarouselPosition()
     {
+        _seasonCarouselIndex = 0;
+        _seasonCarouselSeasonKey = null;
+    }
+
+    private void StartSeasonCarousel()
+    {
+        if (_seasonCarouselTimer is null)
+        {
+            _seasonCarouselTimer = DispatcherQueue.CreateTimer();
+            _seasonCarouselTimer.Interval = TimeSpan.FromSeconds(60);
+            _seasonCarouselTimer.IsRepeating = true;
+            _seasonCarouselTimer.Tick += async (_, _) =>
+                await AdvanceSeasonCarouselAsync();
+        }
+
+        _seasonCarouselTimer.Start();
+    }
+
+    private void StopSeasonCarousel(bool resetPosition = true)
+    {
+        _seasonCarouselTimer?.Stop();
+
+        if (resetPosition)
+            ResetSeasonCarouselPosition();
+    }
+
+    private void QueueSeasonCarouselRefreshForDisplayedMonth()
+    {
+        var isElena = string.Equals(
+            _settings.AppearanceMode,
+            "elena",
+            StringComparison.OrdinalIgnoreCase);
+
+        if (!isElena ||
+            !_settings.UseSeasonalBackground ||
+            _backgroundImage.Source is null)
+            return;
+
+        ResetSeasonCarouselPosition();
+        _ = ApplyBackgroundAsync();
+    }
+
+    private async Task AdvanceSeasonCarouselAsync()
+    {
+        if (_seasonCarouselBusy)
+            return;
+
+        var isElena = string.Equals(
+            _settings.AppearanceMode,
+            "elena",
+            StringComparison.OrdinalIgnoreCase);
+
+        if (!isElena || !_settings.UseSeasonalBackground)
+        {
+            StopSeasonCarousel();
+            return;
+        }
+
+        var files = _themeService.GetSeasonalBackgroundPaths(_month);
+        if (files.Count <= 1)
+            return;
+
+        _seasonCarouselBusy = true;
         try
         {
-            var displayArea = DisplayArea.GetFromWindowId(
-                AppWindow.Id,
-                DisplayAreaFallback.Primary);
+            var seasonKey = ThemeService.GetSeasonKey(_month);
 
-            var workArea = displayArea.WorkArea;
-            if (workArea.Width > 0 && workArea.Height > 0)
+            if (!string.Equals(
+                    _seasonCarouselSeasonKey,
+                    seasonKey,
+                    StringComparison.OrdinalIgnoreCase))
             {
-                var ratio = (double)workArea.Width / workArea.Height;
-                StartupDiagnostics.Log(
-                    $"Desktop work area: {workArea.Width}x{workArea.Height}, ratio={ratio:0.000}");
-                return ratio;
+                _seasonCarouselSeasonKey = seasonKey;
+                _seasonCarouselIndex = 0;
             }
+            else
+            {
+                _seasonCarouselIndex =
+                    (_seasonCarouselIndex + 1) % files.Count;
+            }
+
+            await ApplyBackgroundAsync();
         }
         catch (Exception ex)
         {
-            StartupDiagnostics.Log($"Desktop aspect ratio detection failed: {ex}");
+            StartupDiagnostics.Log($"Season Carousel advance failed: {ex}");
         }
-
-        return 16d / 9d;
+        finally
+        {
+            _seasonCarouselBusy = false;
+        }
     }
 
     private async Task ApplyBackgroundAsync()
@@ -4464,24 +4548,38 @@ public sealed class MainWindow : Window
                 StringComparison.OrdinalIgnoreCase);
             var isCustom = false;
 
+            IReadOnlyList<string> seasonalFiles = [];
+
             if (isElena && _settings.UseSeasonalBackground)
             {
                 StartupDiagnostics.MarkPhase("manual-background-seasonal-resolve");
-                var desktopAspectRatio = GetDesktopAspectRatio();
-                path = _themeService.GetSeasonalBackgroundPath(_month, desktopAspectRatio);
 
-                var season = _month switch
+                seasonalFiles = _themeService.GetSeasonalBackgroundPaths(_month);
+                var seasonKey = ThemeService.GetSeasonKey(_month);
+
+                if (!string.Equals(
+                        _seasonCarouselSeasonKey,
+                        seasonKey,
+                        StringComparison.OrdinalIgnoreCase))
                 {
-                    <= 3 => "بهار",
-                    <= 6 => "تابستان",
-                    <= 9 => "پاییز",
-                    _ => "زمستان"
-                };
+                    _seasonCarouselSeasonKey = seasonKey;
+                    _seasonCarouselIndex = 0;
+                }
 
-                var ratioLabel = ThemeService.FormatAspectRatioLabel(desktopAspectRatio);
+                if (seasonalFiles.Count > 0)
+                {
+                    _seasonCarouselIndex = Math.Clamp(
+                        _seasonCarouselIndex,
+                        0,
+                        seasonalFiles.Count - 1);
+
+                    path = seasonalFiles[_seasonCarouselIndex];
+                }
+
+                var season = GetCurrentSeasonName();
                 label = path is null
-                    ? $"Elena Mode · {season} · {ratioLabel} · تصویری پیدا نشد"
-                    : $"Elena Mode · {season} · {ratioLabel} · {Path.GetFileName(path)}";
+                    ? $"Elena Mode · {season} · Season Carousel · تصویری پیدا نشد"
+                    : $"Elena Mode · {season} · {ToPersianDigits((_seasonCarouselIndex + 1).ToString())}/{ToPersianDigits(seasonalFiles.Count.ToString())} · {Path.GetFileName(path)}";
             }
             else if (string.Equals(
                          _settings.BackgroundMode,
@@ -4492,11 +4590,12 @@ public sealed class MainWindow : Window
             {
                 path = _settings.CustomBackgroundPath;
                 isCustom = true;
+                StopSeasonCarousel();
                 label = $"تصویر شخصی · {Path.GetFileName(path)}";
             }
 
             StartupDiagnostics.Log(
-                $"Background image load requested: mode={_settings.BackgroundMode}; elena={isElena}; path={(path is null ? "<none>" : Path.GetFileName(path))}.");
+                $"Background image load requested: mode={_settings.BackgroundMode}; elena={isElena}; carouselIndex={_seasonCarouselIndex}; path={(path is null ? "<none>" : Path.GetFileName(path))}.");
             StartupDiagnostics.MarkPhase("manual-background-decode-start");
             var source = await PictureService.LoadImageAsync(path, decodePixelWidth: 1920);
             StartupDiagnostics.MarkPhase("manual-background-decode-complete");
@@ -4526,6 +4625,19 @@ public sealed class MainWindow : Window
                             : 0.24;
 
             _backgroundPathText.Text = label;
+
+            if (isElena &&
+                _settings.UseSeasonalBackground &&
+                source is not null &&
+                seasonalFiles.Count > 1)
+            {
+                StartSeasonCarousel();
+            }
+            else if (!isElena || isCustom || seasonalFiles.Count <= 1)
+            {
+                StopSeasonCarousel(resetPosition: false);
+            }
+
             StartupDiagnostics.MarkPhase("manual-background-apply-complete");
         }
         catch (Exception ex)
@@ -5119,6 +5231,7 @@ public sealed class MainWindow : Window
         _month = _selected.Month;
         BuildCalendar();
         await LoadSelectedDayAsync();
+        QueueSeasonCarouselRefreshForDisplayedMonth();
     }
 
     private void PreviousMonth_Click(object sender, RoutedEventArgs e)
@@ -5126,6 +5239,7 @@ public sealed class MainWindow : Window
         _month--;
         if (_month == 0) { _month = 12; _year--; }
         BuildCalendar();
+        QueueSeasonCarouselRefreshForDisplayedMonth();
     }
 
     private void NextMonth_Click(object sender, RoutedEventArgs e)
@@ -5133,6 +5247,7 @@ public sealed class MainWindow : Window
         _month++;
         if (_month == 13) { _month = 1; _year++; }
         BuildCalendar();
+        QueueSeasonCarouselRefreshForDisplayedMonth();
     }
 
     private async void SaveNote_Click(object sender, RoutedEventArgs e)
