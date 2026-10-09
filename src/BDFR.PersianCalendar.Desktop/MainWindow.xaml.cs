@@ -79,6 +79,8 @@ public sealed class MainWindow : Window
     private readonly TextBox SpecialCalendarBox = new();
     private readonly TextBox SpecialMonthBox = new();
     private readonly TextBox SpecialDayBox = new();
+    private readonly TextBox SpecialHourBox = new();
+    private readonly TextBox SpecialMinuteBox = new();
     private readonly TextBox SpecialReminderDaysBox = new();
     private readonly TextBox QuickAddBox = new();
     private readonly TextBlock StatusText = new();
@@ -165,6 +167,7 @@ public sealed class MainWindow : Window
             Content = BuildRoot();
             ApplyUserFont(Content);
             BuildCalendar();
+            ApplyCornerRadiusLive(Content);
             StartupDiagnostics.MarkPhase("startup-full-ui-build-complete");
             StartupDiagnostics.Log("MainWindow: stable full UI selected as startup interface.");
         }
@@ -613,6 +616,7 @@ public sealed class MainWindow : Window
 
             Content = root;
             BuildCalendar();
+            ApplyCornerRadiusLive(Content);
 
             StartupDiagnostics.MarkPhase($"diagnostic-stage-{stage}-mounted");
             StartupDiagnostics.Log($"Safe shell: diagnostic stage mounted: {stage}.");
@@ -645,6 +649,7 @@ public sealed class MainWindow : Window
             ApplyUserFont(Content);
             StartupDiagnostics.MarkPhase("full-ui-font-apply-complete");
             BuildCalendar();
+            ApplyCornerRadiusLive(Content);
 
             StartupDiagnostics.MarkPhase("safe-shell-full-ui-mounted");
             StartupDiagnostics.Log("Safe shell: advanced interface mounted; starting deferred initialization.");
@@ -1054,21 +1059,37 @@ public sealed class MainWindow : Window
         SpecialCalendarBox.PlaceholderText = "شمسی / میلادی / قمری";
         stack.Children.Add(SpecialCalendarBox);
 
-        var md = new Grid { ColumnSpacing = 8 };
-        md.ColumnDefinitions.Add(new ColumnDefinition());
-        md.ColumnDefinitions.Add(new ColumnDefinition());
+        stack.Children.Add(new TextBlock
+        {
+            Text = "این مناسبت سالانه است؛ ماه، روز، ساعت و دقیقه هرکدام در فیلد جدا وارد می‌شوند.",
+            TextWrapping = TextWrapping.Wrap,
+            FontSize = 10.5,
+            Opacity = 0.62
+        });
 
+        SpecialMonthBox.Header = "ماه";
         SpecialMonthBox.Text = "1";
-        SpecialMonthBox.PlaceholderText = "ماه 1 تا 12";
-        Grid.SetColumn(SpecialMonthBox, 0);
-        md.Children.Add(SpecialMonthBox);
+        SpecialMonthBox.PlaceholderText = "1 تا 12";
+        SpecialMonthBox.FlowDirection = FlowDirection.LeftToRight;
+        stack.Children.Add(SpecialMonthBox);
 
+        SpecialDayBox.Header = "روز";
         SpecialDayBox.Text = "1";
-        SpecialDayBox.PlaceholderText = "روز 1 تا 31";
-        Grid.SetColumn(SpecialDayBox, 1);
-        md.Children.Add(SpecialDayBox);
+        SpecialDayBox.PlaceholderText = "1 تا 31";
+        SpecialDayBox.FlowDirection = FlowDirection.LeftToRight;
+        stack.Children.Add(SpecialDayBox);
 
-        stack.Children.Add(md);
+        SpecialHourBox.Header = "ساعت یادآوری";
+        SpecialHourBox.Text = "09";
+        SpecialHourBox.PlaceholderText = "0 تا 23";
+        SpecialHourBox.FlowDirection = FlowDirection.LeftToRight;
+        stack.Children.Add(SpecialHourBox);
+
+        SpecialMinuteBox.Header = "دقیقه یادآوری";
+        SpecialMinuteBox.Text = "00";
+        SpecialMinuteBox.PlaceholderText = "0 تا 59";
+        SpecialMinuteBox.FlowDirection = FlowDirection.LeftToRight;
+        stack.Children.Add(SpecialMinuteBox);
 
         SpecialReminderDaysBox.Header = "روزهای یادآوری قبل از مناسبت";
         SpecialReminderDaysBox.Text = "7,1,0";
@@ -1108,6 +1129,36 @@ public sealed class MainWindow : Window
             Foreground = ThemeService.Brush(_theme.PrimaryText),
             BorderThickness = new Thickness(0)
         };
+
+    private double CurrentUiCornerRadius
+        => Math.Clamp(_settings.UiCornerRadius, 0, 32);
+
+    private void ApplyCornerRadiusLive(DependencyObject? root)
+    {
+        if (root is null)
+            return;
+
+        var radius = new CornerRadius(CurrentUiCornerRadius);
+
+        switch (root)
+        {
+            case Border border:
+                border.CornerRadius = radius;
+                break;
+            case Control control:
+                control.CornerRadius = radius;
+                break;
+        }
+
+        var childCount = VisualTreeHelper.GetChildrenCount(root);
+        for (var i = 0; i < childCount; i++)
+            ApplyCornerRadiusLive(VisualTreeHelper.GetChild(root, i));
+
+        // Mourning ribbons keep their narrow ribbon shape regardless of the
+        // global UI radius setting.
+        foreach (var ribbon in _calendarMourningRibbons.Values)
+            ribbon.CornerRadius = new CornerRadius(2);
+    }
 
     private static SolidColorBrush BrushWithAlpha(string color, byte alpha)
     {
@@ -1253,6 +1304,7 @@ public sealed class MainWindow : Window
                         _settings.ElenaAccentId = "seasonal";
                         _settings.ElenaDayAccentId = "seasonal";
                         _settings.BackgroundOpacity = 0.22;
+                        _settings.UiCornerRadius = 14.0;
                         _settingsService.Save(_settings);
 
                         await ApplyAppearanceAsync();
@@ -1405,6 +1457,50 @@ public sealed class MainWindow : Window
         openSeasonFolder.Click += (_, _) =>
             OpenFolderInExplorer(_themeService.SeasonalBackgroundsRoot);
         _settingsPanel.Children.Add(openSeasonFolder);
+
+        _settingsPanel.Children.Add(new Border
+        {
+            Height = 1,
+            Margin = new Thickness(0, 4, 0, 4),
+            Background = BrushWithAlpha(_theme.SecondaryText, 0x30)
+        });
+
+        var cornerRadiusValue = new TextBlock
+        {
+            Text = $"گردی گوشه‌ها: {ToPersianDigits(Math.Round(Math.Clamp(_settings.UiCornerRadius, 0, 32)).ToString(CultureInfo.InvariantCulture))} px",
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Foreground = ThemeService.Brush(_theme.PrimaryText)
+        };
+        _settingsPanel.Children.Add(cornerRadiusValue);
+
+        var cornerRadiusSlider = new Slider
+        {
+            Minimum = 0,
+            Maximum = 32,
+            StepFrequency = 1,
+            Value = Math.Clamp(_settings.UiCornerRadius, 0, 32),
+            Header = "Corner Radius",
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+        cornerRadiusSlider.ValueChanged += (_, e) =>
+        {
+            var value = Math.Round(Math.Clamp(e.NewValue, 0, 32));
+            _settings.UiCornerRadius = value;
+            cornerRadiusValue.Text =
+                $"گردی گوشه‌ها: {ToPersianDigits(value.ToString(CultureInfo.InvariantCulture))} px";
+            ApplyCornerRadiusLive(Content);
+            _settingsService.Save(_settings);
+        };
+        _settingsPanel.Children.Add(cornerRadiusSlider);
+
+        _settingsPanel.Children.Add(new TextBlock
+        {
+            Text = "۰ = گوشه کاملاً مربعی · ۳۲ = گوشه بسیار گرد. تغییرات به‌صورت زنده روی کارت‌ها، دکمه‌ها، ورودی‌ها و خانه‌های تقویم اعمال می‌شود.",
+            FontSize = 10.5,
+            TextWrapping = TextWrapping.Wrap,
+            Opacity = 0.62,
+            Foreground = ThemeService.Brush(_theme.SecondaryText)
+        });
 
         if (isElena)
         {
@@ -4910,6 +5006,7 @@ public sealed class MainWindow : Window
 
         ApplyUserFont(CalendarGrid);
         ApplySecondaryCalendarTypography();
+        ApplyCornerRadiusLive(CalendarGrid);
 
         if (_postActivationInitializationStarted)
         {
@@ -5196,6 +5293,9 @@ public sealed class MainWindow : Window
             ApplyUserFont(OccasionsPanel);
             ApplyUserFont(EventsPanel);
             ApplyUserFont(TasksPanel);
+            ApplyCornerRadiusLive(OccasionsPanel);
+            ApplyCornerRadiusLive(EventsPanel);
+            ApplyCornerRadiusLive(TasksPanel);
         }
         catch (Exception ex)
         {
@@ -5209,19 +5309,19 @@ public sealed class MainWindow : Window
         try
         {
             var typeBox = BuildCalendarSystemComboBox();
-            var inputBox = new TextBox
-            {
-                Header = "تاریخ",
-                PlaceholderText = "سال/ماه/روز",
-                FlowDirection = FlowDirection.LeftToRight
-            };
+            var yearBox = CreateDatePartBox("سال", "مثلاً 1405");
+            var monthBox = CreateDatePartBox("ماه", "1 تا 12");
+            var dayBox = CreateDatePartBox("روز", "1 تا 31");
 
             void RefreshInput()
             {
                 var conversion = CalendarDateConverter.Convert(_selected.ToDateOnly());
-                inputBox.Text = FormatConversionInput(
+                SetDatePartBoxes(
                     conversion,
-                    CalendarSystemFromSelection(typeBox));
+                    CalendarSystemFromSelection(typeBox),
+                    yearBox,
+                    monthBox,
+                    dayBox);
             }
 
             typeBox.SelectionChanged += (_, _) => RefreshInput();
@@ -5234,19 +5334,14 @@ public sealed class MainWindow : Window
             };
             form.Children.Add(new TextBlock
             {
-                Text = "نوع تاریخی که وارد می‌کنید را انتخاب کنید.",
+                Text = "نوع تقویم را انتخاب کنید؛ سال، ماه و روز هرکدام در یک فیلد مستقل هستند.",
                 TextWrapping = TextWrapping.Wrap,
                 Opacity = 0.68
             });
             form.Children.Add(typeBox);
-            form.Children.Add(inputBox);
-            form.Children.Add(new TextBlock
-            {
-                Text = "فرمت نمونه: 1405/07/17  ·  ارقام فارسی، عربی و انگلیسی پذیرفته می‌شوند.",
-                FontSize = 10.5,
-                TextWrapping = TextWrapping.Wrap,
-                Opacity = 0.62
-            });
+            form.Children.Add(yearBox);
+            form.Children.Add(monthBox);
+            form.Children.Add(dayBox);
 
             var dialog = new ContentDialog
             {
@@ -5264,10 +5359,11 @@ public sealed class MainWindow : Window
             if (result != ContentDialogResult.Primary)
                 return;
 
-            var calendar = CalendarSystemFromSelection(typeBox);
-            if (!CalendarDateConverter.TryConvertInput(
-                    inputBox.Text,
-                    calendar,
+            if (!TryReadSeparatedDate(
+                    yearBox,
+                    monthBox,
+                    dayBox,
+                    CalendarSystemFromSelection(typeBox),
                     out var conversionResult,
                     out var error))
             {
@@ -5285,7 +5381,9 @@ public sealed class MainWindow : Window
             QueueSeasonCarouselRefreshForDisplayedMonth();
 
             StatusText.Text =
-                $"پرش انجام شد: {ToPersianDigits(_selected.Year.ToString())}/{ToPersianDigits(_selected.Month.ToString("00"))}/{ToPersianDigits(_selected.Day.ToString("00"))}";
+                $"پرش انجام شد: {ToPersianDigits(_selected.Year.ToString())}/" +
+                $"{ToPersianDigits(_selected.Month.ToString("00"))}/" +
+                $"{ToPersianDigits(_selected.Day.ToString("00"))}";
         }
         catch (Exception ex)
         {
@@ -5299,12 +5397,9 @@ public sealed class MainWindow : Window
         try
         {
             var typeBox = BuildCalendarSystemComboBox();
-            var inputBox = new TextBox
-            {
-                Header = "تاریخ ورودی",
-                PlaceholderText = "سال/ماه/روز",
-                FlowDirection = FlowDirection.LeftToRight
-            };
+            var yearBox = CreateDatePartBox("سال", "مثلاً 1405");
+            var monthBox = CreateDatePartBox("ماه", "1 تا 12");
+            var dayBox = CreateDatePartBox("روز", "1 تا 31");
 
             var resultText = new TextBlock
             {
@@ -5317,20 +5412,25 @@ public sealed class MainWindow : Window
             var resultCard = new Border
             {
                 Padding = new Thickness(12),
-                CornerRadius = new CornerRadius(12),
+                CornerRadius = new CornerRadius(CurrentUiCornerRadius),
                 BorderBrush = BrushWithAlpha(_theme.Accent, 0xA0),
                 BorderThickness = new Thickness(1),
                 Background = BrushWithAlpha(_theme.CardBackground, 0xD8),
                 Child = resultText
             };
 
+            var suppressLiveRender = false;
+
             void RenderConversion()
             {
-                var calendar = CalendarSystemFromSelection(typeBox);
+                if (suppressLiveRender)
+                    return;
 
-                if (!CalendarDateConverter.TryConvertInput(
-                        inputBox.Text,
-                        calendar,
+                if (!TryReadSeparatedDate(
+                        yearBox,
+                        monthBox,
+                        dayBox,
+                        CalendarSystemFromSelection(typeBox),
                         out var converted,
                         out var error))
                 {
@@ -5343,24 +5443,26 @@ public sealed class MainWindow : Window
 
             void RefreshInput()
             {
+                suppressLiveRender = true;
                 var conversion = CalendarDateConverter.Convert(_selected.ToDateOnly());
-                inputBox.Text = FormatConversionInput(
+                SetDatePartBoxes(
                     conversion,
-                    CalendarSystemFromSelection(typeBox));
+                    CalendarSystemFromSelection(typeBox),
+                    yearBox,
+                    monthBox,
+                    dayBox);
+                suppressLiveRender = false;
                 RenderConversion();
             }
 
             typeBox.SelectionChanged += (_, _) => RefreshInput();
+            yearBox.TextChanged += (_, _) => RenderConversion();
+            monthBox.TextChanged += (_, _) => RenderConversion();
+            dayBox.TextChanged += (_, _) => RenderConversion();
 
             var convertButton = MakeButton("تبدیل");
             convertButton.HorizontalAlignment = HorizontalAlignment.Stretch;
             convertButton.Click += (_, _) => RenderConversion();
-
-            inputBox.TextChanged += (_, _) =>
-            {
-                if (!string.IsNullOrWhiteSpace(inputBox.Text))
-                    RenderConversion();
-            };
 
             var form = new StackPanel
             {
@@ -5369,12 +5471,14 @@ public sealed class MainWindow : Window
             };
             form.Children.Add(new TextBlock
             {
-                Text = "تقویم مبدأ را انتخاب کنید و یک تاریخ وارد کنید. معادل آن در هر سه تقویم نمایش داده می‌شود.",
+                Text = "تقویم مبدأ را انتخاب کنید؛ سال، ماه و روز جداگانه وارد می‌شوند.",
                 TextWrapping = TextWrapping.Wrap,
                 Opacity = 0.68
             });
             form.Children.Add(typeBox);
-            form.Children.Add(inputBox);
+            form.Children.Add(yearBox);
+            form.Children.Add(monthBox);
+            form.Children.Add(dayBox);
             form.Children.Add(convertButton);
             form.Children.Add(resultCard);
 
@@ -5397,6 +5501,140 @@ public sealed class MainWindow : Window
             StartupDiagnostics.Log($"Date converter failed: {ex}");
             StatusText.Text = $"مبدل تاریخ اجرا نشد: {ex.Message}";
         }
+    }
+
+    private static TextBox CreateDatePartBox(
+        string header,
+        string placeholder)
+        => new()
+        {
+            Header = header,
+            PlaceholderText = placeholder,
+            FlowDirection = FlowDirection.LeftToRight,
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+
+    private static TextBox CreateTimePartBox(
+        string header,
+        string placeholder)
+        => new()
+        {
+            Header = header,
+            PlaceholderText = placeholder,
+            FlowDirection = FlowDirection.LeftToRight,
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+
+    private static void SetDatePartBoxes(
+        CalendarDateConversionResult conversion,
+        CalendarSystemKind calendar,
+        TextBox yearBox,
+        TextBox monthBox,
+        TextBox dayBox)
+    {
+        switch (calendar)
+        {
+            case CalendarSystemKind.Gregorian:
+                yearBox.Text = conversion.Gregorian.Year.ToString(CultureInfo.InvariantCulture);
+                monthBox.Text = conversion.Gregorian.Month.ToString(CultureInfo.InvariantCulture);
+                dayBox.Text = conversion.Gregorian.Day.ToString(CultureInfo.InvariantCulture);
+                break;
+
+            case CalendarSystemKind.Hijri:
+                yearBox.Text = conversion.Hijri.Year.ToString(CultureInfo.InvariantCulture);
+                monthBox.Text = conversion.Hijri.Month.ToString(CultureInfo.InvariantCulture);
+                dayBox.Text = conversion.Hijri.Day.ToString(CultureInfo.InvariantCulture);
+                break;
+
+            default:
+                yearBox.Text = conversion.Persian.Year.ToString(CultureInfo.InvariantCulture);
+                monthBox.Text = conversion.Persian.Month.ToString(CultureInfo.InvariantCulture);
+                dayBox.Text = conversion.Persian.Day.ToString(CultureInfo.InvariantCulture);
+                break;
+        }
+    }
+
+    private static bool TryReadSeparatedDate(
+        TextBox yearBox,
+        TextBox monthBox,
+        TextBox dayBox,
+        CalendarSystemKind calendar,
+        out CalendarDateConversionResult result,
+        out string error)
+    {
+        result = default;
+        error = string.Empty;
+
+        if (!int.TryParse(
+                PersianQuickAddParser.NormalizeDigits(yearBox.Text ?? string.Empty),
+                out var year))
+        {
+            error = "سال معتبر نیست.";
+            return false;
+        }
+
+        if (!int.TryParse(
+                PersianQuickAddParser.NormalizeDigits(monthBox.Text ?? string.Empty),
+                out var month))
+        {
+            error = "ماه معتبر نیست.";
+            return false;
+        }
+
+        if (!int.TryParse(
+                PersianQuickAddParser.NormalizeDigits(dayBox.Text ?? string.Empty),
+                out var day))
+        {
+            error = "روز معتبر نیست.";
+            return false;
+        }
+
+        try
+        {
+            result = CalendarDateConverter.Convert(calendar, year, month, day);
+            return true;
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            error = "ترکیب سال، ماه و روز در تقویم انتخاب‌شده معتبر نیست.";
+            return false;
+        }
+        catch (Exception ex)
+        {
+            error = $"تاریخ معتبر نیست: {ex.Message}";
+            return false;
+        }
+    }
+
+    private static bool TryReadSeparatedTime(
+        TextBox hourBox,
+        TextBox minuteBox,
+        out TimeOnly time,
+        out string error)
+    {
+        time = default;
+        error = string.Empty;
+
+        if (!int.TryParse(
+                PersianQuickAddParser.NormalizeDigits(hourBox.Text ?? string.Empty),
+                out var hour) ||
+            hour is < 0 or > 23)
+        {
+            error = "ساعت باید بین 0 تا 23 باشد.";
+            return false;
+        }
+
+        if (!int.TryParse(
+                PersianQuickAddParser.NormalizeDigits(minuteBox.Text ?? string.Empty),
+                out var minute) ||
+            minute is < 0 or > 59)
+        {
+            error = "دقیقه باید بین 0 تا 59 باشد.";
+            return false;
+        }
+
+        time = new TimeOnly(hour, minute);
+        return true;
     }
 
     private ComboBox BuildCalendarSystemComboBox()
@@ -5514,13 +5752,17 @@ public sealed class MainWindow : Window
                 PlaceholderText = "مثلاً جلسه تیم"
             };
 
-            var timeBox = new TextBox
-            {
-                Header = "زمان",
-                Text = "09:00",
-                PlaceholderText = "مثلاً 14:30",
-                FlowDirection = FlowDirection.LeftToRight
-            };
+            var yearBox = CreateDatePartBox("سال شمسی", "مثلاً 1405");
+            var monthBox = CreateDatePartBox("ماه", "1 تا 12");
+            var dayBox = CreateDatePartBox("روز", "1 تا 31");
+            yearBox.Text = _selected.Year.ToString(CultureInfo.InvariantCulture);
+            monthBox.Text = _selected.Month.ToString(CultureInfo.InvariantCulture);
+            dayBox.Text = _selected.Day.ToString(CultureInfo.InvariantCulture);
+
+            var hourBox = CreateTimePartBox("ساعت", "0 تا 23");
+            var minuteBox = CreateTimePartBox("دقیقه", "0 تا 59");
+            hourBox.Text = "09";
+            minuteBox.Text = "00";
 
             var privateCheck = new CheckBox
             {
@@ -5556,18 +5798,22 @@ public sealed class MainWindow : Window
             };
             form.Children.Add(new TextBlock
             {
-                Text = $"تاریخ: {_selected.ToLongPersianString()}",
+                Text = "تاریخ و زمان رویداد را جزءبه‌جزء وارد کنید.",
                 FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
             });
             form.Children.Add(titleBox);
-            form.Children.Add(timeBox);
+            form.Children.Add(yearBox);
+            form.Children.Add(monthBox);
+            form.Children.Add(dayBox);
+            form.Children.Add(hourBox);
+            form.Children.Add(minuteBox);
             form.Children.Add(privateCheck);
             form.Children.Add(reminderBeforeBox);
             form.Children.Add(repeatCountBox);
             form.Children.Add(repeatIntervalBox);
             form.Children.Add(new TextBlock
             {
-                Text = "یادآور داخل برنامه تا زمانی که «متوجه شدم» را بزنید روی صفحه می‌ماند. اگر تأیید نکنید، مطابق تعداد و فاصله بالا دوباره هشدار می‌دهد.",
+                Text = "یادآور تا زمانی که «متوجه شدم» را بزنید روی صفحه می‌ماند و در صورت بی‌توجهی طبق تعداد و فاصله انتخاب‌شده دوباره هشدار می‌دهد.",
                 TextWrapping = TextWrapping.Wrap,
                 Opacity = 0.68
             });
@@ -5578,7 +5824,7 @@ public sealed class MainWindow : Window
                 Content = new ScrollViewer
                 {
                     Content = form,
-                    MaxHeight = 520,
+                    MaxHeight = 560,
                     VerticalScrollBarVisibility = ScrollBarVisibility.Auto
                 },
                 PrimaryButtonText = "ثبت",
@@ -5593,12 +5839,31 @@ public sealed class MainWindow : Window
             if (result != ContentDialogResult.Primary)
                 return;
 
-            if (string.IsNullOrWhiteSpace(titleBox.Text) ||
-                !TimeOnly.TryParse(
-                    PersianQuickAddParser.NormalizeDigits(timeBox.Text ?? string.Empty),
-                    out var time))
+            if (string.IsNullOrWhiteSpace(titleBox.Text))
             {
-                StatusText.Text = "عنوان یا زمان رویداد معتبر نیست.";
+                StatusText.Text = "عنوان رویداد را وارد کنید.";
+                return;
+            }
+
+            if (!TryReadSeparatedDate(
+                    yearBox,
+                    monthBox,
+                    dayBox,
+                    CalendarSystemKind.Persian,
+                    out var eventDate,
+                    out var dateError))
+            {
+                StatusText.Text = dateError;
+                return;
+            }
+
+            if (!TryReadSeparatedTime(
+                    hourBox,
+                    minuteBox,
+                    out var time,
+                    out var timeError))
+            {
+                StatusText.Text = timeError;
                 return;
             }
 
@@ -5626,12 +5891,17 @@ public sealed class MainWindow : Window
 
             await _planner.AddEventAsync(
                 titleBox.Text.Trim(),
-                _selected,
+                eventDate.Persian,
                 time,
                 reminderMinutes: [reminderBefore],
                 privacy: privacy,
                 reminderRepeatCount: repeatCount,
                 reminderRepeatIntervalMinutes: repeatInterval);
+
+            _selected = eventDate.Persian;
+            _year = _selected.Year;
+            _month = _selected.Month;
+            BuildCalendar();
 
             StatusText.Text =
                 $"رویداد {(privacy == PrivacyLevel.Private ? "خصوصی" : "عمومی")} ثبت شد · {repeatCount} بار هشدار با فاصله {repeatInterval} دقیقه.";
@@ -5728,6 +5998,16 @@ public sealed class MainWindow : Window
             return;
         }
 
+        if (!TryReadSeparatedTime(
+                SpecialHourBox,
+                SpecialMinuteBox,
+                out var notificationTime,
+                out var timeError))
+        {
+            StatusText.Text = timeError;
+            return;
+        }
+
         var reminderDays = (SpecialReminderDaysBox.Text ?? "7,1,0")
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Select(x => int.TryParse(PersianQuickAddParser.NormalizeDigits(x), out var n) ? n : -1)
@@ -5750,7 +6030,7 @@ public sealed class MainWindow : Window
                 month,
                 day,
                 reminderDays.Length == 0 ? [7, 1, 0] : reminderDays,
-                new TimeOnly(9, 0));
+                notificationTime);
 
             SpecialTitleBox.Text = "";
             StatusText.Text = "مناسبت شخصی و یادآورهای سالانه ثبت شد.";
@@ -5927,7 +6207,7 @@ public sealed class MainWindow : Window
             Width = 500,
             MaxWidth = 500,
             Padding = new Thickness(14),
-            CornerRadius = new CornerRadius(14),
+            CornerRadius = new CornerRadius(CurrentUiCornerRadius),
             Background = BrushWithAlpha(_theme.PanelBackground, 0xF2),
             BorderBrush = ThemeService.Brush(_theme.Accent),
             BorderThickness = new Thickness(2),
