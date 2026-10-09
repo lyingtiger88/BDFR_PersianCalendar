@@ -50,6 +50,10 @@ public sealed class AppSettings
     // Zara Pastel optional Liquid Glass presentation.
     public bool GlassMode { get; set; }
 
+    // Global corner radius for cards and interactive UI elements.
+    // 0 = square corners, 32 = strongly rounded.
+    public double UiCornerRadius { get; set; } = 14.0;
+
     // Global UI typography.
     public string FontFamilyName { get; set; } = "Segoe UI Variable";
 
