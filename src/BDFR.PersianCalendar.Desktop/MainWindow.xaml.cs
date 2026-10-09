@@ -260,25 +260,44 @@ public sealed class MainWindow : Window
             await LoadCalendarCellOccasionsAsync(_year, _month);
             StartupDiagnostics.Log("Post-activation: calendar-cell occasion load completed.");
 
-            // Startup stability quarantine:
-            // Do not decode/apply any seasonal or custom background image during
-            // launch. On the affected Windows 11 machine the process terminates
-            // natively inside ApplyBackgroundAsync after the work-area probe,
-            // without a managed exception or ProcessExit marker.
-            //
-            // Theme colors remain active. Background images can still be applied
-            // later through the appearance controls after the window is stable.
-            _backgroundImage.Source = null;
-            _backgroundWash.Opacity = 0;
-            _backgroundPathText.Text = "تصویر زمینه در شروع برنامه برای پایداری موقتاً غیرفعال است.";
-            StartupDiagnostics.MarkPhase("startup-background-image-quarantined");
-            StartupDiagnostics.Log("Post-activation: background image application suppressed by startup quarantine.");
+            // The old startup image quarantine is no longer needed. Seasonal
+            // assets now use the numbered Season Carousel resolver and raster
+            // images are decoded to a bounded width. Apply the saved background
+            // only after the visual tree and calendar data are fully initialized.
+            var shouldApplyBackground =
+                (string.Equals(
+                     _settings.AppearanceMode,
+                     "elena",
+                     StringComparison.OrdinalIgnoreCase) &&
+                 _settings.UseSeasonalBackground) ||
+                (string.Equals(
+                     _settings.BackgroundMode,
+                     "custom",
+                     StringComparison.OrdinalIgnoreCase) &&
+                 !string.IsNullOrWhiteSpace(_settings.CustomBackgroundPath));
 
-            // Do not start automatic year refresh during startup in the stability
-            // build. The manual Sync action remains available and cached occasions
-            // are still rendered normally.
+            if (shouldApplyBackground)
+            {
+                StartupDiagnostics.MarkPhase("startup-background-apply-start");
+                await ApplyBackgroundAsync();
+                StartupDiagnostics.MarkPhase("startup-background-apply-complete");
+                StartupDiagnostics.Log(
+                    $"Post-activation: saved background applied. mode={_settings.AppearanceMode}; backgroundMode={_settings.BackgroundMode}.");
+            }
+            else
+            {
+                _backgroundImage.Source = null;
+                _backgroundWash.Opacity = 0;
+                _backgroundPathText.Text = "بدون تصویر زمینه";
+                StopSeasonCarousel(resetPosition: false);
+                StartupDiagnostics.Log(
+                    "Post-activation: no saved background requested.");
+            }
+
+            // Automatic year refresh remains deferred; manual Sync is still
+            // available and cached occasions are rendered normally.
             StartupDiagnostics.Log(
-                "Post-activation: automatic year occasion refresh suppressed by startup quarantine.");
+                "Post-activation: automatic year occasion refresh remains deferred.");
 
             StartInAppReminderPolling();
             StartupDiagnostics.MarkPhase("startup-ui-stable-quarantine");
@@ -1257,114 +1276,53 @@ public sealed class MainWindow : Window
 
     private FrameworkElement BuildSettingsPanelSafe()
     {
-        try
-        {
-            StartupDiagnostics.Log("Settings UI: build starting.");
-            var result = BuildSettingsPanel();
-            StartupDiagnostics.Log("Settings UI: build completed.");
-            return result;
-        }
-        catch (Exception ex)
-        {
-            StartupDiagnostics.Log($"Settings UI build failed; safe settings panel used: {ex}");
+        var requestedLevel = Math.Clamp(_settingsDiagnosticLevel, 1, 4);
+        Exception? lastError = null;
 
+        // Never replace Settings with a destructive/recovery panel.
+        // If an optional advanced section fails, keep the real Settings UI and
+        // retry without only the failing higher tier.
+        for (var level = requestedLevel; level >= 1; level--)
+        {
             try
             {
-                _settingsPanel.Children.Clear();
-                _settingsPanel.Spacing = 10;
-                _settingsPanel.Padding = new Thickness(12);
-                _settingsPanel.Visibility = Visibility.Collapsed;
+                _settingsDiagnosticLevel = level;
+                StartupDiagnostics.Log(
+                    $"Settings UI: build starting at resilient level {level}.");
 
-                _settingsPanel.Children.Add(new TextBlock
-                {
-                    Text = "تنظیمات در حالت بازیابی",
-                    FontSize = 18,
-                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-                    Foreground = ThemeService.Brush(_theme.PrimaryText)
-                });
+                var result = BuildSettingsPanel();
 
-                _settingsPanel.Children.Add(new TextBlock
-                {
-                    Text = "یکی از بخش‌های تنظیمات پیشرفته هنگام بارگذاری خطا داد. خود تقویم می‌تواند ادامه دهد و خطا در startup.log ثبت شده است.",
-                    TextWrapping = TextWrapping.Wrap,
-                    Foreground = ThemeService.Brush(_theme.SecondaryText)
-                });
+                StartupDiagnostics.Log(
+                    level == requestedLevel
+                        ? "Settings UI: full build completed."
+                        : $"Settings UI: resilient build completed at level {level}; optional higher sections were skipped.");
 
-                var reset = MakeButton("بازنشانی تنظیمات ظاهری و تایپوگرافی");
-                reset.Click += async (_, _) =>
-                {
-                    try
-                    {
-                        _settings.ColorOverrides?.Clear();
-                        _settings.FontFamilyName = "Segoe UI Variable";
-                        _settings.FontSize = 14.0;
-                        _settings.FontWeightMode = "normal";
-                        _settings.FontStyleMode = "normal";
-                        _settings.GlassMode = false;
-                        _settings.ElenaAccentId = "seasonal";
-                        _settings.ElenaDayAccentId = "seasonal";
-                        _settings.BackgroundOpacity = 0.22;
-                        _settings.UiCornerRadius = 14.0;
-                        _settingsService.Save(_settings);
-
-                        await ApplyAppearanceAsync();
-                        StatusText.Text = "تنظیمات ظاهری بازنشانی شد.";
-                    }
-                    catch (Exception resetEx)
-                    {
-                        StartupDiagnostics.Log($"Safe settings reset failed: {resetEx}");
-                        StatusText.Text = "بازنشانی تنظیمات انجام نشد؛ startup.log را بررسی کنید.";
-                    }
-                };
-                _settingsPanel.Children.Add(reset);
-
-                var openLog = MakeButton("باز کردن پوشه startup.log");
-                openLog.Click += (_, _) =>
-                {
-                    try
-                    {
-                        var folder = Path.GetDirectoryName(StartupDiagnostics.LogPath);
-                        if (!string.IsNullOrWhiteSpace(folder))
-                        {
-                            Process.Start(new ProcessStartInfo("explorer.exe", folder)
-                            {
-                                UseShellExecute = true
-                            });
-                        }
-                    }
-                    catch { }
-                };
-                _settingsPanel.Children.Add(openLog);
-
-                _settingsSurface ??= new Border
-                {
-                    CornerRadius = new CornerRadius(14),
-                    BorderThickness = new Thickness(1)
-                };
-
-                _settingsSurface.Background = BrushWithAlpha(_theme.CardBackground, 0xE0);
-                _settingsSurface.BorderBrush = ThemeService.Brush(_theme.Accent);
-
-                if (!ReferenceEquals(_settingsSurface.Child, _settingsPanel))
-                    _settingsSurface.Child = _settingsPanel;
-
-                return _settingsSurface;
+                return result;
             }
-            catch (Exception fallbackEx)
+            catch (Exception ex)
             {
-                StartupDiagnostics.Log($"Safe settings panel itself failed: {fallbackEx}");
-
-                return new Border
-                {
-                    Padding = new Thickness(10),
-                    Child = new TextBlock
-                    {
-                        Text = "Settings unavailable — see startup.log",
-                        TextWrapping = TextWrapping.Wrap
-                    }
-                };
+                lastError = ex;
+                StartupDiagnostics.Log(
+                    $"Settings UI level {level} failed; retrying lower tier: {ex}");
             }
         }
+
+        StartupDiagnostics.Log(
+            $"Settings UI unavailable after resilient retries: {lastError}");
+
+        _settingsPanel.Children.Clear();
+        _settingsPanel.Spacing = 8;
+        _settingsPanel.Padding = new Thickness(10);
+        _settingsPanel.Visibility = Visibility.Collapsed;
+        _settingsPanel.Children.Add(new TextBlock
+        {
+            Text = "تنظیمات پیشرفته در این اجرا بارگذاری نشد.",
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = ThemeService.Brush(_theme.SecondaryText)
+        });
+
+        // No reset/recovery button is intentionally exposed here.
+        return FinalizeSettingsSurface();
     }
 
     private FrameworkElement BuildSettingsPanel()
@@ -3399,6 +3357,7 @@ public sealed class MainWindow : Window
             _settingsService.Save(_settings);
 
             await ApplyAppearanceAsync();
+            await ApplyBackgroundAsync();
 
             StartupDiagnostics.Log($"Elena accent switch completed: {accentId}.");
         }
@@ -3423,6 +3382,7 @@ public sealed class MainWindow : Window
             _settingsService.Save(_settings);
 
             await ApplyAppearanceAsync();
+            await ApplyBackgroundAsync();
 
             StartupDiagnostics.Log(
                 $"Elena selected-day color switch completed: {dayAccentId}.");
@@ -4654,7 +4614,7 @@ public sealed class MainWindow : Window
 
                 var season = GetCurrentSeasonName();
                 label = path is null
-                    ? $"Elena Mode · {season} · Season Carousel · تصویری پیدا نشد"
+                    ? $"Elena Mode · {season} · Season Carousel · فایل Season_N پیدا نشد"
                     : $"Elena Mode · {season} · {ToPersianDigits((_seasonCarouselIndex + 1).ToString())}/{ToPersianDigits(seasonalFiles.Count.ToString())} · {Path.GetFileName(path)}";
             }
             else if (string.Equals(
