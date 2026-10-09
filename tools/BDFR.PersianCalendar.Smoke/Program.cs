@@ -131,6 +131,60 @@ var ordinaryBahman = officialFallbackOccasions.SingleOrDefault(
 if (ordinaryBahman is null || ordinaryBahman.IsHoliday)
     throw new Exception("Ordinary classless occasions must not be promoted to holidays.");
 
+var ramadanHolidayFixture = """
+<!doctype html>
+<html lang="fa">
+<body>
+  <section>
+    <div>9 اسفند شهادت امام علی (ع) [ ۲۱ رمضان ]</div>
+    <div>8 اسفند مناسبت آزمایشی [ ۲۰ رمضان ]</div>
+  </section>
+</body>
+</html>
+""";
+
+var ramadanOccasions = await TimeIrOccasionSource.ParseAnnualHtmlAsync(
+    ramadanHolidayFixture,
+    1405);
+
+var aliMartyrdom = ramadanOccasions.SingleOrDefault(
+    x => x.Date == new PersianDate(1405, 12, 9));
+if (aliMartyrdom is null || !aliMartyrdom.IsHoliday)
+    throw new Exception("21 Ramadan must be classified as an official holiday even without a holiday CSS class.");
+
+var ramadanRegular = ramadanOccasions.SingleOrDefault(
+    x => x.Date == new PersianDate(1405, 12, 8));
+if (ramadanRegular is null || ramadanRegular.IsHoliday)
+    throw new Exception("20 Ramadan regular fixture must remain non-holiday.");
+
+if (!CalendarDateConverter.TryConvertInput(
+        "۱۴۰۵/۰۷/۱۷",
+        CalendarSystemKind.Persian,
+        out var conversion,
+        out var conversionError))
+{
+    throw new Exception($"Persian date conversion failed: {conversionError}");
+}
+
+if (conversion.Persian != new PersianDate(1405, 7, 17))
+    throw new Exception("Persian converter returned the wrong Persian date.");
+
+var gregorianRoundTrip = CalendarDateConverter.Convert(
+    CalendarSystemKind.Gregorian,
+    conversion.Gregorian.Year,
+    conversion.Gregorian.Month,
+    conversion.Gregorian.Day);
+if (gregorianRoundTrip.Persian != conversion.Persian)
+    throw new Exception("Gregorian converter round-trip failed.");
+
+var hijriRoundTrip = CalendarDateConverter.Convert(
+    CalendarSystemKind.Hijri,
+    conversion.Hijri.Year,
+    conversion.Hijri.Month,
+    conversion.Hijri.Day);
+if (hijriRoundTrip.Gregorian != conversion.Gregorian)
+    throw new Exception("Hijri converter round-trip failed.");
+
 var dbPath = Path.Combine(Path.GetTempPath(), $"bdfr-calendar-smoke-{Guid.NewGuid():N}.db");
 try
 {
