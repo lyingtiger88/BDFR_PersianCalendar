@@ -852,6 +852,7 @@ public sealed class MainWindow : Window
         var panel = new Grid { Padding = new Thickness(24) };
         panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         panel.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
 
         var header = new Grid();
@@ -904,7 +905,31 @@ public sealed class MainWindow : Window
         Grid.SetRow(header, 0);
         panel.Children.Add(header);
 
-        var weekdays = new Grid { Margin = new Thickness(0, 20, 0, 10) };
+        var calendarTools = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Margin = new Thickness(0, 10, 0, 2),
+            FlowDirection = FlowDirection.RightToLeft
+        };
+
+        var jumpToDate = MakeButton("↗ پرش به تاریخ");
+        jumpToDate.MinWidth = 132;
+        jumpToDate.HorizontalAlignment = HorizontalAlignment.Center;
+        jumpToDate.Click += JumpToDate_Click;
+        calendarTools.Children.Add(jumpToDate);
+
+        var dateConverter = MakeButton("⇄ مبدل تاریخ");
+        dateConverter.MinWidth = 132;
+        dateConverter.HorizontalAlignment = HorizontalAlignment.Center;
+        dateConverter.Click += DateConverter_Click;
+        calendarTools.Children.Add(dateConverter);
+
+        Grid.SetRow(calendarTools, 1);
+        panel.Children.Add(calendarTools);
+
+        var weekdays = new Grid { Margin = new Thickness(0, 10, 0, 10) };
         for (var i = 0; i < 7; i++)
             weekdays.ColumnDefinitions.Add(new ColumnDefinition());
 
@@ -940,10 +965,10 @@ public sealed class MainWindow : Window
             weekdays.Children.Add(label);
         }
 
-        Grid.SetRow(weekdays, 1);
+        Grid.SetRow(weekdays, 2);
         panel.Children.Add(weekdays);
 
-        Grid.SetRow(CalendarGrid, 2);
+        Grid.SetRow(CalendarGrid, 3);
         panel.Children.Add(CalendarGrid);
 
         return panel;
@@ -5222,6 +5247,264 @@ public sealed class MainWindow : Window
             StartupDiagnostics.Log($"LoadSelectedDayAsync failed: {ex}");
             StatusText.Text = ex.Message;
         }
+    }
+
+    private async void JumpToDate_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var typeBox = BuildCalendarSystemComboBox();
+            var inputBox = new TextBox
+            {
+                Header = "تاریخ",
+                PlaceholderText = "سال/ماه/روز",
+                FlowDirection = FlowDirection.LeftToRight
+            };
+
+            void RefreshInput()
+            {
+                var conversion = CalendarDateConverter.Convert(_selected.ToDateOnly());
+                inputBox.Text = FormatConversionInput(
+                    conversion,
+                    CalendarSystemFromSelection(typeBox));
+            }
+
+            typeBox.SelectionChanged += (_, _) => RefreshInput();
+            RefreshInput();
+
+            var form = new StackPanel
+            {
+                Spacing = 10,
+                Width = 380
+            };
+            form.Children.Add(new TextBlock
+            {
+                Text = "نوع تاریخی که وارد می‌کنید را انتخاب کنید.",
+                TextWrapping = TextWrapping.Wrap,
+                Opacity = 0.68
+            });
+            form.Children.Add(typeBox);
+            form.Children.Add(inputBox);
+            form.Children.Add(new TextBlock
+            {
+                Text = "فرمت نمونه: 1405/07/17  ·  ارقام فارسی، عربی و انگلیسی پذیرفته می‌شوند.",
+                FontSize = 10.5,
+                TextWrapping = TextWrapping.Wrap,
+                Opacity = 0.62
+            });
+
+            var dialog = new ContentDialog
+            {
+                Title = "پرش به تاریخ",
+                Content = form,
+                PrimaryButtonText = "پرش",
+                CloseButtonText = "انصراف",
+                DefaultButton = ContentDialogButton.Primary
+            };
+
+            if (Content is FrameworkElement root && root.XamlRoot is not null)
+                dialog.XamlRoot = root.XamlRoot;
+
+            var result = await dialog.ShowAsync();
+            if (result != ContentDialogResult.Primary)
+                return;
+
+            var calendar = CalendarSystemFromSelection(typeBox);
+            if (!CalendarDateConverter.TryConvertInput(
+                    inputBox.Text,
+                    calendar,
+                    out var conversionResult,
+                    out var error))
+            {
+                StatusText.Text = error;
+                return;
+            }
+
+            _selected = conversionResult.Persian;
+            _year = _selected.Year;
+            _month = _selected.Month;
+
+            BuildCalendar();
+            await LoadSelectedDayAsync();
+            await LoadCalendarCellOccasionsAsync(_year, _month);
+            QueueSeasonCarouselRefreshForDisplayedMonth();
+
+            StatusText.Text =
+                $"پرش انجام شد: {ToPersianDigits(_selected.Year.ToString())}/{ToPersianDigits(_selected.Month.ToString("00"))}/{ToPersianDigits(_selected.Day.ToString("00"))}";
+        }
+        catch (Exception ex)
+        {
+            StartupDiagnostics.Log($"Jump-to-date failed: {ex}");
+            StatusText.Text = $"پرش به تاریخ انجام نشد: {ex.Message}";
+        }
+    }
+
+    private async void DateConverter_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var typeBox = BuildCalendarSystemComboBox();
+            var inputBox = new TextBox
+            {
+                Header = "تاریخ ورودی",
+                PlaceholderText = "سال/ماه/روز",
+                FlowDirection = FlowDirection.LeftToRight
+            };
+
+            var resultText = new TextBlock
+            {
+                TextWrapping = TextWrapping.Wrap,
+                LineHeight = 26,
+                FontSize = 14,
+                Foreground = ThemeService.Brush(_theme.PrimaryText)
+            };
+
+            var resultCard = new Border
+            {
+                Padding = new Thickness(12),
+                CornerRadius = new CornerRadius(12),
+                BorderBrush = BrushWithAlpha(_theme.Accent, 0xA0),
+                BorderThickness = new Thickness(1),
+                Background = BrushWithAlpha(_theme.CardBackground, 0xD8),
+                Child = resultText
+            };
+
+            void RenderConversion()
+            {
+                var calendar = CalendarSystemFromSelection(typeBox);
+
+                if (!CalendarDateConverter.TryConvertInput(
+                        inputBox.Text,
+                        calendar,
+                        out var converted,
+                        out var error))
+                {
+                    resultText.Text = error;
+                    return;
+                }
+
+                resultText.Text = FormatConversionResult(converted);
+            }
+
+            void RefreshInput()
+            {
+                var conversion = CalendarDateConverter.Convert(_selected.ToDateOnly());
+                inputBox.Text = FormatConversionInput(
+                    conversion,
+                    CalendarSystemFromSelection(typeBox));
+                RenderConversion();
+            }
+
+            typeBox.SelectionChanged += (_, _) => RefreshInput();
+
+            var convertButton = MakeButton("تبدیل");
+            convertButton.HorizontalAlignment = HorizontalAlignment.Stretch;
+            convertButton.Click += (_, _) => RenderConversion();
+
+            inputBox.TextChanged += (_, _) =>
+            {
+                if (!string.IsNullOrWhiteSpace(inputBox.Text))
+                    RenderConversion();
+            };
+
+            var form = new StackPanel
+            {
+                Spacing = 10,
+                Width = 430
+            };
+            form.Children.Add(new TextBlock
+            {
+                Text = "تقویم مبدأ را انتخاب کنید و یک تاریخ وارد کنید. معادل آن در هر سه تقویم نمایش داده می‌شود.",
+                TextWrapping = TextWrapping.Wrap,
+                Opacity = 0.68
+            });
+            form.Children.Add(typeBox);
+            form.Children.Add(inputBox);
+            form.Children.Add(convertButton);
+            form.Children.Add(resultCard);
+
+            RefreshInput();
+
+            var dialog = new ContentDialog
+            {
+                Title = "مبدل تاریخ",
+                Content = form,
+                CloseButtonText = "بستن"
+            };
+
+            if (Content is FrameworkElement root && root.XamlRoot is not null)
+                dialog.XamlRoot = root.XamlRoot;
+
+            await dialog.ShowAsync();
+        }
+        catch (Exception ex)
+        {
+            StartupDiagnostics.Log($"Date converter failed: {ex}");
+            StatusText.Text = $"مبدل تاریخ اجرا نشد: {ex.Message}";
+        }
+    }
+
+    private ComboBox BuildCalendarSystemComboBox()
+    {
+        var box = new ComboBox
+        {
+            Header = "نوع تقویم",
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            SelectedIndex = 0
+        };
+
+        box.Items.Add("شمسی");
+        box.Items.Add("میلادی");
+        box.Items.Add("قمری");
+        return box;
+    }
+
+    private static CalendarSystemKind CalendarSystemFromSelection(ComboBox box)
+        => box.SelectedIndex switch
+        {
+            1 => CalendarSystemKind.Gregorian,
+            2 => CalendarSystemKind.Hijri,
+            _ => CalendarSystemKind.Persian
+        };
+
+    private static string FormatConversionInput(
+        CalendarDateConversionResult conversion,
+        CalendarSystemKind calendar)
+        => calendar switch
+        {
+            CalendarSystemKind.Persian =>
+                $"{conversion.Persian.Year:0000}/{conversion.Persian.Month:00}/{conversion.Persian.Day:00}",
+
+            CalendarSystemKind.Gregorian =>
+                conversion.Gregorian.ToString("yyyy/MM/dd", CultureInfo.InvariantCulture),
+
+            CalendarSystemKind.Hijri =>
+                $"{conversion.Hijri.Year:0000}/{conversion.Hijri.Month:00}/{conversion.Hijri.Day:00}",
+
+            _ => conversion.Persian.ToString()
+        };
+
+    private static string FormatConversionResult(
+        CalendarDateConversionResult conversion)
+    {
+        var persianNumeric =
+            $"{ToPersianDigits(conversion.Persian.Year.ToString())}/" +
+            $"{ToPersianDigits(conversion.Persian.Month.ToString("00"))}/" +
+            $"{ToPersianDigits(conversion.Persian.Day.ToString("00"))}";
+
+        var gregorian =
+            conversion.Gregorian.ToString("yyyy/MM/dd", CultureInfo.InvariantCulture);
+
+        var hijri =
+            $"{ToArabicIndicDigits(conversion.Hijri.Year.ToString())}/" +
+            $"{ToArabicIndicDigits(conversion.Hijri.Month.ToString("00"))}/" +
+            $"{ToArabicIndicDigits(conversion.Hijri.Day.ToString("00"))} هـ";
+
+        return
+            $"شمسی:  {persianNumeric}\n" +
+            $"{conversion.Persian.ToLongPersianString()}\n\n" +
+            $"میلادی:  {gregorian}\n\n" +
+            $"قمری:  {hijri}";
     }
 
     private async void Today_Click(object sender, RoutedEventArgs e)
