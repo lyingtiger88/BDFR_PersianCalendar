@@ -3929,55 +3929,10 @@ public sealed class MainWindow : Window
     private static bool IsOfficialHolidayOccasion(
         PersianDate date,
         Occasion occasion)
-    {
-        if (occasion.IsHoliday)
-            return true;
-
-        // Fixed official holidays in the Persian calendar. This also protects
-        // against markup/class changes on time.ir where the holiday flag can be
-        // lost even though the date itself is an official holiday.
-        if (date.Month == 1 && date.Day is >= 1 and <= 4)
-            return true;
-        if (date.Month == 1 && date.Day is 12 or 13)
-            return true;
-        if (date.Month == 3 && date.Day is 14 or 15)
-            return true;
-        if (date.Month == 11 && date.Day == 22)
-            return true;
-        if (date.Month == 12 && date.Day == 29)
-            return true;
-
-        var normalized = NormalizeOccasionTitle(occasion.Title);
-
-        string[] officialReligiousKeywords =
-        [
-            "عید فطر",
-            "عید سعید فطر",
-            "عید قربان",
-            "عید غدیر",
-            "مبعث",
-            "نیمه شعبان",
-            "ولادت حضرت قائم",
-            "ولادت امام علی",
-            "میلاد امام علی",
-            "میلاد پیامبر",
-            "ولادت پیامبر",
-            "امام جعفر صادق",
-            "شهادت امام علی",
-            "شهادت امام صادق",
-            "شهادت حضرت فاطمه",
-            "رحلت رسول اکرم",
-            "رحلت پیامبر",
-            "شهادت امام حسن",
-            "شهادت امام رضا",
-            "تاسوعا",
-            "عاشورا",
-            "اربعین"
-        ];
-
-        return officialReligiousKeywords.Any(keyword =>
-            normalized.Contains(keyword, StringComparison.OrdinalIgnoreCase));
-    }
+        => OfficialHolidayClassifier.IsOfficialHoliday(
+            date,
+            occasion.Title,
+            occasion.IsHoliday);
 
     private static string GetOccasionBadge(
         string? title,
