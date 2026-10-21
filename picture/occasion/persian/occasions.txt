@@ -1,0 +1,25 @@
+# Dourvan occasion picture map — Persian / شمسی
+# فرمت هر خط:
+# عبارت موجود در عنوان|نام فایل تصویر
+#
+# برنامه ی/ک عربی، نیم‌فاصله و ارقام فارسی/عربی را نرمال می‌کند.
+# عبارت‌های طولانی‌تر اولویت بالاتری دارند.
+# برای افزودن مورد جدید، عکس را در همین پوشه بگذارید و یک خط اضافه کنید.
+
+تحویل سال|nowruz.svg
+نوروز|nowruz.svg
+سیزده بدر|nowruz.svg
+روز طبیعت|nowruz.svg
+شب یلدا|yalda.svg
+شب چله|yalda.svg
+چله تابستان|culture.svg
+سپندارمذگان|culture.svg
+سپندرمذگان|culture.svg
+اسفندگان|culture.svg
+مهرگان|culture.svg
+تیرگان|culture.svg
+جشن سده|culture.svg
+انقلاب اسلامی|national.svg
+22 بهمن|national.svg
+روز جمهوری اسلامی|national.svg
+ملی شدن صنعت نفت|national.svg

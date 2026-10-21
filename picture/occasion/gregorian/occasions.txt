@@ -1,0 +1,10 @@
+# Dourvan occasion picture map — Gregorian / میلادی
+# فرمت: عبارت موجود در عنوان|نام فایل تصویر
+# این لیست قابل توسعه است؛ عکس را در همین پوشه بگذارید و mapping را اضافه کنید.
+
+سال نو میلادی|celebration.svg
+کریسمس|celebration.svg
+ولنتاین|celebration.svg
+روز جهانی زن|general.svg
+روز جهانی کارگر|general.svg
+روز جهانی کودک|general.svg

@@ -1,0 +1,25 @@
+# Dourvan occasion picture map — Hijri / قمری
+# فرمت: عبارت موجود در عنوان|نام فایل تصویر
+# عکس‌ها را می‌توانید با فایل دلخواه جایگزین کنید.
+
+عید سعید فطر|religious.svg
+عید فطر|religious.svg
+عید قربان|religious.svg
+عید غدیر|religious.svg
+مبعث|religious.svg
+نیمه شعبان|religious.svg
+ولادت حضرت قائم|religious.svg
+میلاد پیامبر|religious.svg
+ولادت پیامبر|religious.svg
+تاسوعا|mourning.svg
+عاشورا|mourning.svg
+اربعین|mourning.svg
+شهادت امام علی|mourning.svg
+شهادت حضرت علی|mourning.svg
+شهادت امیرالمؤمنین|mourning.svg
+شهادت حضرت فاطمه|mourning.svg
+رحلت پیامبر|mourning.svg
+رحلت رسول اکرم|mourning.svg
+شهادت امام رضا|mourning.svg
+شهادت امام حسن|mourning.svg
+شهادت امام صادق|mourning.svg
