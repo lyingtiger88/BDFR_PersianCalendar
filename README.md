@@ -85,6 +85,38 @@ dotnet run --project tools/BDFR.PersianCalendar.Smoke/BDFR.PersianCalendar.Smoke
 
 Every push to `main` runs GitHub Actions checks for the Core/Infrastructure and the Windows desktop application. The Windows job also publishes an x64 test build as the `Dourvan-win-x64` workflow artifact.
 
+## Development roadmap
+
+- **Windows 11 desktop — Active development / test-ready.** WinUI 3 is the current primary client.
+- **Android — Planned.** Reuse the platform-independent Core/Infrastructure calendar, occasion and reminder logic with an Android-native client.
+- **iOS — Planned.** Reuse the shared calendar domain and data model with an iOS-native client.
+- Cross-device data compatibility and synchronization are future roadmap items; the current Windows SQLite database remains local-first.
+
+## Occasion picture mappings
+
+Occasion images are editable without changing application code. The packaged folders are:
+
+```text
+picture/occasion/persian/
+picture/occasion/hijri/
+picture/occasion/gregorian/
+```
+
+Each folder contains an `occasions.txt` mapping file. Every non-comment line uses:
+
+```text
+title phrase|image filename
+```
+
+For example:
+
+```text
+عید فطر|religious.svg
+شب یلدا|yalda.svg
+```
+
+Dourvan normalizes Persian/Arabic digits, Arabic/Persian ی/ک, and common zero-width characters before matching. Longer phrases take priority over shorter phrases. Matching images are shown both in the selected-day occasion card and as small thumbnails inside calendar day cards when occasion pictures are enabled.
+
 ## time.ir data
 
 `TimeIrOccasionSource` is isolated behind `IOccasionSource`. This intentionally keeps the application independent from the site's HTML structure. Parser failures preserve the local cache instead of corrupting calendar data.
