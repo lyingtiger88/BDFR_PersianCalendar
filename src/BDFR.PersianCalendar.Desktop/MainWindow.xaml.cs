@@ -157,7 +157,7 @@ public sealed class MainWindow : Window
         _theme = _themeService.ResolveAppearance(_settings, _month);
         _pictureService = new PictureService(_themeService);
 
-        Title = "Anahita";
+        Title = "Dourvan | دوران";
 
         try
         {
@@ -327,7 +327,7 @@ public sealed class MainWindow : Window
 
         var title = new TextBlock
         {
-            Text = "Anahita · Safe Mode",
+            Text = "Dourvan · Safe Mode",
             FontSize = 24,
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
             Foreground = new SolidColorBrush(Colors.Black),
@@ -762,7 +762,7 @@ public sealed class MainWindow : Window
 
         stack.Children.Add(new TextBlock
         {
-            Text = "Anahita",
+            Text = "دوران",
             FontSize = 24,
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
             Foreground = ThemeService.Brush(_theme.PrimaryText)
@@ -1901,7 +1901,7 @@ public sealed class MainWindow : Window
 
         var preview = new TextBlock
         {
-            Text = "آناهیتا · امروز یک روز تازه است — Anahita Calendar 1405",
+            Text = "دوران · امروز یک روز تازه است — Dourvan Calendar 1405",
             TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(2, 6, 2, 6),
             Padding = new Thickness(10),
@@ -3235,7 +3235,7 @@ public sealed class MainWindow : Window
 
         _aboutUsPanel.Children.Add(new TextBlock
         {
-            Text = $"Anahita · Version {version}",
+            Text = $"Dourvan · Version {version}",
             FontSize = 11,
             Opacity = 0.62,
             Foreground = ThemeService.Brush(_theme.SecondaryText)
