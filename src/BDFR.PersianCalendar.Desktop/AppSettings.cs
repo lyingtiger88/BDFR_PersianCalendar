@@ -54,6 +54,12 @@ public sealed class AppSettings
     // 0 = square corners, 32 = strongly rounded.
     public double UiCornerRadius { get; set; } = 14.0;
 
+    // Calendar display priority inside each day card.
+    // First = large/primary center, second = upper-right, third = lower-left.
+    public string PrimaryCalendar { get; set; } = "persian";
+    public string SecondaryCalendar { get; set; } = "hijri";
+    public string TertiaryCalendar { get; set; } = "gregorian";
+
     // Global UI typography.
     public string FontFamilyName { get; set; } = "Segoe UI Variable";
 
