@@ -3049,25 +3049,11 @@ public sealed class MainWindow : Window
                 selected ? _theme.SelectedDay : GetWeekdayColor(column),
                 selected);
 
-            if (_calendarDayNumberLabels.TryGetValue(date, out var dayLabel))
-            {
-                var holiday =
-                    date.DayOfWeek == DayOfWeek.Friday ||
-                    _calendarHolidayDates.Contains(date);
-                dayLabel.Foreground = ThemeService.Brush(
-                    holiday ? _theme.HolidayText : _theme.PrimaryText);
-                dayLabel.FontWeight = holiday
-                    ? Microsoft.UI.Text.FontWeights.SemiBold
-                    : date == PersianDate.Today()
-                        ? Microsoft.UI.Text.FontWeights.Bold
-                        : Microsoft.UI.Text.FontWeights.Normal;
-            }
-
-            if (_calendarGregorianDayLabels.TryGetValue(date, out var gregorian))
-                gregorian.Foreground = ThemeService.Brush(_theme.SecondaryText);
-            if (_calendarHijriDayLabels.TryGetValue(date, out var hijri))
-                hijri.Foreground = ThemeService.Brush(_theme.SecondaryText);
+            // Calendar number typography and holiday color are applied
+            // after the loop according to the saved first/second/third order.
         }
+
+        ApplyCalendarOrderTypography();
 
         foreach (var text in _calendarHolidayOccasionLabels)
             text.Foreground = ThemeService.Brush(_theme.HolidayText);
@@ -6500,30 +6486,209 @@ public sealed class MainWindow : Window
             _ => $"{occasion.Month}/{occasion.Day}"
         };
 
-    private void ApplySecondaryCalendarTypography()
+    private void NormalizeCalendarOrderSettings()
     {
+        var requested = new[]
+        {
+            NormalizeCalendarKey(_settings.PrimaryCalendar),
+            NormalizeCalendarKey(_settings.SecondaryCalendar),
+            NormalizeCalendarKey(_settings.TertiaryCalendar)
+        };
+
+        var normalized = new List<string>(3);
+        foreach (var key in requested)
+        {
+            if (!normalized.Contains(key, StringComparer.OrdinalIgnoreCase))
+                normalized.Add(key);
+        }
+
+        foreach (var fallback in new[] { "persian", "hijri", "gregorian" })
+        {
+            if (!normalized.Contains(fallback, StringComparer.OrdinalIgnoreCase))
+                normalized.Add(fallback);
+        }
+
+        _settings.PrimaryCalendar = normalized[0];
+        _settings.SecondaryCalendar = normalized[1];
+        _settings.TertiaryCalendar = normalized[2];
+    }
+
+    private IReadOnlyList<string> GetCalendarOrderKeys()
+    {
+        NormalizeCalendarOrderSettings();
+        return
+        [
+            _settings.PrimaryCalendar,
+            _settings.SecondaryCalendar,
+            _settings.TertiaryCalendar
+        ];
+    }
+
+    private void SaveCalendarOrder(IReadOnlyList<string> order)
+    {
+        if (order.Count < 3)
+            return;
+
+        _settings.PrimaryCalendar = NormalizeCalendarKey(order[0]);
+        _settings.SecondaryCalendar = NormalizeCalendarKey(order[1]);
+        _settings.TertiaryCalendar = NormalizeCalendarKey(order[2]);
+        NormalizeCalendarOrderSettings();
+        _settingsService.Save(_settings);
+    }
+
+    private static string NormalizeCalendarKey(string? key)
+        => (key ?? string.Empty).Trim().ToLowerInvariant() switch
+        {
+            "gregorian" or "میلادی" => "gregorian",
+            "hijri" or "قمری" => "hijri",
+            _ => "persian"
+        };
+
+    private static string CalendarDisplayName(string? key)
+        => NormalizeCalendarKey(key) switch
+        {
+            "gregorian" => "میلادی",
+            "hijri" => "قمری",
+            _ => "شمسی"
+        };
+
+    private void ConfigureCalendarDateLabel(
+        TextBlock label,
+        string calendarKey,
+        int slot,
+        bool isHoliday)
+    {
+        var key = NormalizeCalendarKey(calendarKey);
         var scale = Math.Clamp(_settings.FontSize / 14.0, 0.72, 1.72);
 
-        foreach (var label in _calendarGregorianDayLabels.Values)
+        label.FontFamily = key switch
         {
-            label.FontFamily = new FontFamily("Segoe UI Variable");
-            label.FontSize = Math.Clamp(10.5 * scale, 8.5, 18.0);
-            label.FlowDirection = FlowDirection.LeftToRight;
-            label.Foreground = ThemeService.Brush(_theme.SecondaryText);
-        }
+            "gregorian" => new FontFamily("Segoe UI Variable"),
+            "hijri" => new FontFamily("Traditional Arabic"),
+            _ => ResolveUserFont()
+        };
 
-        foreach (var label in _calendarHijriDayLabels.Values)
+        label.FlowDirection = key == "gregorian"
+            ? FlowDirection.LeftToRight
+            : FlowDirection.RightToLeft;
+
+        label.FontSize = slot switch
         {
-            label.FontFamily = new FontFamily("Traditional Arabic");
-            label.FontSize = Math.Clamp(11.5 * scale, 9.0, 19.0);
-            label.FlowDirection = FlowDirection.RightToLeft;
-            label.Foreground = ThemeService.Brush(_theme.SecondaryText);
-        }
+            0 => Math.Clamp(17.0 * scale, 13.0, 29.0),
+            1 => Math.Clamp(11.5 * scale, 9.0, 19.0),
+            _ => Math.Clamp(10.5 * scale, 8.5, 18.0)
+        };
 
-        GregorianDateText.FontFamily = new FontFamily("Segoe UI Variable");
-        GregorianDateText.FlowDirection = FlowDirection.LeftToRight;
-        HijriDateText.FontFamily = new FontFamily("Traditional Arabic");
-        HijriDateText.FlowDirection = FlowDirection.RightToLeft;
+        label.FontWeight = slot == 0
+            ? Microsoft.UI.Text.FontWeights.Bold
+            : Microsoft.UI.Text.FontWeights.Normal;
+
+        label.Opacity = slot == 0 ? 1.0 : 0.82;
+        label.Foreground = slot == 0
+            ? ThemeService.Brush(
+                isHoliday ? _theme.HolidayText : _theme.PrimaryText)
+            : ThemeService.Brush(_theme.SecondaryText);
+
+        label.HorizontalAlignment = slot switch
+        {
+            0 => HorizontalAlignment.Center,
+            1 => HorizontalAlignment.Right,
+            _ => HorizontalAlignment.Left
+        };
+
+        label.VerticalAlignment = slot == 2
+            ? VerticalAlignment.Bottom
+            : VerticalAlignment.Center;
+
+        label.Margin = slot == 2
+            ? new Thickness(2, 0, 0, 1)
+            : new Thickness(0);
+    }
+
+    private void ApplyCalendarOrderTypography()
+    {
+        var order = GetCalendarOrderKeys();
+
+        foreach (var date in _calendarDayNumberLabels.Keys)
+        {
+            var holiday =
+                date.DayOfWeek == DayOfWeek.Friday ||
+                _calendarHolidayDates.Contains(date);
+
+            TextBlock? ResolveLabel(string key)
+                => NormalizeCalendarKey(key) switch
+                {
+                    "gregorian" => _calendarGregorianDayLabels.GetValueOrDefault(date),
+                    "hijri" => _calendarHijriDayLabels.GetValueOrDefault(date),
+                    _ => _calendarDayNumberLabels.GetValueOrDefault(date)
+                };
+
+            var primary = ResolveLabel(order[0]);
+            var secondary = ResolveLabel(order[1]);
+            var tertiary = ResolveLabel(order[2]);
+
+            if (primary is not null)
+            {
+                ConfigureCalendarDateLabel(primary, order[0], 0, holiday);
+                _calendarPrimaryDayLabels[date] = primary;
+            }
+
+            if (secondary is not null)
+                ConfigureCalendarDateLabel(secondary, order[1], 1, false);
+
+            if (tertiary is not null)
+                ConfigureCalendarDateLabel(tertiary, order[2], 2, false);
+        }
+    }
+
+    private void ApplySelectedDateCalendarOrder()
+    {
+        var conversion = CalendarDateConverter.Convert(_selected.ToDateOnly());
+        var order = GetCalendarOrderKeys();
+        var slots = new[] { SelectedDateTitle, GregorianDateText, HijriDateText };
+
+        for (var index = 0; index < slots.Length; index++)
+        {
+            var key = NormalizeCalendarKey(order[index]);
+            var block = slots[index];
+
+            block.Text = key switch
+            {
+                "gregorian" =>
+                    $"میلادی · {conversion.Gregorian:yyyy-MM-dd}",
+                "hijri" =>
+                    $"هجری قمری · {FormatHijriDate(conversion.Gregorian)}",
+                _ =>
+                    conversion.Persian.ToLongPersianString()
+            };
+
+            block.FontFamily = key switch
+            {
+                "gregorian" => new FontFamily("Segoe UI Variable"),
+                "hijri" => new FontFamily("Traditional Arabic"),
+                _ => ResolveUserFont()
+            };
+
+            block.FlowDirection = key == "gregorian"
+                ? FlowDirection.LeftToRight
+                : FlowDirection.RightToLeft;
+
+            block.FontSize = index switch
+            {
+                0 => 24,
+                1 => 13.5,
+                _ => 12.5
+            };
+
+            block.FontWeight = index == 0
+                ? Microsoft.UI.Text.FontWeights.SemiBold
+                : Microsoft.UI.Text.FontWeights.Normal;
+
+            block.Opacity = index == 0 ? 1.0 : 0.65;
+            block.Foreground = index == 0
+                ? ThemeService.Brush(_theme.PrimaryText)
+                : ThemeService.Brush(_theme.SecondaryText);
+        }
     }
 
     private static string FormatHijriDate(DateOnly gregorianDate)
