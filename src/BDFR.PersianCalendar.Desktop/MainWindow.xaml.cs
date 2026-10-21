@@ -4876,27 +4876,13 @@ public sealed class MainWindow : Window
             var cell = cells[i];
             var dayNumber = new TextBlock
             {
-                Text = ToPersianDigits(cell.Date.Day.ToString()),
-                FontSize = 17,
-                FontWeight = Microsoft.UI.Text.FontWeights.Bold,
-                HorizontalAlignment = HorizontalAlignment.Center,
-                Foreground = cell.Date.DayOfWeek == DayOfWeek.Friday
-                    ? ThemeService.Brush(_theme.HolidayText)
-                    : ThemeService.Brush(_theme.PrimaryText)
+                Text = ToPersianDigits(cell.Date.Day.ToString())
             };
 
             var gregorianDate = cell.Date.ToDateOnly();
             var gregorianDayNumber = new TextBlock
             {
-                Text = gregorianDate.Day.ToString(CultureInfo.InvariantCulture),
-                FontSize = 10.5,
-                FontFamily = new FontFamily("Segoe UI Variable"),
-                FlowDirection = FlowDirection.LeftToRight,
-                HorizontalAlignment = HorizontalAlignment.Left,
-                VerticalAlignment = VerticalAlignment.Bottom,
-                Margin = new Thickness(2, 0, 0, 1),
-                Foreground = ThemeService.Brush(_theme.SecondaryText),
-                Opacity = 0.82
+                Text = gregorianDate.Day.ToString(CultureInfo.InvariantCulture)
             };
 
             var gregorianDateTime = gregorianDate.ToDateTime(TimeOnly.MinValue);
@@ -4907,16 +4893,14 @@ public sealed class MainWindow : Window
 
             var hijriDayNumber = new TextBlock
             {
-                Text = ToArabicIndicDigits(hijriDay.ToString(CultureInfo.InvariantCulture)),
-                FontSize = 11.5,
-                FontFamily = new FontFamily("Traditional Arabic"),
-                FlowDirection = FlowDirection.RightToLeft,
-                HorizontalAlignment = HorizontalAlignment.Right,
-                VerticalAlignment = VerticalAlignment.Center,
-                Foreground = ThemeService.Brush(_theme.SecondaryText),
-                Opacity = 0.82
+                Text = ToArabicIndicDigits(hijriDay.ToString(CultureInfo.InvariantCulture))
             };
 
+            ToolTipService.SetToolTip(
+                dayNumber,
+                $"شمسی: {ToPersianDigits(cell.Date.Year.ToString())}/" +
+                $"{ToPersianDigits(cell.Date.Month.ToString("00"))}/" +
+                $"{ToPersianDigits(cell.Date.Day.ToString("00"))}");
             ToolTipService.SetToolTip(
                 gregorianDayNumber,
                 $"میلادی: {gregorianDate:yyyy-MM-dd}");
@@ -4926,20 +4910,48 @@ public sealed class MainWindow : Window
                 $"{ToArabicIndicDigits(hijriMonth.ToString("00", CultureInfo.InvariantCulture))}/" +
                 $"{ToArabicIndicDigits(hijriDay.ToString("00", CultureInfo.InvariantCulture))}");
 
+            TextBlock LabelForCalendar(string key)
+                => NormalizeCalendarKey(key) switch
+                {
+                    "gregorian" => gregorianDayNumber,
+                    "hijri" => hijriDayNumber,
+                    _ => dayNumber
+                };
+
+            var order = GetCalendarOrderKeys();
+            var primaryLabel = LabelForCalendar(order[0]);
+            var secondaryLabel = LabelForCalendar(order[1]);
+            var tertiaryLabel = LabelForCalendar(order[2]);
+
+            ConfigureCalendarDateLabel(
+                primaryLabel,
+                order[0],
+                slot: 0,
+                isHoliday: cell.Date.DayOfWeek == DayOfWeek.Friday);
+            ConfigureCalendarDateLabel(
+                secondaryLabel,
+                order[1],
+                slot: 1,
+                isHoliday: false);
+            ConfigureCalendarDateLabel(
+                tertiaryLabel,
+                order[2],
+                slot: 2,
+                isHoliday: false);
+
             var dateHeader = new Grid
             {
                 HorizontalAlignment = HorizontalAlignment.Stretch,
                 FlowDirection = FlowDirection.LeftToRight
             };
-            // Equal side gutters keep the bold Persian day visually centered.
             dateHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(30) });
             dateHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             dateHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(30) });
 
-            Grid.SetColumn(dayNumber, 1);
-            dateHeader.Children.Add(dayNumber);
-            Grid.SetColumn(hijriDayNumber, 2);
-            dateHeader.Children.Add(hijriDayNumber);
+            Grid.SetColumn(primaryLabel, 1);
+            dateHeader.Children.Add(primaryLabel);
+            Grid.SetColumn(secondaryLabel, 2);
+            dateHeader.Children.Add(secondaryLabel);
 
             var occasionPanel = new StackPanel
             {
@@ -4983,8 +4995,6 @@ public sealed class MainWindow : Window
             };
             cellLayer.Children.Add(content);
 
-            // Physical overlay: force LTR coordinates so "Left" always means the
-            // actual left edge even though the rest of the calendar is RTL.
             var physicalOverlay = new Grid
             {
                 HorizontalAlignment = HorizontalAlignment.Stretch,
@@ -4992,7 +5002,7 @@ public sealed class MainWindow : Window
                 FlowDirection = FlowDirection.LeftToRight,
                 IsHitTestVisible = false
             };
-            physicalOverlay.Children.Add(gregorianDayNumber);
+            physicalOverlay.Children.Add(tertiaryLabel);
             physicalOverlay.Children.Add(mourningRibbon);
             cellLayer.Children.Add(physicalOverlay);
 
@@ -5037,6 +5047,7 @@ public sealed class MainWindow : Window
             _calendarDayNumberLabels[captured] = dayNumber;
             _calendarGregorianDayLabels[captured] = gregorianDayNumber;
             _calendarHijriDayLabels[captured] = hijriDayNumber;
+            _calendarPrimaryDayLabels[captured] = primaryLabel;
             _calendarMourningRibbons[captured] = mourningRibbon;
             _calendarCellButtons[captured] = button;
 
@@ -5046,7 +5057,7 @@ public sealed class MainWindow : Window
         }
 
         ApplyUserFont(CalendarGrid);
-        ApplySecondaryCalendarTypography();
+        ApplyCalendarOrderTypography();
         ApplyCornerRadiusLive(CalendarGrid);
 
         if (_postActivationInitializationStarted)
@@ -5106,7 +5117,51 @@ public sealed class MainWindow : Window
                             : ThemeService.Brush(_theme.PrimaryText)
                     };
 
-                    panel.Children.Add(occasionLabel);
+                    if (_settings.ShowOccasionPictures)
+                    {
+                        var picturePath = _pictureService.ResolveOccasionPicture(occasion);
+                        var pictureSource = await PictureService.LoadImageAsync(
+                            picturePath,
+                            decodePixelWidth: 64);
+
+                        if (pictureSource is not null)
+                        {
+                            var occasionRow = new Grid
+                            {
+                                ColumnSpacing = 4,
+                                HorizontalAlignment = HorizontalAlignment.Stretch,
+                                FlowDirection = FlowDirection.LeftToRight
+                            };
+                            occasionRow.ColumnDefinitions.Add(
+                                new ColumnDefinition { Width = new GridLength(20) });
+                            occasionRow.ColumnDefinitions.Add(
+                                new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+                            var picture = new Image
+                            {
+                                Width = 18,
+                                Height = 18,
+                                Stretch = Stretch.UniformToFill,
+                                VerticalAlignment = VerticalAlignment.Top
+                            };
+                            picture.Source = pictureSource;
+
+                            Grid.SetColumn(picture, 0);
+                            occasionRow.Children.Add(picture);
+                            Grid.SetColumn(occasionLabel, 1);
+                            occasionRow.Children.Add(occasionLabel);
+                            panel.Children.Add(occasionRow);
+                        }
+                        else
+                        {
+                            panel.Children.Add(occasionLabel);
+                        }
+                    }
+                    else
+                    {
+                        panel.Children.Add(occasionLabel);
+                    }
+
                     if (effectiveHoliday)
                         _calendarHolidayOccasionLabels.Add(occasionLabel);
                 }
@@ -5131,10 +5186,10 @@ public sealed class MainWindow : Window
                     _calendarHolidayDates.Remove(date);
 
                 if ((date.DayOfWeek == DayOfWeek.Friday || hasOfficialHoliday) &&
-                    _calendarDayNumberLabels.TryGetValue(date, out var dayLabel))
+                    _calendarPrimaryDayLabels.TryGetValue(date, out var dayLabel))
                 {
                     dayLabel.Foreground = ThemeService.Brush(_theme.HolidayText);
-                    dayLabel.FontWeight = Microsoft.UI.Text.FontWeights.SemiBold;
+                    dayLabel.FontWeight = Microsoft.UI.Text.FontWeights.Bold;
                 }
 
                 var hasMourningHoliday = snapshot.Occasions.Any(
@@ -5208,10 +5263,7 @@ public sealed class MainWindow : Window
         try
         {
             var snapshot = await _repository.GetDayAsync(_selected);
-            SelectedDateTitle.Text = _selected.ToLongPersianString();
-            var selectedGregorian = _selected.ToDateOnly();
-            GregorianDateText.Text = $"Gregorian · {selectedGregorian:yyyy-MM-dd}";
-            HijriDateText.Text = $"هجری قمری · {FormatHijriDate(selectedGregorian)}";
+            ApplySelectedDateCalendarOrder();
             NoteBox.Text = snapshot.Note?.Text ?? string.Empty;
 
             OccasionsPanel.Children.Clear();
