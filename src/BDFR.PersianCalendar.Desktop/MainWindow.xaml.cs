@@ -101,6 +101,7 @@ public sealed class MainWindow : Window
     private readonly Dictionary<PersianDate, TextBlock> _calendarDayNumberLabels = new();
     private readonly Dictionary<PersianDate, TextBlock> _calendarGregorianDayLabels = new();
     private readonly Dictionary<PersianDate, TextBlock> _calendarHijriDayLabels = new();
+    private readonly Dictionary<PersianDate, TextBlock> _calendarPrimaryDayLabels = new();
     private readonly Dictionary<PersianDate, Border> _calendarMourningRibbons = new();
     private readonly Dictionary<PersianDate, Button> _calendarCellButtons = new();
     private readonly HashSet<PersianDate> _calendarHolidayDates = new();
@@ -138,12 +139,14 @@ public sealed class MainWindow : Window
         _settingsService = new SettingsService();
         _themeService = new ThemeService();
         _settings = _settingsService.Load();
+        NormalizeCalendarOrderSettings();
         _settingsService.Save(_settings);
         StartupDiagnostics.Log(
             $"Appearance settings: mode={_settings.AppearanceMode}; theme={_settings.ThemeId}; " +
             $"glass={_settings.GlassMode}; font={_settings.FontFamilyName}/{_settings.FontSize:0.##}; " +
             $"colorOverrides={_settings.ColorOverrides.Count}; backgroundMode={_settings.BackgroundMode}; " +
-            $"backgroundOpacity={_settings.BackgroundOpacity:0.##}.");
+            $"backgroundOpacity={_settings.BackgroundOpacity:0.##}; " +
+            $"calendarOrder={string.Join(">", GetCalendarOrderKeys())}.");
 
         if (_settings.GlassMode)
         {
@@ -1459,6 +1462,83 @@ public sealed class MainWindow : Window
             Opacity = 0.62,
             Foreground = ThemeService.Brush(_theme.SecondaryText)
         });
+
+        _settingsPanel.Children.Add(new Border
+        {
+            Height = 1,
+            Margin = new Thickness(0, 6, 0, 4),
+            Background = BrushWithAlpha(_theme.SecondaryText, 0x30)
+        });
+
+        _settingsPanel.Children.Add(new TextBlock
+        {
+            Text = "ترتیب نمایش تقویم‌ها",
+            FontSize = 15,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Foreground = ThemeService.Brush(_theme.PrimaryText)
+        });
+
+        _settingsPanel.Children.Add(new TextBlock
+        {
+            Text = "اولی عدد بزرگ و اصلی وسط کارت است؛ دومی بالا-راست و سومی پایین-چپ. روی هر دکمه بزنید تا گزینه بعدی جابه‌جا شود.",
+            FontSize = 10.5,
+            TextWrapping = TextWrapping.Wrap,
+            Opacity = 0.62,
+            Foreground = ThemeService.Brush(_theme.SecondaryText)
+        });
+
+        var calendarOrder = GetCalendarOrderKeys().ToList();
+        var calendarOrderButtons = new List<Button>();
+        var slotLabels = new[] { "تقویم اول (اصلی)", "تقویم دوم", "تقویم سوم" };
+
+        void RefreshCalendarOrderButtons()
+        {
+            for (var index = 0; index < calendarOrderButtons.Count; index++)
+            {
+                calendarOrderButtons[index].Content =
+                    $"{slotLabels[index]}: {CalendarDisplayName(calendarOrder[index])}  ↻";
+            }
+        }
+
+        void CycleCalendarOrder(int index)
+        {
+            var allKeys = new[] { "persian", "hijri", "gregorian" };
+            var current = calendarOrder[index];
+            var currentPosition = Array.FindIndex(
+                allKeys,
+                x => string.Equals(x, current, StringComparison.OrdinalIgnoreCase));
+            var next = allKeys[(Math.Max(0, currentPosition) + 1) % allKeys.Length];
+
+            var duplicateIndex = calendarOrder.FindIndex(
+                x => string.Equals(x, next, StringComparison.OrdinalIgnoreCase));
+
+            if (duplicateIndex >= 0 && duplicateIndex != index)
+                (calendarOrder[index], calendarOrder[duplicateIndex]) =
+                    (calendarOrder[duplicateIndex], calendarOrder[index]);
+            else
+                calendarOrder[index] = next;
+
+            SaveCalendarOrder(calendarOrder);
+            RefreshCalendarOrderButtons();
+            BuildCalendar();
+            _ = LoadSelectedDayAsync();
+
+            StatusText.Text =
+                $"ترتیب تقویم‌ها: {CalendarDisplayName(calendarOrder[0])} ← " +
+                $"{CalendarDisplayName(calendarOrder[1])} ← " +
+                $"{CalendarDisplayName(calendarOrder[2])}";
+        }
+
+        for (var index = 0; index < 3; index++)
+        {
+            var capturedIndex = index;
+            var button = MakeButton("");
+            button.Click += (_, _) => CycleCalendarOrder(capturedIndex);
+            calendarOrderButtons.Add(button);
+            _settingsPanel.Children.Add(button);
+        }
+
+        RefreshCalendarOrderButtons();
 
         if (isElena)
         {
@@ -4779,6 +4859,7 @@ public sealed class MainWindow : Window
         _calendarDayNumberLabels.Clear();
         _calendarGregorianDayLabels.Clear();
         _calendarHijriDayLabels.Clear();
+        _calendarPrimaryDayLabels.Clear();
         _calendarMourningRibbons.Clear();
         _calendarCellButtons.Clear();
         _calendarHolidayDates.Clear();
