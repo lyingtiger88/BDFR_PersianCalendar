@@ -152,6 +152,14 @@ jobs:
             Copy-Item -Path "$seasonSource\*" -Destination $seasonPatch -Force
           }
 
+          # Include editable occasion-picture mappings and their assets.
+          $occasionSource = Join-Path $publish "picture\occasion"
+          $occasionPatch = Join-Path $patch "picture\occasion"
+          if (Test-Path $occasionSource) {
+            New-Item -ItemType Directory -Force -Path $occasionPatch | Out-Null
+            Copy-Item -Path "$occasionSource\*" -Destination $occasionPatch -Recurse -Force
+          }
+
           @"
           Dourvan lightweight debug patch
           ===============================
