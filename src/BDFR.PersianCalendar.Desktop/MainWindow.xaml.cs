@@ -157,7 +157,7 @@ public sealed class MainWindow : Window
         _theme = _themeService.ResolveAppearance(_settings, _month);
         _pictureService = new PictureService(_themeService);
 
-        Title = "Dourvan | دوران";
+        Title = "Dourvan | دروان";
 
         try
         {
@@ -762,7 +762,7 @@ public sealed class MainWindow : Window
 
         stack.Children.Add(new TextBlock
         {
-            Text = "دوران",
+            Text = "دروان",
             FontSize = 24,
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
             Foreground = ThemeService.Brush(_theme.PrimaryText)
@@ -1901,7 +1901,7 @@ public sealed class MainWindow : Window
 
         var preview = new TextBlock
         {
-            Text = "دوران · امروز یک روز تازه است — Dourvan Calendar 1405",
+            Text = "دروان · امروز یک روز تازه است — Dourvan Calendar 1405",
             TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(2, 6, 2, 6),
             Padding = new Thickness(10),

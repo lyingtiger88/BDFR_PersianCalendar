@@ -1,6 +1,6 @@
-# Dourvan | دوران
+# Dourvan | دروان
 
-Dourvan (دوران) is a native, Persian-first calendar, planner, occasions and reminder application for Windows 11, created by BDFR.
+Dourvan (دروان) is a native, Persian-first calendar, planner, occasions and reminder application for Windows 11, created by BDFR.
 
 ## Current development build
 

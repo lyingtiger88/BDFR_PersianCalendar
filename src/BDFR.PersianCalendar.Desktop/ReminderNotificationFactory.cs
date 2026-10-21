@@ -13,7 +13,7 @@ internal static class ReminderNotificationFactory
             : reminder.Title;
 
         var body = reminder.Privacy == PrivacyLevel.Private
-            ? "برای مشاهده جزئیات، برنامه دوران را باز کنید."
+            ? "برای مشاهده جزئیات، برنامه دروان را باز کنید."
             : reminder.Body;
 
         return new AppNotificationBuilder()
