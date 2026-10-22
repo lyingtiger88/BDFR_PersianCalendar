@@ -49,8 +49,14 @@ public sealed record ZurvanCloudObjectMetadata(
     DateTimeOffset ModifiedAtUtc,
     string OriginDeviceId);
 
-public sealed record ZurvanCloudEncryptedObject(
+public sealed record ZurvanCloudPlainObject(
     ZurvanCloudObjectMetadata Metadata,
+    string PayloadBase64);
+
+public sealed record ZurvanCloudEncryptedObject(
+    int ProtocolVersion,
+    string VaultId,
+    string ObjectId,
     string NonceBase64,
     string CiphertextBase64,
     string TagBase64);
@@ -107,9 +113,6 @@ public static class ZurvanCloudSecretNames
 
 public static class ZurvanCloudCrypto
 {
-    private static readonly byte[] AssociatedDataPrefix =
-        Encoding.UTF8.GetBytes("zurvan-cloud-v1");
-
     public static byte[] CreateVaultKey()
         => RandomNumberGenerator.GetBytes(32);
 
@@ -153,20 +156,32 @@ public static class ZurvanCloudCrypto
         try
         {
             var nonce = RandomNumberGenerator.GetBytes(12);
-            var ciphertext = new byte[plaintext.Length];
+            var plainObject = new ZurvanCloudPlainObject(
+                metadata,
+                Convert.ToBase64String(plaintext));
+
+            var plainBytes = JsonSerializer.SerializeToUtf8Bytes(plainObject);
+            var ciphertext = new byte[plainBytes.Length];
             var tag = new byte[16];
-            var aad = BuildAssociatedData(metadata);
+            var aad = BuildAssociatedData(
+                metadata.ProtocolVersion,
+                metadata.VaultId,
+                metadata.ObjectId);
 
             using var aes = new AesGcm(objectKey, tag.Length);
             aes.Encrypt(
                 nonce,
-                plaintext,
+                plainBytes,
                 ciphertext,
                 tag,
                 aad);
 
+            CryptographicOperations.ZeroMemory(plainBytes);
+
             return new ZurvanCloudEncryptedObject(
-                metadata,
+                metadata.ProtocolVersion,
+                metadata.VaultId,
+                metadata.ObjectId,
                 Convert.ToBase64String(nonce),
                 Convert.ToBase64String(ciphertext),
                 Convert.ToBase64String(tag));
@@ -183,35 +198,63 @@ public static class ZurvanCloudCrypto
     {
         ValidateVaultKey(vaultKey);
 
-        if (encrypted.Metadata.ProtocolVersion !=
-            ZurvanCloudProtocol.CurrentVersion)
+        if (encrypted.ProtocolVersion != ZurvanCloudProtocol.CurrentVersion)
         {
             throw new NotSupportedException(
-                $"Unsupported Zurvan Cloud protocol version: {encrypted.Metadata.ProtocolVersion}");
+                $"Unsupported Zurvan Cloud protocol version: {encrypted.ProtocolVersion}");
         }
 
         var objectKey = DeriveObjectKey(
             vaultKey,
-            encrypted.Metadata.VaultId,
-            encrypted.Metadata.ObjectId);
+            encrypted.VaultId,
+            encrypted.ObjectId);
 
         try
         {
             var nonce = Convert.FromBase64String(encrypted.NonceBase64);
             var ciphertext = Convert.FromBase64String(encrypted.CiphertextBase64);
             var tag = Convert.FromBase64String(encrypted.TagBase64);
-            var plaintext = new byte[ciphertext.Length];
-            var aad = BuildAssociatedData(encrypted.Metadata);
+            var plainBytes = new byte[ciphertext.Length];
+            var aad = BuildAssociatedData(
+                encrypted.ProtocolVersion,
+                encrypted.VaultId,
+                encrypted.ObjectId);
 
             using var aes = new AesGcm(objectKey, tag.Length);
             aes.Decrypt(
                 nonce,
                 ciphertext,
                 tag,
-                plaintext,
+                plainBytes,
                 aad);
 
-            return plaintext;
+            try
+            {
+                var plainObject =
+                    JsonSerializer.Deserialize<ZurvanCloudPlainObject>(plainBytes)
+                    ?? throw new InvalidOperationException(
+                        "Zurvan Cloud decrypted object is empty.");
+
+                if (plainObject.Metadata.ProtocolVersion != encrypted.ProtocolVersion ||
+                    !string.Equals(
+                        plainObject.Metadata.VaultId,
+                        encrypted.VaultId,
+                        StringComparison.Ordinal) ||
+                    !string.Equals(
+                        plainObject.Metadata.ObjectId,
+                        encrypted.ObjectId,
+                        StringComparison.Ordinal))
+                {
+                    throw new CryptographicException(
+                        "Zurvan Cloud encrypted header does not match its protected metadata.");
+                }
+
+                return Convert.FromBase64String(plainObject.PayloadBase64);
+            }
+            finally
+            {
+                CryptographicOperations.ZeroMemory(plainBytes);
+            }
         }
         finally
         {
@@ -241,15 +284,11 @@ public static class ZurvanCloudCrypto
     }
 
     private static byte[] BuildAssociatedData(
-        ZurvanCloudObjectMetadata metadata)
-    {
-        var metadataJson = JsonSerializer.SerializeToUtf8Bytes(metadata);
-        var aad = new byte[AssociatedDataPrefix.Length + 1 + metadataJson.Length];
-        AssociatedDataPrefix.CopyTo(aad, 0);
-        aad[AssociatedDataPrefix.Length] = 0;
-        metadataJson.CopyTo(aad, AssociatedDataPrefix.Length + 1);
-        return aad;
-    }
+        int protocolVersion,
+        string vaultId,
+        string objectId)
+        => Encoding.UTF8.GetBytes(
+            $"zurvan-cloud-v1|{protocolVersion}|{vaultId}|{objectId}");
 
     private static void ValidateVaultKey(ReadOnlySpan<byte> key)
     {
