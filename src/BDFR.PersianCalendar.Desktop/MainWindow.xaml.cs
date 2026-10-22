@@ -160,7 +160,7 @@ public sealed class MainWindow : Window
         _theme = _themeService.ResolveAppearance(_settings, _month);
         _pictureService = new PictureService(_themeService);
 
-        Title = "Dourvan | دروان";
+        Title = "Zurvan | زروان";
 
         try
         {
@@ -330,7 +330,7 @@ public sealed class MainWindow : Window
 
         var title = new TextBlock
         {
-            Text = "Dourvan · Safe Mode",
+            Text = "Zurvan · Safe Mode",
             FontSize = 24,
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
             Foreground = new SolidColorBrush(Colors.Black),
@@ -765,7 +765,7 @@ public sealed class MainWindow : Window
 
         stack.Children.Add(new TextBlock
         {
-            Text = "دروان",
+            Text = "زروان",
             FontSize = 24,
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
             Foreground = ThemeService.Brush(_theme.PrimaryText)
@@ -1981,7 +1981,7 @@ public sealed class MainWindow : Window
 
         var preview = new TextBlock
         {
-            Text = "دروان · امروز یک روز تازه است — Dourvan Calendar 1405",
+            Text = "زروان · امروز یک روز تازه است — Zurvan Calendar 1405",
             TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(2, 6, 2, 6),
             Padding = new Thickness(10),
@@ -3301,7 +3301,7 @@ public sealed class MainWindow : Window
 
         _aboutUsPanel.Children.Add(new TextBlock
         {
-            Text = $"Dourvan · Version {version}",
+            Text = $"Zurvan · Version {version}",
             FontSize = 11,
             Opacity = 0.62,
             Foreground = ThemeService.Brush(_theme.SecondaryText)

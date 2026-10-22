@@ -101,25 +101,25 @@ jobs:
             -p:PublishSingleFile=false `
             -p:AnahitaGitCommit="${{ github.sha }}" `
             -p:AnahitaBuildNumber="${{ github.run_number }}" `
-            -o artifacts/Dourvan-win-x64
+            -o artifacts/Zurvan-win-x64
 
       - name: Package portable test ZIP
         shell: pwsh
         run: |
           Compress-Archive `
-            -Path artifacts/Dourvan-win-x64/* `
-            -DestinationPath artifacts/Dourvan-win-x64.zip `
+            -Path artifacts/Zurvan-win-x64/* `
+            -DestinationPath artifacts/Zurvan-win-x64.zip `
             -Force
 
-          (Get-FileHash artifacts/Dourvan-win-x64.zip -Algorithm SHA256).Hash |
-            Out-File artifacts/Dourvan-win-x64.zip.sha256 -Encoding ascii
+          (Get-FileHash artifacts/Zurvan-win-x64.zip -Algorithm SHA256).Hash |
+            Out-File artifacts/Zurvan-win-x64.zip.sha256 -Encoding ascii
 
       - name: Package lightweight debug patch
         if: github.event_name == 'push'
         shell: pwsh
         run: |
-          $publish = Join-Path $env:GITHUB_WORKSPACE "artifacts\Dourvan-win-x64"
-          $patch = Join-Path $env:GITHUB_WORKSPACE "artifacts\Dourvan-DebugPatch-x64"
+          $publish = Join-Path $env:GITHUB_WORKSPACE "artifacts\Zurvan-win-x64"
+          $patch = Join-Path $env:GITHUB_WORKSPACE "artifacts\Zurvan-DebugPatch-x64"
           New-Item -ItemType Directory -Force -Path $patch | Out-Null
 
           # First-party binaries carry the code we are changing during the
@@ -161,11 +161,11 @@ jobs:
           }
 
           @"
-          Dourvan lightweight debug patch
+          Zurvan lightweight debug patch
           ===============================
           Base requirement:
-          - Keep one recent full Dourvan portable build already extracted.
-          - Close Dourvan completely.
+          - Keep one recent full Zurvan portable build already extracted.
+          - Close Zurvan completely.
           - Extract this ZIP directly over that existing folder and replace files.
           - Do NOT delete the existing .NET / Windows App SDK runtime files.
 
@@ -177,14 +177,14 @@ jobs:
 
           Compress-Archive `
             -Path "$patch\*" `
-            -DestinationPath artifacts/Dourvan-DebugPatch-x64.zip `
+            -DestinationPath artifacts/Zurvan-DebugPatch-x64.zip `
             -Force
 
-          (Get-FileHash artifacts/Dourvan-DebugPatch-x64.zip -Algorithm SHA256).Hash |
-            Out-File artifacts/Dourvan-DebugPatch-x64.zip.sha256 -Encoding ascii
+          (Get-FileHash artifacts/Zurvan-DebugPatch-x64.zip -Algorithm SHA256).Hash |
+            Out-File artifacts/Zurvan-DebugPatch-x64.zip.sha256 -Encoding ascii
 
-          $fullSize = (Get-Item artifacts/Dourvan-win-x64.zip).Length
-          $patchSize = (Get-Item artifacts/Dourvan-DebugPatch-x64.zip).Length
+          $fullSize = (Get-Item artifacts/Zurvan-win-x64.zip).Length
+          $patchSize = (Get-Item artifacts/Zurvan-DebugPatch-x64.zip).Length
           Write-Host ("Full portable: {0:N2} MB" -f ($fullSize / 1MB))
           Write-Host ("Debug patch:   {0:N2} MB" -f ($patchSize / 1MB))
 
@@ -198,20 +198,20 @@ jobs:
         shell: pwsh
         run: |
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" `
-            /DMySourceDir="${{ github.workspace }}\artifacts\Dourvan-win-x64" `
+            /DMySourceDir="${{ github.workspace }}\artifacts\Zurvan-win-x64" `
             /DMyOutputDir="${{ github.workspace }}\artifacts" `
             installer\BDFR_PersianCalendar.iss
 
-          (Get-FileHash artifacts/Dourvan-Setup-x64.exe -Algorithm SHA256).Hash |
-            Out-File artifacts/Dourvan-Setup-x64.exe.sha256 -Encoding ascii
+          (Get-FileHash artifacts/Zurvan-Setup-x64.exe -Algorithm SHA256).Hash |
+            Out-File artifacts/Zurvan-Setup-x64.exe.sha256 -Encoding ascii
 
       - name: Upload portable test artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Dourvan-win-x64
+          name: Zurvan-win-x64
           path: |
-            artifacts/Dourvan-win-x64.zip
-            artifacts/Dourvan-win-x64.zip.sha256
+            artifacts/Zurvan-win-x64.zip
+            artifacts/Zurvan-win-x64.zip.sha256
           if-no-files-found: error
           retention-days: 14
 
@@ -219,10 +219,10 @@ jobs:
         if: github.event_name == 'push'
         uses: actions/upload-artifact@v4
         with:
-          name: Dourvan-DebugPatch-x64
+          name: Zurvan-DebugPatch-x64
           path: |
-            artifacts/Dourvan-DebugPatch-x64.zip
-            artifacts/Dourvan-DebugPatch-x64.zip.sha256
+            artifacts/Zurvan-DebugPatch-x64.zip
+            artifacts/Zurvan-DebugPatch-x64.zip.sha256
           if-no-files-found: error
           retention-days: 14
 
@@ -230,10 +230,10 @@ jobs:
         if: github.event_name == 'push'
         uses: actions/upload-artifact@v4
         with:
-          name: Dourvan-Setup-x64
+          name: Zurvan-Setup-x64
           path: |
-            artifacts/Dourvan-Setup-x64.exe
-            artifacts/Dourvan-Setup-x64.exe.sha256
+            artifacts/Zurvan-Setup-x64.exe
+            artifacts/Zurvan-Setup-x64.exe.sha256
           if-no-files-found: error
           retention-days: 14
 
@@ -244,17 +244,17 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $tag = "test-${{ github.run_number }}"
-          $title = "Dourvan Test Build #${{ github.run_number }}"
+          $title = "Zurvan Test Build #${{ github.run_number }}"
           $releaseTarget = (git rev-parse HEAD).Trim()
-          $notes = "Automated Dourvan Windows x64 test build from main. Commit: $releaseTarget. Includes portable ZIP, installer EXE and SHA256 checksums."
+          $notes = "Automated Zurvan Windows x64 test build from main. Commit: $releaseTarget. Includes portable ZIP, installer EXE and SHA256 checksums."
 
           gh release create $tag `
-            artifacts/Dourvan-win-x64.zip `
-            artifacts/Dourvan-win-x64.zip.sha256 `
-            artifacts/Dourvan-DebugPatch-x64.zip `
-            artifacts/Dourvan-DebugPatch-x64.zip.sha256 `
-            artifacts/Dourvan-Setup-x64.exe `
-            artifacts/Dourvan-Setup-x64.exe.sha256 `
+            artifacts/Zurvan-win-x64.zip `
+            artifacts/Zurvan-win-x64.zip.sha256 `
+            artifacts/Zurvan-DebugPatch-x64.zip `
+            artifacts/Zurvan-DebugPatch-x64.zip.sha256 `
+            artifacts/Zurvan-Setup-x64.exe `
+            artifacts/Zurvan-Setup-x64.exe.sha256 `
             --repo "${{ github.repository }}" `
             --target $releaseTarget `
             --title $title `

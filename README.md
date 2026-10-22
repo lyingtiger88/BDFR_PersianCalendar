@@ -1,6 +1,6 @@
-# Dourvan | دروان
+# Zurvan | زروان
 
-Dourvan (دروان) is a native, Persian-first calendar, planner, occasions and reminder application for Windows 11, created by BDFR.
+Zurvan (زروان) is a native, Persian-first calendar, planner, occasions and reminder application for Windows 11, created by BDFR.
 
 ## Current development build
 
@@ -83,7 +83,7 @@ Run smoke checks:
 dotnet run --project tools/BDFR.PersianCalendar.Smoke/BDFR.PersianCalendar.Smoke.csproj
 ```
 
-Every push to `main` runs GitHub Actions checks for the Core/Infrastructure and the Windows desktop application. The Windows job also publishes an x64 test build as the `Dourvan-win-x64` workflow artifact.
+Every push to `main` runs GitHub Actions checks for the Core/Infrastructure and the Windows desktop application. The Windows job also publishes an x64 test build as the `Zurvan-win-x64` workflow artifact.
 
 ## Development roadmap
 
@@ -115,7 +115,7 @@ For example:
 شب یلدا|yalda.svg
 ```
 
-Dourvan normalizes Persian/Arabic digits, Arabic/Persian ی/ک, and common zero-width characters before matching. Longer phrases take priority over shorter phrases. Matching images are shown both in the selected-day occasion card and as small thumbnails inside calendar day cards when occasion pictures are enabled.
+Zurvan normalizes Persian/Arabic digits, Arabic/Persian ی/ک, and common zero-width characters before matching. Longer phrases take priority over shorter phrases. Matching images are shown both in the selected-day occasion card and as small thumbnails inside calendar day cards when occasion pictures are enabled.
 
 ## time.ir data
 
