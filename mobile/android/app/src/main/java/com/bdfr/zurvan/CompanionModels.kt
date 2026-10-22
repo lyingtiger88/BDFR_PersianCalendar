@@ -39,3 +39,10 @@ data class SyncBatch(
     val items: List<SyncEnvelope>,
     val createdAtUtc: String
 )
+
+
+data class EncryptedCompanionFrame(
+    val nonceBase64: String,
+    val ciphertextBase64: String,
+    val tagBase64: String
+)
