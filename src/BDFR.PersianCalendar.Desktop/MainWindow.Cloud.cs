@@ -14,6 +14,7 @@ public sealed partial class MainWindow
     };
 
     private WindowsCloudSecretStore? _cloudSecretStore;
+    private FrameworkElement? _zurvanDeskSettingsElement;
 
     private WindowsCloudSecretStore CloudSecretStore
         => _cloudSecretStore ??= new WindowsCloudSecretStore();
@@ -284,7 +285,7 @@ public sealed partial class MainWindow
         };
         root.Children.Add(forgetSecrets);
 
-        return new Border
+        var deskSurface = new Border
         {
             Margin = new Thickness(0, 8, 0, 4),
             Padding = new Thickness(2),
@@ -294,6 +295,9 @@ public sealed partial class MainWindow
             Background = BrushWithAlpha(_theme.CardBackground, 0x92),
             Child = root
         };
+
+        _zurvanDeskSettingsElement = deskSurface;
+        return deskSurface;
     }
 
     private async Task SaveAndProbeZurvanCloudAsync(
