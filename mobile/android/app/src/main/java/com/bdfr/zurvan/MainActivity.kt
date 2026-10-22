@@ -36,6 +36,7 @@ private enum class ZurvanTab(val label: String) {
     Settings("تنظیمات")
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ZurvanMobileShell() {
     var selected by remember { mutableStateOf(ZurvanTab.Calendar) }
