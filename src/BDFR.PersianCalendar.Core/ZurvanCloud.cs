@@ -25,6 +25,11 @@ public static class ZurvanCloudProtocol
         string vaultId,
         string objectId)
         => $"{NormalizePrefix(prefix)}/v{CurrentVersion}/{vaultId}/objects/{objectId}.zcv";
+
+    public static string BuildRecoveryObjectKey(
+        string prefix,
+        string vaultId)
+        => $"{NormalizePrefix(prefix)}/v{CurrentVersion}/{vaultId}/recovery/master.zrk";
 }
 
 public sealed record ZurvanCloudProfile(
