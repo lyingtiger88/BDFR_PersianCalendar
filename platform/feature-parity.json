@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 1,
+  "policy": {
+    "requiredPlatforms": ["windows", "android", "ios"],
+    "rule": "Every product feature must be present in this manifest for all required platforms. A platform may be planned while its client is still under construction, but omission is a CI failure."
+  },
+  "features": [
+    {
+      "id": "calendar-month-view",
+      "name": "Three-calendar month view",
+      "windows": "implemented",
+      "android": "shell",
+      "ios": "shell"
+    },
+    {
+      "id": "calendar-order",
+      "name": "Configurable Persian/Hijri/Gregorian priority",
+      "windows": "implemented",
+      "android": "planned",
+      "ios": "planned"
+    },
+    {
+      "id": "jump-to-date",
+      "name": "Jump to date with separated date parts",
+      "windows": "implemented",
+      "android": "planned",
+      "ios": "planned"
+    },
+    {
+      "id": "date-converter",
+      "name": "Persian/Gregorian/Hijri date converter",
+      "windows": "implemented",
+      "android": "planned",
+      "ios": "planned"
+    },
+    {
+      "id": "events-reminders",
+      "name": "Events, reminders and acknowledgement repeats",
+      "windows": "implemented",
+      "android": "planned",
+      "ios": "planned"
+    },
+    {
+      "id": "privacy",
+      "name": "Public/private calendar items and redacted notifications",
+      "windows": "implemented",
+      "android": "planned",
+      "ios": "planned"
+    },
+    {
+      "id": "occasion-pictures",
+      "name": "Editable Persian/Hijri/Gregorian occasion picture mappings",
+      "windows": "implemented",
+      "android": "planned",
+      "ios": "planned"
+    },
+    {
+      "id": "season-carousel",
+      "name": "Season_N background carousel",
+      "windows": "implemented",
+      "android": "planned",
+      "ios": "planned"
+    },
+    {
+      "id": "corner-radius",
+      "name": "Live global corner-radius appearance setting",
+      "windows": "implemented",
+      "android": "planned",
+      "ios": "planned"
+    },
+    {
+      "id": "companion-pairing",
+      "name": "PC/mobile companion pairing",
+      "windows": "protocol",
+      "android": "protocol",
+      "ios": "protocol"
+    },
+    {
+      "id": "companion-sync",
+      "name": "Two-way local-first companion sync",
+      "windows": "protocol",
+      "android": "protocol",
+      "ios": "protocol"
+    }
+  ]
+}
