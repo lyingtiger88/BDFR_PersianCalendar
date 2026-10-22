@@ -6,7 +6,7 @@ namespace BDFR.PersianCalendar.Desktop;
 
 public sealed partial class MainWindow
 {
-    private FrameworkElement BuildNavigationRail()
+    private Border BuildNavigationRail()
     {
         var shell = new Grid
         {
