@@ -8,7 +8,7 @@
         android:allowBackup="true"
         android:label="Zurvan | زروان"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Material3.DayNight.NoActionBar">
+        android:theme="@style/Theme.Zurvan">
         <activity
             android:name=".MainActivity"
             android:exported="true">
