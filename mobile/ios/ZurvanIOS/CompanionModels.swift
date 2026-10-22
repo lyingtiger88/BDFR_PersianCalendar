@@ -56,3 +56,10 @@ struct SyncBatch: Codable, Sendable {
     let items: [SyncEnvelope]
     let createdAtUtc: Date
 }
+
+
+struct EncryptedCompanionFrame: Codable, Sendable {
+    let nonceBase64: String
+    let ciphertextBase64: String
+    let tagBase64: String
+}
