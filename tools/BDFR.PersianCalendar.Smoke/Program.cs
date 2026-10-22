@@ -482,4 +482,56 @@ foreach (var requiredMobileFile in new[]
             $"Cross-platform scaffold is missing required file: {requiredMobileFile}");
 }
 
+// Zurvan Cloud: recovery-key and encrypted-object round-trip.
+var cloudVaultKey = ZurvanCloudCrypto.CreateVaultKey();
+try
+{
+    var recoveryKey = ZurvanCloudCrypto.EncodeRecoveryKey(cloudVaultKey);
+    var recoveredKey = ZurvanCloudCrypto.DecodeRecoveryKey(recoveryKey);
+
+    if (!cloudVaultKey.SequenceEqual(recoveredKey))
+        throw new Exception("Zurvan Cloud recovery-key round-trip failed.");
+
+    var cloudMetadata = new ZurvanCloudObjectMetadata(
+        ZurvanCloudProtocol.CurrentVersion,
+        "vault-smoke",
+        "object-smoke",
+        "note",
+        1,
+        DateTimeOffset.UtcNow,
+        "device-smoke");
+
+    var cloudPlaintext = System.Text.Encoding.UTF8.GetBytes(
+        "{\"text\":\"client-side encrypted\"}");
+
+    var cloudEncrypted = ZurvanCloudCrypto.Encrypt(
+        cloudPlaintext,
+        cloudVaultKey,
+        cloudMetadata);
+
+    var cloudSerialized = ZurvanCloudCrypto.SerializeEncrypted(cloudEncrypted);
+    if (System.Text.Encoding.UTF8.GetString(cloudSerialized)
+        .Contains("client-side encrypted", StringComparison.Ordinal))
+    {
+        throw new Exception(
+            "Zurvan Cloud serialized object leaked plaintext.");
+    }
+
+    var cloudParsed = ZurvanCloudCrypto.DeserializeEncrypted(cloudSerialized);
+    var cloudDecrypted = ZurvanCloudCrypto.Decrypt(
+        cloudParsed,
+        recoveredKey);
+
+    if (!cloudPlaintext.SequenceEqual(cloudDecrypted))
+        throw new Exception("Zurvan Cloud encrypted-object round-trip failed.");
+
+    System.Security.Cryptography.CryptographicOperations.ZeroMemory(recoveredKey);
+    System.Security.Cryptography.CryptographicOperations.ZeroMemory(cloudPlaintext);
+    System.Security.Cryptography.CryptographicOperations.ZeroMemory(cloudDecrypted);
+}
+finally
+{
+    System.Security.Cryptography.CryptographicOperations.ZeroMemory(cloudVaultKey);
+}
+
 Console.WriteLine("BDFR Persian Calendar smoke checks passed.");
