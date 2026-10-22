@@ -3,4 +3,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>BDFR.PersianCalendar.Core</RootNamespace>
   </PropertyGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\bip39-english.txt" />
+  </ItemGroup>
 </Project>
