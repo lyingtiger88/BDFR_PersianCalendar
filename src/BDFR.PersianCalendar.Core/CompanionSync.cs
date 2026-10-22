@@ -39,6 +39,142 @@ public static class CompanionProtocol
     }
 }
 
+public sealed record EncryptedCompanionFrame(
+    string NonceBase64,
+    string CiphertextBase64,
+    string TagBase64);
+
+public sealed class CompanionEphemeralKey : IDisposable
+{
+    private static readonly byte[] AssociatedData =
+        Encoding.UTF8.GetBytes("zurvan-companion-v1");
+
+    private readonly ECDiffieHellman _key =
+        ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
+
+    public string PublicKeyBase64 =>
+        Convert.ToBase64String(_key.ExportSubjectPublicKeyInfo());
+
+    public string PublicKeyFingerprint
+    {
+        get
+        {
+            var hash = SHA256.HashData(
+                _key.ExportSubjectPublicKeyInfo());
+
+            return Convert.ToHexString(hash.AsSpan(0, 8));
+        }
+    }
+
+    public byte[] DeriveSessionKey(
+        string peerPublicKeyBase64,
+        string sessionId)
+    {
+        using var peer = ECDiffieHellman.Create();
+        peer.ImportSubjectPublicKeyInfo(
+            Convert.FromBase64String(peerPublicKeyBase64),
+            out _);
+
+        var sharedSecret = _key.DeriveKeyMaterial(peer.PublicKey);
+
+        try
+        {
+            using var hmac = new HMACSHA256(sharedSecret);
+            return hmac.ComputeHash(
+                Encoding.UTF8.GetBytes(
+                    $"zurvan-companion-v1|{sessionId}"));
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(sharedSecret);
+        }
+    }
+
+    public static string ComputeSixDigitSas(
+        ReadOnlySpan<byte> sessionKey)
+    {
+        var hash = SHA256.HashData(sessionKey);
+
+        var value =
+            ((uint)hash[0] << 24) |
+            ((uint)hash[1] << 16) |
+            ((uint)hash[2] << 8) |
+            hash[3];
+
+        return (value % 1_000_000)
+            .ToString(
+                "D6",
+                System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    public static EncryptedCompanionFrame EncryptJson<T>(
+        T value,
+        ReadOnlySpan<byte> sessionKey)
+    {
+        if (sessionKey.Length != 32)
+            throw new ArgumentException(
+                "Companion session key must be 32 bytes.",
+                nameof(sessionKey));
+
+        var plaintext = Encoding.UTF8.GetBytes(
+            JsonSerializer.Serialize(value));
+        var nonce = RandomNumberGenerator.GetBytes(12);
+        var ciphertext = new byte[plaintext.Length];
+        var tag = new byte[16];
+
+        using var aes = new AesGcm(sessionKey, tag.Length);
+        aes.Encrypt(
+            nonce,
+            plaintext,
+            ciphertext,
+            tag,
+            AssociatedData);
+
+        CryptographicOperations.ZeroMemory(plaintext);
+
+        return new EncryptedCompanionFrame(
+            Convert.ToBase64String(nonce),
+            Convert.ToBase64String(ciphertext),
+            Convert.ToBase64String(tag));
+    }
+
+    public static T DecryptJson<T>(
+        EncryptedCompanionFrame frame,
+        ReadOnlySpan<byte> sessionKey)
+    {
+        if (sessionKey.Length != 32)
+            throw new ArgumentException(
+                "Companion session key must be 32 bytes.",
+                nameof(sessionKey));
+
+        var nonce = Convert.FromBase64String(frame.NonceBase64);
+        var ciphertext = Convert.FromBase64String(frame.CiphertextBase64);
+        var tag = Convert.FromBase64String(frame.TagBase64);
+        var plaintext = new byte[ciphertext.Length];
+
+        using var aes = new AesGcm(sessionKey, tag.Length);
+        aes.Decrypt(
+            nonce,
+            ciphertext,
+            tag,
+            plaintext,
+            AssociatedData);
+
+        try
+        {
+            return JsonSerializer.Deserialize<T>(plaintext)
+                ?? throw new InvalidOperationException(
+                    "Decrypted companion payload is empty.");
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(plaintext);
+        }
+    }
+
+    public void Dispose() => _key.Dispose();
+}
+
 public enum CompanionPlatform
 {
     Windows,
