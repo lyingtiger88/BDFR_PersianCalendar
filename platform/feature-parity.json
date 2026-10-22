@@ -106,6 +106,13 @@
       "windows": "implemented",
       "android": "implemented",
       "ios": "implemented"
+    },
+    {
+      "id": "workspace-navigation-layout",
+      "name": "Resizable sidebars and ordered navigation headers",
+      "windows": "implemented",
+      "android": "implemented-mobile-order",
+      "ios": "implemented-mobile-order"
     }
   ]
 }
