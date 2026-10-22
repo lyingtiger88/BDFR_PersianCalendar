@@ -345,6 +345,53 @@ public sealed class ZurvanCloudClient
         return ZurvanCloudCrypto.Decrypt(encrypted, _vaultKey);
     }
 
+    public async Task UploadRecoveryEnvelopeAsync(
+        ZurvanCloudRecoveryEnvelope envelope,
+        CancellationToken cancellationToken = default)
+    {
+        if (!string.Equals(
+                envelope.VaultId,
+                _profile.VaultId,
+                StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                "Recovery envelope belongs to a different vault.");
+        }
+
+        var key = ZurvanCloudProtocol.BuildRecoveryObjectKey(
+            _profile.Prefix,
+            _profile.VaultId);
+
+        var payload = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
+            envelope);
+
+        await _objectStore.PutAsync(
+            key,
+            payload,
+            "application/vnd.zurvan.recovery+json",
+            cancellationToken);
+    }
+
+    public async Task<ZurvanCloudRecoveryEnvelope?> DownloadRecoveryEnvelopeAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var key = ZurvanCloudProtocol.BuildRecoveryObjectKey(
+            _profile.Prefix,
+            _profile.VaultId);
+
+        var payload = await _objectStore.GetAsync(
+            key,
+            cancellationToken);
+
+        if (payload is null)
+            return null;
+
+        return System.Text.Json.JsonSerializer.Deserialize<ZurvanCloudRecoveryEnvelope>(
+            payload)
+            ?? throw new InvalidOperationException(
+                "Zurvan Cloud recovery envelope is empty.");
+    }
+
     public async Task DeleteAsync(
         string objectId,
         CancellationToken cancellationToken = default)
