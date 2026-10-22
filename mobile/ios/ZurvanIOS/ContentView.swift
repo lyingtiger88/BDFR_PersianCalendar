@@ -2,10 +2,11 @@ import SwiftUI
 
 private enum ZurvanTab: Hashable {
     case calendar
+    case desk
     case plans
+    case occasions
     case reminders
     case companion
-    case cloud
     case settings
 }
 
@@ -24,12 +25,29 @@ struct ContentView: View {
             .tag(ZurvanTab.calendar)
 
             NavigationStack {
+                ZurvanCloudShellView()
+                    .navigationTitle("Zurvan Desk")
+            }
+            .tabItem {
+                Label("زروان دسک", systemImage: "externaldrive.connected.to.line.below")
+            }
+            .tag(ZurvanTab.desk)
+
+            NavigationStack {
                 PlaceholderView(title: "برنامه‌ها")
             }
             .tabItem {
                 Label("برنامه‌ها", systemImage: "checklist")
             }
             .tag(ZurvanTab.plans)
+
+            NavigationStack {
+                PlaceholderView(title: "مناسبت‌ها")
+            }
+            .tabItem {
+                Label("مناسبت‌ها", systemImage: "sparkles")
+            }
+            .tag(ZurvanTab.occasions)
 
             NavigationStack {
                 PlaceholderView(title: "یادآورها")
@@ -49,16 +67,7 @@ struct ContentView: View {
             .tag(ZurvanTab.companion)
 
             NavigationStack {
-                ZurvanCloudShellView()
-                    .navigationTitle("Zurvan Desk")
-            }
-            .tabItem {
-                Label("دسک", systemImage: "externaldrive.connected.to.line.below")
-            }
-            .tag(ZurvanTab.cloud)
-
-            NavigationStack {
-                PlaceholderView(title: "تنظیمات")
+                MobileSettingsView()
             }
             .tabItem {
                 Label("تنظیمات", systemImage: "gearshape")
@@ -181,6 +190,38 @@ private struct ZurvanCloudShellView: View {
             }
             .padding()
         }
+    }
+}
+
+private struct MobileSettingsView: View {
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("تنظیمات")
+                    .font(.title2.bold())
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("چیدمان ناوبری")
+                        .font(.headline)
+
+                    Text("در iPhone سربرگ‌ها در پایین صفحه قرار می‌گیرند تا فضای تقویم حفظ شود؛ ترتیب با نسخه Windows یکسان است و تنظیمات همیشه آخر قرار دارد.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+
+                    Text("در iPad، NavigationSplitView/Sidebar کناری در مسیر UI تطبیقی زروان فعال خواهد شد.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding()
+                .background(
+                    .thinMaterial,
+                    in: RoundedRectangle(cornerRadius: 18)
+                )
+            }
+            .padding()
+        }
+        .navigationTitle("تنظیمات")
     }
 }
 
