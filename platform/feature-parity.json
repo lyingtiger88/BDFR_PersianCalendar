@@ -1,7 +1,11 @@
 {
   "schemaVersion": 1,
   "policy": {
-    "requiredPlatforms": ["windows", "android", "ios"],
+    "requiredPlatforms": [
+      "windows",
+      "android",
+      "ios"
+    ],
     "rule": "Every product feature must be present in this manifest for all required platforms. A platform may be planned while its client is still under construction, but omission is a CI failure."
   },
   "features": [
@@ -81,6 +85,27 @@
       "windows": "protocol",
       "android": "protocol",
       "ios": "protocol"
+    },
+    {
+      "id": "zurvan-cloud-e2ee",
+      "name": "Client-side encrypted Zurvan Cloud over Arvan S3",
+      "windows": "implemented",
+      "android": "protocol",
+      "ios": "protocol"
+    },
+    {
+      "id": "zurvan-cloud-recovery",
+      "name": "24-word recovery phrase for vault-key recovery",
+      "windows": "implemented",
+      "android": "protocol",
+      "ios": "protocol"
+    },
+    {
+      "id": "zurvan-cloud-secure-storage",
+      "name": "Platform secure storage for cloud credentials and vault keys",
+      "windows": "implemented",
+      "android": "implemented",
+      "ios": "implemented"
     }
   ]
 }
