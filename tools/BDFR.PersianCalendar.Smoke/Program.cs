@@ -385,8 +385,8 @@ using (var mobileKey = new CompanionEphemeralKey())
         throw new Exception("Companion encrypted frame round-trip failed.");
     }
 
-    CryptographicOperations.ZeroMemory(hostSessionKey);
-    CryptographicOperations.ZeroMemory(mobileSessionKey);
+    System.Security.Cryptography.CryptographicOperations.ZeroMemory(hostSessionKey);
+    System.Security.Cryptography.CryptographicOperations.ZeroMemory(mobileSessionKey);
 }
 
 var localEnvelope = new SyncEnvelope(
