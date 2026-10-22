@@ -84,7 +84,7 @@ public sealed class CompanionEphemeralKey : IDisposable
             }
         });
 
-        var sharedSecret = _key.DeriveKeyMaterial(peer.PublicKey);
+        var sharedSecret = _key.DeriveRawSecretAgreement(peer.PublicKey);
 
         try
         {
