@@ -90,6 +90,15 @@ public sealed partial class MainWindow
         };
         root.Children.Add(prefixBox);
 
+        var vaultIdBox = new TextBox
+        {
+            Header = "Vault ID",
+            Text = _settings.CloudVaultId ?? string.Empty,
+            PlaceholderText = "برای Vault جدید خالی بگذارید؛ برای بازیابی Vault قبلی وارد کنید",
+            FlowDirection = FlowDirection.LeftToRight
+        };
+        root.Children.Add(vaultIdBox);
+
         var accessKeyBox = new TextBox
         {
             Header = "Arvan S3 Access Key",
@@ -108,7 +117,7 @@ public sealed partial class MainWindow
 
         root.Children.Add(new TextBlock
         {
-            Text = "Access Key، Secret Key و Vault Key داخل فایل Settings ذخیره نمی‌شوند؛ در Secure Storage ویندوز نگه‌داری می‌شوند.",
+            Text = "Access Key، Secret Key و Vault Key داخل فایل Settings ذخیره نمی‌شوند؛ در Secure Storage ویندوز نگه‌داری می‌شوند. شماره تلفن/ایمیل حساب به‌تنهایی نمی‌تواند Vault را رمزگشایی کند.",
             FontSize = 10.5,
             TextWrapping = TextWrapping.Wrap,
             Opacity = 0.66,
@@ -139,8 +148,11 @@ public sealed partial class MainWindow
                     regionBox.Text,
                     bucketBox.Text,
                     prefixBox.Text,
+                    vaultIdBox.Text,
                     accessKeyBox.Text,
                     secretKeyBox.Password);
+
+                vaultIdBox.Text = _settings.CloudVaultId;
 
                 cloudStatus.Text =
                     "✓ تست موفق: payload روی کلاینت رمز شد، روی Cloud Upload شد، Download و روی کلاینت Decrypt شد و سپس object آزمایشی حذف شد.";
@@ -160,20 +172,91 @@ public sealed partial class MainWindow
         };
         root.Children.Add(saveAndTest);
 
-        var recoveryKey = MakeButton("🗝 نمایش / ساخت Recovery Key این Vault");
-        recoveryKey.Click += async (_, _) =>
+        root.Children.Add(new TextBlock
         {
+            Text = "بازیابی حساب",
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Foreground = ThemeService.Brush(_theme.PrimaryText)
+        });
+
+        root.Children.Add(new TextBlock
+        {
+            Text = "زروان یک عبارت بازیابی ۲۴ کلمه‌ای با checksum می‌سازد. خود عبارت هرگز روی سرور ذخیره نمی‌شود؛ فقط Vault Key با کلیدی مشتق‌شده از آن wrap و روی Cloud ذخیره می‌شود.",
+            FontSize = 10.5,
+            TextWrapping = TextWrapping.Wrap,
+            Opacity = 0.68,
+            Foreground = ThemeService.Brush(_theme.SecondaryText)
+        });
+
+        var createRecoveryPhrase = MakeButton("🧾 ساخت عبارت بازیابی ۲۴ کلمه‌ای");
+        createRecoveryPhrase.Click += async (_, _) =>
+        {
+            createRecoveryPhrase.IsEnabled = false;
+
             try
             {
-                await ShowZurvanCloudRecoveryKeyAsync();
+                var phrase = await CreateAndUploadZurvanRecoveryPhraseAsync(
+                    endpointBox.Text,
+                    regionBox.Text,
+                    bucketBox.Text,
+                    prefixBox.Text,
+                    vaultIdBox.Text,
+                    accessKeyBox.Text,
+                    secretKeyBox.Password);
+
+                vaultIdBox.Text = _settings.CloudVaultId;
+                await ShowZurvanRecoveryPhraseAsync(phrase);
+
+                cloudStatus.Text =
+                    "✓ عبارت بازیابی جدید فعال شد. عبارت قبلی دیگر Recovery Envelope فعلی را باز نمی‌کند.";
             }
             catch (Exception ex)
             {
-                StartupDiagnostics.Log($"Zurvan Cloud recovery-key view failed: {ex}");
-                cloudStatus.Text = $"نمایش Recovery Key انجام نشد: {ex.Message}";
+                StartupDiagnostics.Log($"Zurvan Cloud recovery phrase creation failed: {ex}");
+                cloudStatus.Text = $"ساخت عبارت بازیابی انجام نشد: {ex.Message}";
+            }
+            finally
+            {
+                createRecoveryPhrase.IsEnabled = true;
             }
         };
-        root.Children.Add(recoveryKey);
+        root.Children.Add(createRecoveryPhrase);
+
+        var restoreFromPhrase = MakeButton("♻ بازیابی Vault با عبارت ۲۴ کلمه‌ای");
+        restoreFromPhrase.Click += async (_, _) =>
+        {
+            restoreFromPhrase.IsEnabled = false;
+
+            try
+            {
+                var restored = await RestoreZurvanCloudVaultFromPhraseDialogAsync(
+                    endpointBox.Text,
+                    regionBox.Text,
+                    bucketBox.Text,
+                    prefixBox.Text,
+                    vaultIdBox.Text,
+                    accessKeyBox.Text,
+                    secretKeyBox.Password);
+
+                if (restored)
+                {
+                    vaultIdBox.Text = _settings.CloudVaultId;
+                    enabledCheck.IsChecked = true;
+                    cloudStatus.Text =
+                        "✓ Vault Key با عبارت بازیابی روی همین دستگاه بازسازی و در Secure Storage ذخیره شد.";
+                }
+            }
+            catch (Exception ex)
+            {
+                StartupDiagnostics.Log($"Zurvan Cloud recovery restore failed: {ex}");
+                cloudStatus.Text = $"بازیابی Vault انجام نشد: {ex.Message}";
+            }
+            finally
+            {
+                restoreFromPhrase.IsEnabled = true;
+            }
+        };
+        root.Children.Add(restoreFromPhrase);
 
         var forgetSecrets = MakeButton("حذف Credentialهای محلی Zurvan Cloud");
         forgetSecrets.Click += async (_, _) =>
@@ -219,79 +302,32 @@ public sealed partial class MainWindow
         string region,
         string bucket,
         string prefix,
+        string vaultIdInput,
         string accessKeyInput,
         string secretKeyInput)
     {
-        endpoint = (endpoint ?? string.Empty).Trim();
-        region = (region ?? string.Empty).Trim();
-        bucket = (bucket ?? string.Empty).Trim();
-        prefix = ZurvanCloudProtocol.NormalizePrefix(prefix);
+        var connection = await ResolveZurvanCloudConnectionAsync(
+            endpoint,
+            region,
+            bucket,
+            prefix,
+            vaultIdInput,
+            accessKeyInput,
+            secretKeyInput,
+            allowCreateVault: true,
+            persistSecrets: true);
 
-        if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var endpointUri) ||
-            endpointUri.Scheme != Uri.UriSchemeHttps)
-        {
-            throw new ArgumentException(
-                "Endpoint باید یک آدرس HTTPS معتبر باشد.");
-        }
-
-        if (string.IsNullOrWhiteSpace(region))
-            throw new ArgumentException("Region را وارد کنید.");
-
-        if (string.IsNullOrWhiteSpace(bucket))
-            throw new ArgumentException("Bucket را وارد کنید.");
-
-        var accessKey = string.IsNullOrWhiteSpace(accessKeyInput)
-            ? await CloudSecretStore.GetAsync(
-                ZurvanCloudSecretNames.AccessKeyId)
-            : accessKeyInput.Trim();
-
-        var secretKey = string.IsNullOrWhiteSpace(secretKeyInput)
-            ? await CloudSecretStore.GetAsync(
-                ZurvanCloudSecretNames.SecretAccessKey)
-            : secretKeyInput.Trim();
-
-        if (string.IsNullOrWhiteSpace(accessKey))
-            throw new InvalidOperationException(
-                "Arvan S3 Access Key وارد یا ذخیره نشده است.");
-
-        if (string.IsNullOrWhiteSpace(secretKey))
-            throw new InvalidOperationException(
-                "Arvan S3 Secret Key وارد یا ذخیره نشده است.");
-
-        if (!string.IsNullOrWhiteSpace(accessKeyInput))
-        {
-            await CloudSecretStore.SetAsync(
-                ZurvanCloudSecretNames.AccessKeyId,
-                accessKey);
-        }
-
-        if (!string.IsNullOrWhiteSpace(secretKeyInput))
-        {
-            await CloudSecretStore.SetAsync(
-                ZurvanCloudSecretNames.SecretAccessKey,
-                secretKey);
-        }
-
-        if (string.IsNullOrWhiteSpace(_settings.CloudVaultId))
-            _settings.CloudVaultId = ZurvanCloudProtocol.NewVaultId();
-
+        _settings.CloudVaultId = connection.Profile.VaultId;
         var vaultKey = await GetOrCreateZurvanCloudVaultKeyAsync();
+
 
         try
         {
-            var profile = new ZurvanCloudProfile(
-                ZurvanCloudProtocol.DefaultProvider,
-                endpoint,
-                region,
-                bucket,
-                prefix,
-                _settings.CloudVaultId,
-                enabled);
-
+            var profile = connection.Profile;
             var objectStore = new ArvanS3ObjectStore(
                 ZurvanCloudHttpClient,
                 profile,
-                new ZurvanCloudCredentials(accessKey, secretKey));
+                connection.Credentials);
 
             var client = new ZurvanCloudClient(
                 objectStore,
@@ -349,59 +385,397 @@ public sealed partial class MainWindow
         return key;
     }
 
-    private async Task ShowZurvanCloudRecoveryKeyAsync()
+    private async Task<(
+        ZurvanCloudProfile Profile,
+        ZurvanCloudCredentials Credentials)> ResolveZurvanCloudConnectionAsync(
+        string endpoint,
+        string region,
+        string bucket,
+        string prefix,
+        string vaultIdInput,
+        string accessKeyInput,
+        string secretKeyInput,
+        bool allowCreateVault,
+        bool persistSecrets)
     {
-        var key = await GetOrCreateZurvanCloudVaultKeyAsync();
+        endpoint = (endpoint ?? string.Empty).Trim();
+        region = (region ?? string.Empty).Trim();
+        bucket = (bucket ?? string.Empty).Trim();
+        prefix = ZurvanCloudProtocol.NormalizePrefix(prefix);
+
+        if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var endpointUri) ||
+            endpointUri.Scheme != Uri.UriSchemeHttps)
+        {
+            throw new ArgumentException(
+                "Endpoint باید یک آدرس HTTPS معتبر باشد.");
+        }
+
+        if (string.IsNullOrWhiteSpace(region))
+            throw new ArgumentException("Region را وارد کنید.");
+
+        if (string.IsNullOrWhiteSpace(bucket))
+            throw new ArgumentException("Bucket را وارد کنید.");
+
+        var vaultId = (vaultIdInput ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(vaultId))
+            vaultId = _settings.CloudVaultId;
+
+        if (string.IsNullOrWhiteSpace(vaultId))
+        {
+            if (!allowCreateVault)
+            {
+                throw new InvalidOperationException(
+                    "برای بازیابی، Vault ID حساب قبلی لازم است.");
+            }
+
+            vaultId = ZurvanCloudProtocol.NewVaultId();
+        }
+
+        var accessKey = string.IsNullOrWhiteSpace(accessKeyInput)
+            ? await CloudSecretStore.GetAsync(
+                ZurvanCloudSecretNames.AccessKeyId)
+            : accessKeyInput.Trim();
+
+        var secretKey = string.IsNullOrWhiteSpace(secretKeyInput)
+            ? await CloudSecretStore.GetAsync(
+                ZurvanCloudSecretNames.SecretAccessKey)
+            : secretKeyInput.Trim();
+
+        if (string.IsNullOrWhiteSpace(accessKey))
+        {
+            throw new InvalidOperationException(
+                "Arvan S3 Access Key وارد یا از حساب دریافت نشده است.");
+        }
+
+        if (string.IsNullOrWhiteSpace(secretKey))
+        {
+            throw new InvalidOperationException(
+                "Arvan S3 Secret Key وارد یا از حساب دریافت نشده است.");
+        }
+
+        if (persistSecrets)
+        {
+            if (!string.IsNullOrWhiteSpace(accessKeyInput))
+            {
+                await CloudSecretStore.SetAsync(
+                    ZurvanCloudSecretNames.AccessKeyId,
+                    accessKey);
+            }
+
+            if (!string.IsNullOrWhiteSpace(secretKeyInput))
+            {
+                await CloudSecretStore.SetAsync(
+                    ZurvanCloudSecretNames.SecretAccessKey,
+                    secretKey);
+            }
+        }
+
+        return (
+            new ZurvanCloudProfile(
+                ZurvanCloudProtocol.DefaultProvider,
+                endpoint,
+                region,
+                bucket,
+                prefix,
+                vaultId,
+                true),
+            new ZurvanCloudCredentials(
+                accessKey,
+                secretKey));
+    }
+
+    private async Task<string> CreateAndUploadZurvanRecoveryPhraseAsync(
+        string endpoint,
+        string region,
+        string bucket,
+        string prefix,
+        string vaultIdInput,
+        string accessKeyInput,
+        string secretKeyInput)
+    {
+        var connection = await ResolveZurvanCloudConnectionAsync(
+            endpoint,
+            region,
+            bucket,
+            prefix,
+            vaultIdInput,
+            accessKeyInput,
+            secretKeyInput,
+            allowCreateVault: true,
+            persistSecrets: true);
+
+        _settings.CloudVaultId = connection.Profile.VaultId;
+
+        var vaultKey = await GetOrCreateZurvanCloudVaultKeyAsync();
+        var phrase = ZurvanRecoveryPhrase.Generate(
+            ZurvanRecoveryPhrase.DefaultWordCount);
 
         try
         {
-            var recoveryKey = ZurvanCloudCrypto.EncodeRecoveryKey(key);
+            var envelope = ZurvanRecoveryPhrase.WrapVaultKey(
+                phrase,
+                connection.Profile.VaultId,
+                vaultKey);
 
-            var recoveryBox = new TextBox
-            {
-                Text = recoveryKey,
-                IsReadOnly = true,
-                TextWrapping = TextWrapping.Wrap,
-                FlowDirection = FlowDirection.LeftToRight
-            };
+            var objectStore = new ArvanS3ObjectStore(
+                ZurvanCloudHttpClient,
+                connection.Profile,
+                connection.Credentials);
 
-            var stack = new StackPanel
-            {
-                Spacing = 10,
-                Width = 460
-            };
-            stack.Children.Add(new TextBlock
-            {
-                Text = "این کلید می‌تواند تمام داده‌های Zurvan Cloud این Vault را رمزگشایی کند. آن را فقط در محل امن نگه‌دار و برای هیچ‌کس ارسال نکن.",
-                TextWrapping = TextWrapping.Wrap
-            });
-            stack.Children.Add(recoveryBox);
-            stack.Children.Add(new TextBlock
-            {
-                Text = $"Vault ID: {_settings.CloudVaultId}",
-                FontSize = 10.5,
-                Opacity = 0.68,
-                FlowDirection = FlowDirection.LeftToRight
-            });
+            var client = new ZurvanCloudClient(
+                objectStore,
+                connection.Profile,
+                vaultKey);
 
-            var dialog = new ContentDialog
-            {
-                Title = "Zurvan Cloud Recovery Key",
-                Content = stack,
-                CloseButtonText = "بستن"
-            };
+            await client.UploadRecoveryEnvelopeAsync(envelope);
 
-            if (Content is FrameworkElement root &&
-                root.XamlRoot is not null)
-            {
-                dialog.XamlRoot = root.XamlRoot;
-            }
+            _settings.CloudEnabled = true;
+            _settings.CloudProvider = connection.Profile.Provider;
+            _settings.CloudEndpoint = connection.Profile.Endpoint;
+            _settings.CloudRegion = connection.Profile.Region;
+            _settings.CloudBucket = connection.Profile.Bucket;
+            _settings.CloudPrefix = connection.Profile.Prefix;
+            _settings.CloudVaultId = connection.Profile.VaultId;
+            _settingsService.Save(_settings);
 
-            await dialog.ShowAsync();
+            await _repository.AddActivityAsync(
+                new ActivityLogEntry(
+                    $"activity-cloud-recovery-{Guid.NewGuid():N}",
+                    DateTimeOffset.UtcNow,
+                    "cloud-recovery-created",
+                    null,
+                    null,
+                    "A new 24-word Zurvan Cloud recovery phrase was activated."));
+
+            return phrase;
         }
         finally
         {
-            CryptographicOperations.ZeroMemory(key);
+            CryptographicOperations.ZeroMemory(vaultKey);
+        }
+    }
+
+    private async Task ShowZurvanRecoveryPhraseAsync(
+        string phrase)
+    {
+        var words = phrase.Split(
+            ' ',
+            StringSplitOptions.RemoveEmptyEntries);
+
+        var formatted = string.Join(
+            Environment.NewLine,
+            words.Select(
+                (word, index) =>
+                    $"{index + 1:00}. {word}"));
+
+        var phraseBox = new TextBox
+        {
+            Text = formatted,
+            IsReadOnly = true,
+            TextWrapping = TextWrapping.NoWrap,
+            AcceptsReturn = true,
+            MinHeight = 360,
+            FlowDirection = FlowDirection.LeftToRight
+        };
+
+        var stack = new StackPanel
+        {
+            Spacing = 10,
+            Width = 480
+        };
+        stack.Children.Add(new TextBlock
+        {
+            Text = "این ۲۴ کلمه تنها راه بازیابی Vault در صورت حذف برنامه، فراموشی رمز یا تصاحب حساب است. از آن عکس آنلاین نگیرید، در ایمیل/پیام‌رسان ذخیره نکنید و برای هیچ‌کس ارسال نکنید.",
+            TextWrapping = TextWrapping.Wrap,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
+        });
+        stack.Children.Add(phraseBox);
+        stack.Children.Add(new TextBlock
+        {
+            Text = $"Vault ID: {_settings.CloudVaultId}",
+            FontSize = 10.5,
+            Opacity = 0.68,
+            FlowDirection = FlowDirection.LeftToRight
+        });
+        stack.Children.Add(new TextBlock
+        {
+            Text = "ساخت عبارت جدید، عبارت قبلی را برای Recovery Envelope فعلی باطل می‌کند.",
+            FontSize = 10.5,
+            TextWrapping = TextWrapping.Wrap,
+            Opacity = 0.68
+        });
+
+        var dialog = new ContentDialog
+        {
+            Title = "عبارت بازیابی Zurvan Cloud",
+            Content = new ScrollViewer
+            {
+                Content = stack,
+                MaxHeight = 620,
+                VerticalScrollBarVisibility =
+                    ScrollBarVisibility.Auto
+            },
+            CloseButtonText = "عبارت را ذخیره کردم"
+        };
+
+        if (Content is FrameworkElement root &&
+            root.XamlRoot is not null)
+        {
+            dialog.XamlRoot = root.XamlRoot;
+        }
+
+        await dialog.ShowAsync();
+    }
+
+    private async Task<bool> RestoreZurvanCloudVaultFromPhraseDialogAsync(
+        string endpoint,
+        string region,
+        string bucket,
+        string prefix,
+        string vaultIdInput,
+        string accessKeyInput,
+        string secretKeyInput)
+    {
+        var phraseBox = new TextBox
+        {
+            Header = "عبارت بازیابی ۲۴ کلمه‌ای",
+            PlaceholderText = "کلمات را با فاصله وارد کنید",
+            AcceptsReturn = true,
+            TextWrapping = TextWrapping.Wrap,
+            MinHeight = 150,
+            FlowDirection = FlowDirection.LeftToRight
+        };
+
+        var stack = new StackPanel
+        {
+            Spacing = 10,
+            Width = 480
+        };
+        stack.Children.Add(new TextBlock
+        {
+            Text = "شماره تلفن یا ایمیل فقط دسترسی حساب را برمی‌گرداند؛ برای بازکردن Vault Key باید عبارت بازیابی صحیح را وارد کنید.",
+            TextWrapping = TextWrapping.Wrap
+        });
+        stack.Children.Add(phraseBox);
+
+        var dialog = new ContentDialog
+        {
+            Title = "بازیابی Zurvan Cloud",
+            Content = stack,
+            PrimaryButtonText = "بازیابی Vault",
+            CloseButtonText = "انصراف",
+            DefaultButton = ContentDialogButton.Primary
+        };
+
+        if (Content is FrameworkElement root &&
+            root.XamlRoot is not null)
+        {
+            dialog.XamlRoot = root.XamlRoot;
+        }
+
+        var result = await dialog.ShowAsync();
+        if (result != ContentDialogResult.Primary)
+            return false;
+
+        var phrase = phraseBox.Text;
+        phraseBox.Text = string.Empty;
+
+        if (!ZurvanRecoveryPhrase.TryDecodeEntropy(
+                phrase,
+                out var phraseEntropy))
+        {
+            throw new FormatException(
+                "عبارت بازیابی یا checksum آن معتبر نیست.");
+        }
+        CryptographicOperations.ZeroMemory(phraseEntropy);
+
+        var connection = await ResolveZurvanCloudConnectionAsync(
+            endpoint,
+            region,
+            bucket,
+            prefix,
+            vaultIdInput,
+            accessKeyInput,
+            secretKeyInput,
+            allowCreateVault: false,
+            persistSecrets: true);
+
+        // Temporary key only lets the generic client exist; the recovery
+        // envelope itself is not encrypted with the vault key.
+        var placeholderKey = new byte[32];
+
+        try
+        {
+            var objectStore = new ArvanS3ObjectStore(
+                ZurvanCloudHttpClient,
+                connection.Profile,
+                connection.Credentials);
+
+            var client = new ZurvanCloudClient(
+                objectStore,
+                connection.Profile,
+                placeholderKey);
+
+            var envelope = await client.DownloadRecoveryEnvelopeAsync()
+                ?? throw new InvalidOperationException(
+                    "Recovery Envelope برای این Vault روی Cloud پیدا نشد.");
+
+            var recoveredVaultKey =
+                ZurvanRecoveryPhrase.UnwrapVaultKey(
+                    phrase,
+                    envelope);
+
+            try
+            {
+                await CloudSecretStore.SetAsync(
+                    ZurvanCloudSecretNames.VaultKey,
+                    ZurvanCloudCrypto.EncodeRecoveryKey(
+                        recoveredVaultKey));
+
+                var verifiedClient = new ZurvanCloudClient(
+                    objectStore,
+                    connection.Profile,
+                    recoveredVaultKey);
+
+                await verifiedClient.ProbeRoundTripAsync(
+                    GetCloudOriginDeviceId());
+
+                _settings.CloudEnabled = true;
+                _settings.CloudProvider =
+                    connection.Profile.Provider;
+                _settings.CloudEndpoint =
+                    connection.Profile.Endpoint;
+                _settings.CloudRegion =
+                    connection.Profile.Region;
+                _settings.CloudBucket =
+                    connection.Profile.Bucket;
+                _settings.CloudPrefix =
+                    connection.Profile.Prefix;
+                _settings.CloudVaultId =
+                    connection.Profile.VaultId;
+                _settingsService.Save(_settings);
+
+                await _repository.AddActivityAsync(
+                    new ActivityLogEntry(
+                        $"activity-cloud-restore-{Guid.NewGuid():N}",
+                        DateTimeOffset.UtcNow,
+                        "cloud-recovery-restored",
+                        null,
+                        null,
+                        "Zurvan Cloud vault key was restored from the recovery phrase."));
+            }
+            finally
+            {
+                CryptographicOperations.ZeroMemory(
+                    recoveredVaultKey);
+            }
+
+            return true;
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(
+                placeholderKey);
         }
     }
 
