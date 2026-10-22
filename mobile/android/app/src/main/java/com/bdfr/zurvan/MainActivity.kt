@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.Devices
+import androidx.compose.material.icons.outlined.Event
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.TaskAlt
@@ -31,10 +32,11 @@ class MainActivity : ComponentActivity() {
 
 private enum class ZurvanTab(val label: String) {
     Calendar("تقویم"),
+    Desk("زروان دسک"),
     Plans("برنامه‌ها"),
+    Occasions("مناسبت‌ها"),
     Reminders("یادآورها"),
     Companion("همراه"),
-    Cloud("دسک"),
     Settings("تنظیمات")
 }
 
@@ -59,10 +61,11 @@ private fun ZurvanMobileShell() {
                             Icon(
                                 imageVector = when (tab) {
                                     ZurvanTab.Calendar -> Icons.Outlined.CalendarMonth
+                                    ZurvanTab.Desk -> Icons.Outlined.Cloud
                                     ZurvanTab.Plans -> Icons.Outlined.TaskAlt
+                                    ZurvanTab.Occasions -> Icons.Outlined.Event
                                     ZurvanTab.Reminders -> Icons.Outlined.Notifications
                                     ZurvanTab.Companion -> Icons.Outlined.Devices
-                                    ZurvanTab.Cloud -> Icons.Outlined.Cloud
                                     ZurvanTab.Settings -> Icons.Outlined.Settings
                                 },
                                 contentDescription = tab.label
@@ -83,8 +86,9 @@ private fun ZurvanMobileShell() {
     ) { padding ->
         when (selected) {
             ZurvanTab.Calendar -> CalendarShell(Modifier.padding(padding))
+            ZurvanTab.Desk -> ZurvanCloudShell(Modifier.padding(padding))
             ZurvanTab.Companion -> CompanionShell(Modifier.padding(padding))
-            ZurvanTab.Cloud -> ZurvanCloudShell(Modifier.padding(padding))
+            ZurvanTab.Settings -> MobileSettingsShell(Modifier.padding(padding))
             else -> PlaceholderScreen(selected.label, Modifier.padding(padding))
         }
     }
@@ -215,6 +219,41 @@ private fun ZurvanCloudShell(modifier: Modifier = Modifier) {
                 Button(onClick = { }) {
                     Text("تنظیم Zurvan Desk")
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MobileSettingsShell(modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text("تنظیمات", style = MaterialTheme.typography.headlineSmall)
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(18.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    "چیدمان ناوبری",
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Text(
+                    "در گوشی، سربرگ‌ها برای حفظ فضای تقویم در پایین صفحه نمایش داده می‌شوند. ترتیب آن‌ها با نسخه Windows یکسان است و تنظیمات همیشه آخر قرار دارد.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                Text(
+                    "در نمایشگرهای بزرگ‌تر Android، Navigation Rail کناری در فاز UI تطبیقی فعال خواهد شد.",
+                    style = MaterialTheme.typography.bodySmall
+                )
             }
         }
     }
