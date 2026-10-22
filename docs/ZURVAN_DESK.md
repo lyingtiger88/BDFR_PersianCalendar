@@ -1,6 +1,6 @@
-# Zurvan Cloud — E2EE, Recovery and Account Security
+# Zurvan Desk — E2EE, Recovery and Account Security
 
-Zurvan Cloud stores encrypted user data on S3-compatible Object Storage. The initial provider is ArvanCloud Object Storage.
+Zurvan Desk stores encrypted user data on S3-compatible Object Storage. The initial provider is ArvanCloud Object Storage.
 
 ## Security goal
 
@@ -152,7 +152,7 @@ Users should keep the phrase offline and should not store it in:
 
 ## Server-side visibility
 
-Zurvan Cloud is content-encrypted but is not intended to claim perfect traffic-analysis anonymity.
+Zurvan Desk is content-encrypted but is not intended to claim perfect traffic-analysis anonymity.
 
 ArvanCloud can still observe normal storage-layer metadata such as:
 

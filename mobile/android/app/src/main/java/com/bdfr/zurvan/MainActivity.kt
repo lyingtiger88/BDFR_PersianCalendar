@@ -34,7 +34,7 @@ private enum class ZurvanTab(val label: String) {
     Plans("برنامه‌ها"),
     Reminders("یادآورها"),
     Companion("همراه"),
-    Cloud("کلاد"),
+    Cloud("دسک"),
     Settings("تنظیمات")
 }
 
@@ -168,7 +168,7 @@ private fun ZurvanCloudShell(modifier: Modifier = Modifier) {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text("Zurvan Cloud", style = MaterialTheme.typography.headlineSmall)
+        Text("Zurvan Desk", style = MaterialTheme.typography.headlineSmall)
 
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -213,7 +213,7 @@ private fun ZurvanCloudShell(modifier: Modifier = Modifier) {
                 )
 
                 Button(onClick = { }) {
-                    Text("تنظیم Zurvan Cloud")
+                    Text("تنظیم Zurvan Desk")
                 }
             }
         }

@@ -88,14 +88,14 @@
     },
     {
       "id": "zurvan-cloud-e2ee",
-      "name": "Client-side encrypted Zurvan Cloud over Arvan S3",
+      "name": "Client-side encrypted Zurvan Desk over Arvan S3",
       "windows": "implemented",
       "android": "protocol",
       "ios": "protocol"
     },
     {
       "id": "zurvan-cloud-recovery",
-      "name": "24-word recovery phrase for vault-key recovery",
+      "name": "24-word Zurvan Desk recovery phrase for vault-key recovery",
       "windows": "implemented",
       "android": "protocol",
       "ios": "protocol"

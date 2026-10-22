@@ -28,7 +28,7 @@ public sealed partial class MainWindow
 
         root.Children.Add(new TextBlock
         {
-            Text = "☁ Zurvan Cloud",
+            Text = "☁ Zurvan Desk",
             FontSize = 16,
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
             Foreground = ThemeService.Brush(_theme.PrimaryText)
@@ -45,7 +45,7 @@ public sealed partial class MainWindow
 
         var enabledCheck = new CheckBox
         {
-            Content = "فعال‌سازی Zurvan Cloud برای این دستگاه",
+            Content = "فعال‌سازی Zurvan Desk برای این دستگاه",
             IsChecked = _settings.CloudEnabled
         };
         root.Children.Add(enabledCheck);
@@ -127,8 +127,8 @@ public sealed partial class MainWindow
         var cloudStatus = new TextBlock
         {
             Text = _settings.CloudEnabled
-                ? "وضعیت: پیکربندی Cloud فعال است."
-                : "وضعیت: Cloud غیرفعال است.",
+                ? "وضعیت: پیکربندی Zurvan Desk فعال است."
+                : "وضعیت: Zurvan Desk غیرفعال است.",
             TextWrapping = TextWrapping.Wrap,
             Foreground = ThemeService.Brush(_theme.SecondaryText)
         };
@@ -138,7 +138,7 @@ public sealed partial class MainWindow
         saveAndTest.Click += async (_, _) =>
         {
             saveAndTest.IsEnabled = false;
-            cloudStatus.Text = "در حال تست رمزگذاری و اتصال به Object Storage...";
+            cloudStatus.Text = "در حال تست رمزگذاری و اتصال Zurvan Desk به Object Storage...";
 
             try
             {
@@ -155,15 +155,15 @@ public sealed partial class MainWindow
                 vaultIdBox.Text = _settings.CloudVaultId;
 
                 cloudStatus.Text =
-                    "✓ تست موفق: payload روی کلاینت رمز شد، روی Cloud Upload شد، Download و روی کلاینت Decrypt شد و سپس object آزمایشی حذف شد.";
+                    "✓ تست موفق: payload روی کلاینت رمز شد، روی Zurvan Desk Upload شد، Download و روی کلاینت Decrypt شد و سپس object آزمایشی حذف شد.";
 
                 accessKeyBox.Text = string.Empty;
                 secretKeyBox.Password = string.Empty;
             }
             catch (Exception ex)
             {
-                StartupDiagnostics.Log($"Zurvan Cloud probe failed: {ex}");
-                cloudStatus.Text = $"خطای Zurvan Cloud: {ex.Message}";
+                StartupDiagnostics.Log($"Zurvan Desk probe failed: {ex}");
+                cloudStatus.Text = $"خطای Zurvan Desk: {ex.Message}";
             }
             finally
             {
@@ -181,7 +181,7 @@ public sealed partial class MainWindow
 
         root.Children.Add(new TextBlock
         {
-            Text = "زروان یک عبارت بازیابی ۲۴ کلمه‌ای با checksum می‌سازد. خود عبارت هرگز روی سرور ذخیره نمی‌شود؛ فقط Vault Key با کلیدی مشتق‌شده از آن wrap و روی Cloud ذخیره می‌شود.",
+            Text = "زروان یک عبارت بازیابی ۲۴ کلمه‌ای با checksum می‌سازد. خود عبارت هرگز روی سرور ذخیره نمی‌شود؛ فقط Vault Key با کلیدی مشتق‌شده از آن wrap و روی Zurvan Desk ذخیره می‌شود.",
             FontSize = 10.5,
             TextWrapping = TextWrapping.Wrap,
             Opacity = 0.68,
@@ -212,7 +212,7 @@ public sealed partial class MainWindow
             }
             catch (Exception ex)
             {
-                StartupDiagnostics.Log($"Zurvan Cloud recovery phrase creation failed: {ex}");
+                StartupDiagnostics.Log($"Zurvan Desk recovery phrase creation failed: {ex}");
                 cloudStatus.Text = $"ساخت عبارت بازیابی انجام نشد: {ex.Message}";
             }
             finally
@@ -248,7 +248,7 @@ public sealed partial class MainWindow
             }
             catch (Exception ex)
             {
-                StartupDiagnostics.Log($"Zurvan Cloud recovery restore failed: {ex}");
+                StartupDiagnostics.Log($"Zurvan Desk recovery restore failed: {ex}");
                 cloudStatus.Text = $"بازیابی Vault انجام نشد: {ex.Message}";
             }
             finally
@@ -258,7 +258,7 @@ public sealed partial class MainWindow
         };
         root.Children.Add(restoreFromPhrase);
 
-        var forgetSecrets = MakeButton("حذف Credentialهای محلی Zurvan Cloud");
+        var forgetSecrets = MakeButton("حذف Credentialهای محلی Zurvan Desk");
         forgetSecrets.Click += async (_, _) =>
         {
             try
@@ -274,11 +274,11 @@ public sealed partial class MainWindow
                 _settingsService.Save(_settings);
                 enabledCheck.IsChecked = false;
                 cloudStatus.Text =
-                    "Credentialها و Vault Key از این دستگاه حذف شدند. Ciphertextهای موجود در Cloud حذف نشده‌اند.";
+                    "Credentialها و Vault Key از این دستگاه حذف شدند. Ciphertextهای موجود در Zurvan Desk حذف نشده‌اند.";
             }
             catch (Exception ex)
             {
-                StartupDiagnostics.Log($"Zurvan Cloud local-secret removal failed: {ex}");
+                StartupDiagnostics.Log($"Zurvan Desk local-secret removal failed: {ex}");
                 cloudStatus.Text = $"حذف Credentialها انجام نشد: {ex.Message}";
             }
         };
@@ -353,7 +353,7 @@ public sealed partial class MainWindow
                     "cloud-probe",
                     null,
                     null,
-                    "Zurvan Cloud encrypted round-trip completed."));
+                    "Zurvan Desk encrypted round-trip completed."));
         }
         finally
         {
@@ -545,7 +545,7 @@ public sealed partial class MainWindow
                     "cloud-recovery-created",
                     null,
                     null,
-                    "A new 24-word Zurvan Cloud recovery phrase was activated."));
+                    "A new 24-word Zurvan Desk recovery phrase was activated."));
 
             return phrase;
         }
@@ -607,7 +607,7 @@ public sealed partial class MainWindow
 
         var dialog = new ContentDialog
         {
-            Title = "عبارت بازیابی Zurvan Cloud",
+            Title = "عبارت بازیابی Zurvan Desk",
             Content = new ScrollViewer
             {
                 Content = stack,
@@ -660,7 +660,7 @@ public sealed partial class MainWindow
 
         var dialog = new ContentDialog
         {
-            Title = "بازیابی Zurvan Cloud",
+            Title = "بازیابی Zurvan Desk",
             Content = stack,
             PrimaryButtonText = "بازیابی Vault",
             CloseButtonText = "انصراف",
@@ -762,7 +762,7 @@ public sealed partial class MainWindow
                         "cloud-recovery-restored",
                         null,
                         null,
-                        "Zurvan Cloud vault key was restored from the recovery phrase."));
+                        "Zurvan Desk vault key was restored from the recovery phrase."));
             }
             finally
             {

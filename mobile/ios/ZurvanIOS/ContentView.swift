@@ -50,10 +50,10 @@ struct ContentView: View {
 
             NavigationStack {
                 ZurvanCloudShellView()
-                    .navigationTitle("Zurvan Cloud")
+                    .navigationTitle("Zurvan Desk")
             }
             .tabItem {
-                Label("کلاد", systemImage: "icloud")
+                Label("دسک", systemImage: "externaldrive.connected.to.line.below")
             }
             .tag(ZurvanTab.cloud)
 
@@ -169,7 +169,7 @@ private struct ZurvanCloudShellView: View {
                         .font(.footnote)
                         .foregroundStyle(.secondary)
 
-                    Button("تنظیم Zurvan Cloud") {}
+                    Button("تنظیم Zurvan Desk") {}
                         .buttonStyle(.borderedProminent)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)

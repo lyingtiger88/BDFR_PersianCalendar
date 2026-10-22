@@ -62,7 +62,7 @@ public sealed class AppSettings
     public string SecondaryCalendar { get; set; } = "hijri";
     public string TertiaryCalendar { get; set; } = "gregorian";
 
-    // Zurvan Cloud public/non-secret configuration. Credentials and the
+    // Zurvan Desk public/non-secret configuration. Credentials and the
     // encryption vault key are stored only in the platform secure store.
     public bool CloudEnabled { get; set; }
     public string CloudProvider { get; set; } = "arvancloud";
