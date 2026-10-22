@@ -472,8 +472,14 @@ foreach (var requiredMobileFile in new[]
 {
     "mobile/android/app/src/main/java/com/bdfr/zurvan/MainActivity.kt",
     "mobile/android/app/src/main/java/com/bdfr/zurvan/CompanionModels.kt",
+    "mobile/android/app/src/main/java/com/bdfr/zurvan/ZurvanCloudCrypto.kt",
+    "mobile/android/app/src/main/java/com/bdfr/zurvan/ZurvanRecoveryPhrase.kt",
+    "mobile/android/app/src/main/assets/bip39-english.txt",
     "mobile/ios/ZurvanIOS/ContentView.swift",
     "mobile/ios/ZurvanIOS/CompanionModels.swift",
+    "mobile/ios/ZurvanIOS/ZurvanCloudCrypto.swift",
+    "mobile/ios/ZurvanIOS/ZurvanRecoveryPhrase.swift",
+    "mobile/ios/ZurvanIOS/Resources/bip39-english.txt",
     "docs/COMPANION_SYNC.md"
 })
 {
@@ -524,6 +530,73 @@ try
 
     if (!cloudPlaintext.SequenceEqual(cloudDecrypted))
         throw new Exception("Zurvan Cloud encrypted-object round-trip failed.");
+
+    var recoveryPhrase = ZurvanRecoveryPhrase.Generate();
+    var recoveryWords = recoveryPhrase.Split(
+        ' ',
+        StringSplitOptions.RemoveEmptyEntries);
+
+    if (recoveryWords.Length != 24)
+        throw new Exception("Zurvan recovery phrase must contain 24 words by default.");
+
+    var recoveryEntropy = ZurvanRecoveryPhrase.DecodeEntropy(
+        recoveryPhrase);
+    try
+    {
+        var encodedAgain = ZurvanRecoveryPhrase.EncodeEntropy(
+            recoveryEntropy);
+
+        if (!string.Equals(
+                encodedAgain,
+                recoveryPhrase,
+                StringComparison.Ordinal))
+        {
+            throw new Exception("Zurvan BIP39 recovery phrase round-trip failed.");
+        }
+    }
+    finally
+    {
+        System.Security.Cryptography.CryptographicOperations.ZeroMemory(
+            recoveryEntropy);
+    }
+
+    var recoveryEnvelope = ZurvanRecoveryPhrase.WrapVaultKey(
+        recoveryPhrase,
+        "vault-smoke",
+        cloudVaultKey);
+
+    var restoredVaultKey = ZurvanRecoveryPhrase.UnwrapVaultKey(
+        recoveryPhrase,
+        recoveryEnvelope);
+
+    try
+    {
+        if (!cloudVaultKey.SequenceEqual(restoredVaultKey))
+            throw new Exception("Zurvan recovery phrase failed to restore the vault key.");
+    }
+    finally
+    {
+        System.Security.Cryptography.CryptographicOperations.ZeroMemory(
+            restoredVaultKey);
+    }
+
+    var wrongRecoveryPhrase = ZurvanRecoveryPhrase.Generate();
+    var wrongPhraseRejected = false;
+    try
+    {
+        var unexpected = ZurvanRecoveryPhrase.UnwrapVaultKey(
+            wrongRecoveryPhrase,
+            recoveryEnvelope);
+        System.Security.Cryptography.CryptographicOperations.ZeroMemory(
+            unexpected);
+    }
+    catch (System.Security.Cryptography.CryptographicException)
+    {
+        wrongPhraseRejected = true;
+    }
+
+    if (!wrongPhraseRejected)
+        throw new Exception("A wrong recovery phrase unexpectedly unlocked the vault.");
 
     System.Security.Cryptography.CryptographicOperations.ZeroMemory(recoveredKey);
     System.Security.Cryptography.CryptographicOperations.ZeroMemory(cloudPlaintext);
