@@ -3773,6 +3773,15 @@ public sealed partial class MainWindow : Window
                 : ThemeService.Brush(_theme.Accent);
         }
 
+        if (_navigationRailSurface is not null)
+        {
+            _navigationRailSurface.Background = CreateSideSurfaceBrush();
+            _navigationRailSurface.CornerRadius =
+                new CornerRadius(CurrentUiCornerRadius);
+            _navigationRailSurface.BorderBrush =
+                ThemeService.Brush(_theme.Accent);
+        }
+
         if (_settingsSurface is not null)
         {
             _settingsSurface.Background = IsLiquidGlassActive()
