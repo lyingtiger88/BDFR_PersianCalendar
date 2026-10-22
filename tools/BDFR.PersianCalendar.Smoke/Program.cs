@@ -340,4 +340,146 @@ finally
     try { File.Delete(dbPath); } catch { }
 }
 
+// Companion protocol: both peers must derive the same session key.
+using (var hostKey = new CompanionEphemeralKey())
+using (var mobileKey = new CompanionEphemeralKey())
+{
+    var sessionId = CompanionProtocol.NewSessionId();
+    var hostSessionKey = hostKey.DeriveSessionKey(
+        mobileKey.PublicKeyBase64,
+        sessionId);
+    var mobileSessionKey = mobileKey.DeriveSessionKey(
+        hostKey.PublicKeyBase64,
+        sessionId);
+
+    if (!hostSessionKey.SequenceEqual(mobileSessionKey))
+        throw new Exception("Companion ECDH session keys do not match.");
+
+    var hostSas = CompanionEphemeralKey.ComputeSixDigitSas(hostSessionKey);
+    var mobileSas = CompanionEphemeralKey.ComputeSixDigitSas(mobileSessionKey);
+    if (hostSas != mobileSas || hostSas.Length != 6)
+        throw new Exception("Companion six-digit SAS mismatch.");
+
+    var syncEnvelope = new SyncEnvelope(
+        "env-smoke",
+        SyncEntityKind.Note,
+        "note-smoke",
+        SyncMutationKind.Upsert,
+        2,
+        DateTimeOffset.UtcNow,
+        "device-host",
+        "{\"text\":\"hello\"}",
+        "hash-smoke");
+
+    var encrypted = CompanionEphemeralKey.EncryptJson(
+        syncEnvelope,
+        hostSessionKey);
+    var decrypted = CompanionEphemeralKey.DecryptJson<SyncEnvelope>(
+        encrypted,
+        mobileSessionKey);
+
+    if (decrypted.EntityId != syncEnvelope.EntityId ||
+        decrypted.Revision != syncEnvelope.Revision ||
+        decrypted.PayloadJson != syncEnvelope.PayloadJson)
+    {
+        throw new Exception("Companion encrypted frame round-trip failed.");
+    }
+
+    CryptographicOperations.ZeroMemory(hostSessionKey);
+    CryptographicOperations.ZeroMemory(mobileSessionKey);
+}
+
+var localEnvelope = new SyncEnvelope(
+    "env-local",
+    SyncEntityKind.Event,
+    "event-shared",
+    SyncMutationKind.Upsert,
+    5,
+    DateTimeOffset.UtcNow.AddMinutes(-2),
+    "device-a",
+    "{}",
+    "A");
+
+var incomingEnvelope = localEnvelope with
+{
+    EnvelopeId = "env-incoming",
+    Revision = 6,
+    ModifiedAtUtc = DateTimeOffset.UtcNow,
+    OriginDeviceId = "device-b",
+    ContentHash = "B"
+};
+
+if (SyncMergePolicy.Decide(localEnvelope, incomingEnvelope) !=
+    SyncConflictResolution.ApplyIncoming)
+{
+    throw new Exception("Companion merge policy failed for a newer revision.");
+}
+
+// Feature parity contract: every feature must explicitly track all three clients.
+string? repoRoot = null;
+foreach (var start in new[] { Directory.GetCurrentDirectory(), AppContext.BaseDirectory })
+{
+    var directory = new DirectoryInfo(start);
+    while (directory is not null)
+    {
+        var candidate = Path.Combine(
+            directory.FullName,
+            "platform",
+            "feature-parity.json");
+
+        if (File.Exists(candidate))
+        {
+            repoRoot = directory.FullName;
+            break;
+        }
+
+        directory = directory.Parent;
+    }
+
+    if (repoRoot is not null)
+        break;
+}
+
+if (repoRoot is null)
+    throw new Exception("Could not locate platform/feature-parity.json.");
+
+var parityPath = Path.Combine(repoRoot, "platform", "feature-parity.json");
+using (var parityDocument = System.Text.Json.JsonDocument.Parse(
+           await File.ReadAllTextAsync(parityPath)))
+{
+    var features = parityDocument.RootElement.GetProperty("features");
+    var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+    foreach (var feature in features.EnumerateArray())
+    {
+        var id = feature.GetProperty("id").GetString();
+        if (string.IsNullOrWhiteSpace(id) || !ids.Add(id))
+            throw new Exception("Feature parity manifest contains a missing or duplicate feature id.");
+
+        foreach (var platform in new[] { "windows", "android", "ios" })
+        {
+            if (!feature.TryGetProperty(platform, out var status) ||
+                string.IsNullOrWhiteSpace(status.GetString()))
+            {
+                throw new Exception(
+                    $"Feature parity entry [{id}] is missing platform [{platform}].");
+            }
+        }
+    }
+}
+
+foreach (var requiredMobileFile in new[]
+{
+    "mobile/android/app/src/main/java/com/bdfr/zurvan/MainActivity.kt",
+    "mobile/android/app/src/main/java/com/bdfr/zurvan/CompanionModels.kt",
+    "mobile/ios/ZurvanIOS/ContentView.swift",
+    "mobile/ios/ZurvanIOS/CompanionModels.swift",
+    "docs/COMPANION_SYNC.md"
+})
+{
+    if (!File.Exists(Path.Combine(repoRoot, requiredMobileFile)))
+        throw new Exception(
+            $"Cross-platform scaffold is missing required file: {requiredMobileFile}");
+}
+
 Console.WriteLine("BDFR Persian Calendar smoke checks passed.");
