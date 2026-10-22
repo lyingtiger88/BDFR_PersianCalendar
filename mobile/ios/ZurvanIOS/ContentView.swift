@@ -5,6 +5,7 @@ private enum ZurvanTab: Hashable {
     case plans
     case reminders
     case companion
+    case cloud
     case settings
 }
 
@@ -46,6 +47,15 @@ struct ContentView: View {
                 Label("همراه", systemImage: "laptopcomputer.and.iphone")
             }
             .tag(ZurvanTab.companion)
+
+            NavigationStack {
+                ZurvanCloudShellView()
+                    .navigationTitle("Zurvan Cloud")
+            }
+            .tabItem {
+                Label("کلاد", systemImage: "icloud")
+            }
+            .tag(ZurvanTab.cloud)
 
             NavigationStack {
                 PlaceholderView(title: "تنظیمات")
@@ -118,6 +128,56 @@ private struct CompanionShellView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding()
                 .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
+            }
+            .padding()
+        }
+    }
+}
+
+private struct ZurvanCloudShellView: View {
+    @State private var endpoint =
+        "https://s3.ir-thr-at1.arvanstorage.ir"
+    @State private var region = "ir-thr-at1"
+    @State private var bucket = ""
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("End-to-End Encrypted")
+                        .font(.headline)
+
+                    Text("داده قبل از Upload روی همین دستگاه رمز می‌شود و ابر آروان فقط ciphertext دریافت می‌کند.")
+                        .foregroundStyle(.secondary)
+
+                    TextField("S3 Endpoint", text: $endpoint)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .textFieldStyle(.roundedBorder)
+
+                    TextField("Region", text: $region)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .textFieldStyle(.roundedBorder)
+
+                    TextField("Bucket", text: $bucket)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .textFieldStyle(.roundedBorder)
+
+                    Text("Vault Key در Keychain نگه‌داری می‌شود؛ انتقال آن بین دستگاه‌ها فقط از Companion یا Recovery Key انجام می‌شود.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+
+                    Button("تنظیم Zurvan Cloud") {}
+                        .buttonStyle(.borderedProminent)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding()
+                .background(
+                    .thinMaterial,
+                    in: RoundedRectangle(cornerRadius: 18)
+                )
             }
             .padding()
         }
