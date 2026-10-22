@@ -861,7 +861,9 @@ public sealed partial class MainWindow : Window
         StatusText.Opacity = 0.78;
         stack.Children.Add(StatusText);
 
-        stack.Children.Add(SectionTitle("مرکز فعالیت"));
+        var activityTitle = SectionTitle("مرکز فعالیت");
+        _activitySectionAnchor = activityTitle;
+        stack.Children.Add(activityTitle);
 
         var activityActions = new Grid { ColumnSpacing = 6 };
         activityActions.ColumnDefinitions.Add(new ColumnDefinition());
@@ -1069,11 +1071,15 @@ public sealed partial class MainWindow : Window
         HijriDateText.FontFamily = new FontFamily("Traditional Arabic");
         stack.Children.Add(HijriDateText);
 
-        stack.Children.Add(SectionTitle("مناسبت‌ها"));
+        var occasionsTitle = SectionTitle("مناسبت‌ها");
+        _occasionsSectionAnchor = occasionsTitle;
+        stack.Children.Add(occasionsTitle);
         OccasionsPanel.Spacing = 6;
         stack.Children.Add(OccasionsPanel);
 
-        stack.Children.Add(SectionTitle("رویدادها"));
+        var eventsTitle = SectionTitle("رویدادها");
+        _eventsSectionAnchor = eventsTitle;
+        stack.Children.Add(eventsTitle);
         EventsPanel.Spacing = 6;
         stack.Children.Add(EventsPanel);
 
@@ -1091,7 +1097,9 @@ public sealed partial class MainWindow : Window
         saveNote.Click += SaveNote_Click;
         stack.Children.Add(saveNote);
 
-        stack.Children.Add(SectionTitle("رویداد و یادآور"));
+        var remindersTitle = SectionTitle("رویداد و یادآور");
+        _remindersSectionAnchor = remindersTitle;
+        stack.Children.Add(remindersTitle);
 
         stack.Children.Add(new TextBlock
         {
@@ -1502,6 +1510,119 @@ public sealed partial class MainWindow : Window
         _settingsPanel.Children.Add(new TextBlock
         {
             Text = "۰ = گوشه کاملاً مربعی · ۳۲ = گوشه بسیار گرد. تغییرات به‌صورت زنده روی کارت‌ها، دکمه‌ها، ورودی‌ها و خانه‌های تقویم اعمال می‌شود.",
+            FontSize = 10.5,
+            TextWrapping = TextWrapping.Wrap,
+            Opacity = 0.62,
+            Foreground = ThemeService.Brush(_theme.SecondaryText)
+        });
+
+        _settingsPanel.Children.Add(new TextBlock
+        {
+            Text = "چیدمان پنل‌ها و سربرگ",
+            FontSize = 15,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Foreground = ThemeService.Brush(_theme.PrimaryText),
+            Margin = new Thickness(0, 8, 0, 0)
+        });
+
+        var leftWidthValue = new TextBlock
+        {
+            Text = $"عرض سایدبار چپ: {ToPersianDigits(Math.Round(Math.Clamp(_settings.LeftSidebarWidth, 220, 560)).ToString(CultureInfo.InvariantCulture))} px",
+            Foreground = ThemeService.Brush(_theme.SecondaryText)
+        };
+        _settingsPanel.Children.Add(leftWidthValue);
+
+        var leftWidthSlider = new Slider
+        {
+            Minimum = 220,
+            Maximum = 560,
+            StepFrequency = 10,
+            Value = Math.Clamp(_settings.LeftSidebarWidth, 220, 560),
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+        leftWidthSlider.ValueChanged += (_, e) =>
+        {
+            _settings.LeftSidebarWidth = Math.Round(e.NewValue / 10.0) * 10.0;
+            leftWidthValue.Text =
+                $"عرض سایدبار چپ: {ToPersianDigits(_settings.LeftSidebarWidth.ToString("0", CultureInfo.InvariantCulture))} px";
+            ApplyWorkspaceLayoutSettingsLive();
+            _settingsService.Save(_settings);
+        };
+        _settingsPanel.Children.Add(leftWidthSlider);
+
+        var rightWidthValue = new TextBlock
+        {
+            Text = $"عرض سایدبار راست: {ToPersianDigits(Math.Round(Math.Clamp(_settings.RightSidebarWidth, 220, 560)).ToString(CultureInfo.InvariantCulture))} px",
+            Foreground = ThemeService.Brush(_theme.SecondaryText)
+        };
+        _settingsPanel.Children.Add(rightWidthValue);
+
+        var rightWidthSlider = new Slider
+        {
+            Minimum = 220,
+            Maximum = 560,
+            StepFrequency = 10,
+            Value = Math.Clamp(_settings.RightSidebarWidth, 220, 560),
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+        rightWidthSlider.ValueChanged += (_, e) =>
+        {
+            _settings.RightSidebarWidth = Math.Round(e.NewValue / 10.0) * 10.0;
+            rightWidthValue.Text =
+                $"عرض سایدبار راست: {ToPersianDigits(_settings.RightSidebarWidth.ToString("0", CultureInfo.InvariantCulture))} px";
+            ApplyWorkspaceLayoutSettingsLive();
+            _settingsService.Save(_settings);
+        };
+        _settingsPanel.Children.Add(rightWidthSlider);
+
+        var railWidthValue = new TextBlock
+        {
+            Text = $"عرض سربرگ کناری: {ToPersianDigits(Math.Round(Math.Clamp(_settings.NavigationRailWidth, 108, 210)).ToString(CultureInfo.InvariantCulture))} px",
+            Foreground = ThemeService.Brush(_theme.SecondaryText)
+        };
+        _settingsPanel.Children.Add(railWidthValue);
+
+        var railWidthSlider = new Slider
+        {
+            Minimum = 108,
+            Maximum = 210,
+            StepFrequency = 6,
+            Value = Math.Clamp(_settings.NavigationRailWidth, 108, 210),
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+        railWidthSlider.ValueChanged += (_, e) =>
+        {
+            _settings.NavigationRailWidth = Math.Round(e.NewValue / 6.0) * 6.0;
+            railWidthValue.Text =
+                $"عرض سربرگ کناری: {ToPersianDigits(_settings.NavigationRailWidth.ToString("0", CultureInfo.InvariantCulture))} px";
+            ApplyWorkspaceLayoutSettingsLive();
+            _settingsService.Save(_settings);
+        };
+        _settingsPanel.Children.Add(railWidthSlider);
+
+        var railSideButton = MakeButton("");
+        void RefreshRailSideButton()
+        {
+            railSideButton.Content =
+                IsNavigationRailOnLeft()
+                    ? "محل سربرگ: چپ  ↔"
+                    : "محل سربرگ: راست  ↔";
+        }
+
+        railSideButton.Click += (_, _) =>
+        {
+            _settings.NavigationRailSide =
+                IsNavigationRailOnLeft() ? "right" : "left";
+            RefreshRailSideButton();
+            ApplyWorkspaceLayoutSettingsLive();
+            _settingsService.Save(_settings);
+        };
+        RefreshRailSideButton();
+        _settingsPanel.Children.Add(railSideButton);
+
+        _settingsPanel.Children.Add(new TextBlock
+        {
+            Text = "ترتیب سربرگ ثابت و یکدست است: تقویم، زروان دسک، برنامه‌ها، مناسبت‌ها، یادآورها، همراه، فعالیت‌ها و در انتها تنظیمات.",
             FontSize = 10.5,
             TextWrapping = TextWrapping.Wrap,
             Opacity = 0.62,
