@@ -15,7 +15,7 @@ using System.Globalization;
 
 namespace BDFR.PersianCalendar.Desktop;
 
-public sealed class MainWindow : Window
+public sealed partial class MainWindow : Window
 {
     private readonly ICalendarRepository _repository;
     private readonly PlannerService _planner;
@@ -1539,6 +1539,8 @@ public sealed class MainWindow : Window
         }
 
         RefreshCalendarOrderButtons();
+
+        _settingsPanel.Children.Add(BuildZurvanCloudSettingsPanel());
 
         if (isElena)
         {
