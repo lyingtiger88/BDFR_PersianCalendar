@@ -53,15 +53,13 @@ public sealed class CompanionEphemeralKey : IDisposable
         ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
 
     public string PublicKeyBase64 =>
-        Convert.ToBase64String(_key.ExportSubjectPublicKeyInfo());
+        Convert.ToBase64String(ExportX963PublicKey());
 
     public string PublicKeyFingerprint
     {
         get
         {
-            var hash = SHA256.HashData(
-                _key.ExportSubjectPublicKeyInfo());
-
+            var hash = SHA256.HashData(ExportX963PublicKey());
             return Convert.ToHexString(hash.AsSpan(0, 8));
         }
     }
@@ -70,10 +68,21 @@ public sealed class CompanionEphemeralKey : IDisposable
         string peerPublicKeyBase64,
         string sessionId)
     {
+        var peerBytes = Convert.FromBase64String(peerPublicKeyBase64);
+        if (peerBytes.Length != 65 || peerBytes[0] != 0x04)
+            throw new CryptographicException(
+                "Companion public key must be a 65-byte P-256 X9.63 point.");
+
         using var peer = ECDiffieHellman.Create();
-        peer.ImportSubjectPublicKeyInfo(
-            Convert.FromBase64String(peerPublicKeyBase64),
-            out _);
+        peer.ImportParameters(new ECParameters
+        {
+            Curve = ECCurve.NamedCurves.nistP256,
+            Q = new ECPoint
+            {
+                X = peerBytes.AsSpan(1, 32).ToArray(),
+                Y = peerBytes.AsSpan(33, 32).ToArray()
+            }
+        });
 
         var sharedSecret = _key.DeriveKeyMaterial(peer.PublicKey);
 
@@ -170,6 +179,25 @@ public sealed class CompanionEphemeralKey : IDisposable
         {
             CryptographicOperations.ZeroMemory(plaintext);
         }
+    }
+
+    private byte[] ExportX963PublicKey()
+    {
+        var parameters = _key.ExportParameters(false);
+        var x = parameters.Q.X
+            ?? throw new CryptographicException("Missing P-256 X coordinate.");
+        var y = parameters.Q.Y
+            ?? throw new CryptographicException("Missing P-256 Y coordinate.");
+
+        if (x.Length != 32 || y.Length != 32)
+            throw new CryptographicException(
+                "Unexpected P-256 public-key coordinate size.");
+
+        var output = new byte[65];
+        output[0] = 0x04;
+        x.CopyTo(output, 1);
+        y.CopyTo(output, 33);
+        return output;
     }
 
     public void Dispose() => _key.Dispose();
