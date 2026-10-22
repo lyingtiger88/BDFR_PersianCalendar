@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.Devices
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Settings
@@ -33,6 +34,7 @@ private enum class ZurvanTab(val label: String) {
     Plans("برنامه‌ها"),
     Reminders("یادآورها"),
     Companion("همراه"),
+    Cloud("کلاد"),
     Settings("تنظیمات")
 }
 
@@ -60,6 +62,7 @@ private fun ZurvanMobileShell() {
                                     ZurvanTab.Plans -> Icons.Outlined.TaskAlt
                                     ZurvanTab.Reminders -> Icons.Outlined.Notifications
                                     ZurvanTab.Companion -> Icons.Outlined.Devices
+                                    ZurvanTab.Cloud -> Icons.Outlined.Cloud
                                     ZurvanTab.Settings -> Icons.Outlined.Settings
                                 },
                                 contentDescription = tab.label
@@ -81,6 +84,7 @@ private fun ZurvanMobileShell() {
         when (selected) {
             ZurvanTab.Calendar -> CalendarShell(Modifier.padding(padding))
             ZurvanTab.Companion -> CompanionShell(Modifier.padding(padding))
+            ZurvanTab.Cloud -> ZurvanCloudShell(Modifier.padding(padding))
             else -> PlaceholderScreen(selected.label, Modifier.padding(padding))
         }
     }
@@ -144,6 +148,72 @@ private fun CompanionShell(modifier: Modifier = Modifier) {
                 Text("QR یا کد ۶ رقمی برای Pairing؛ سپس همگام‌سازی دوطرفه و Local-first.")
                 Button(onClick = { }) {
                     Text("جفت‌سازی دستگاه")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ZurvanCloudShell(modifier: Modifier = Modifier) {
+    var endpoint by remember {
+        mutableStateOf("https://s3.ir-thr-at1.arvanstorage.ir")
+    }
+    var region by remember { mutableStateOf("ir-thr-at1") }
+    var bucket by remember { mutableStateOf("") }
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text("Zurvan Cloud", style = MaterialTheme.typography.headlineSmall)
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(18.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    "End-to-End Encrypted",
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Text(
+                    "اطلاعات قبل از Upload روی همین گوشی رمز می‌شوند. ابر آروان فقط ciphertext دریافت می‌کند."
+                )
+
+                OutlinedTextField(
+                    value = endpoint,
+                    onValueChange = { endpoint = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("S3 Endpoint") }
+                )
+
+                OutlinedTextField(
+                    value = region,
+                    onValueChange = { region = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Region") }
+                )
+
+                OutlinedTextField(
+                    value = bucket,
+                    onValueChange = { bucket = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Bucket") }
+                )
+
+                Text(
+                    "Vault Key در Android Keystore محافظت می‌شود و برای انتقال به دستگاه دیگر از Companion یا Recovery Key استفاده خواهد شد.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+
+                Button(onClick = { }) {
+                    Text("تنظیم Zurvan Cloud")
                 }
             }
         }
