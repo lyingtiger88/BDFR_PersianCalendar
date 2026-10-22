@@ -60,6 +60,16 @@ public sealed class AppSettings
     public string SecondaryCalendar { get; set; } = "hijri";
     public string TertiaryCalendar { get; set; } = "gregorian";
 
+    // Zurvan Cloud public/non-secret configuration. Credentials and the
+    // encryption vault key are stored only in the platform secure store.
+    public bool CloudEnabled { get; set; }
+    public string CloudProvider { get; set; } = "arvancloud";
+    public string CloudEndpoint { get; set; } = ZurvanCloudProtocol.DefaultEndpoint;
+    public string CloudRegion { get; set; } = ZurvanCloudProtocol.DefaultRegion;
+    public string CloudBucket { get; set; } = "";
+    public string CloudPrefix { get; set; } = "zurvan";
+    public string CloudVaultId { get; set; } = "";
+
     // Global UI typography.
     public string FontFamilyName { get; set; } = "Segoe UI Variable";
 
