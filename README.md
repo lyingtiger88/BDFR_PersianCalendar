@@ -88,9 +88,27 @@ Every push to `main` runs GitHub Actions checks for the Core/Infrastructure and 
 ## Development roadmap
 
 - **Windows 11 desktop — Active development / test-ready.** WinUI 3 is the current primary client.
-- **Android — Planned.** Reuse the platform-independent Core/Infrastructure calendar, occasion and reminder logic with an Android-native client.
-- **iOS — Planned.** Reuse the shared calendar domain and data model with an iOS-native client.
+- **Android — Active scaffold.** Kotlin + Jetpack Compose shell, calendar/Companion navigation and mirrored Companion protocol models live under `mobile/android`.
+- **iOS — Active scaffold.** SwiftUI shell, calendar/Companion navigation and mirrored Companion protocol models live under `mobile/ios`.
 - Cross-device data compatibility and synchronization are future roadmap items; the current Windows SQLite database remains local-first.
+
+## Cross-platform parity and Companion
+
+`platform/feature-parity.json` is the product parity contract. Every feature must explicitly track Windows, Android and iOS; the smoke suite fails if one platform is omitted.
+
+The shared Core now contains Companion protocol v1:
+
+- persistent device identity;
+- short-lived pairing sessions;
+- QR/base64 pairing payloads and six-digit fallback codes;
+- ECDH P-256 session-key derivation;
+- six-digit short authentication string (SAS);
+- AES-256-GCM authenticated sync frames;
+- revision/checkpoint-based sync batches;
+- tombstone deletes;
+- deterministic conflict resolution.
+
+The Android and iOS shells already expose a Companion destination and mirror the protocol data models. The **encrypted LAN transport and persistent device registry are the next implementation layer**; the current repository does not yet claim live PC↔phone synchronization is complete. See `docs/COMPANION_SYNC.md`.
 
 ## Occasion picture mappings
 
