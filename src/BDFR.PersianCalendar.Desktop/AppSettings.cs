@@ -72,6 +72,13 @@ public sealed class AppSettings
     public string CloudPrefix { get; set; } = "zurvan";
     public string CloudVaultId { get; set; } = "";
 
+    // Workspace layout / side navigation.
+    // These values describe the physical left/right sidebars.
+    public double LeftSidebarWidth { get; set; } = 390.0;
+    public double RightSidebarWidth { get; set; } = 300.0;
+    public double NavigationRailWidth { get; set; } = 138.0;
+    public string NavigationRailSide { get; set; } = "left";
+
     // Global UI typography.
     public string FontFamilyName { get; set; } = "Segoe UI Variable";
 
