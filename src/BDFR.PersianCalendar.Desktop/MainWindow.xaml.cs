@@ -52,6 +52,17 @@ public sealed partial class MainWindow : Window
     private Border? _leftPanelSurface;
     private Border? _centerPanelSurface;
     private Border? _rightPanelSurface;
+    private Border? _navigationRailSurface;
+    private Grid? _workspaceLayoutGrid;
+    private ColumnDefinition? _navigationRailLeftColumn;
+    private ColumnDefinition? _physicalLeftSidebarColumn;
+    private ColumnDefinition? _centerWorkspaceColumn;
+    private ColumnDefinition? _physicalRightSidebarColumn;
+    private ColumnDefinition? _navigationRailRightColumn;
+    private FrameworkElement? _occasionsSectionAnchor;
+    private FrameworkElement? _eventsSectionAnchor;
+    private FrameworkElement? _remindersSectionAnchor;
+    private FrameworkElement? _activitySectionAnchor;
     private Border? _settingsSurface;
     private Border? _accentSubmenuSurface;
     private Border? _pictureLibrarySurface;
@@ -692,7 +703,10 @@ public sealed partial class MainWindow : Window
         var outer = new Grid
         {
             Background = ThemeService.Brush(_theme.WindowBackground),
-            RequestedTheme = string.Equals(_theme.Id, "graphite-night", StringComparison.OrdinalIgnoreCase)
+            RequestedTheme = string.Equals(
+                _theme.Id,
+                "graphite-night",
+                StringComparison.OrdinalIgnoreCase)
                 ? ElementTheme.Dark
                 : ElementTheme.Light
         };
@@ -700,42 +714,73 @@ public sealed partial class MainWindow : Window
         _rootSurface = outer;
 
         _backgroundImage.Stretch = Stretch.UniformToFill;
-        _backgroundImage.Opacity = Math.Clamp(_settings.BackgroundOpacity, 0, 0.95);
+        _backgroundImage.Opacity =
+            Math.Clamp(_settings.BackgroundOpacity, 0, 0.95);
         outer.Children.Add(_backgroundImage);
 
-        _backgroundWash.Background = ThemeService.Brush(_theme.WindowBackground);
+        _backgroundWash.Background =
+            ThemeService.Brush(_theme.WindowBackground);
         _backgroundWash.Opacity = 0.62;
         outer.Children.Add(_backgroundWash);
 
+        // Use a physical LTR grid so "left" and "right" settings always map
+        // to the visible side of the window. Each content panel remains RTL.
         var root = new Grid
         {
-            FlowDirection = FlowDirection.RightToLeft,
+            FlowDirection = FlowDirection.LeftToRight,
             Margin = new Thickness(12),
-            ColumnSpacing = 12
+            ColumnSpacing = 10
         };
-        root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(300) });
-        root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(390) });
+        _workspaceLayoutGrid = root;
 
-        var left = BuildLeftPanel();
-        Grid.SetColumn(left, 0);
-        root.Children.Add(left);
+        _navigationRailLeftColumn = new ColumnDefinition();
+        _physicalLeftSidebarColumn = new ColumnDefinition();
+        _centerWorkspaceColumn = new ColumnDefinition
+        {
+            Width = new GridLength(1, GridUnitType.Star)
+        };
+        _physicalRightSidebarColumn = new ColumnDefinition();
+        _navigationRailRightColumn = new ColumnDefinition();
+
+        root.ColumnDefinitions.Add(_navigationRailLeftColumn);
+        root.ColumnDefinitions.Add(_physicalLeftSidebarColumn);
+        root.ColumnDefinitions.Add(_centerWorkspaceColumn);
+        root.ColumnDefinitions.Add(_physicalRightSidebarColumn);
+        root.ColumnDefinitions.Add(_navigationRailRightColumn);
+
+        // The existing right detail panel was physically on the left under
+        // the old RTL grid. Keep that visual arrangement while making the
+        // physical column semantics explicit.
+        var physicalLeftPanel = BuildRightPanel();
+        physicalLeftPanel.FlowDirection = FlowDirection.RightToLeft;
+        Grid.SetColumn(physicalLeftPanel, 1);
+        root.Children.Add(physicalLeftPanel);
 
         var center = new Border
         {
             Background = CreateCenterSurfaceBrush(),
-            CornerRadius = new CornerRadius(IsLiquidGlassActive() ? 24 : 18),
-            BorderBrush = BrushWithAlpha("#FFFFFFFF", IsLiquidGlassActive() ? (byte)0xD0 : (byte)0xA8),
+            CornerRadius = new CornerRadius(
+                IsLiquidGlassActive() ? 24 : 18),
+            BorderBrush = BrushWithAlpha(
+                "#FFFFFFFF",
+                IsLiquidGlassActive() ? (byte)0xD0 : (byte)0xA8),
             BorderThickness = new Thickness(1),
-            Child = BuildCalendarPanel()
+            Child = BuildCalendarPanel(),
+            FlowDirection = FlowDirection.RightToLeft
         };
         _centerPanelSurface = center;
-        Grid.SetColumn(center, 1);
+        Grid.SetColumn(center, 2);
         root.Children.Add(center);
 
-        var right = BuildRightPanel();
-        Grid.SetColumn(right, 2);
-        root.Children.Add(right);
+        var physicalRightPanel = BuildLeftPanel();
+        physicalRightPanel.FlowDirection = FlowDirection.RightToLeft;
+        Grid.SetColumn(physicalRightPanel, 3);
+        root.Children.Add(physicalRightPanel);
+
+        _navigationRailSurface = BuildNavigationRail();
+        root.Children.Add(_navigationRailSurface);
+
+        ApplyWorkspaceLayoutSettingsLive();
 
         outer.Children.Add(root);
 
