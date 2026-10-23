@@ -127,8 +127,8 @@ class AndroidLocalRepository(
         isPrivate: Boolean,
         repeatCount: Int,
         repeatIntervalMinutes: Int
-    ) {
-        val next = _reminders.value + LocalReminder(
+    ): LocalReminder {
+        val reminder = LocalReminder(
             id = "reminder_${UUID.randomUUID()}",
             title = title.trim(),
             dateKey = dateKey,
@@ -139,7 +139,12 @@ class AndroidLocalRepository(
             repeatIntervalMinutes =
                 repeatIntervalMinutes.coerceIn(1, 1440)
         )
-        saveReminders(next)
+
+        saveReminders(
+            _reminders.value + reminder
+        )
+
+        return reminder
     }
 
     fun acknowledgeReminder(id: String) {
