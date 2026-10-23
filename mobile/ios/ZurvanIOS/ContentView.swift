@@ -123,22 +123,147 @@ private struct CalendarShellView: View {
 }
 
 private struct CompanionShellView: View {
+    @StateObject private var model =
+        CompanionPairingViewModel()
+
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("جفت‌سازی با رایانه")
-                        .font(.headline)
-                    Text("QR یا کد ۶ رقمی برای Pairing و سپس همگام‌سازی دوطرفه Local-first.")
-                        .foregroundStyle(.secondary)
-                    Button("جفت‌سازی دستگاه") {}
-                        .buttonStyle(.borderedProminent)
+            VStack(
+                alignment: .leading,
+                spacing: 16
+            ) {
+                VStack(
+                    alignment: .leading,
+                    spacing: 10
+                ) {
+                    Text(
+                        "جفت‌سازی امن شبیه SHAREit"
+                    )
+                    .font(.headline)
+
+                    Text(
+                        "در رایانه یا دستگاه Master یک QR یک‌بارمصرف ساخته می‌شود. این iPhone/iPad با اسکن QR مستقیماً روی شبکه محلی وصل می‌شود و Sync Frameها با ECDH P-256 و AES-GCM رمز می‌شوند."
+                    )
+                    .foregroundStyle(
+                        .secondary
+                    )
+
+                    Button {
+                        model.scan()
+                    } label: {
+                        Label(
+                            "اسکن QR دستگاه Master",
+                            systemImage:
+                                "qrcode.viewfinder"
+                        )
+                    }
+                    .buttonStyle(
+                        .borderedProminent
+                    )
+                    .disabled(
+                        model.isBusy
+                    )
+
+                    if model.isBusy {
+                        HStack {
+                            ProgressView()
+                            Text(model.status)
+                        }
+                    } else {
+                        Text(model.status)
+                            .font(.subheadline)
+                    }
+
+                    if let peer =
+                        model.peerName {
+                        Text(
+                            "دستگاه مقابل: \(peer)"
+                        )
+                    }
+
+                    if let sas =
+                        model.sas {
+                        Text(
+                            "کد امنیتی مشترک: \(sas)"
+                        )
+                        .font(
+                            .title3.bold()
+                        )
+                    }
+
+                    if model
+                        .receivedItemCount >
+                        0 {
+                        Text(
+                            "آیتم‌های دریافت‌شده: \(model.receivedItemCount)"
+                        )
+                    }
+
+                    if let error =
+                        model.errorMessage {
+                        Text(error)
+                            .foregroundStyle(
+                                .red
+                            )
+                            .font(.footnote)
+                    }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(
+                    maxWidth: .infinity,
+                    alignment: .leading
+                )
                 .padding()
-                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
+                .background(
+                    .thinMaterial,
+                    in:
+                        RoundedRectangle(
+                            cornerRadius: 18
+                        )
+                )
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 6
+                ) {
+                    Text("امنیت Pairing")
+                        .font(.headline)
+                    Text(
+                        "QR فقط اطلاعات جلسه کوتاه‌عمر، آدرس LAN و کلید عمومی موقت را حمل می‌کند؛ اطلاعات تقویم داخل QR نیست. پس از Handshake، Snapshot رمز‌شده دریافت و در فضای Application Support زروان ذخیره می‌شود."
+                    )
+                    .font(.footnote)
+                    .foregroundStyle(
+                        .secondary
+                    )
+                }
+                .frame(
+                    maxWidth: .infinity,
+                    alignment: .leading
+                )
+                .padding()
+                .background(
+                    .thinMaterial,
+                    in:
+                        RoundedRectangle(
+                            cornerRadius: 18
+                        )
+                )
             }
             .padding()
+        }
+        .sheet(
+            isPresented:
+                $model
+                    .isScannerPresented
+        ) {
+            CompanionQRScannerView {
+                payload in
+                model.handleScannedPayload(
+                    payload
+                )
+            } onCancel: {
+                model.cancelScanner()
+            }
+            .ignoresSafeArea()
         }
     }
 }
