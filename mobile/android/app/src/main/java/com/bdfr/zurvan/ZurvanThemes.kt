@@ -42,7 +42,19 @@ object ZurvanThemes {
         }
         fun color(key: String, fallback: Color): Color =
             overrides[key]?.let { runCatching { Color(android.graphics.Color.parseColor(it)) }.getOrNull() } ?: fallback
-        val palette = presets.firstOrNull { it.id == selected } ?: presets.first()
+        val season = when (AndroidCalendarEngine.currentPersianYearMonth().second) {
+            in 1..3 -> 0
+            in 4..6 -> 1
+            in 7..9 -> 2
+            else -> 3
+        }
+        val seasonalPalette = listOf(
+            ZurvanPalette("season-vibe","Season Vibe",Color(0xFFE7F5E8),Color(0xFFF6FCF4),Color(0xFFE8F5DF),Color(0xFF254630),Color(0xFF66AD79),Color(0xFFC74652)),
+            ZurvanPalette("season-vibe","Season Vibe",Color(0xFFDFF7FC),Color(0xFFF2FCFF),Color(0xFFE1F9F9),Color(0xFF17465D),Color(0xFF29B6B8),Color(0xFFD34E5E)),
+            ZurvanPalette("season-vibe","Season Vibe",Color(0xFFF9EBDD),Color(0xFFFFF7ED),Color(0xFFF7E3CF),Color(0xFF51362A),Color(0xFFC18751),Color(0xFFC65B52)),
+            ZurvanPalette("season-vibe","Season Vibe",Color(0xFFE7F1FB),Color(0xFFF1F7FC),Color(0xFFE4F0FC),Color(0xFF19304A),Color(0xFF6AA4D8),Color(0xFFCE4452))
+        )[season]
+        val palette = if (selected == "season-vibe") seasonalPalette else presets.firstOrNull { it.id == selected } ?: presets.first()
         val isDark = selected == "graphite-night"
         val base = if (isDark) darkColorScheme() else lightColorScheme()
         val colors = base.copy(
