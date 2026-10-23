@@ -141,6 +141,43 @@ app.MapGet("/api/v1/account", (
         });
 });
 
+app.MapPut("/api/v1/recovery", async (
+    RecoveryEnvelopeRequest request,
+    HttpContext http,
+    DeskAccountStore accounts) =>
+{
+    var user = ResolveUser(http, accounts);
+    if (user is null)
+        return Results.Unauthorized();
+
+    if (string.IsNullOrWhiteSpace(request.Payload) ||
+        request.Payload.Length > 64_000)
+    {
+        return Results.BadRequest(
+            new ApiError("Recovery envelope is invalid."));
+    }
+
+    await accounts.SetRecoveryEnvelopeAsync(
+        user.Id,
+        request.Payload);
+
+    return Results.NoContent();
+});
+
+app.MapGet("/api/v1/recovery", (
+    HttpContext http,
+    DeskAccountStore accounts) =>
+{
+    var user = ResolveUser(http, accounts);
+    if (user is null)
+        return Results.Unauthorized();
+
+    var payload = accounts.GetRecoveryEnvelope(user.Id);
+    return payload is null
+        ? Results.NotFound()
+        : Results.Ok(new RecoveryEnvelopeRequest(payload));
+});
+
 app.MapGet("/api/v1/files", (
     HttpContext http,
     DeskAccountStore accounts) =>
@@ -356,6 +393,9 @@ public sealed record AuthResponse(
 public sealed record RenameFileRequest(
     string EncryptedName);
 
+public sealed record RecoveryEnvelopeRequest(
+    string Payload);
+
 public sealed record DeskFileResponse(
     string Id,
     string EncryptedName,
@@ -504,6 +544,33 @@ public sealed class DeskAccountStore
                     tokenHash,
                     StringComparison.Ordinal));
 
+            await SaveLockedAsync();
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    public string? GetRecoveryEnvelope(string userId)
+        => _database.Users
+            .FirstOrDefault(x => x.Id == userId)
+            ?.RecoveryEnvelope;
+
+    public async Task SetRecoveryEnvelopeAsync(
+        string userId,
+        string payload)
+    {
+        await _gate.WaitAsync();
+
+        try
+        {
+            var user = _database.Users.FirstOrDefault(
+                x => x.Id == userId)
+                ?? throw new InvalidOperationException(
+                    "Desk user was not found.");
+
+            user.RecoveryEnvelope = payload;
             await SaveLockedAsync();
         }
         finally
@@ -713,6 +780,7 @@ public sealed class DeskUser
     public string PasswordSalt { get; set; } = "";
     public string PasswordHash { get; set; } = "";
     public string VaultId { get; set; } = "";
+    public string? RecoveryEnvelope { get; set; }
     public DateTimeOffset CreatedAtUtc { get; set; }
 }
 
