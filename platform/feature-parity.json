@@ -139,8 +139,8 @@
       "id": "appearance-presets",
       "name": "Desktop-matched five appearance color presets",
       "windows": "implemented",
-      "android": "implemented-colors",
-      "ios": "planned"
+      "android": "implemented-presets-and-six-custom-color-controls",
+      "ios": "implemented-presets-and-six-custom-color-controls"
     },
     {
       "id": "official-holiday-mourning-cards",
@@ -155,6 +155,13 @@
       "windows": "implemented",
       "android": "partial-custom-events",
       "ios": "implemented-fixed-date-only"
+    },
+    {
+      "id": "application-brand-icon",
+      "name": "Approved Zurvan halo icon deployed to OS launcher and installer",
+      "windows": "awaiting-binary-assets",
+      "android": "awaiting-binary-assets",
+      "ios": "awaiting-binary-assets"
     }
   ]
 }
