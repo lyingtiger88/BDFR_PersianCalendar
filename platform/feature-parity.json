@@ -14,7 +14,7 @@
       "name": "Three-calendar month view",
       "windows": "implemented",
       "android": "implemented",
-      "ios": "shell"
+      "ios": "implemented-basic-month"
     },
     {
       "id": "calendar-order",
@@ -134,6 +134,27 @@
       "windows": "planned-account-ui",
       "android": "implemented-client",
       "ios": "implemented-account-ui-backend-pending"
+    },
+    {
+      "id": "appearance-presets",
+      "name": "Desktop-matched five appearance color presets",
+      "windows": "implemented",
+      "android": "implemented-colors",
+      "ios": "planned"
+    },
+    {
+      "id": "official-holiday-mourning-cards",
+      "name": "Red holiday dates and black mourning ribbon on day cards",
+      "windows": "implemented",
+      "android": "implemented-fixed-date-and-custom",
+      "ios": "implemented-fixed-date"
+    },
+    {
+      "id": "official-occasion-catalogue",
+      "name": "Official fixed-date Persian and Hijri occasions with editable/live data",
+      "windows": "implemented",
+      "android": "partial-custom-events",
+      "ios": "implemented-fixed-date-only"
     }
   ]
 }
