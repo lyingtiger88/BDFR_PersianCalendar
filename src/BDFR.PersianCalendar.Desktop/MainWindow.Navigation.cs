@@ -281,4 +281,3 @@ public sealed partial class MainWindow
     private async Task ShowCompanionOverviewAsync()
         => await ShowCompanionPairingAsync();
 }
-}
