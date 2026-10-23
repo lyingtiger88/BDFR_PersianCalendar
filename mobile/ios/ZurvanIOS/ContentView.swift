@@ -14,11 +14,13 @@ private enum ZurvanTab: Hashable {
 struct ContentView: View {
     @AppStorage("zurvan.appearance.theme") private var themeID = "windows-light"
     @State private var selection: ZurvanTab = .calendar
+    @State private var licensed = ZurvanIOSLicense.isLicensed
 
     var body: some View {
         TabView(selection: $selection) {
             NavigationStack {
                 ZurvanCalendarView()
+                    .allowsHitTesting(licensed)
                     .navigationTitle("Zurvan | زروان")
             }
             .tabItem {
@@ -27,57 +29,122 @@ struct ContentView: View {
             .tag(ZurvanTab.calendar)
 
             NavigationStack {
-                ZurvanCloudShellView()
+                if licensed {
+                    ZurvanCloudShellView()
+                } else {
+                    ZurvanLockedView()
+                }
                     .navigationTitle("Zurvan Desk")
             }
             .tabItem {
                 Label("زروان دسک", systemImage: "externaldrive.connected.to.line.below")
             }
             .tag(ZurvanTab.desk)
+            .disabled(!licensed)
 
             NavigationStack {
-                PlaceholderView(title: "برنامه‌ها")
+                if licensed {
+                    PlaceholderView(title: "برنامه‌ها")
+                } else {
+                    ZurvanLockedView()
+                }
             }
             .tabItem {
                 Label("برنامه‌ها", systemImage: "checklist")
             }
             .tag(ZurvanTab.plans)
+            .disabled(!licensed)
 
             NavigationStack {
-                ZurvanOccasionsView()
+                if licensed {
+                    ZurvanOccasionsView()
+                } else {
+                    ZurvanLockedView()
+                }
             }
             .tabItem {
                 Label("مناسبت‌ها", systemImage: "sparkles")
             }
             .tag(ZurvanTab.occasions)
+            .disabled(!licensed)
 
             NavigationStack {
-                PlaceholderView(title: "یادآورها")
+                if licensed {
+                    PlaceholderView(title: "یادآورها")
+                } else {
+                    ZurvanLockedView()
+                }
             }
             .tabItem {
                 Label("یادآورها", systemImage: "bell")
             }
             .tag(ZurvanTab.reminders)
+            .disabled(!licensed)
 
             NavigationStack {
-                CompanionShellView()
+                if licensed {
+                    CompanionShellView()
+                } else {
+                    ZurvanLockedView()
+                }
                     .navigationTitle("Companion")
             }
             .tabItem {
                 Label("همراه", systemImage: "laptopcomputer.and.iphone")
             }
             .tag(ZurvanTab.companion)
+            .disabled(!licensed)
 
             NavigationStack {
-                MobileSettingsView()
+                if licensed {
+                    MobileSettingsView()
+                } else {
+                    ZurvanActivationView(onActivated: { licensed = true })
+                }
             }
             .tabItem {
                 Label("تنظیمات", systemImage: "gearshape")
             }
             .tag(ZurvanTab.settings)
         }
+        .onChange(of: selection) { _, newValue in
+            if !licensed && newValue != .calendar && newValue != .settings { selection = .calendar }
+        }
         .tint(ZurvanIOSAppearance.color(themeID, key: "accent"))
         .preferredColorScheme(themeID == "graphite-night" ? .dark : .light)
+    }
+}
+
+private struct ZurvanLockedView: View {
+    var body: some View {
+        ContentUnavailableView("نیازمند فعال‌سازی", systemImage: "lock.fill",
+                               description: Text("برای استفاده از این بخش، کد فعال‌سازی معتبر وارد کنید."))
+    }
+}
+
+private struct ZurvanActivationView: View {
+    let onActivated: () -> Void
+    @State private var activationCode = ""
+    @State private var status = "کد دستگاه را برای دریافت لایسنس ارائه کنید."
+
+    var body: some View {
+        Form {
+            Section("فعال‌سازی زروان") {
+                Text(ZurvanIOSLicense.deviceCode()).textSelection(.enabled)
+                ShareLink("اشتراک کد دستگاه", item: ZurvanIOSLicense.deviceCode())
+                TextField("کد فعال‌سازی", text: $activationCode, axis: .vertical)
+                    .textInputAutocapitalization(.never)
+                Button("بررسی و فعال‌سازی") {
+                    if ZurvanIOSLicense.activate(activationCode.trimmingCharacters(in: .whitespacesAndNewlines)) {
+                        status = "فعال‌سازی موفق بود."
+                        onActivated()
+                    } else {
+                        status = "کد معتبر نیست یا کلید عمومی در این نسخه پیکربندی نشده است."
+                    }
+                }
+                Text(status).font(.footnote)
+            }
+        }.navigationTitle("تنظیمات فعال‌سازی")
     }
 }
 
