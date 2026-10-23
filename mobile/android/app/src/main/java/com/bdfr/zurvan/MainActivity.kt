@@ -2308,6 +2308,34 @@ private fun SettingsScreen(
             }
         }
         item {
+            SettingsCard(title = "فعال‌سازی زروان") {
+                val deviceCode = remember { ZurvanActivation.deviceCode(context) }
+                var enteredCode by remember { mutableStateOf("") }
+                var status by remember { mutableStateOf("کد دستگاه را به صادرکننده لایسنس ارائه کنید.") }
+                Text("کد دستگاه: " + deviceCode)
+                TextButton(onClick = {
+                    (context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager)
+                        .setPrimaryClip(android.content.ClipData.newPlainText("Zurvan device code", deviceCode))
+                }) { Text("کپی کد دستگاه") }
+                OutlinedTextField(
+                    value = enteredCode,
+                    onValueChange = { enteredCode = it.take(8192) },
+                    label = { Text("کد فعال‌سازی") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Button(onClick = {
+                    if (ZurvanActivation.validate(context, enteredCode.trim())) {
+                        context.getSharedPreferences("zurvan_license", Context.MODE_PRIVATE)
+                            .edit().putString("activation_code", enteredCode.trim()).apply()
+                        status = "لایسنس معتبر است."
+                    } else {
+                        status = "کد معتبر نیست یا کلید عمومی صدور پیکربندی نشده است."
+                    }
+                }) { Text("بررسی و فعال‌سازی") }
+                Text(status, style = MaterialTheme.typography.bodySmall)
+            }
+        }
+        item {
             SettingsCard(title = "تم ظاهری") {
                 ZurvanThemes.presets.forEach { option ->
                     Row(verticalAlignment = Alignment.CenterVertically) {
