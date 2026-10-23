@@ -556,6 +556,92 @@ class ZurvanDeskViewModel(
         }
     }
 
+    fun renameFile(
+        file: DeskUiFile,
+        newName: String
+    ) {
+        if (newName.isBlank() ||
+            file.clientObjectId.isBlank()) {
+            return
+        }
+
+        viewModelScope.launch {
+            val vaultId = requireVaultId()
+            val vaultKey = readVaultKeyOrNull()
+
+            if (vaultKey == null) {
+                _state.value =
+                    _state.value.copy(
+                        needsRecovery = true
+                    )
+                return@launch
+            }
+
+            setLoading(true)
+
+            try {
+                val encryptedName =
+                    ZurvanCloudCryptoAndroid
+                        .encrypt(
+                            newName.trim()
+                                .toByteArray(
+                                    Charsets.UTF_8
+                                ),
+                            vaultKey,
+                            vaultId,
+                            "${file.clientObjectId}:name"
+                        )
+
+                val nameMetadata =
+                    JSONObject()
+                        .put(
+                            "objectId",
+                            file.clientObjectId
+                        )
+                        .put(
+                            "nonce",
+                            encryptedName
+                                .nonceBase64
+                        )
+                        .put(
+                            "ciphertext",
+                            encryptedName
+                                .ciphertextBase64
+                        )
+                        .put(
+                            "tag",
+                            encryptedName
+                                .tagBase64
+                        )
+                        .toString()
+
+                api.renameFile(
+                    requireToken(),
+                    file.id,
+                    Base64.encodeToString(
+                        nameMetadata.toByteArray(
+                            Charsets.UTF_8
+                        ),
+                        Base64.NO_WRAP
+                    )
+                )
+
+                _state.value =
+                    _state.value.copy(
+                        message =
+                            "نام فایل تغییر کرد."
+                    )
+
+                refreshFiles()
+            } catch (ex: Exception) {
+                setError(ex)
+            } finally {
+                vaultKey.fill(0)
+                setLoading(false)
+            }
+        }
+    }
+
     fun deleteFile(
         file: DeskUiFile
     ) {
