@@ -22,12 +22,30 @@ enum ZurvanBackgroundStore {
         try jpeg.write(to: location, options: .atomic)
     }
     static func remove() { try? FileManager.default.removeItem(at: location) }
-    static func image() -> UIImage? { UIImage(contentsOfFile: location.path) }
+    static func image(themeID: String = "windows-light", elenaIndex: Int = 1) -> UIImage? {
+        if let custom = UIImage(contentsOfFile: location.path) { return custom }
+        if themeID == "season-vibe" {
+            let month = Calendar(identifier: .persian).component(.month, from: Date())
+            let name = month <= 3 ? "spring" : month <= 6 ? "summer" : month <= 9 ? "autumn" : "winter"
+            if let url = Bundle.main.url(forResource: name, withExtension: "jpg", subdirectory: "themes/season-vibe") {
+                return UIImage(contentsOfFile: url.path)
+            }
+        }
+        if themeID == "elena-mode" {
+            let name = String(format: "elena-%02d", min(max(elenaIndex, 1), 11))
+            if let url = Bundle.main.url(forResource: name, withExtension: "jpg", subdirectory: "themes/elena-mode") {
+                return UIImage(contentsOfFile: url.path)
+            }
+        }
+        return nil
+    }
 }
 
 struct ZurvanBackgroundView: View {
+    @AppStorage("zurvan.appearance.theme") private var themeID = "windows-light"
+    @AppStorage("zurvan.elena.image") private var elenaIndex = 1
     var body: some View {
-        if let image = ZurvanBackgroundStore.image() {
+        if let image = ZurvanBackgroundStore.image(themeID: themeID, elenaIndex: elenaIndex) {
             Image(uiImage: image)
                 .resizable()
                 .scaledToFill()
