@@ -11,6 +11,7 @@ private enum ZurvanTab: Hashable {
 }
 
 struct ContentView: View {
+    @AppStorage("zurvan.appearance.theme") private var themeID = "windows-light"
     @State private var selection: ZurvanTab = .calendar
 
     var body: some View {
@@ -74,6 +75,8 @@ struct ContentView: View {
             }
             .tag(ZurvanTab.settings)
         }
+        .tint(ZurvanIOSAppearance.accent(themeID))
+        .preferredColorScheme(themeID == "graphite-night" ? .dark : .light)
     }
 }
 
@@ -399,11 +402,27 @@ private struct ZurvanCloudShellView: View {
 }
 
 private struct MobileSettingsView: View {
+    @AppStorage("zurvan.appearance.theme") private var themeID = "windows-light"
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 Text("تنظیمات")
                     .font(.title2.bold())
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("تم ظاهری").font(.headline)
+                    Picker("تم", selection: $themeID) {
+                        ForEach(ZurvanIOSAppearance.presets, id: \.0) { id, title in
+                            Text(title).tag(id)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    Text("تم‌های متناظر با ویندوز و اندروید؛ انتخاب در دستگاه ذخیره می‌شود.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
+                .padding()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
 
                 VStack(alignment: .leading, spacing: 8) {
                     Text("چیدمان ناوبری")
