@@ -607,4 +607,40 @@ finally
     System.Security.Cryptography.CryptographicOperations.ZeroMemory(cloudVaultKey);
 }
 
+// Companion QR payload must round-trip without leaking calendar content.
+using (var qrKey = new CompanionEphemeralKey())
+{
+    var offer = new CompanionPairingOffer(
+        CompanionProtocol.CurrentVersion,
+        CompanionProtocol.NewSessionId(),
+        "dev-master-smoke",
+        "Zurvan Windows",
+        CompanionPlatform.Windows,
+        "tcp://192.168.1.10:54321",
+        "123456",
+        DateTimeOffset.UtcNow.AddMinutes(5),
+        qrKey.PublicKeyBase64);
+
+    var qrPayload = CompanionProtocol.BuildPairingQrPayload(offer);
+    if (!qrPayload.StartsWith("zurvan://pair/v1/", StringComparison.Ordinal))
+        throw new Exception("Companion QR scheme/version is invalid.");
+
+    var parsedOffer = CompanionProtocol.ParsePairingQrPayload(qrPayload);
+    if (parsedOffer.SessionId != offer.SessionId ||
+        parsedOffer.HostDeviceId != offer.HostDeviceId ||
+        parsedOffer.Endpoint != offer.Endpoint ||
+        parsedOffer.PairingCode != offer.PairingCode ||
+        parsedOffer.HostPlatform != CompanionPlatform.Windows ||
+        parsedOffer.HostPublicKey != offer.HostPublicKey)
+    {
+        throw new Exception("Companion QR payload round-trip failed.");
+    }
+
+    if (qrPayload.Contains("calendar", StringComparison.OrdinalIgnoreCase) ||
+        qrPayload.Contains("note", StringComparison.OrdinalIgnoreCase))
+    {
+        throw new Exception("Companion QR unexpectedly contains calendar payload content.");
+    }
+}
+
 Console.WriteLine("BDFR Persian Calendar smoke checks passed.");
