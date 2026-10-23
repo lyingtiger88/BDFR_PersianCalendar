@@ -269,51 +269,131 @@ private struct CompanionShellView: View {
 }
 
 private struct ZurvanCloudShellView: View {
-    @State private var endpoint =
-        "https://s3.ir-thr-at1.arvanstorage.ir"
-    @State private var region = "ir-thr-at1"
-    @State private var bucket = ""
+    @State private var identifier = ""
+    @State private var password = ""
+    @State private var displayName = ""
+    @State private var creatingAccount = false
+    @State private var session: DeskSessionIOS?
+    @State private var files: [DeskFileIOS] = []
+    @State private var isBusy = false
+    @State private var errorMessage: String?
+    private let api = ZurvanDeskAccountAPI()
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("End-to-End Encrypted")
-                        .font(.headline)
+                Text("زروان دسک")
+                    .font(.title2.bold())
+                Text("فضای شخصی فایل‌ها و نسخه‌های پشتیبان شما")
+                    .foregroundStyle(.secondary)
 
-                    Text("داده قبل از Upload روی همین دستگاه رمز می‌شود و ابر آروان فقط ciphertext دریافت می‌کند.")
-                        .foregroundStyle(.secondary)
-
-                    TextField("S3 Endpoint", text: $endpoint)
+                if let session {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text(session.displayName ?? session.identifier)
+                            .font(.headline)
+                        Button("خروج از حساب") {
+                            run {
+                                try await api.logout(token: session.token)
+                                self.session = nil
+                                files = []
+                                password = ""
+                            }
+                        }
+                        .disabled(isBusy)
+                        Divider()
+                        Text("فایل‌های من").font(.headline)
+                        Button("به‌روزرسانی فایل‌ها") { refreshFiles() }
+                            .disabled(isBusy)
+                        if files.isEmpty {
+                            Text("فایلی برای نمایش وجود ندارد.")
+                                .foregroundStyle(.secondary)
+                        }
+                        ForEach(files) { file in
+                            HStack {
+                                Image(systemName: "doc")
+                                VStack(alignment: .leading) {
+                                    Text("فایل رمزگذاری‌شده")
+                                    Text("\(file.size) بایت")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Button(role: .destructive) {
+                                    run {
+                                        try await api.deleteFile(token: session.token, fileID: file.id)
+                                        files = try await api.listFiles(token: session.token)
+                                    }
+                                } label: {
+                                    Image(systemName: "trash")
+                                }
+                                .disabled(isBusy)
+                                .accessibilityLabel("حذف فایل")
+                            }
+                        }
+                        Text("نام فایل‌ها تا زمان آماده‌شدن رمزگشایی امن در iOS نمایش داده نمی‌شود.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                } else {
+                    Picker("حساب", selection: $creatingAccount) {
+                        Text("ورود").tag(false)
+                        Text("ساخت حساب").tag(true)
+                    }
+                    .pickerStyle(.segmented)
+                    TextField("ایمیل یا شناسه حساب", text: $identifier)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
-                        .textFieldStyle(.roundedBorder)
-
-                    TextField("Region", text: $region)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .textFieldStyle(.roundedBorder)
-
-                    TextField("Bucket", text: $bucket)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .textFieldStyle(.roundedBorder)
-
-                    Text("Vault Key در Keychain نگه‌داری می‌شود؛ انتقال آن بین دستگاه‌ها فقط از Companion یا Recovery Key انجام می‌شود.")
+                        .textContentType(.username)
+                    SecureField("رمز عبور", text: $password)
+                        .textContentType(creatingAccount ? .newPassword : .password)
+                    if creatingAccount {
+                        TextField("نام نمایشی (اختیاری)", text: $displayName)
+                    }
+                    Button(creatingAccount ? "ساخت حساب" : "ورود") {
+                        run {
+                            let result = try await (creatingAccount
+                                ? api.register(identifier: identifier, password: password, displayName: displayName)
+                                : api.login(identifier: identifier, password: password))
+                            session = result
+                            password = ""
+                            files = try await api.listFiles(token: result.token)
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(isBusy || identifier.isEmpty || password.isEmpty || !api.isConfigured)
+                    Text("بازیابی اطلاعات رمزگذاری‌شده فقط با عبارت بازیابی ۲۴ کلمه‌ای یا دستگاه مورد اعتماد امکان‌پذیر است.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
-
-                    Button("تنظیم Zurvan Desk") {}
-                        .buttonStyle(.borderedProminent)
+                    if !api.isConfigured {
+                        Text("سرویس حساب زروان دسک هنوز برای این نسخه پیکربندی نشده است.")
+                            .foregroundStyle(.secondary)
+                    }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding()
-                .background(
-                    .thinMaterial,
-                    in: RoundedRectangle(cornerRadius: 18)
-                )
+                if isBusy { ProgressView() }
+                if let errorMessage {
+                    Text(errorMessage)
+                        .foregroundStyle(.red)
+                        .font(.footnote)
+                }
             }
+            .textFieldStyle(.roundedBorder)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding()
+        }
+    }
+
+    private func refreshFiles() {
+        guard let session else { return }
+        run { files = try await api.listFiles(token: session.token) }
+    }
+
+    private func run(_ action: @escaping () async throws -> Void) {
+        isBusy = true
+        errorMessage = nil
+        Task {
+            do { try await action() }
+            catch { errorMessage = error.localizedDescription }
+            isBusy = false
         }
     }
 }
