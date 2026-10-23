@@ -23,6 +23,8 @@ object ZurvanThemes {
     )
     val active = staticCompositionLocalOf { presets.first() }
     val setActive = staticCompositionLocalOf<(String) -> Unit> { {} }
+    val customColors = staticCompositionLocalOf<Map<String, String>> { emptyMap() }
+    val setCustomColor = staticCompositionLocalOf<(String, String?) -> Unit> { _, _ -> }
     val wallpaper = staticCompositionLocalOf<String?> { null }
     val setWallpaper = staticCompositionLocalOf<(String?) -> Unit> { {} }
 
@@ -31,16 +33,36 @@ object ZurvanThemes {
         val prefs = remember { context.getSharedPreferences("zurvan_appearance", Context.MODE_PRIVATE) }
         var selected by remember { mutableStateOf(prefs.getString("theme", "windows-light") ?: "windows-light") }
         var wallpaperPath by remember { mutableStateOf(prefs.getString("wallpaper", null)) }
+        var overrides by remember(selected) {
+            mutableStateOf(listOf("background","surface","card","ink","accent","holiday").mapNotNull { key ->
+                prefs.getString("color.$selected.$key", null)?.let { key to it }
+            }.toMap())
+        }
+        fun color(key: String, fallback: Color): Color =
+            overrides[key]?.let { runCatching { Color(android.graphics.Color.parseColor(it)) }.getOrNull() } ?: fallback
         val palette = presets.firstOrNull { it.id == selected } ?: presets.first()
         val isDark = selected == "graphite-night"
         val base = if (isDark) darkColorScheme() else lightColorScheme()
         val colors = base.copy(
-            background=palette.background, surface=palette.surface,
-            surfaceVariant=palette.card, onSurface=palette.ink, onBackground=palette.ink,
-            primary=palette.accent, primaryContainer=palette.accent,
-            onPrimaryContainer=palette.ink, error=palette.holiday
+            background=color("background",palette.background), surface=color("surface",palette.surface),
+            surfaceVariant=color("card",palette.card), onSurface=color("ink",palette.ink), onBackground=color("ink",palette.ink),
+            primary=color("accent",palette.accent), primaryContainer=color("accent",palette.accent),
+            onPrimaryContainer=color("ink",palette.ink), error=color("holiday",palette.holiday)
         )
-        CompositionLocalProvider(wallpaper provides wallpaperPath,
+        CompositionLocalProvider(customColors provides overrides,
+            setCustomColor provides { key, hex ->
+                val allowed = setOf("background","surface","card","ink","accent","holiday")
+                if (key in allowed && (hex == null || Regex("^#[0-9A-Fa-f]{6}$").matches(hex))) {
+                    val next = overrides.toMutableMap()
+                    if (hex == null) next.remove(key) else next[key] = hex
+                    overrides = next
+                    prefs.edit().apply {
+                        if (hex == null) remove("color.$selected.$key")
+                        else putString("color.$selected.$key", hex)
+                    }.apply()
+                }
+            },
+            wallpaper provides wallpaperPath,
             setWallpaper provides { value ->
                 wallpaperPath = value
                 prefs.edit().apply {
