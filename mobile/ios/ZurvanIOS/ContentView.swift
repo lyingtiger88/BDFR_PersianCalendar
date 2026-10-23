@@ -412,8 +412,8 @@ private struct MobileSettingsView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("تم ظاهری").font(.headline)
                     Picker("تم", selection: $themeID) {
-                        ForEach(ZurvanIOSAppearance.presets, id: \.0) { id, title in
-                            Text(title).tag(id)
+                        ForEach(ZurvanIOSAppearance.presets, id: \.0) { preset in
+                            Text(preset.1).tag(preset.0)
                         }
                     }
                     .pickerStyle(.menu)
