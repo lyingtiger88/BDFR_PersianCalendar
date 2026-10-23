@@ -1,9 +1,7 @@
 package com.bdfr.zurvan
 
 import android.icu.util.Calendar
-import android.icu.util.GregorianCalendar
-import android.icu.util.IslamicCalendar
-import android.icu.util.PersianCalendar
+import android.icu.util.ULocale
 import java.util.Date
 
 data class CalendarDayCell(
@@ -45,7 +43,7 @@ object AndroidCalendarEngine {
     )
 
     fun currentPersianYearMonth(): Pair<Int, Int> {
-        val calendar = PersianCalendar()
+        val calendar = newPersianCalendar()
         return calendar.get(Calendar.YEAR) to
             (calendar.get(Calendar.MONTH) + 1)
     }
@@ -56,63 +54,145 @@ object AndroidCalendarEngine {
     ): PersianMonthModel {
         require(month in 1..12)
 
-        val first = PersianCalendar().apply {
+        val first = newPersianCalendar().apply {
             clear()
-            set(year, month - 1, 1, 12, 0, 0)
+            set(Calendar.YEAR, year)
+            set(Calendar.MONTH, month - 1)
+            set(Calendar.DAY_OF_MONTH, 1)
+            set(Calendar.HOUR_OF_DAY, 12)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
         }
 
-        val maxDay = first.getActualMaximum(Calendar.DAY_OF_MONTH)
-        val leading = weekColumn(first.get(Calendar.DAY_OF_WEEK))
+        val maxDay =
+            first.getActualMaximum(
+                Calendar.DAY_OF_MONTH
+            )
 
-        val today = PersianCalendar()
-        val todayYear = today.get(Calendar.YEAR)
-        val todayMonth = today.get(Calendar.MONTH) + 1
-        val todayDay = today.get(Calendar.DAY_OF_MONTH)
+        val leading =
+            weekColumn(
+                first.get(
+                    Calendar.DAY_OF_WEEK
+                )
+            )
+
+        val today = newPersianCalendar()
+        val todayYear =
+            today.get(Calendar.YEAR)
+        val todayMonth =
+            today.get(Calendar.MONTH) + 1
+        val todayDay =
+            today.get(
+                Calendar.DAY_OF_MONTH
+            )
 
         val days = (1..maxDay).map { day ->
-            val persian = PersianCalendar().apply {
-                clear()
-                set(year, month - 1, day, 12, 0, 0)
-            }
+            val persian =
+                newPersianCalendar().apply {
+                    clear()
+                    set(
+                        Calendar.YEAR,
+                        year
+                    )
+                    set(
+                        Calendar.MONTH,
+                        month - 1
+                    )
+                    set(
+                        Calendar.DAY_OF_MONTH,
+                        day
+                    )
+                    set(
+                        Calendar.HOUR_OF_DAY,
+                        12
+                    )
+                    set(
+                        Calendar.MINUTE,
+                        0
+                    )
+                    set(
+                        Calendar.SECOND,
+                        0
+                    )
+                }
 
-            val millis = persian.timeInMillis
+            val millis =
+                persian.timeInMillis
 
-            val gregorian = GregorianCalendar().apply {
-                time = Date(millis)
-            }
+            val gregorian =
+                Calendar.getInstance(
+                    ULocale(
+                        "en_US@calendar=gregorian"
+                    )
+                ).apply {
+                    time = Date(millis)
+                }
 
-            val hijri = IslamicCalendar().apply {
-                calculationType =
-                    IslamicCalendar.CalculationType.ISLAMIC_CIVIL
-                time = Date(millis)
-            }
+            val hijri =
+                Calendar.getInstance(
+                    ULocale(
+                        "ar_SA@calendar=islamic-civil"
+                    )
+                ).apply {
+                    time = Date(millis)
+                }
 
-            val dow = persian.get(Calendar.DAY_OF_WEEK)
+            val dow =
+                persian.get(
+                    Calendar.DAY_OF_WEEK
+                )
 
             CalendarDayCell(
                 persianYear = year,
                 persianMonth = month,
                 persianDay = day,
-                gregorianYear = gregorian.get(Calendar.YEAR),
-                gregorianMonth = gregorian.get(Calendar.MONTH) + 1,
-                gregorianDay = gregorian.get(Calendar.DAY_OF_MONTH),
-                hijriYear = hijri.get(Calendar.YEAR),
-                hijriMonth = hijri.get(Calendar.MONTH) + 1,
-                hijriDay = hijri.get(Calendar.DAY_OF_MONTH),
-                weekColumn = weekColumn(dow),
-                isFriday = dow == Calendar.FRIDAY,
+                gregorianYear =
+                    gregorian.get(
+                        Calendar.YEAR
+                    ),
+                gregorianMonth =
+                    gregorian.get(
+                        Calendar.MONTH
+                    ) + 1,
+                gregorianDay =
+                    gregorian.get(
+                        Calendar.DAY_OF_MONTH
+                    ),
+                hijriYear =
+                    hijri.get(
+                        Calendar.YEAR
+                    ),
+                hijriMonth =
+                    hijri.get(
+                        Calendar.MONTH
+                    ) + 1,
+                hijriDay =
+                    hijri.get(
+                        Calendar.DAY_OF_MONTH
+                    ),
+                weekColumn =
+                    weekColumn(dow),
+                isFriday =
+                    dow ==
+                        Calendar.FRIDAY,
                 isToday =
                     year == todayYear &&
-                    month == todayMonth &&
-                    day == todayDay
+                        month ==
+                            todayMonth &&
+                        day ==
+                            todayDay
             )
         }
 
         return PersianMonthModel(
             year = year,
             month = month,
-            monthName = persianMonthNames[month - 1],
-            leadingBlankCount = leading,
+            monthName =
+                persianMonthNames[
+                    month - 1
+                ],
+            leadingBlankCount =
+                leading,
             days = days
         )
     }
@@ -122,20 +202,88 @@ object AndroidCalendarEngine {
         month: Int,
         delta: Int
     ): Pair<Int, Int> {
-        val zeroBased = (year * 12 + (month - 1)) + delta
-        val newYear = Math.floorDiv(zeroBased, 12)
-        val newMonth = Math.floorMod(zeroBased, 12) + 1
+        val zeroBased =
+            (year * 12 +
+                (month - 1)) +
+                delta
+
+        val newYear =
+            Math.floorDiv(
+                zeroBased,
+                12
+            )
+
+        val newMonth =
+            Math.floorMod(
+                zeroBased,
+                12
+            ) + 1
+
         return newYear to newMonth
     }
 
-    private fun weekColumn(dayOfWeek: Int): Int =
-        when (dayOfWeek) {
-            Calendar.SATURDAY -> 0
-            Calendar.SUNDAY -> 1
-            Calendar.MONDAY -> 2
-            Calendar.TUESDAY -> 3
-            Calendar.WEDNESDAY -> 4
-            Calendar.THURSDAY -> 5
-            else -> 6
-        }
+    fun persianDateTimeToMillis(
+        dateKey: String,
+        hour: Int,
+        minute: Int
+    ): Long? {
+        val parts = dateKey
+            .split("-")
+            .mapNotNull {
+                it.toIntOrNull()
+            }
+
+        if (parts.size != 3)
+            return null
+
+        return newPersianCalendar()
+            .apply {
+                clear()
+                set(
+                    Calendar.YEAR,
+                    parts[0]
+                )
+                set(
+                    Calendar.MONTH,
+                    parts[1] - 1
+                )
+                set(
+                    Calendar.DAY_OF_MONTH,
+                    parts[2]
+                )
+                set(
+                    Calendar.HOUR_OF_DAY,
+                    hour.coerceIn(0, 23)
+                )
+                set(
+                    Calendar.MINUTE,
+                    minute.coerceIn(0, 59)
+                )
+                set(
+                    Calendar.SECOND,
+                    0
+                )
+            }
+            .timeInMillis
+    }
+
+    private fun newPersianCalendar():
+        Calendar =
+        Calendar.getInstance(
+            ULocale(
+                "fa_IR@calendar=persian"
+            )
+        )
+
+    private fun weekColumn(
+        dayOfWeek: Int
+    ): Int = when (dayOfWeek) {
+        Calendar.SATURDAY -> 0
+        Calendar.SUNDAY -> 1
+        Calendar.MONDAY -> 2
+        Calendar.TUESDAY -> 3
+        Calendar.WEDNESDAY -> 4
+        Calendar.THURSDAY -> 5
+        else -> 6
+    }
 }
