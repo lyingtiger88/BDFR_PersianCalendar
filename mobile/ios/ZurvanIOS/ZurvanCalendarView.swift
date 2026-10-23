@@ -133,6 +133,7 @@ struct ZurvanCalendarView: View {
                     .font(.caption).foregroundStyle(.secondary)
             }.padding()
         }
+        .background { ZurvanBackgroundView() }
         .sheet(item: Binding(
             get: { selectedDate.map { SelectedZurvanDate(date:$0) } },
             set: { selectedDate = $0?.date }
