@@ -102,6 +102,33 @@ private fun ZurvanMobileShell(
             .getString("activation_code", null)
         code != null && ZurvanActivation.validate(context, code)
     }
+    var unlocked by remember { mutableStateOf(!ZurvanAppLock.enabled(context)) }
+    var unlockInput by remember { mutableStateOf("") }
+    var unlockMessage by remember { mutableStateOf("") }
+    if (!unlocked) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(24.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text("زروان قفل است", style = MaterialTheme.typography.headlineMedium)
+            OutlinedTextField(
+                value = unlockInput,
+                onValueChange = { unlockInput = it },
+                label = { Text("رمز ورود برنامه") },
+                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation()
+            )
+            Button(onClick = {
+                if (ZurvanAppLock.check(context, unlockInput)) {
+                    unlocked = true
+                    unlockInput = ""
+                    unlockMessage = ""
+                } else unlockMessage = "رمز اشتباه است."
+            }) { Text("باز کردن برنامه") }
+            Text(unlockMessage)
+        }
+        return
+    }
     var selected by remember { mutableStateOf(ZurvanTab.Calendar) }
     LaunchedEffect(licensed) {
         if (!licensed && selected !in listOf(ZurvanTab.Calendar, ZurvanTab.Settings)) selected = ZurvanTab.Calendar
@@ -2431,6 +2458,43 @@ private fun SettingsScreen(
                     }
                 }) { Text("بررسی و فعال‌سازی") }
                 Text(status, style = MaterialTheme.typography.bodySmall)
+            }
+        }
+        item {
+            SettingsCard(title = "قفل برنامه") {
+                var lockEnabled by remember { mutableStateOf(ZurvanAppLock.enabled(context)) }
+                var pin by remember { mutableStateOf("") }
+                var oldPin by remember { mutableStateOf("") }
+                var feedback by remember { mutableStateOf("") }
+                Text(if (lockEnabled) "قفل فعال است" else "قفل غیرفعال است")
+                if (lockEnabled) {
+                    OutlinedTextField(
+                        value = oldPin, onValueChange = { oldPin = it },
+                        label = { Text("رمز فعلی") },
+                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation()
+                    )
+                    Button(onClick = {
+                        if (ZurvanAppLock.remove(context, oldPin)) {
+                            lockEnabled = false
+                            oldPin = ""
+                            feedback = "قفل غیرفعال شد."
+                        } else feedback = "رمز فعلی صحیح نیست."
+                    }) { Text("حذف قفل") }
+                } else {
+                    OutlinedTextField(
+                        value = pin, onValueChange = { pin = it },
+                        label = { Text("رمز جدید (حداقل ۴ کاراکتر)") },
+                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation()
+                    )
+                    Button(onClick = {
+                        if (ZurvanAppLock.set(context, pin)) {
+                            lockEnabled = true
+                            pin = ""
+                            feedback = "قفل فعال شد. هنگام باز کردن مجدد برنامه رمز لازم است."
+                        } else feedback = "رمز باید حداقل ۴ کاراکتر باشد."
+                    }) { Text("فعال کردن قفل") }
+                }
+                Text(feedback)
             }
         }
         item {
