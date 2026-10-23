@@ -16,7 +16,7 @@ struct ContentView: View {
     var body: some View {
         TabView(selection: $selection) {
             NavigationStack {
-                CalendarShellView()
+                ZurvanCalendarView()
                     .navigationTitle("Zurvan | زروان")
             }
             .tabItem {
@@ -42,7 +42,7 @@ struct ContentView: View {
             .tag(ZurvanTab.plans)
 
             NavigationStack {
-                PlaceholderView(title: "مناسبت‌ها")
+                ZurvanOccasionsView()
             }
             .tabItem {
                 Label("مناسبت‌ها", systemImage: "sparkles")
