@@ -85,21 +85,38 @@ class ZurvanViewModel(
         isPrivate: Boolean,
         repeatCount: Int,
         repeatIntervalMinutes: Int
-    ) = repository.addReminder(
-        title,
-        dateKey,
-        hour,
-        minute,
-        isPrivate,
-        repeatCount,
-        repeatIntervalMinutes
-    )
+    ) {
+        val reminder = repository.addReminder(
+            title,
+            dateKey,
+            hour,
+            minute,
+            isPrivate,
+            repeatCount,
+            repeatIntervalMinutes
+        )
 
-    fun acknowledgeReminder(id: String) =
+        AndroidReminderScheduler.schedule(
+            getApplication(),
+            reminder
+        )
+    }
+
+    fun acknowledgeReminder(id: String) {
+        AndroidReminderScheduler.cancel(
+            getApplication(),
+            id
+        )
         repository.acknowledgeReminder(id)
+    }
 
-    fun deleteReminder(id: String) =
+    fun deleteReminder(id: String) {
+        AndroidReminderScheduler.cancel(
+            getApplication(),
+            id
+        )
         repository.deleteReminder(id)
+    }
 
     fun setCalendarOrder(
         value: List<CalendarPriority>
