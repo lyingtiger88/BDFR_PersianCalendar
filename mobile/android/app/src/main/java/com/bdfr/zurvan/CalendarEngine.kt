@@ -3,6 +3,7 @@ package com.bdfr.zurvan
 import android.icu.util.Calendar
 import android.icu.util.ULocale
 import java.util.Date
+import java.time.Instant
 
 data class CalendarDayCell(
     val persianYear: Int,
@@ -363,6 +364,47 @@ object AndroidCalendarEngine {
                 )
             }
             .timeInMillis
+    }
+
+    fun persianDateTimeToInstant(
+        dateKey: String,
+        hour: Int,
+        minute: Int
+    ): Instant? =
+        persianDateTimeToMillis(
+            dateKey.replace("/", "-"),
+            hour,
+            minute
+        )?.let {
+            Instant.ofEpochMilli(it)
+        }
+
+    fun instantToPersianDateTime(
+        instantText: String
+    ): Triple<String, Int, Int>? {
+        val instant = try {
+            Instant.parse(instantText)
+        } catch (_: Exception) {
+            return null
+        }
+
+        val calendar =
+            newPersianCalendar().apply {
+                timeInMillis =
+                    instant.toEpochMilli()
+            }
+
+        val key = "%04d-%02d-%02d".format(
+            calendar.get(Calendar.YEAR),
+            calendar.get(Calendar.MONTH) + 1,
+            calendar.get(Calendar.DAY_OF_MONTH)
+        )
+
+        return Triple(
+            key,
+            calendar.get(Calendar.HOUR_OF_DAY),
+            calendar.get(Calendar.MINUTE)
+        )
     }
 
     private fun newPersianCalendar():
