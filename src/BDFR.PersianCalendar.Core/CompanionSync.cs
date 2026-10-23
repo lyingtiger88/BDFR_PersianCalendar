@@ -1,11 +1,15 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace BDFR.PersianCalendar.Core;
 
 public static class CompanionProtocol
 {
+    internal static readonly JsonSerializerOptions WireJsonOptions =
+        CreateWireJsonOptions();
+
     public const int CurrentVersion = 1;
     public static readonly TimeSpan DefaultPairingLifetime = TimeSpan.FromMinutes(5);
 
@@ -19,7 +23,9 @@ public static class CompanionProtocol
 
     public static string EncodePairingPayload(CompanionPairingOffer offer)
     {
-        var json = JsonSerializer.Serialize(offer);
+        var json = JsonSerializer.Serialize(
+            offer,
+            WireJsonOptions);
         return Convert.ToBase64String(Encoding.UTF8.GetBytes(json))
             .TrimEnd('=')
             .Replace('+', '-')
@@ -34,7 +40,9 @@ public static class CompanionProtocol
             '=');
 
         var json = Encoding.UTF8.GetString(Convert.FromBase64String(normalized));
-        return JsonSerializer.Deserialize<CompanionPairingOffer>(json)
+        return JsonSerializer.Deserialize<CompanionPairingOffer>(
+            json,
+            WireJsonOptions)
             ?? throw new InvalidOperationException("Pairing payload is empty.");
     }
 
@@ -63,6 +71,16 @@ public static class CompanionProtocol
         }
 
         return DecodePairingPayload(qrPayload[(slash + 1)..]);
+    }
+
+    private static JsonSerializerOptions CreateWireJsonOptions()
+    {
+        var options = new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
+        };
+        options.Converters.Add(new JsonStringEnumConverter());
+        return options;
     }
 }
 
@@ -153,7 +171,9 @@ public sealed class CompanionEphemeralKey : IDisposable
                 nameof(sessionKey));
 
         var plaintext = Encoding.UTF8.GetBytes(
-            JsonSerializer.Serialize(value));
+            JsonSerializer.Serialize(
+                value,
+                CompanionProtocol.WireJsonOptions));
         var nonce = RandomNumberGenerator.GetBytes(12);
         var ciphertext = new byte[plaintext.Length];
         var tag = new byte[16];
@@ -198,7 +218,9 @@ public sealed class CompanionEphemeralKey : IDisposable
 
         try
         {
-            return JsonSerializer.Deserialize<T>(plaintext)
+            return JsonSerializer.Deserialize<T>(
+                plaintext,
+                CompanionProtocol.WireJsonOptions)
                 ?? throw new InvalidOperationException(
                     "Decrypted companion payload is empty.");
         }
