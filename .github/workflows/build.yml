@@ -188,6 +188,7 @@ jobs:
             "BDFR.PersianCalendar.Core.pdb",
             "BDFR.PersianCalendar.Infrastructure.dll",
             "BDFR.PersianCalendar.Infrastructure.pdb",
+            "QRCoder.dll",
             "*.pri"
           )
 
@@ -221,8 +222,8 @@ jobs:
           - Extract this ZIP directly over that existing folder and replace files.
           - Do NOT delete the existing .NET / Windows App SDK runtime files.
 
-          This patch is intended for rapid debug builds where package/runtime
-          dependencies did not change. If a future release changes NuGet/runtime
+          This patch includes the QRCoder dependency required by Companion QR pairing.
+          Other runtime dependencies still come from the existing full portable build. If a future release changes NuGet/runtime
           dependencies, use that release's full portable ZIP once, then continue
           with lightweight patches again.
           "@ | Out-File (Join-Path $patch "PATCH-README.txt") -Encoding utf8
