@@ -37,6 +37,33 @@ public static class CompanionProtocol
         return JsonSerializer.Deserialize<CompanionPairingOffer>(json)
             ?? throw new InvalidOperationException("Pairing payload is empty.");
     }
+
+    public static string BuildPairingQrPayload(CompanionPairingOffer offer)
+        => $"zurvan://pair/v{CurrentVersion}/{EncodePairingPayload(offer)}";
+
+    public static CompanionPairingOffer ParsePairingQrPayload(string qrPayload)
+    {
+        const string prefix = "zurvan://pair/v";
+        if (string.IsNullOrWhiteSpace(qrPayload) ||
+            !qrPayload.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new FormatException("This QR code is not a Zurvan pairing code.");
+        }
+
+        var slash = qrPayload.IndexOf('/', prefix.Length);
+        if (slash < 0)
+            throw new FormatException("Zurvan pairing QR version is missing.");
+
+        var versionText = qrPayload[prefix.Length..slash];
+        if (!int.TryParse(versionText, out var version) ||
+            version != CurrentVersion)
+        {
+            throw new NotSupportedException(
+                $"Unsupported Zurvan pairing QR version: {versionText}");
+        }
+
+        return DecodePairingPayload(qrPayload[(slash + 1)..]);
+    }
 }
 
 public sealed record EncryptedCompanionFrame(
@@ -241,6 +268,65 @@ public enum SyncConflictResolution
     CreateConflictCopy
 }
 
+public sealed record CompanionEventPayload(
+    string Id,
+    string Title,
+    string PersianDate,
+    string? StartTime,
+    string? EndTime,
+    bool AllDay,
+    string? Description,
+    string? Category,
+    string? Location,
+    int Recurrence,
+    int Privacy);
+
+public sealed record CompanionTaskPayload(
+    string Id,
+    string Title,
+    string PersianDate,
+    string? DueTime,
+    int Priority,
+    bool Completed,
+    string? Category,
+    string? Description);
+
+public sealed record CompanionNotePayload(
+    string Id,
+    string PersianDate,
+    string Text,
+    bool Pinned,
+    string ModifiedAtUtc);
+
+public sealed record CompanionSpecialOccasionPayload(
+    string Id,
+    string Title,
+    int CalendarSystem,
+    int Month,
+    int Day,
+    bool RepeatYearly,
+    IReadOnlyList<int> ReminderDaysBefore,
+    string? Category,
+    string? Note);
+
+public sealed record CompanionReminderPayload(
+    string Id,
+    int ItemKind,
+    string ItemId,
+    string FireAtUtc,
+    int State,
+    string Title,
+    string Body,
+    int Privacy,
+    int RepeatCount,
+    int RepeatIntervalMinutes,
+    int Attempt);
+
+public sealed record CompanionSharedSettingsPayload(
+    IReadOnlyList<string> CalendarOrder,
+    double CornerRadius,
+    string NavigationRailSide);
+
 public sealed record CompanionDevice(
     string DeviceId,
     string DisplayName,
@@ -376,6 +462,19 @@ public interface ICompanionDeviceRegistry
 
     Task RevokeDeviceAsync(
         string deviceId,
+        CancellationToken cancellationToken = default);
+}
+
+public interface ICompanionSnapshotStore
+{
+    Task<SyncBatch> CreateSnapshotAsync(
+        string sourceDeviceId,
+        string targetDeviceId,
+        CancellationToken cancellationToken = default);
+
+    Task<SyncAck> ApplySnapshotAsync(
+        SyncBatch batch,
+        bool preferIncoming,
         CancellationToken cancellationToken = default);
 }
 
