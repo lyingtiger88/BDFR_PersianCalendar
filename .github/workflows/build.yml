@@ -85,7 +85,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          app="mobile/ios/DerivedData/Build/Products/Debug-iphonesimulator/ZurvanIOS.app"
+          app="mobile/ios/DerivedData/Build/Products/Debug-iphonesimulator/Zurvan.app"
           test -d "$app"
           ditto -c -k --sequesterRsrc --keepParent "$app" Zurvan-iOS-simulator.zip
 
