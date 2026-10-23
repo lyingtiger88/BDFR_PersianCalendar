@@ -19,6 +19,9 @@ class ZurvanViewModel(
     val reminders: StateFlow<List<LocalReminder>> =
         repository.reminders
 
+    val notes: StateFlow<List<LocalDayNote>> =
+        repository.notes
+
     val uiPreferences:
         StateFlow<AndroidUiPreferences> =
         repository.uiPreferences
@@ -63,6 +66,16 @@ class ZurvanViewModel(
 
     fun deleteOccasion(id: String) =
         repository.deleteOccasion(id)
+
+    fun saveNote(
+        dateKey: String,
+        text: String,
+        isPrivate: Boolean
+    ) = repository.saveNote(
+        dateKey,
+        text,
+        isPrivate
+    )
 
     fun addReminder(
         title: String,
