@@ -85,5 +85,8 @@ class ZurvanCloudSecureStore(context: Context) {
         const val ACCESS_KEY = "arvan_access_key"
         const val SECRET_KEY = "arvan_secret_key"
         const val VAULT_KEY = "vault_key"
+        const val DESK_SESSION_TOKEN = "desk_session_token"
+        const val DESK_VAULT_ID = "desk_vault_id"
+        const val DESK_ACCOUNT_IDENTIFIER = "desk_account_identifier"
     }
 }
