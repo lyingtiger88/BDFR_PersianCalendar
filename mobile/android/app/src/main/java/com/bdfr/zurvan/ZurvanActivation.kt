@@ -20,8 +20,7 @@ object ZurvanActivation {
     }
 
     fun validate(context: Context, code: String): Boolean {
-        val keyPem = context.getSharedPreferences("zurvan_license", Context.MODE_PRIVATE)
-            .getString("public_key_pem", null) ?: return false
+        val keyPem = runCatching { String(Base64.decode(BuildConfig.LICENSE_PUBLIC_KEY_B64, Base64.DEFAULT), Charsets.UTF_8) }.getOrNull()?.takeIf { it.contains("BEGIN PUBLIC KEY") } ?: return false
         return runCatching {
             val parts = code.trim().split('.')
             if (parts.size != 3 || parts[0] != "ZRV1") return false
