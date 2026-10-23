@@ -131,6 +131,10 @@ private struct ZurvanActivationView: View {
         Form {
             Section("فعال‌سازی زروان") {
                 Text(ZurvanIOSLicense.deviceCode()).textSelection(.enabled)
+                Button("کپی کد دستگاه", systemImage: "doc.on.doc") {
+                    UIPasteboard.general.string = ZurvanIOSLicense.deviceCode()
+                    status = "کد دستگاه کپی شد."
+                }
                 ShareLink("اشتراک کد دستگاه", item: ZurvanIOSLicense.deviceCode())
                 TextField("کد فعال‌سازی", text: $activationCode, axis: .vertical)
                     .textInputAutocapitalization(.never)
