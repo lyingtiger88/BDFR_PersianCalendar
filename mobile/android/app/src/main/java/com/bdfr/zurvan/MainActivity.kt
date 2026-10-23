@@ -2235,6 +2235,8 @@ private fun SettingsScreen(
 
     val palette = ZurvanThemes.active.current
     val setPalette = ZurvanThemes.setActive.current
+    val colorOverrides = ZurvanThemes.customColors.current
+    val setColorOverride = ZurvanThemes.setCustomColor.current
     val context = LocalContext.current
     val wallpaperPath = ZurvanThemes.wallpaper.current
     val setWallpaper = ZurvanThemes.setWallpaper.current
@@ -2266,6 +2268,42 @@ private fun SettingsScreen(
                 Button(onClick = { imagePicker.launch("image/*") }) { Text("انتخاب عکس از دستگاه") }
                 if (wallpaperPath != null) {
                     Button(onClick = { setWallpaper(null) }) { Text("حذف تصویر سفارشی") }
+                }
+            }
+        }
+        item {
+            SettingsCard(title = "پالت اختصاصی رنگ عناصر") {
+                listOf(
+                    "background" to "پس‌زمینه اصلی",
+                    "surface" to "پنل‌ها و سربرگ‌ها",
+                    "card" to "کارت‌ها و بخش‌ها",
+                    "ink" to "رنگ متن",
+                    "accent" to "دکمه‌ها و رنگ تأکیدی",
+                    "holiday" to "تعطیلات و هشدارها"
+                ).forEach { (key, label) ->
+                    var value by remember(key, palette.id, colorOverrides[key]) {
+                        mutableStateOf(colorOverrides[key] ?: "")
+                    }
+                    Column {
+                        Text(label, style = MaterialTheme.typography.labelMedium)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            OutlinedTextField(
+                                value = value,
+                                onValueChange = { next ->
+                                    value = next.take(7)
+                                    if (Regex("^#[0-9A-Fa-f]{6}$").matches(value)) {
+                                        setColorOverride(key, value)
+                                    }
+                                },
+                                modifier = Modifier.weight(1f),
+                                singleLine = true,
+                                label = { Text("#RRGGBB") }
+                            )
+                            TextButton(onClick = { setColorOverride(key, null) }) {
+                                Text("پیش‌فرض")
+                            }
+                        }
+                    }
                 }
             }
         }
