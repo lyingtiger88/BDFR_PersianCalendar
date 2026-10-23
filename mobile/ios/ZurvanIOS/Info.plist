@@ -4,6 +4,8 @@
 <dict>
     <key>CFBundleDisplayName</key>
     <string>Zurvan | زروان</string>
+    <key>NSCameraUsageDescription</key>
+    <string>زروان برای اسکن QR جفت‌سازی Companion به دوربین نیاز دارد.</string>
     <key>NSLocalNetworkUsageDescription</key>
     <string>زروان برای جفت‌سازی و همگام‌سازی مستقیم با رایانه شما به شبکه محلی نیاز دارد.</string>
     <key>NSBonjourServices</key>
