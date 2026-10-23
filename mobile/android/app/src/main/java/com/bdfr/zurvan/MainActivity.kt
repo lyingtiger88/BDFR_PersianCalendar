@@ -2232,6 +2232,20 @@ private fun SettingsScreen(
 
     val palette = ZurvanThemes.active.current
     val setPalette = ZurvanThemes.setActive.current
+    val context = LocalContext.current
+    val wallpaperPath = ZurvanThemes.wallpaper.current
+    val setWallpaper = ZurvanThemes.setWallpaper.current
+    val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) {
+            runCatching {
+                val target = java.io.File(context.filesDir, "zurvan_custom_background")
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    target.outputStream().use { output -> input.copyTo(output) }
+                } ?: error("تصویر قابل خواندن نیست")
+                setWallpaper(target.absolutePath)
+            }
+        }
+    }
 
     LazyColumn(
         modifier = modifier
@@ -2244,6 +2258,14 @@ private fun SettingsScreen(
                 bottom = 24.dp
             )
     ) {
+        item {
+            SettingsCard(title = "تصویر پس‌زمینه سفارشی") {
+                Button(onClick = { imagePicker.launch("image/*") }) { Text("انتخاب عکس از دستگاه") }
+                if (wallpaperPath != null) {
+                    Button(onClick = { setWallpaper(null) }) { Text("حذف تصویر سفارشی") }
+                }
+            }
+        }
         item {
             SettingsCard(title = "تم ظاهری — هماهنگ با ویندوز") {
                 ZurvanThemes.presets.forEach { option ->
