@@ -4,8 +4,6 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.icu.util.Calendar
-import android.icu.util.PersianCalendar
 
 object AndroidReminderScheduler {
     fun schedule(
@@ -21,19 +19,14 @@ object AndroidReminderScheduler {
         if (parts.size != 3)
             return
 
-        val triggerAt = PersianCalendar()
-            .apply {
-                clear()
-                set(
-                    parts[0],
-                    parts[1] - 1,
-                    parts[2],
+        val triggerAt =
+            AndroidCalendarEngine
+                .persianDateTimeToMillis(
+                    reminder.dateKey,
                     reminder.hour,
-                    reminder.minute,
-                    0
+                    reminder.minute
                 )
-            }
-            .timeInMillis
+                ?: return
 
         if (triggerAt <=
             System.currentTimeMillis()) {
