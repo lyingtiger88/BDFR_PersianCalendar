@@ -24,6 +24,7 @@ import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
@@ -742,6 +743,8 @@ private fun WeekdayHeader() {
 @Composable
 private fun CalendarDayCard(
     day: CalendarDayCell,
+    isHoliday: Boolean,
+    isMourning: Boolean,
     calendarOrder:
         List<CalendarPriority>,
     cornerRadius: Float,
@@ -853,6 +856,16 @@ private fun CalendarDayCard(
                         .typography
                         .labelSmall
             )
+
+            if (isMourning) {
+                Text(
+                    text = "◢",
+                    color = Color.Black,
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.align(Alignment.TopStart),
+                    // Small black corner ribbon, distinct from holiday red text.
+                )
+            }
 
             if (hasContent) {
                 Box(
