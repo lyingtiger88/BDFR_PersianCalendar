@@ -535,6 +535,8 @@ private fun CalendarScreen(
 
                 CalendarDayCard(
                     day = day,
+                    isHoliday = ZurvanDayFlags.isHoliday(day, occasions),
+                    isMourning = ZurvanDayFlags.isMourning(day, occasions),
                     calendarOrder =
                         preferences
                             .calendarOrder,
