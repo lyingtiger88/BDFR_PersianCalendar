@@ -10,6 +10,16 @@ class ZurvanViewModel(
     private val repository =
         AndroidLocalRepository(application)
 
+    private val companionManager =
+        AndroidCompanionManager(
+            application,
+            repository
+        )
+
+    val companionState:
+        StateFlow<CompanionUiState> =
+        companionManager.state
+
     val plans: StateFlow<List<LocalPlan>> =
         repository.plans
 
@@ -127,4 +137,21 @@ class ZurvanViewModel(
 
     fun setRailSide(value: String) =
         repository.setRailSide(value)
+
+    fun startCompanionMaster() =
+        companionManager.startMaster()
+
+    fun joinCompanionFromQr(
+        rawQr: String
+    ) = companionManager.joinFromQr(
+        rawQr
+    )
+
+    fun stopCompanionSession() =
+        companionManager.stop()
+
+    override fun onCleared() {
+        companionManager.close()
+        super.onCleared()
+    }
 }
