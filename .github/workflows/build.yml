@@ -28,6 +28,9 @@ jobs:
       - name: Build infrastructure
         run: dotnet build src/BDFR.PersianCalendar.Infrastructure/BDFR.PersianCalendar.Infrastructure.csproj -c Release
 
+      - name: Build Zurvan Desk account API
+        run: dotnet build server/Zurvan.Desk.Api/Zurvan.Desk.Api.csproj -c Release
+
 
   android:
     runs-on: ubuntu-latest
