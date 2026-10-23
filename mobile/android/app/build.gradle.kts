@@ -8,16 +8,26 @@ android {
     namespace = "com.bdfr.zurvan"
     compileSdk = 35
 
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
+
+    val deskApiBaseUrl = providers.gradleProperty("ZURVAN_DESK_API_BASE_URL")
+        .orElse("http://10.0.2.2:5088")
+        .get()
+
     defaultConfig {
         applicationId = "com.bdfr.zurvan"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0-dev"
-    }
-
-    buildFeatures {
-        compose = true
+        versionCode = 2
+        versionName = "0.2.0-dev"
+        buildConfigField(
+            "String",
+            "DESK_API_BASE_URL",
+            "\"$deskApiBaseUrl\""
+        )
     }
 
     compileOptions {
@@ -40,5 +50,9 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.7")
+    implementation("androidx.compose.material3:material3-window-size-class")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
