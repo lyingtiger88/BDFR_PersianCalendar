@@ -28,6 +28,12 @@ data class LocalOccasion(
     val annual: Boolean = true
 )
 
+data class LocalDayNote(
+    val dateKey: String,
+    val text: String,
+    val isPrivate: Boolean
+)
+
 data class LocalReminder(
     val id: String,
     val title: String,
