@@ -24,7 +24,7 @@ object ZurvanThemes {
     val active = staticCompositionLocalOf { presets.first() }
     val setActive = staticCompositionLocalOf<(String) -> Unit> { {} }
     val customColors = staticCompositionLocalOf<Map<String, String>> { emptyMap() }
-    val setCustomColor = staticCompositionLocalOf<(String, String?) -> Unit> { _, _ -> }
+    val setCustomColor = staticCompositionLocalOf<(String, String?) -> Unit> { { _, _ -> } }
     val wallpaper = staticCompositionLocalOf<String?> { null }
     val setWallpaper = staticCompositionLocalOf<(String?) -> Unit> { {} }
 
