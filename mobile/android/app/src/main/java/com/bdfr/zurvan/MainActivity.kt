@@ -324,6 +324,18 @@ private fun CalendarScreen(
         mutableStateOf<String?>(null)
     }
 
+    var showJumpDialog by remember {
+        mutableStateOf(false)
+    }
+
+    var showConverterDialog by remember {
+        mutableStateOf(false)
+    }
+
+    var pendingSelectedDay by remember {
+        mutableIntStateOf(0)
+    }
+
     val model = remember(
         year,
         month
@@ -425,6 +437,43 @@ private fun CalendarScreen(
             }
         }
 
+        Row(
+            modifier =
+                Modifier.fillMaxWidth(),
+            horizontalArrangement =
+                Arrangement.Center
+        ) {
+            TextButton(
+                onClick = {
+                    showJumpDialog = true
+                }
+            ) {
+                Icon(
+                    Icons.Outlined.NearMe,
+                    contentDescription = null
+                )
+                Spacer(
+                    Modifier.width(4.dp)
+                )
+                Text("پرش به تاریخ")
+            }
+
+            TextButton(
+                onClick = {
+                    showConverterDialog = true
+                }
+            ) {
+                Icon(
+                    Icons.Outlined.SwapHoriz,
+                    contentDescription = null
+                )
+                Spacer(
+                    Modifier.width(4.dp)
+                )
+                Text("مبدل تاریخ")
+            }
+        }
+
         WeekdayHeader()
 
         LazyVerticalGrid(
@@ -490,6 +539,21 @@ private fun CalendarScreen(
                     }
                 )
             }
+        }
+    }
+
+    LaunchedEffect(
+        year,
+        month,
+        pendingSelectedDay
+    ) {
+        if (pendingSelectedDay > 0) {
+            selectedDay =
+                model.days.firstOrNull {
+                    it.persianDay ==
+                        pendingSelectedDay
+                }
+            pendingSelectedDay = 0
         }
     }
 
@@ -596,6 +660,29 @@ private fun CalendarScreen(
                     repeatInterval
                 )
                 addReminderDate = null
+            }
+        )
+    }
+
+    if (showJumpDialog) {
+        JumpToDateDialog(
+            onDismiss = {
+                showJumpDialog = false
+            },
+            onJump = { result ->
+                year = result.persianYear
+                month = result.persianMonth
+                pendingSelectedDay =
+                    result.persianDay
+                showJumpDialog = false
+            }
+        )
+    }
+
+    if (showConverterDialog) {
+        DateConverterDialog(
+            onDismiss = {
+                showConverterDialog = false
             }
         )
     }
@@ -3154,6 +3241,319 @@ private fun OccasionDialog(
                 onClick = onDismiss
             ) {
                 Text("انصراف")
+            }
+        }
+    )
+}
+
+@Composable
+private fun JumpToDateDialog(
+    onDismiss: () -> Unit,
+    onJump: (
+        AndroidDateConversion
+    ) -> Unit
+) {
+    var calendar by remember {
+        mutableStateOf(
+            CalendarPriority.PERSIAN
+        )
+    }
+
+    var year by remember {
+        mutableStateOf("1405")
+    }
+
+    var month by remember {
+        mutableStateOf("1")
+    }
+
+    var day by remember {
+        mutableStateOf("1")
+    }
+
+    var error by remember {
+        mutableStateOf<String?>(null)
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text("پرش به تاریخ")
+        },
+        text = {
+            Column(
+                verticalArrangement =
+                    Arrangement.spacedBy(
+                        8.dp
+                    )
+            ) {
+                Row(
+                    horizontalArrangement =
+                        Arrangement.spacedBy(
+                            4.dp
+                        )
+                ) {
+                    CalendarPriority
+                        .entries
+                        .forEach {
+                            FilterChip(
+                                selected =
+                                    calendar ==
+                                        it,
+                                onClick = {
+                                    calendar =
+                                        it
+                                },
+                                label = {
+                                    Text(
+                                        it.label
+                                    )
+                                }
+                            )
+                        }
+                }
+
+                SeparateDateFields(
+                    year,
+                    month,
+                    day,
+                    { year = it },
+                    { month = it },
+                    { day = it }
+                )
+
+                error?.let {
+                    Text(
+                        it,
+                        color =
+                            MaterialTheme
+                                .colorScheme
+                                .error
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    try {
+                        val result =
+                            AndroidCalendarEngine
+                                .convert(
+                                    calendar,
+                                    year
+                                        .toInt(),
+                                    month
+                                        .toInt(),
+                                    day
+                                        .toInt()
+                                )
+                        onJump(result)
+                    } catch (_: Exception) {
+                        error =
+                            "تاریخ واردشده معتبر نیست."
+                    }
+                }
+            ) {
+                Text("پرش")
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss
+            ) {
+                Text("انصراف")
+            }
+        }
+    )
+}
+
+@Composable
+private fun DateConverterDialog(
+    onDismiss: () -> Unit
+) {
+    var calendar by remember {
+        mutableStateOf(
+            CalendarPriority.PERSIAN
+        )
+    }
+
+    var year by remember {
+        mutableStateOf("1405")
+    }
+
+    var month by remember {
+        mutableStateOf("1")
+    }
+
+    var day by remember {
+        mutableStateOf("1")
+    }
+
+    var result by remember {
+        mutableStateOf<
+            AndroidDateConversion?
+        >(null)
+    }
+
+    var error by remember {
+        mutableStateOf<String?>(null)
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text("مبدل تاریخ")
+        },
+        text = {
+            Column(
+                verticalArrangement =
+                    Arrangement.spacedBy(
+                        8.dp
+                    )
+            ) {
+                Row(
+                    horizontalArrangement =
+                        Arrangement.spacedBy(
+                            4.dp
+                        )
+                ) {
+                    CalendarPriority
+                        .entries
+                        .forEach {
+                            FilterChip(
+                                selected =
+                                    calendar ==
+                                        it,
+                                onClick = {
+                                    calendar =
+                                        it
+                                },
+                                label = {
+                                    Text(
+                                        it.label
+                                    )
+                                }
+                            )
+                        }
+                }
+
+                SeparateDateFields(
+                    year,
+                    month,
+                    day,
+                    { year = it },
+                    { month = it },
+                    { day = it }
+                )
+
+                Button(
+                    onClick = {
+                        try {
+                            result =
+                                AndroidCalendarEngine
+                                    .convert(
+                                        calendar,
+                                        year
+                                            .toInt(),
+                                        month
+                                            .toInt(),
+                                        day
+                                            .toInt()
+                                    )
+                            error = null
+                        } catch (_: Exception) {
+                            result = null
+                            error =
+                                "تاریخ واردشده معتبر نیست."
+                        }
+                    },
+                    modifier =
+                        Modifier.fillMaxWidth()
+                ) {
+                    Text("تبدیل")
+                }
+
+                result?.let {
+                    Card(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier =
+                                Modifier.padding(
+                                    12.dp
+                                ),
+                            verticalArrangement =
+                                Arrangement.spacedBy(
+                                    5.dp
+                                )
+                        ) {
+                            Text(
+                                "شمسی: " +
+                                    toPersianDigits(
+                                        it.persianYear
+                                            .toString()
+                                    ) +
+                                    "/" +
+                                    toPersianDigits(
+                                        it.persianMonth
+                                            .toString()
+                                    ) +
+                                    "/" +
+                                    toPersianDigits(
+                                        it.persianDay
+                                            .toString()
+                                    )
+                            )
+
+                            Text(
+                                "میلادی: " +
+                                    it.gregorianYear +
+                                    "/" +
+                                    it.gregorianMonth +
+                                    "/" +
+                                    it.gregorianDay
+                            )
+
+                            Text(
+                                "قمری: " +
+                                    toArabicDigits(
+                                        it.hijriYear
+                                            .toString()
+                                    ) +
+                                    "/" +
+                                    toArabicDigits(
+                                        it.hijriMonth
+                                            .toString()
+                                    ) +
+                                    "/" +
+                                    toArabicDigits(
+                                        it.hijriDay
+                                            .toString()
+                                    )
+                            )
+                        }
+                    }
+                }
+
+                error?.let {
+                    Text(
+                        it,
+                        color =
+                            MaterialTheme
+                                .colorScheme
+                                .error
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = onDismiss
+            ) {
+                Text("بستن")
             }
         }
     )
