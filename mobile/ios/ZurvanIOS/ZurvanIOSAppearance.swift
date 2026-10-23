@@ -13,6 +13,15 @@ enum ZurvanIOSAppearance {
     ]
 
     static func accent(_ id: String) -> Color {
+        if id == "season-vibe" {
+            let month = Calendar(identifier: .persian).component(.month, from: Date())
+            switch month {
+            case 1...3: return Color(red: 0.40, green: 0.68, blue: 0.47)
+            case 4...6: return Color(red: 0.16, green: 0.71, blue: 0.72)
+            case 7...9: return Color(red: 0.75, green: 0.53, blue: 0.32)
+            default: return Color(red: 0.40, green: 0.64, blue: 0.85)
+            }
+        }
         switch id {
         case "azure-glass": return Color(red: 0.36, green: 0.66, blue: 0.91)
         case "graphite-night": return Color(red: 0.57, green: 0.68, blue: 0.82)
