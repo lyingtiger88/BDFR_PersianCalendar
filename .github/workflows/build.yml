@@ -78,7 +78,63 @@ jobs:
 
       - name: Build iOS simulator app
         run: |
-          xcodebuild             -project mobile/ios/ZurvanIOS.xcodeproj             -scheme ZurvanIOS             -sdk iphonesimulator             -configuration Debug             CODE_SIGNING_ALLOWED=NO             build
+          xcodebuild             -project mobile/ios/ZurvanIOS.xcodeproj             -scheme ZurvanIOS             -sdk iphonesimulator             -configuration Debug             CODE_SIGNING_ALLOWED=NO             -derivedDataPath mobile/ios/DerivedData             build
+
+      - name: Package iOS simulator test app
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          set -euo pipefail
+          app="mobile/ios/DerivedData/Build/Products/Debug-iphonesimulator/ZurvanIOS.app"
+          test -d "$app"
+          ditto -c -k --sequesterRsrc --keepParent "$app" Zurvan-iOS-simulator.zip
+
+      - name: Upload iOS simulator artifact
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Zurvan-iOS-simulator
+          path: Zurvan-iOS-simulator.zip
+          if-no-files-found: error
+          retention-days: 14
+
+  mobile-release:
+    name: Publish mobile test downloads
+    if: github.event_name == 'push'
+    needs: [android, ios, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Android debug APK
+        uses: actions/download-artifact@v4
+        with:
+          name: Zurvan-Android-debug
+          path: mobile-release/android
+
+      - name: Download iOS simulator archive
+        uses: actions/download-artifact@v4
+        with:
+          name: Zurvan-iOS-simulator
+          path: mobile-release/ios
+
+      - name: Label Android build and publish mobile assets to test release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp mobile-release/android/app-debug.apk mobile-release/Zurvan-Android-debug.apk
+          cp mobile-release/ios/Zurvan-iOS-simulator.zip mobile-release/Zurvan-iOS-simulator.zip
+          cd mobile-release
+          sha256sum Zurvan-Android-debug.apk Zurvan-iOS-simulator.zip > SHA256SUMS-mobile.txt
+          tag="test-${{ github.run_number }}"
+          gh release upload "$tag" Zurvan-Android-debug.apk Zurvan-iOS-simulator.zip SHA256SUMS-mobile.txt --clobber --repo "${{ github.repository }}"
+          gh release edit "$tag" --repo "${{ github.repository }}" --notes "Automated test build from main (${{ github.sha }}).
+          
+          Windows: portable ZIP and installer EXE.
+          Android: Zurvan-Android-debug.apk (debug/test build; enable sideloading on your test device).
+          iOS: Zurvan-iOS-simulator.zip (Xcode simulator only; NOT installable on a physical iPhone).
+          Physical iOS installation requires Apple code signing, an IPA distribution workflow, or TestFlight.
+          All downloads are test builds, not production releases."
 
   windows:
     runs-on: windows-latest
