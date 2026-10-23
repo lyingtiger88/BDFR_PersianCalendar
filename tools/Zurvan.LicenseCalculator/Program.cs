@@ -53,6 +53,9 @@ internal sealed class IssuerForm : Form
         };
         keyRow.Controls.Add(browse, 1, 0);
         Add(layout, keyRow, 48);
+        var generateKeys = Button("ساخت جفت‌کلید جدید (فقط مدیر)");
+        generateKeys.Click += (_, _) => GenerateKeys();
+        Add(layout, generateKeys, 42);
 
         AddText(layout, "کد سخت‌افزاری دستگاه");
         Add(layout, device, 42);
@@ -74,6 +77,29 @@ internal sealed class IssuerForm : Form
         copy.Click += (_, _) => { if (activation.TextLength > 0) Clipboard.SetText(activation.Text); };
         Add(layout, copy, 40);
         Add(layout, status, 50);
+    }
+
+    private void GenerateKeys()
+    {
+        try
+        {
+            using var dialog = new FolderBrowserDialog { Description = "Select a secure local folder for the issuer keys" };
+            if (dialog.ShowDialog(this) != DialogResult.OK) return;
+            var privatePath = Path.Combine(dialog.SelectedPath, "zurvan-issuer-private.pem");
+            var publicPath = Path.Combine(dialog.SelectedPath, "zurvan-issuer-public.pem");
+            if (File.Exists(privatePath) || File.Exists(publicPath))
+                throw new InvalidOperationException("Key files already exist. Select a different folder; existing keys will not be overwritten.");
+            using var rsa = RSA.Create(3072);
+            File.WriteAllText(privatePath, rsa.ExportPkcs8PrivateKeyPem());
+            File.WriteAllText(publicPath, rsa.ExportSubjectPublicKeyPem());
+            keyFile.Text = privatePath;
+            status.Text = "جفت‌کلید ایجاد شد. کلید عمومی را برای نسخه‌های مشتری تنظیم کنید.";
+            MessageBox.Show(this, "Private key: " + privatePath + Environment.NewLine +
+                "Public key: " + publicPath + Environment.NewLine +
+                "Keep the private key offline. Never publish it.", "Keys generated",
+                MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+        catch (Exception ex) { MessageBox.Show(this, ex.Message, "Key generation error", MessageBoxButtons.OK, MessageBoxIcon.Error); }
     }
 
     private void Issue()
