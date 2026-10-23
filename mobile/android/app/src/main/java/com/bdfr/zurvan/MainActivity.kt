@@ -26,6 +26,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -94,8 +95,16 @@ private fun ZurvanMobileShell(
     appViewModel: ZurvanViewModel,
     deskViewModel: ZurvanDeskViewModel
 ) {
-    var selected by remember {
-        mutableStateOf(ZurvanTab.Calendar)
+    val context = LocalContext.current
+    var licenseRevision by remember { mutableIntStateOf(0) }
+    val licensed = remember(licenseRevision) {
+        val code = context.getSharedPreferences("zurvan_license", Context.MODE_PRIVATE)
+            .getString("activation_code", null)
+        code != null && ZurvanActivation.validate(context, code)
+    }
+    var selected by remember { mutableStateOf(ZurvanTab.Calendar) }
+    LaunchedEffect(licensed) {
+        if (!licensed && selected !in listOf(ZurvanTab.Calendar, ZurvanTab.Settings)) selected = ZurvanTab.Calendar
     }
 
     val uiPreferences by appViewModel
@@ -124,7 +133,7 @@ private fun ZurvanMobileShell(
                 if (uiPreferences.railSide == "left") {
                     ZurvanNavigationRail(
                         selected = selected,
-                        onSelected = { selected = it }
+                        onSelected = { if (licensed || it == ZurvanTab.Calendar || it == ZurvanTab.Settings) selected = it }
                     )
                 }
 
@@ -141,6 +150,8 @@ private fun ZurvanMobileShell(
                 ) { padding ->
                     ZurvanDestination(
                         tab = selected,
+                        licensed = licensed,
+                        onActivated = { licenseRevision++ },
                         appViewModel = appViewModel,
                         deskViewModel = deskViewModel,
                         modifier = Modifier.padding(padding)
@@ -169,8 +180,9 @@ private fun ZurvanMobileShell(
                         ZurvanTab.entries.forEach { tab ->
                             NavigationBarItem(
                                 selected = selected == tab,
+                                enabled = licensed || tab == ZurvanTab.Calendar || tab == ZurvanTab.Settings,
                                 onClick = {
-                                    selected = tab
+                                    if (licensed || tab == ZurvanTab.Calendar || tab == ZurvanTab.Settings) selected = tab
                                 },
                                 icon = {
                                     Icon(
@@ -196,6 +208,27 @@ private fun ZurvanMobileShell(
             }
         }
     }
+    }
+}
+
+@Composable
+private fun ZurvanActivationScreen(modifier: Modifier, onActivated: () -> Unit) {
+    val context = LocalContext.current
+    var entered by remember { mutableStateOf("") }
+    var message by remember { mutableStateOf("کد سخت‌افزاری را برای دریافت لایسنس ارائه دهید.") }
+    Column(modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Text("فعال‌سازی زروان", style = MaterialTheme.typography.headlineSmall)
+        Text("کد دستگاه: " + remember { ZurvanActivation.deviceCode(context) })
+        OutlinedTextField(entered, { entered = it.take(8192) }, label = { Text("کد فعال‌سازی") }, modifier = Modifier.fillMaxWidth())
+        Button(onClick = {
+            val code = entered.trim()
+            if (ZurvanActivation.validate(context, code)) {
+                context.getSharedPreferences("zurvan_license", Context.MODE_PRIVATE).edit().putString("activation_code",code).apply()
+                message = "فعال‌سازی موفق"
+                onActivated()
+            } else message = "کد معتبر نیست؛ کلید عمومی برنامه نیز باید پیکربندی شده باشد."
+        }) { Text("فعال‌سازی") }
+        Text(message)
     }
 }
 
@@ -251,13 +284,23 @@ private fun navigationIcon(
 @Composable
 private fun ZurvanDestination(
     tab: ZurvanTab,
+    licensed: Boolean,
+    onActivated: () -> Unit,
     appViewModel: ZurvanViewModel,
     deskViewModel: ZurvanDeskViewModel,
     modifier: Modifier
 ) {
+    if (!licensed && tab != ZurvanTab.Calendar && tab != ZurvanTab.Settings) {
+        Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("برای استفاده از این بخش، زروان را فعال کنید.") }
+        return
+    }
+    if (!licensed && tab == ZurvanTab.Settings) {
+        ZurvanActivationScreen(modifier, onActivated)
+        return
+    }
     when (tab) {
         ZurvanTab.Calendar ->
-            CalendarScreen(
+            if (!licensed) Box(modifier.fillMaxSize()) { CalendarScreen(viewModel = appViewModel, modifier = Modifier.fillMaxSize()); Box(Modifier.fillMaxSize().clickable(enabled = true, onClick = {}).semantics { }) } else CalendarScreen(
                 viewModel = appViewModel,
                 modifier = modifier
             )
