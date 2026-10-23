@@ -2308,7 +2308,7 @@ private fun SettingsScreen(
             }
         }
         item {
-            SettingsCard(title = "تم ظاهری — هماهنگ با ویندوز") {
+            SettingsCard(title = "تم ظاهری") {
                 ZurvanThemes.presets.forEach { option ->
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         RadioButton(
