@@ -10,6 +10,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -24,12 +25,16 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.google.android.gms.mlkit.barcode.GmsBarcodeScannerOptions
+import com.google.android.gms.mlkit.barcode.GmsBarcodeScanning
+import com.google.mlkit.vision.barcode.common.Barcode
 import java.security.SecureRandom
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -268,7 +273,10 @@ private fun ZurvanDestination(
             )
 
         ZurvanTab.Companion ->
-            CompanionScreen(modifier)
+            CompanionScreen(
+                viewModel = appViewModel,
+                modifier = modifier
+            )
 
         ZurvanTab.Settings ->
             SettingsScreen(
@@ -1737,80 +1745,453 @@ private fun RemindersScreen(
 
 @Composable
 private fun CompanionScreen(
+    viewModel: ZurvanViewModel,
     modifier: Modifier = Modifier
 ) {
-    var code by remember {
+    val state by viewModel
+        .companionState
+        .collectAsStateWithLifecycle()
+
+    val context = LocalContext.current
+
+    var scannerMessage by remember {
         mutableStateOf<String?>(null)
     }
 
-    Column(
+    val scannerOptions = remember {
+        GmsBarcodeScannerOptions
+            .Builder()
+            .setBarcodeFormats(
+                Barcode.FORMAT_QR_CODE
+            )
+            .enableAutoZoom()
+            .build()
+    }
+
+    val scanner = remember(
+        context,
+        scannerOptions
+    ) {
+        GmsBarcodeScanning.getClient(
+            context,
+            scannerOptions
+        )
+    }
+
+    val qrBitmap = remember(
+        state.qrPayload
+    ) {
+        state.qrPayload?.let {
+            payload ->
+            runCatching {
+                CompanionQrCode.generate(
+                    payload,
+                    720
+                )
+            }.getOrNull()
+        }
+    }
+
+    LazyColumn(
         modifier = modifier
             .fillMaxSize()
             .padding(16.dp),
         verticalArrangement =
-            Arrangement.spacedBy(12.dp)
+            Arrangement.spacedBy(12.dp),
+        contentPadding =
+            PaddingValues(
+                bottom = 28.dp
+            )
     ) {
-        Text(
-            "Companion",
-            style =
-                MaterialTheme
-                    .typography
-                    .headlineSmall
-        )
+        item {
+            Text(
+                "Zurvan Companion",
+                style =
+                    MaterialTheme
+                        .typography
+                        .headlineSmall
+            )
+        }
 
-        Card(
-            modifier =
-                Modifier.fillMaxWidth()
-        ) {
-            Column(
+        item {
+            Card(
                 modifier =
-                    Modifier.padding(16.dp),
-                verticalArrangement =
-                    Arrangement.spacedBy(
-                        10.dp
-                    )
+                    Modifier.fillMaxWidth()
             ) {
-                Text(
-                    "جفت‌سازی امن دستگاه",
-                    style =
-                        MaterialTheme
-                            .typography
-                            .titleMedium
-                )
-
-                Text(
-                    "پروتکل مشترک Windows / Android / iOS از ECDH P-256 و AES-GCM استفاده می‌کند. انتقال نهایی روی شبکه محلی در حال تکمیل است."
-                )
-
-                code?.let {
+                Column(
+                    modifier =
+                        Modifier.padding(
+                            16.dp
+                        ),
+                    verticalArrangement =
+                        Arrangement.spacedBy(
+                            10.dp
+                        )
+                ) {
                     Text(
-                        text = it,
+                        "جفت‌سازی شبیه SHAREit",
                         style =
                             MaterialTheme
                                 .typography
-                                .displaySmall,
+                                .titleMedium,
                         fontWeight =
                             FontWeight.Bold
                     )
-                }
 
-                Button(
-                    onClick = {
-                        code =
-                            SecureRandom()
-                                .nextInt(
-                                    1_000_000
-                                )
-                                .toString()
-                                .padStart(
-                                    6,
-                                    '0'
-                                )
-                    }
-                ) {
                     Text(
-                        "ساخت کد جفت‌سازی"
+                        "Master یک QR یک‌بارمصرف ۵ دقیقه‌ای می‌سازد. Secondary با اسکن QR روی همان شبکه محلی وصل می‌شود؛ سپس ECDH P-256 کلید جلسه را می‌سازد و تمام Sync Frameها با AES-GCM رمز می‌شوند.",
+                        style =
+                            MaterialTheme
+                                .typography
+                                .bodySmall
                     )
+
+                    Row(
+                        modifier =
+                            Modifier.fillMaxWidth(),
+                        horizontalArrangement =
+                            Arrangement.spacedBy(
+                                8.dp
+                            )
+                    ) {
+                        Button(
+                            onClick = {
+                                scannerMessage =
+                                    null
+                                viewModel
+                                    .startCompanionMaster()
+                            },
+                            modifier =
+                                Modifier.weight(
+                                    1f
+                                ),
+                            enabled =
+                                !state.busy
+                        ) {
+                            Icon(
+                                Icons.Outlined
+                                    .QrCode2,
+                                contentDescription =
+                                    null
+                            )
+                            Spacer(
+                                Modifier.width(
+                                    6.dp
+                                )
+                            )
+                            Text("Master")
+                        }
+
+                        Button(
+                            onClick = {
+                                scannerMessage =
+                                    "دوربین QR باز شد…"
+
+                                scanner
+                                    .startScan()
+                                    .addOnSuccessListener {
+                                        barcode ->
+                                        val raw =
+                                            barcode
+                                                .rawValue
+
+                                        if (
+                                            raw
+                                                .isNullOrBlank()
+                                        ) {
+                                            scannerMessage =
+                                                "QR خوانده شد ولی داده‌ای نداشت."
+                                        } else {
+                                            scannerMessage =
+                                                "QR تأیید شد؛ در حال اتصال امن…"
+
+                                            viewModel
+                                                .joinCompanionFromQr(
+                                                    raw
+                                                )
+                                        }
+                                    }
+                                    .addOnCanceledListener {
+                                        scannerMessage =
+                                            "اسکن QR لغو شد."
+                                    }
+                                    .addOnFailureListener {
+                                        error ->
+                                        scannerMessage =
+                                            "اسکن QR انجام نشد: " +
+                                                (
+                                                    error
+                                                        .message
+                                                        ?: "خطای ناشناخته"
+                                                    )
+                                    }
+                            },
+                            modifier =
+                                Modifier.weight(
+                                    1f
+                                ),
+                            enabled =
+                                !state.busy
+                        ) {
+                            Icon(
+                                Icons.Outlined
+                                    .QrCodeScanner,
+                                contentDescription =
+                                    null
+                            )
+                            Spacer(
+                                Modifier.width(
+                                    6.dp
+                                )
+                            )
+                            Text("Secondary")
+                        }
+                    }
+
+                    if (
+                        state.mode ==
+                        "master"
+                    ) {
+                        TextButton(
+                            onClick = {
+                                viewModel
+                                    .stopCompanionSession()
+                            }
+                        ) {
+                            Text(
+                                "لغو جلسه Master"
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        if (
+            qrBitmap != null &&
+            state.qrPayload != null
+        ) {
+            item {
+                Card(
+                    modifier =
+                        Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier =
+                            Modifier.padding(
+                                16.dp
+                            ),
+                        horizontalAlignment =
+                            Alignment.CenterHorizontally,
+                        verticalArrangement =
+                            Arrangement.spacedBy(
+                                10.dp
+                            )
+                    ) {
+                        Text(
+                            "این QR را در دستگاه Secondary اسکن کنید",
+                            fontWeight =
+                                FontWeight.SemiBold,
+                            textAlign =
+                                TextAlign.Center
+                        )
+
+                        Image(
+                            bitmap =
+                                qrBitmap
+                                    .asImageBitmap(),
+                            contentDescription =
+                                "Zurvan Companion pairing QR",
+                            modifier =
+                                Modifier
+                                    .size(
+                                        270.dp
+                                    )
+                        )
+
+                        state.pairingCode
+                            ?.let {
+                                Text(
+                                    "کد جلسه: $it",
+                                    style =
+                                        MaterialTheme
+                                            .typography
+                                            .titleMedium,
+                                    fontWeight =
+                                        FontWeight.Bold
+                                )
+                            }
+
+                        Text(
+                            "QR پس از ۵ دقیقه یا اولین Pair موفق باطل می‌شود.",
+                            style =
+                                MaterialTheme
+                                    .typography
+                                    .bodySmall,
+                            textAlign =
+                                TextAlign.Center
+                        )
+                    }
+                }
+            }
+        }
+
+        item {
+            Card(
+                modifier =
+                    Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier =
+                        Modifier.padding(
+                            16.dp
+                        ),
+                    verticalArrangement =
+                        Arrangement.spacedBy(
+                            8.dp
+                        )
+                ) {
+                    Row(
+                        verticalAlignment =
+                            Alignment.CenterVertically,
+                        horizontalArrangement =
+                            Arrangement.spacedBy(
+                                8.dp
+                            )
+                    ) {
+                        if (state.busy) {
+                            CircularProgressIndicator(
+                                modifier =
+                                    Modifier.size(
+                                        20.dp
+                                    ),
+                                strokeWidth =
+                                    2.dp
+                            )
+                        }
+
+                        Text(
+                            state.status,
+                            fontWeight =
+                                FontWeight.SemiBold
+                        )
+                    }
+
+                    scannerMessage
+                        ?.let {
+                            Text(
+                                it,
+                                style =
+                                    MaterialTheme
+                                        .typography
+                                        .bodySmall
+                            )
+                        }
+
+                    state.peerName
+                        ?.let {
+                            Text(
+                                "دستگاه مقابل: $it"
+                            )
+                        }
+
+                    state.sas
+                        ?.let {
+                            Text(
+                                "کد امنیتی مشترک: $it",
+                                style =
+                                    MaterialTheme
+                                        .typography
+                                        .titleMedium,
+                                fontWeight =
+                                    FontWeight.Bold
+                            )
+                        }
+
+                    if (
+                        state.syncedItemCount >
+                        0
+                    ) {
+                        Text(
+                            "آیتم‌های اعمال‌شده: " +
+                                toPersianDigits(
+                                    state
+                                        .syncedItemCount
+                                        .toString()
+                                )
+                        )
+                    }
+
+                    state.error
+                        ?.let {
+                            Text(
+                                it,
+                                color =
+                                    MaterialTheme
+                                        .colorScheme
+                                        .error,
+                                style =
+                                    MaterialTheme
+                                        .typography
+                                        .bodySmall
+                            )
+                        }
+                }
+            }
+        }
+
+        if (
+            state.trustedDevices
+                .isNotEmpty()
+        ) {
+            item {
+                Text(
+                    "دستگاه‌های جفت‌شده",
+                    style =
+                        MaterialTheme
+                            .typography
+                            .titleMedium,
+                    fontWeight =
+                        FontWeight.Bold
+                )
+            }
+
+            items(
+                state.trustedDevices,
+                key = {
+                    it.deviceId
+                }
+            ) {
+                device ->
+                Card(
+                    modifier =
+                        Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier =
+                            Modifier.padding(
+                                14.dp
+                            ),
+                        verticalArrangement =
+                            Arrangement.spacedBy(
+                                4.dp
+                            )
+                    ) {
+                        Text(
+                            device.displayName,
+                            fontWeight =
+                                FontWeight.SemiBold
+                        )
+                        Text(
+                            device.platform.name +
+                                " · " +
+                                device.publicKeyFingerprint,
+                            style =
+                                MaterialTheme
+                                    .typography
+                                    .bodySmall
+                        )
+                    }
                 }
             }
         }
