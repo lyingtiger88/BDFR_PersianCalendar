@@ -1,6 +1,11 @@
 package com.bdfr.zurvan
 
 import android.content.Context
+import androidx.compose.foundation.Image
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.asImageBitmap
+import android.graphics.BitmapFactory
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Color
@@ -18,11 +23,14 @@ object ZurvanThemes {
     )
     val active = staticCompositionLocalOf { presets.first() }
     val setActive = staticCompositionLocalOf<(String) -> Unit> { {} }
+    val wallpaper = staticCompositionLocalOf<String?> { null }
+    val setWallpaper = staticCompositionLocalOf<(String?) -> Unit> { {} }
 
     @Composable
     fun Apply(context: Context, content: @Composable () -> Unit) {
         val prefs = remember { context.getSharedPreferences("zurvan_appearance", Context.MODE_PRIVATE) }
         var selected by remember { mutableStateOf(prefs.getString("theme", "windows-light") ?: "windows-light") }
+        var wallpaperPath by remember { mutableStateOf(prefs.getString("wallpaper", null)) }
         val palette = presets.firstOrNull { it.id == selected } ?: presets.first()
         val isDark = selected == "graphite-night"
         val base = if (isDark) darkColorScheme() else lightColorScheme()
@@ -32,11 +40,27 @@ object ZurvanThemes {
             primary=palette.accent, primaryContainer=palette.accent,
             onPrimaryContainer=palette.ink, error=palette.holiday
         )
-        CompositionLocalProvider(active provides palette, setActive provides { id ->
+        CompositionLocalProvider(wallpaper provides wallpaperPath,
+            setWallpaper provides { value ->
+                wallpaperPath = value
+                prefs.edit().apply {
+                    if (value == null) remove("wallpaper") else putString("wallpaper", value)
+                }.apply()
+            },
+            active provides palette, setActive provides { id ->
             selected = id
             prefs.edit().putString("theme", id).apply()
         }) {
             MaterialTheme(colorScheme=colors, content=content)
         }
+    }
+    @Composable
+    fun Wallpaper(modifier: Modifier = Modifier) {
+        val path = wallpaper.current ?: return
+        val bitmap = remember(path) {
+            runCatching { BitmapFactory.decodeFile(path)?.asImageBitmap() }.getOrNull()
+        } ?: return
+        Image(bitmap = bitmap, contentDescription = null,
+            modifier = modifier, contentScale = ContentScale.Crop, alpha = 0.28f)
     }
 }
