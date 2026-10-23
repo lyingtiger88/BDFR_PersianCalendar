@@ -133,7 +133,7 @@
       "name": "Zurvan Desk account sign-up/login/logout and encrypted file management",
       "windows": "planned-account-ui",
       "android": "implemented-client",
-      "ios": "planned"
+      "ios": "implemented-account-ui-backend-pending"
     }
   ]
 }
