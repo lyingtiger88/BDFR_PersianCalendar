@@ -26,6 +26,18 @@ data class CalendarDayCell(
         )
 }
 
+data class AndroidDateConversion(
+    val persianYear: Int,
+    val persianMonth: Int,
+    val persianDay: Int,
+    val gregorianYear: Int,
+    val gregorianMonth: Int,
+    val gregorianDay: Int,
+    val hijriYear: Int,
+    val hijriMonth: Int,
+    val hijriDay: Int
+)
+
 data class PersianMonthModel(
     val year: Int,
     val month: Int,
@@ -194,6 +206,92 @@ object AndroidCalendarEngine {
             leadingBlankCount =
                 leading,
             days = days
+        )
+    }
+
+    fun convert(
+        calendar: CalendarPriority,
+        year: Int,
+        month: Int,
+        day: Int
+    ): AndroidDateConversion {
+        require(month in 1..12)
+        require(day in 1..31)
+
+        val source = when (calendar) {
+            CalendarPriority.PERSIAN ->
+                Calendar.getInstance(
+                    ULocale(
+                        "fa_IR@calendar=persian"
+                    )
+                )
+
+            CalendarPriority.HIJRI ->
+                Calendar.getInstance(
+                    ULocale(
+                        "ar_SA@calendar=islamic-civil"
+                    )
+                )
+
+            CalendarPriority.GREGORIAN ->
+                Calendar.getInstance(
+                    ULocale(
+                        "en_US@calendar=gregorian"
+                    )
+                )
+        }.apply {
+            clear()
+            set(Calendar.YEAR, year)
+            set(Calendar.MONTH, month - 1)
+            set(Calendar.DAY_OF_MONTH, day)
+            set(Calendar.HOUR_OF_DAY, 12)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+        }
+
+        val millis = source.timeInMillis
+
+        val persian = Calendar.getInstance(
+            ULocale(
+                "fa_IR@calendar=persian"
+            )
+        ).apply {
+            time = Date(millis)
+        }
+
+        val gregorian = Calendar.getInstance(
+            ULocale(
+                "en_US@calendar=gregorian"
+            )
+        ).apply {
+            time = Date(millis)
+        }
+
+        val hijri = Calendar.getInstance(
+            ULocale(
+                "ar_SA@calendar=islamic-civil"
+            )
+        ).apply {
+            time = Date(millis)
+        }
+
+        return AndroidDateConversion(
+            persianYear = persian.get(Calendar.YEAR),
+            persianMonth =
+                persian.get(Calendar.MONTH) + 1,
+            persianDay =
+                persian.get(Calendar.DAY_OF_MONTH),
+            gregorianYear =
+                gregorian.get(Calendar.YEAR),
+            gregorianMonth =
+                gregorian.get(Calendar.MONTH) + 1,
+            gregorianDay =
+                gregorian.get(Calendar.DAY_OF_MONTH),
+            hijriYear = hijri.get(Calendar.YEAR),
+            hijriMonth =
+                hijri.get(Calendar.MONTH) + 1,
+            hijriDay =
+                hijri.get(Calendar.DAY_OF_MONTH)
         )
     }
 
