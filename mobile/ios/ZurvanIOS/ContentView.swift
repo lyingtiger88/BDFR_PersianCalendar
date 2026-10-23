@@ -1,4 +1,5 @@
 import SwiftUI
+import PhotosUI
 
 private enum ZurvanTab: Hashable {
     case calendar
@@ -403,6 +404,9 @@ private struct ZurvanCloudShellView: View {
 
 private struct MobileSettingsView: View {
     @AppStorage("zurvan.appearance.theme") private var themeID = "windows-light"
+    @State private var selectedBackground: PhotosPickerItem?
+    @State private var backgroundError: String?
+    @State private var backgroundAvailable = ZurvanBackgroundStore.exists
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
@@ -419,6 +423,41 @@ private struct MobileSettingsView: View {
                     .pickerStyle(.menu)
                     Text("تم‌های متناظر با ویندوز و اندروید؛ انتخاب در دستگاه ذخیره می‌شود.")
                         .font(.footnote).foregroundStyle(.secondary)
+                }
+                .padding()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("پس‌زمینه سفارشی").font(.headline)
+                    PhotosPicker(selection: $selectedBackground, matching: .images) {
+                        Label("انتخاب تصویر از گالری", systemImage: "photo")
+                    }
+                    if backgroundAvailable {
+                        Button("حذف پس‌زمینه") {
+                            ZurvanBackgroundStore.remove()
+                            backgroundAvailable = false
+                        }
+                    }
+                    if let backgroundError {
+                        Text(backgroundError).foregroundStyle(.red).font(.footnote)
+                    }
+                }
+                .onChange(of: selectedBackground) { _, newValue in
+                    guard let newValue else { return }
+                    Task {
+                        do {
+                            guard let data = try await newValue.loadTransferable(type: Data.self),
+                                  data.count < 20_000_000 else {
+                                throw ZurvanBackgroundError.invalidImage
+                            }
+                            try ZurvanBackgroundStore.save(data)
+                            backgroundAvailable = true
+                            backgroundError = nil
+                        } catch {
+                            backgroundError = error.localizedDescription
+                        }
+                    }
                 }
                 .padding()
                 .frame(maxWidth: .infinity, alignment: .leading)
