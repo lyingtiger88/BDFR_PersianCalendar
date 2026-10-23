@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using System.Security;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using BDFR.PersianCalendar.Core;
