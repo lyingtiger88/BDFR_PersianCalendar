@@ -13,42 +13,42 @@
       "id": "calendar-month-view",
       "name": "Three-calendar month view",
       "windows": "implemented",
-      "android": "shell",
+      "android": "implemented",
       "ios": "shell"
     },
     {
       "id": "calendar-order",
       "name": "Configurable Persian/Hijri/Gregorian priority",
       "windows": "implemented",
-      "android": "planned",
+      "android": "implemented",
       "ios": "planned"
     },
     {
       "id": "jump-to-date",
       "name": "Jump to date with separated date parts",
       "windows": "implemented",
-      "android": "planned",
+      "android": "implemented",
       "ios": "planned"
     },
     {
       "id": "date-converter",
       "name": "Persian/Gregorian/Hijri date converter",
       "windows": "implemented",
-      "android": "planned",
+      "android": "implemented",
       "ios": "planned"
     },
     {
       "id": "events-reminders",
       "name": "Events, reminders and acknowledgement repeats",
       "windows": "implemented",
-      "android": "planned",
+      "android": "implemented",
       "ios": "planned"
     },
     {
       "id": "privacy",
       "name": "Public/private calendar items and redacted notifications",
       "windows": "implemented",
-      "android": "planned",
+      "android": "implemented",
       "ios": "planned"
     },
     {
@@ -69,14 +69,14 @@
       "id": "corner-radius",
       "name": "Live global corner-radius appearance setting",
       "windows": "implemented",
-      "android": "planned",
+      "android": "implemented",
       "ios": "planned"
     },
     {
       "id": "companion-pairing",
       "name": "PC/mobile companion pairing",
       "windows": "protocol",
-      "android": "protocol",
+      "android": "protocol-ui",
       "ios": "protocol"
     },
     {
@@ -90,14 +90,14 @@
       "id": "zurvan-cloud-e2ee",
       "name": "Client-side encrypted Zurvan Desk over Arvan S3",
       "windows": "implemented",
-      "android": "protocol",
+      "android": "implemented-client",
       "ios": "protocol"
     },
     {
       "id": "zurvan-cloud-recovery",
       "name": "24-word Zurvan Desk recovery phrase for vault-key recovery",
       "windows": "implemented",
-      "android": "protocol",
+      "android": "implemented-client",
       "ios": "protocol"
     },
     {
@@ -111,8 +111,29 @@
       "id": "workspace-navigation-layout",
       "name": "Resizable sidebars and ordered navigation headers",
       "windows": "implemented",
-      "android": "implemented-mobile-order",
+      "android": "implemented",
       "ios": "implemented-mobile-order"
+    },
+    {
+      "id": "daily-notes",
+      "name": "Public/private daily notes",
+      "windows": "implemented",
+      "android": "implemented",
+      "ios": "planned"
+    },
+    {
+      "id": "native-reminder-notifications",
+      "name": "Platform-native reminder notifications with privacy redaction and repeats",
+      "windows": "implemented-in-app",
+      "android": "implemented",
+      "ios": "planned"
+    },
+    {
+      "id": "zurvan-desk-account-files",
+      "name": "Zurvan Desk account sign-up/login/logout and encrypted file management",
+      "windows": "planned-account-ui",
+      "android": "implemented-client",
+      "ios": "planned"
     }
   ]
 }
