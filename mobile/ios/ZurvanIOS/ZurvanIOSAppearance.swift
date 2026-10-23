@@ -7,7 +7,9 @@ enum ZurvanIOSAppearance {
         ("azure-glass", "Azure Glass"),
         ("graphite-night", "Graphite Night"),
         ("warm-sand", "Warm Sand"),
-        ("zara-pastel", "Zara Pastel")
+        ("zara-pastel", "Zara Pastel"),
+        ("season-vibe", "Season Vibe"),
+        ("elena-mode", "Elena Mode")
     ]
 
     static func accent(_ id: String) -> Color {
@@ -15,6 +17,8 @@ enum ZurvanIOSAppearance {
         case "azure-glass": return Color(red: 0.36, green: 0.66, blue: 0.91)
         case "graphite-night": return Color(red: 0.57, green: 0.68, blue: 0.82)
         case "warm-sand": return Color(red: 0.72, green: 0.48, blue: 0.25)
+        case "season-vibe": return Color(red: 0.34, green: 0.61, blue: 0.85)
+        case "elena-mode": return Color(red: 0.75, green: 0.54, blue: 0.38)
         case "zara-pastel": return Color(red: 0.49, green: 0.67, blue: 0.86)
         default: return Color(red: 0.28, green: 0.52, blue: 0.85)
         }
