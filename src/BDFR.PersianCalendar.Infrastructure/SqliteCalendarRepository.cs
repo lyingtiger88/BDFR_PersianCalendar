@@ -1,10 +1,13 @@
 using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 using BDFR.PersianCalendar.Core;
 using Microsoft.Data.Sqlite;
 
 namespace BDFR.PersianCalendar.Infrastructure;
 
-public sealed class SqliteCalendarRepository(string databasePath) : ICalendarRepository
+public sealed class SqliteCalendarRepository(string databasePath) : ICalendarRepository, ICompanionSnapshotStore
 {
     private readonly string _connectionString = new SqliteConnectionStringBuilder
     {
@@ -586,6 +589,382 @@ public sealed class SqliteCalendarRepository(string databasePath) : ICalendarRep
         cmd.Parameters.AddWithValue("$y", persianYear);
         cmd.Parameters.AddWithValue("$at", syncedAt.ToUniversalTime().ToString("O"));
         await cmd.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    public async Task<SyncBatch> CreateSnapshotAsync(
+        string sourceDeviceId,
+        string targetDeviceId,
+        CancellationToken cancellationToken = default)
+    {
+        var items = new List<SyncEnvelope>();
+        var snapshotAt = DateTimeOffset.UtcNow;
+
+        await using var db = await OpenAsync(cancellationToken);
+
+        async Task AddRowsAsync<T>(
+            string sql,
+            SyncEntityKind kind,
+            Func<SqliteDataReader, T> projector,
+            Func<T, string> idSelector,
+            Func<T, DateTimeOffset>? modifiedSelector = null)
+        {
+            var cmd = db.CreateCommand();
+            cmd.CommandText = sql;
+
+            await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                var payload = projector(reader);
+                var payloadJson = JsonSerializer.Serialize(payload);
+                var modified = modifiedSelector?.Invoke(payload) ?? snapshotAt;
+                var id = idSelector(payload);
+
+                items.Add(new SyncEnvelope(
+                    $"env_{Guid.NewGuid():N}",
+                    kind,
+                    id,
+                    SyncMutationKind.Upsert,
+                    1,
+                    modified,
+                    sourceDeviceId,
+                    payloadJson,
+                    ComputeContentHash(payloadJson)));
+            }
+        }
+
+        await AddRowsAsync(
+            """
+            SELECT id,title,persian_date,start_time,end_time,all_day,
+                   description,category,location,recurrence,privacy
+            FROM events
+            ORDER BY persian_date,id
+            """,
+            SyncEntityKind.Event,
+            r => new CompanionEventPayload(
+                r.GetString(0),
+                r.GetString(1),
+                r.GetString(2),
+                ReadNullable(r, 3),
+                ReadNullable(r, 4),
+                r.GetInt32(5) != 0,
+                ReadNullable(r, 6),
+                ReadNullable(r, 7),
+                ReadNullable(r, 8),
+                r.GetInt32(9),
+                r.GetInt32(10)),
+            x => x.Id);
+
+        await AddRowsAsync(
+            """
+            SELECT id,title,persian_date,due_time,priority,completed,
+                   category,description
+            FROM tasks
+            ORDER BY persian_date,id
+            """,
+            SyncEntityKind.Task,
+            r => new CompanionTaskPayload(
+                r.GetString(0),
+                r.GetString(1),
+                r.GetString(2),
+                ReadNullable(r, 3),
+                r.GetInt32(4),
+                r.GetInt32(5) != 0,
+                ReadNullable(r, 6),
+                ReadNullable(r, 7)),
+            x => x.Id);
+
+        await AddRowsAsync(
+            """
+            SELECT id,persian_date,text,pinned,modified_at
+            FROM notes
+            ORDER BY persian_date
+            """,
+            SyncEntityKind.Note,
+            r => new CompanionNotePayload(
+                r.GetString(0),
+                r.GetString(1),
+                r.GetString(2),
+                r.GetInt32(3) != 0,
+                r.GetString(4)),
+            x => x.Id,
+            x => DateTimeOffset.TryParse(x.ModifiedAtUtc, out var at)
+                ? at
+                : snapshotAt);
+
+        await AddRowsAsync(
+            """
+            SELECT id,title,calendar_system,month,day,repeat_yearly,
+                   reminder_days,category,note
+            FROM special_occasions
+            ORDER BY month,day,id
+            """,
+            SyncEntityKind.SpecialOccasion,
+            r => new CompanionSpecialOccasionPayload(
+                r.GetString(0),
+                r.GetString(1),
+                r.GetInt32(2),
+                r.GetInt32(3),
+                r.GetInt32(4),
+                r.GetInt32(5) != 0,
+                r.GetString(6)
+                    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .Select(int.Parse)
+                    .ToArray(),
+                ReadNullable(r, 7),
+                ReadNullable(r, 8)),
+            x => x.Id);
+
+        await AddRowsAsync(
+            """
+            SELECT id,item_kind,item_id,fire_at_utc,state,title,body,
+                   privacy,repeat_count,repeat_interval_minutes,attempt
+            FROM reminders
+            ORDER BY fire_at_utc,id
+            """,
+            SyncEntityKind.Reminder,
+            r => new CompanionReminderPayload(
+                r.GetString(0),
+                r.GetInt32(1),
+                r.GetString(2),
+                r.GetString(3),
+                r.GetInt32(4),
+                r.GetString(5),
+                r.GetString(6),
+                r.GetInt32(7),
+                r.GetInt32(8),
+                r.GetInt32(9),
+                r.GetInt32(10)),
+            x => x.Id);
+
+        return new SyncBatch(
+            CompanionProtocol.CurrentVersion,
+            CompanionProtocol.NewBatchId(),
+            sourceDeviceId,
+            targetDeviceId,
+            null,
+            items,
+            snapshotAt);
+    }
+
+    public async Task<SyncAck> ApplySnapshotAsync(
+        SyncBatch batch,
+        bool preferIncoming,
+        CancellationToken cancellationToken = default)
+    {
+        if (batch.ProtocolVersion != CompanionProtocol.CurrentVersion)
+            throw new NotSupportedException(
+                $"Unsupported companion protocol version: {batch.ProtocolVersion}");
+
+        var applied = new List<string>();
+        var conflicts = new List<SyncConflict>();
+
+        await using var db = await OpenAsync(cancellationToken);
+        await using var tx = await db.BeginTransactionAsync(cancellationToken);
+
+        foreach (var envelope in batch.Items)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (envelope.Mutation == SyncMutationKind.Delete)
+            {
+                if (!preferIncoming)
+                    continue;
+
+                var delete = db.CreateCommand();
+                delete.Transaction = (SqliteTransaction)tx;
+                delete.Parameters.AddWithValue("$id", envelope.EntityId);
+                delete.CommandText = envelope.EntityKind switch
+                {
+                    SyncEntityKind.Event => "DELETE FROM events WHERE id=$id",
+                    SyncEntityKind.Task => "DELETE FROM tasks WHERE id=$id",
+                    SyncEntityKind.Note => "DELETE FROM notes WHERE id=$id",
+                    SyncEntityKind.SpecialOccasion => "DELETE FROM special_occasions WHERE id=$id",
+                    SyncEntityKind.Reminder => "DELETE FROM reminders WHERE id=$id",
+                    _ => string.Empty
+                };
+
+                if (!string.IsNullOrEmpty(delete.CommandText))
+                {
+                    await delete.ExecuteNonQueryAsync(cancellationToken);
+                    applied.Add(envelope.EnvelopeId);
+                }
+
+                continue;
+            }
+
+            if (string.IsNullOrWhiteSpace(envelope.PayloadJson))
+                continue;
+
+            var insertMode = preferIncoming
+                ? "INSERT OR REPLACE"
+                : "INSERT OR IGNORE";
+
+            var cmd = db.CreateCommand();
+            cmd.Transaction = (SqliteTransaction)tx;
+
+            switch (envelope.EntityKind)
+            {
+                case SyncEntityKind.Event:
+                {
+                    var payload = JsonSerializer.Deserialize<CompanionEventPayload>(
+                        envelope.PayloadJson)
+                        ?? throw new InvalidOperationException("Invalid companion event payload.");
+
+                    cmd.CommandText = $"""
+                        {insertMode} INTO events(
+                            id,title,persian_date,start_time,end_time,all_day,
+                            description,category,location,recurrence,privacy)
+                        VALUES($id,$title,$date,$start,$end,$all,$description,
+                               $category,$location,$recurrence,$privacy)
+                        """;
+                    cmd.Parameters.AddWithValue("$id", payload.Id);
+                    cmd.Parameters.AddWithValue("$title", payload.Title);
+                    cmd.Parameters.AddWithValue("$date", payload.PersianDate);
+                    cmd.Parameters.AddWithValue("$start", (object?)payload.StartTime ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("$end", (object?)payload.EndTime ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("$all", payload.AllDay ? 1 : 0);
+                    cmd.Parameters.AddWithValue("$description", (object?)payload.Description ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("$category", (object?)payload.Category ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("$location", (object?)payload.Location ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("$recurrence", payload.Recurrence);
+                    cmd.Parameters.AddWithValue("$privacy", payload.Privacy);
+                    break;
+                }
+
+                case SyncEntityKind.Task:
+                {
+                    var payload = JsonSerializer.Deserialize<CompanionTaskPayload>(
+                        envelope.PayloadJson)
+                        ?? throw new InvalidOperationException("Invalid companion task payload.");
+
+                    cmd.CommandText = $"""
+                        {insertMode} INTO tasks(
+                            id,title,persian_date,due_time,priority,completed,
+                            category,description)
+                        VALUES($id,$title,$date,$due,$priority,$completed,
+                               $category,$description)
+                        """;
+                    cmd.Parameters.AddWithValue("$id", payload.Id);
+                    cmd.Parameters.AddWithValue("$title", payload.Title);
+                    cmd.Parameters.AddWithValue("$date", payload.PersianDate);
+                    cmd.Parameters.AddWithValue("$due", (object?)payload.DueTime ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("$priority", payload.Priority);
+                    cmd.Parameters.AddWithValue("$completed", payload.Completed ? 1 : 0);
+                    cmd.Parameters.AddWithValue("$category", (object?)payload.Category ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("$description", (object?)payload.Description ?? DBNull.Value);
+                    break;
+                }
+
+                case SyncEntityKind.Note:
+                {
+                    var payload = JsonSerializer.Deserialize<CompanionNotePayload>(
+                        envelope.PayloadJson)
+                        ?? throw new InvalidOperationException("Invalid companion note payload.");
+
+                    if (!preferIncoming)
+                    {
+                        var exists = db.CreateCommand();
+                        exists.Transaction = (SqliteTransaction)tx;
+                        exists.CommandText = "SELECT 1 FROM notes WHERE persian_date=$date LIMIT 1";
+                        exists.Parameters.AddWithValue("$date", payload.PersianDate);
+                        if (await exists.ExecuteScalarAsync(cancellationToken) is not null)
+                            continue;
+                    }
+
+                    cmd.CommandText = """
+                        INSERT INTO notes(id,persian_date,text,pinned,modified_at)
+                        VALUES($id,$date,$text,$pinned,$modified)
+                        ON CONFLICT(persian_date) DO UPDATE SET
+                            id=excluded.id,
+                            text=excluded.text,
+                            pinned=excluded.pinned,
+                            modified_at=excluded.modified_at
+                        """;
+                    cmd.Parameters.AddWithValue("$id", payload.Id);
+                    cmd.Parameters.AddWithValue("$date", payload.PersianDate);
+                    cmd.Parameters.AddWithValue("$text", payload.Text);
+                    cmd.Parameters.AddWithValue("$pinned", payload.Pinned ? 1 : 0);
+                    cmd.Parameters.AddWithValue("$modified", payload.ModifiedAtUtc);
+                    break;
+                }
+
+                case SyncEntityKind.SpecialOccasion:
+                {
+                    var payload = JsonSerializer.Deserialize<CompanionSpecialOccasionPayload>(
+                        envelope.PayloadJson)
+                        ?? throw new InvalidOperationException("Invalid companion occasion payload.");
+
+                    cmd.CommandText = $"""
+                        {insertMode} INTO special_occasions(
+                            id,title,calendar_system,month,day,repeat_yearly,
+                            reminder_days,category,note)
+                        VALUES($id,$title,$calendar,$month,$day,$repeat,
+                               $reminders,$category,$note)
+                        """;
+                    cmd.Parameters.AddWithValue("$id", payload.Id);
+                    cmd.Parameters.AddWithValue("$title", payload.Title);
+                    cmd.Parameters.AddWithValue("$calendar", payload.CalendarSystem);
+                    cmd.Parameters.AddWithValue("$month", payload.Month);
+                    cmd.Parameters.AddWithValue("$day", payload.Day);
+                    cmd.Parameters.AddWithValue("$repeat", payload.RepeatYearly ? 1 : 0);
+                    cmd.Parameters.AddWithValue("$reminders", string.Join(",", payload.ReminderDaysBefore));
+                    cmd.Parameters.AddWithValue("$category", (object?)payload.Category ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("$note", (object?)payload.Note ?? DBNull.Value);
+                    break;
+                }
+
+                case SyncEntityKind.Reminder:
+                {
+                    var payload = JsonSerializer.Deserialize<CompanionReminderPayload>(
+                        envelope.PayloadJson)
+                        ?? throw new InvalidOperationException("Invalid companion reminder payload.");
+
+                    cmd.CommandText = $"""
+                        {insertMode} INTO reminders(
+                            id,item_kind,item_id,fire_at_utc,state,title,body,
+                            privacy,repeat_count,repeat_interval_minutes,attempt)
+                        VALUES($id,$kind,$item,$fire,$state,$title,$body,
+                               $privacy,$repeat,$interval,$attempt)
+                        """;
+                    cmd.Parameters.AddWithValue("$id", payload.Id);
+                    cmd.Parameters.AddWithValue("$kind", payload.ItemKind);
+                    cmd.Parameters.AddWithValue("$item", payload.ItemId);
+                    cmd.Parameters.AddWithValue("$fire", payload.FireAtUtc);
+                    cmd.Parameters.AddWithValue("$state", payload.State);
+                    cmd.Parameters.AddWithValue("$title", payload.Title);
+                    cmd.Parameters.AddWithValue("$body", payload.Body);
+                    cmd.Parameters.AddWithValue("$privacy", payload.Privacy);
+                    cmd.Parameters.AddWithValue("$repeat", payload.RepeatCount);
+                    cmd.Parameters.AddWithValue("$interval", payload.RepeatIntervalMinutes);
+                    cmd.Parameters.AddWithValue("$attempt", payload.Attempt);
+                    break;
+                }
+
+                default:
+                    continue;
+            }
+
+            var changed = await cmd.ExecuteNonQueryAsync(cancellationToken);
+            if (changed > 0)
+                applied.Add(envelope.EnvelopeId);
+        }
+
+        await tx.CommitAsync(cancellationToken);
+
+        return new SyncAck(
+            CompanionProtocol.CurrentVersion,
+            batch.BatchId,
+            batch.TargetDeviceId,
+            DateTimeOffset.UtcNow.ToString("O"),
+            applied,
+            conflicts,
+            DateTimeOffset.UtcNow);
+    }
+
+    private static string ComputeContentHash(string payloadJson)
+    {
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(payloadJson));
+        return Convert.ToHexString(hash).ToLowerInvariant();
     }
 
     private static ReminderSchedule ReadReminder(SqliteDataReader reader)
