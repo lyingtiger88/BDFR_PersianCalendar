@@ -105,6 +105,7 @@ private fun ZurvanMobileShell(
     BoxWithConstraints(
         modifier = Modifier.fillMaxSize()
     ) {
+        ZurvanThemes.Wallpaper(modifier = Modifier.fillMaxSize())
         val wide = maxWidth >= 760.dp
 
         if (wide) {
@@ -119,6 +120,7 @@ private fun ZurvanMobileShell(
                 }
 
                 Scaffold(
+                containerColor = Color.Transparent,
                     modifier = Modifier.weight(1f),
                     topBar = {
                         TopAppBar(
@@ -145,6 +147,7 @@ private fun ZurvanMobileShell(
             }
         } else {
             Scaffold(
+                containerColor = Color.Transparent,
                 topBar = {
                     TopAppBar(
                         title = {
