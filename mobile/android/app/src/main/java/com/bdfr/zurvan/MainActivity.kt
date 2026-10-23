@@ -230,11 +230,11 @@ private fun ZurvanActivationScreen(modifier: Modifier, onActivated: () -> Unit) 
         OutlinedTextField(entered, { entered = it.take(8192) }, label = { Text("کد فعال‌سازی") }, modifier = Modifier.fillMaxWidth())
         Button(onClick = {
             val code = entered.trim()
-            if (ZurvanActivation.validate(context, code)) {
+            if (ZurvanActivation.diagnose(context, code) == ZurvanActivation.Result.VALID) {
                 context.getSharedPreferences("zurvan_license", Context.MODE_PRIVATE).edit().putString("activation_code",code).apply()
                 message = "فعال‌سازی موفق"
                 onActivated()
-            } else message = "کد معتبر نیست؛ کلید عمومی برنامه نیز باید پیکربندی شده باشد."
+            } else message = ZurvanActivation.explanation(ZurvanActivation.diagnose(context, code))
         }) { Text("فعال‌سازی") }
         Text(message)
     }
@@ -2422,12 +2422,12 @@ private fun SettingsScreen(
                     modifier = Modifier.fillMaxWidth()
                 )
                 Button(onClick = {
-                    if (ZurvanActivation.validate(context, enteredCode.trim())) {
+                    if (ZurvanActivation.diagnose(context, enteredCode.trim()) == ZurvanActivation.Result.VALID) {
                         context.getSharedPreferences("zurvan_license", Context.MODE_PRIVATE)
                             .edit().putString("activation_code", enteredCode.trim()).apply()
                         status = "لایسنس معتبر است."
                     } else {
-                        status = "کد معتبر نیست یا کلید عمومی صدور پیکربندی نشده است."
+                        status = ZurvanActivation.explanation(ZurvanActivation.diagnose(context, enteredCode.trim()))
                     }
                 }) { Text("بررسی و فعال‌سازی") }
                 Text(status, style = MaterialTheme.typography.bodySmall)
