@@ -278,7 +278,7 @@ class AndroidLocalRepository(
                         .put("Title", plan.title)
                         .put(
                             "PersianDate",
-                            plan.dateKey
+                            plan.dateKey.replace("-", "/")
                         )
                         .put(
                             "DueTime",
@@ -310,7 +310,7 @@ class AndroidLocalRepository(
                         .put("Title", plan.title)
                         .put(
                             "PersianDate",
-                            plan.dateKey
+                            plan.dateKey.replace("-", "/")
                         )
                         .put(
                             "StartTime",
@@ -361,7 +361,7 @@ class AndroidLocalRepository(
                     .put("Id", id)
                     .put(
                         "PersianDate",
-                        note.dateKey
+                        note.dateKey.replace("-", "/")
                     )
                     .put("Text", note.text)
                     .put("Pinned", false)
@@ -675,7 +675,7 @@ class AndroidLocalRepository(
                             payload.optString(
                                 "PersianDate",
                                 "1400/01/01"
-                            ),
+                            ).replace("/", "-"),
                         hour = start.first,
                         minute =
                             start.second,
@@ -739,7 +739,7 @@ class AndroidLocalRepository(
                             payload.optString(
                                 "PersianDate",
                                 "1400/01/01"
-                            ),
+                            ).replace("/", "-"),
                         hour = due.first,
                         minute = due.second,
                         kind = "task",
@@ -764,7 +764,7 @@ class AndroidLocalRepository(
                         payload.optString(
                             "PersianDate",
                             ""
-                        )
+                        ).replace("/", "-")
                     if (dateKey.isBlank()) {
                         return@forEach
                     }
