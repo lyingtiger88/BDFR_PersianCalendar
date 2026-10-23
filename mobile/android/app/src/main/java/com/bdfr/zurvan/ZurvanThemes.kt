@@ -19,7 +19,9 @@ object ZurvanThemes {
         ZurvanPalette("azure-glass","Azure Glass",Color(0xFFEAF3FB),Color(0xFFF5FAFF),Color(0xFFEAF4FF),Color(0xFF17324D),Color(0xFF5DA9E8),Color(0xFFD25162)),
         ZurvanPalette("graphite-night","Graphite Night",Color(0xFF171A1F),Color(0xFF22262D),Color(0xFF2A2F37),Color(0xFFF1F5F9),Color(0xFF586D88),Color(0xFFFF7A86)),
         ZurvanPalette("warm-sand","Warm Sand",Color(0xFFFFF8F3),Color(0xFFFFF9F0),Color(0xFFFFFDF8),Color(0xFF40362C),Color(0xFFDDB78B),Color(0xFFC95C57)),
-        ZurvanPalette("zara-pastel","Zara Pastel",Color(0xFFFDF9F6),Color.White,Color.White,Color(0xFF1E2A44),Color(0xFF7CC9F5),Color(0xFFD65A6F))
+        ZurvanPalette("zara-pastel","Zara Pastel",Color(0xFFFDF9F6),Color.White,Color.White,Color(0xFF1E2A44),Color(0xFF7CC9F5),Color(0xFFD65A6F)),
+        ZurvanPalette("season-vibe","Season Vibe",Color(0xFFE7F1FB),Color(0xFFF1F7FC),Color(0xFFE4F0FC),Color(0xFF19304A),Color(0xFF6AA4D8),Color(0xFFCE4452)),
+        ZurvanPalette("elena-mode","Elena Mode",Color(0xFFFFF5EA),Color(0xFFFFF9F2),Color(0xFFF6E8DA),Color(0xFF523D34),Color(0xFFC08A61),Color(0xFFC35159))
     )
     val active = staticCompositionLocalOf { presets.first() }
     val setActive = staticCompositionLocalOf<(String) -> Unit> { {} }
