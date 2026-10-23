@@ -43,7 +43,8 @@ enum ZurvanIOSLicense {
 
         let b64 = pem.components(separatedBy: .newlines).filter { !$0.hasPrefix("-----") }.joined()
         guard let keyData = Data(base64Encoded: b64),
-              let publicKey = SecKeyCreateWithData(keyData as CFData, [
+              let pkcs1 = rsaPublicKeyBytes(from: keyData),
+              let publicKey = SecKeyCreateWithData(pkcs1 as CFData, [
                 kSecAttrKeyType: kSecAttrKeyTypeRSA,
                 kSecAttrKeyClass: kSecAttrKeyClassPublic
               ] as CFDictionary, nil) else { return false }
@@ -60,6 +61,35 @@ enum ZurvanIOSLicense {
                 ISO8601DateFormatter().date(from: expiry), date > Date() else { return false }
         }
         return true
+    }
+
+    // Extract RSAPublicKey from X.509 SubjectPublicKeyInfo (PKCS#8 PEM public-key container).
+    private static func rsaPublicKeyBytes(from data: Data) -> Data? {
+        let bytes = [UInt8](data)
+        func field(_ index: Int) -> (start: Int, end: Int)? {
+            guard index + 2 <= bytes.count else { return nil }
+            var length = Int(bytes[index + 1])
+            var header = 2
+            if length & 0x80 != 0 {
+                let count = length & 0x7f
+                guard count > 0, count <= 4, index + header + count <= bytes.count else { return nil }
+                length = 0
+                for p in 0..<count { length = (length << 8) | Int(bytes[index + header + p]) }
+                header += count
+            }
+            let start = index + header
+            guard length <= bytes.count - start else { return nil }
+            return (start, start + length)
+        }
+        guard bytes.first == 0x30, let top = field(0), top.end == bytes.count else { return nil }
+        let algorithm = top.start
+        guard bytes[algorithm] == 0x30, let alg = field(algorithm) else { return nil }
+        let bitString = alg.end
+        guard bitString < top.end, bytes[bitString] == 0x03,
+              let bits = field(bitString), bits.start < bits.end,
+              bytes[bits.start] == 0,
+              bits.start + 1 < bits.end, bytes[bits.start + 1] == 0x30 else { return nil }
+        return Data(bytes[(bits.start + 1)..<bits.end])
     }
 
     private static func decode(_ text: String) -> Data? {
