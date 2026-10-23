@@ -1,6 +1,7 @@
 package com.bdfr.zurvan
 
 import android.content.Context
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.Image
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
@@ -92,9 +93,31 @@ object ZurvanThemes {
     }
     @Composable
     fun Wallpaper(modifier: Modifier = Modifier) {
-        val path = wallpaper.current ?: return
-        val bitmap = remember(path) {
-            runCatching { BitmapFactory.decodeFile(path)?.asImageBitmap() }.getOrNull()
+        val context = LocalContext.current
+        val path = wallpaper.current
+        val theme = active.current.id
+        val seasonMonth = AndroidCalendarEngine.currentPersianYearMonth().second
+        val season = when (seasonMonth) {
+            in 1..3 -> "spring"
+            in 4..6 -> "summer"
+            in 7..9 -> "autumn"
+            else -> "winter"
+        }
+        val prefs = remember { context.getSharedPreferences("zurvan_appearance", Context.MODE_PRIVATE) }
+        val elenaIndex = prefs.getInt("elena_picture", 1).coerceIn(1, 11)
+        val asset = when (theme) {
+            "season-vibe" -> "themes/season-vibe/$season.jpg"
+            "elena-mode" -> "themes/elena-mode/elena-%02d.jpg".format(elenaIndex)
+            else -> null
+        }
+        val bitmap = remember(path, asset) {
+            runCatching {
+                if (path != null) BitmapFactory.decodeFile(path)?.asImageBitmap()
+                else if (asset != null) context.assets.open(asset).use { stream ->
+                    BitmapFactory.decodeStream(stream)?.asImageBitmap()
+                }
+                else null
+            }.getOrNull()
         } ?: return
         Image(bitmap = bitmap, contentDescription = null,
             modifier = modifier, contentScale = ContentScale.Crop, alpha = 0.28f)
