@@ -279,46 +279,6 @@ public sealed partial class MainWindow
     }
 
     private async Task ShowCompanionOverviewAsync()
-    {
-        var content = new StackPanel
-        {
-            Spacing = 10,
-            Width = 420
-        };
-
-        content.Children.Add(new TextBlock
-        {
-            Text = "Zurvan Companion",
-            FontSize = 18,
-            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
-        });
-
-        content.Children.Add(new TextBlock
-        {
-            Text = "جفت‌سازی Windows، Android و iOS با QR یا کد ۶ رقمی طراحی شده است. پروتکل ECDH/AES-GCM و مدل Sync مشترک فعال است؛ Transport زنده LAN و فهرست دستگاه‌های مورد اعتماد در مرحله توسعه بعدی قرار دارد.",
-            TextWrapping = TextWrapping.Wrap
-        });
-
-        content.Children.Add(new TextBlock
-        {
-            Text = "Zurvan Desk برای همگام‌سازی رمزگذاری‌شده ابری مستقل از Companion محلی باقی می‌ماند.",
-            TextWrapping = TextWrapping.Wrap,
-            Opacity = 0.68
-        });
-
-        var dialog = new ContentDialog
-        {
-            Title = "همراه",
-            Content = content,
-            CloseButtonText = "بستن"
-        };
-
-        if (Content is FrameworkElement root &&
-            root.XamlRoot is not null)
-        {
-            dialog.XamlRoot = root.XamlRoot;
-        }
-
-        await dialog.ShowAsync();
-    }
+        => await ShowCompanionPairingAsync();
+}
 }
