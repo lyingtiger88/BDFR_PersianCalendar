@@ -76,7 +76,7 @@ struct ContentView: View {
             }
             .tag(ZurvanTab.settings)
         }
-        .tint(ZurvanIOSAppearance.accent(themeID))
+        .tint(ZurvanIOSAppearance.color(themeID, key: "accent"))
         .preferredColorScheme(themeID == "graphite-night" ? .dark : .light)
     }
 }
@@ -428,6 +428,18 @@ private struct MobileSettingsView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
 
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("رنگ‌های اختصاصی عناصر").font(.headline)
+                    Text("با انتخاب هر تم، رنگ اجزای آن را جداگانه تغییر بده یا به پیش‌فرض برگردان.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    ForEach(ZurvanIOSAppearance.colorKeys, id: \.0) { entry in
+                        ZurvanColorOverrideRow(themeID: themeID, key: entry.0, label: entry.1)
+                    }
+                }
+                .padding()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
+
                 VStack(alignment: .leading, spacing: 8) {
                     Text("پس‌زمینه سفارشی").font(.headline)
                     PhotosPicker(selection: $selectedBackground, matching: .images) {
@@ -485,6 +497,33 @@ private struct MobileSettingsView: View {
             .padding()
         }
         .navigationTitle("تنظیمات")
+    }
+}
+
+private struct ZurvanColorOverrideRow: View {
+    let themeID: String
+    let key: String
+    let label: String
+    @State private var selectedColor: Color = .blue
+
+    var body: some View {
+        HStack {
+            Text(label)
+            Spacer()
+            ColorPicker(label, selection: $selectedColor, supportsOpacity: false)
+                .labelsHidden()
+                .onChange(of: selectedColor) { _, value in
+                    ZurvanIOSAppearance.setColor(value, themeID: themeID, key: key)
+                }
+            Button("پیش‌فرض") {
+                ZurvanIOSAppearance.resetColor(themeID: themeID, key: key)
+                selectedColor = ZurvanIOSAppearance.color(themeID, key: key)
+            }.font(.caption)
+        }
+        .onAppear { selectedColor = ZurvanIOSAppearance.color(themeID, key: key) }
+        .onChange(of: themeID) { _, _ in
+            selectedColor = ZurvanIOSAppearance.color(themeID, key: key)
+        }
     }
 }
 
