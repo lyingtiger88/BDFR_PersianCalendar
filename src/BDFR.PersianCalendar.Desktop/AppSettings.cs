@@ -79,6 +79,9 @@ public sealed class AppSettings
     public double NavigationRailWidth { get; set; } = 138.0;
     public string NavigationRailSide { get; set; } = "left";
 
+    // Stable local identity used by Zurvan Companion pairing.
+    public string CompanionDeviceId { get; set; } = "";
+
     // Global UI typography.
     public string FontFamilyName { get; set; } = "Segoe UI Variable";
 
