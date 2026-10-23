@@ -220,7 +220,13 @@ private fun ZurvanActivationScreen(modifier: Modifier, onActivated: () -> Unit) 
     var message by remember { mutableStateOf("کد سخت‌افزاری را برای دریافت لایسنس ارائه دهید.") }
     Column(modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text("فعال‌سازی زروان", style = MaterialTheme.typography.headlineSmall)
-        Text("کد دستگاه: " + remember { ZurvanActivation.deviceCode(context) })
+        val hardwareCode = remember { ZurvanActivation.deviceCode(context) }
+        Text("کد دستگاه: " + hardwareCode)
+        TextButton(onClick = {
+            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+            clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Zurvan device code", hardwareCode))
+            message = "کد دستگاه کپی شد."
+        }) { Text("کپی کد دستگاه") }
         OutlinedTextField(entered, { entered = it.take(8192) }, label = { Text("کد فعال‌سازی") }, modifier = Modifier.fillMaxWidth())
         Button(onClick = {
             val code = entered.trim()
