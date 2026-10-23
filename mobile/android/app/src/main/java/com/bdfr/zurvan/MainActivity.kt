@@ -63,7 +63,7 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            MaterialTheme {
+            ZurvanThemes.Apply(this@MainActivity) {
                 val appViewModel: ZurvanViewModel = viewModel()
                 val deskViewModel: ZurvanDeskViewModel = viewModel()
 
@@ -2228,6 +2228,9 @@ private fun SettingsScreen(
         )
     }
 
+    val palette = ZurvanThemes.active.current
+    val setPalette = ZurvanThemes.setActive.current
+
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
@@ -2239,6 +2242,22 @@ private fun SettingsScreen(
                 bottom = 24.dp
             )
     ) {
+        item {
+            SettingsCard(title = "تم ظاهری — هماهنگ با ویندوز") {
+                ZurvanThemes.presets.forEach { option ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(
+                            selected = palette.id == option.id,
+                            onClick = { setPalette(option.id) }
+                        )
+                        Text(option.label, modifier = Modifier.clickable {
+                            setPalette(option.id)
+                        })
+                    }
+                }
+            }
+        }
+
         item {
             Text(
                 "تنظیمات",
