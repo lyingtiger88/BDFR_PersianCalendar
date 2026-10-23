@@ -73,7 +73,17 @@ jobs:
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" "build-tools;35.0.0"
 
       - name: Build Android debug app
-        run: gradle -p mobile/android :app:assembleDebug --stacktrace
+        env:
+          ZURVAN_PUBLIC_KEY_B64: ${{ vars.ZURVAN_LICENSE_PUBLIC_KEY_B64 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${ZURVAN_PUBLIC_KEY_B64:-}" ]]; then
+            echo "::error::ZURVAN_LICENSE_PUBLIC_KEY_B64 repository variable is required for activation-enabled builds."
+            exit 1
+          fi
+          gradle -p mobile/android :app:assembleDebug --stacktrace "-PZURVAN_LICENSE_PUBLIC_KEY_B64=${ZURVAN_PUBLIC_KEY_B64}"
+          unzip -l mobile/android/app/build/outputs/apk/debug/app-debug.apk | grep -E 'resources.arsc|AndroidManifest.xml'
 
       - name: Upload Android debug APK
         if: github.event_name == 'push'
