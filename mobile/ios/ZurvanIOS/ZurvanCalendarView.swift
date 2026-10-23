@@ -96,7 +96,7 @@ struct ZurvanCalendarView: View {
                 }
                 HStack {
                     ForEach(weekdays, id: \.self) { name in
-                        Text(name).frame(maxWidth:.infinity).foregroundStyle(name == "ج" ? .red : .primary)
+                        Text(name).frame(maxWidth:.infinity).foregroundColor(name == "ج" ? Color.red : Color.primary)
                     }
                 }
                 LazyVGrid(columns: columns, spacing: 5) {
@@ -112,7 +112,7 @@ struct ZurvanCalendarView: View {
                                 VStack(spacing: 2) {
                                     Text(String(persian.component(.day, from:date)))
                                         .font(.headline)
-                                        .foregroundStyle(holiday ? .red : .primary)
+                                        .foregroundColor(holiday ? Color.red : Color.primary)
                                     Text(String(Calendar(identifier:.islamicCivil).component(.day, from:date)))
                                         .font(.caption2)
                                     Text(String(Calendar(identifier:.gregorian).component(.day, from:date)))
