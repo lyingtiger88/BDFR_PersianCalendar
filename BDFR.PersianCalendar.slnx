@@ -3,4 +3,5 @@
   <Project Path="src/BDFR.PersianCalendar.Infrastructure/BDFR.PersianCalendar.Infrastructure.csproj" />
   <Project Path="src/BDFR.PersianCalendar.Desktop/BDFR.PersianCalendar.Desktop.csproj" />
   <Project Path="tools/BDFR.PersianCalendar.Smoke/BDFR.PersianCalendar.Smoke.csproj" />
+  <Project Path="server/Zurvan.Desk.Api/Zurvan.Desk.Api.csproj" />
 </Solution>
