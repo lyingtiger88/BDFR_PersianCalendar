@@ -74,17 +74,17 @@
     },
     {
       "id": "companion-pairing",
-      "name": "PC/mobile companion pairing",
-      "windows": "protocol",
-      "android": "protocol-ui",
-      "ios": "protocol"
+      "name": "ShareIt-style QR LAN companion pairing",
+      "windows": "implemented",
+      "android": "implemented",
+      "ios": "implemented-secondary"
     },
     {
       "id": "companion-sync",
-      "name": "Two-way local-first companion sync",
-      "windows": "protocol",
-      "android": "protocol",
-      "ios": "protocol"
+      "name": "Encrypted local-first companion snapshot sync",
+      "windows": "implemented-snapshot",
+      "android": "implemented-snapshot",
+      "ios": "implemented-receive-snapshot"
     },
     {
       "id": "zurvan-cloud-e2ee",
