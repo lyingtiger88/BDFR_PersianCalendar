@@ -102,6 +102,15 @@ private fun ZurvanMobileShell(
         .uiPreferences
         .collectAsStateWithLifecycle()
 
+    MaterialTheme(
+        shapes = Shapes(
+            extraSmall = RoundedCornerShape(uiPreferences.cornerRadius.dp),
+            small = RoundedCornerShape(uiPreferences.cornerRadius.dp),
+            medium = RoundedCornerShape(uiPreferences.cornerRadius.dp),
+            large = RoundedCornerShape(uiPreferences.cornerRadius.dp),
+            extraLarge = RoundedCornerShape(uiPreferences.cornerRadius.dp)
+        )
+    ) {
     BoxWithConstraints(
         modifier = Modifier.fillMaxSize()
     ) {
@@ -186,6 +195,8 @@ private fun ZurvanMobileShell(
                 )
             }
         }
+    }
+}
     }
 }
 
@@ -4228,8 +4239,8 @@ private fun SettingsCard(
         @Composable ColumnScope.() -> Unit
 ) {
     Card(
-        modifier =
-            Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium
     ) {
         Column(
             modifier =
