@@ -19,6 +19,9 @@ android {
 
     defaultConfig {
         applicationId = "com.bdfr.zurvan"
+        val issuerPublicKey = providers.gradleProperty("ZURVAN_LICENSE_PUBLIC_KEY_B64")
+            .orElse("").get()
+        buildConfigField("String", "LICENSE_PUBLIC_KEY_B64", "\"" + issuerPublicKey + "\"")
         minSdk = 26
         targetSdk = 35
         versionCode = 2
