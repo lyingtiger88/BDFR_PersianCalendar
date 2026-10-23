@@ -91,7 +91,7 @@ internal sealed class IssuerForm : Form
                 throw new InvalidOperationException("Key files already exist. Select a different folder; existing keys will not be overwritten.");
             using var rsa = RSA.Create(3072);
             File.WriteAllText(privatePath, rsa.ExportPkcs8PrivateKeyPem());
-            File.WriteAllText(publicPath, rsa.ExportSubjectPublicKeyPem());
+            File.WriteAllText(publicPath, rsa.ExportSubjectPublicKeyInfoPem());
             keyFile.Text = privatePath;
             status.Text = "جفت‌کلید ایجاد شد. کلید عمومی را برای نسخه‌های مشتری تنظیم کنید.";
             MessageBox.Show(this, "Private key: " + privatePath + Environment.NewLine +
