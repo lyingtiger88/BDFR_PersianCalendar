@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import Network
 import SwiftUI
@@ -307,7 +308,7 @@ private final class CompanionTCPConnection {
 
     func connect() async throws {
         try await withCheckedThrowingContinuation {
-            continuation in
+            (continuation: CheckedContinuation<Void, Error>) in
 
             let lock = NSLock()
             var resumed = false
@@ -377,7 +378,7 @@ private final class CompanionTCPConnection {
         }
 
         try await withCheckedThrowingContinuation {
-            continuation in
+            (continuation: CheckedContinuation<Void, Error>) in
             connection.send(
                 content: payload,
                 completion:
@@ -550,16 +551,83 @@ enum CompanionWireIOS {
     static let encoder: JSONEncoder = {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy =
-            .iso8601
+            .custom {
+                date,
+                encoder in
+                var container =
+                    encoder.singleValueContainer()
+                try container.encode(
+                    iso8601String(date)
+                )
+            }
         return encoder
     }()
 
     static let decoder: JSONDecoder = {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy =
-            .iso8601
+            .custom {
+                decoder in
+                let container =
+                    try decoder
+                        .singleValueContainer()
+                let value =
+                    try container
+                        .decode(String.self)
+
+                guard let date =
+                        parseIso8601(value) else {
+                    throw DecodingError
+                        .dataCorruptedError(
+                            in: container,
+                            debugDescription:
+                                "Invalid ISO8601 date: \(value)"
+                        )
+                }
+
+                return date
+            }
         return decoder
     }()
+
+    private static let fractionalFormatter:
+        ISO8601DateFormatter = {
+            let formatter =
+                ISO8601DateFormatter()
+            formatter.formatOptions = [
+                .withInternetDateTime,
+                .withFractionalSeconds
+            ]
+            return formatter
+        }()
+
+    private static let basicFormatter:
+        ISO8601DateFormatter = {
+            let formatter =
+                ISO8601DateFormatter()
+            formatter.formatOptions = [
+                .withInternetDateTime
+            ]
+            return formatter
+        }()
+
+    private static func parseIso8601(
+        _ value: String
+    ) -> Date? {
+        fractionalFormatter.date(
+            from: value
+        ) ?? basicFormatter.date(
+            from: value
+        )
+    }
+
+    private static func iso8601String(
+        _ date: Date
+    ) -> String {
+        fractionalFormatter.string(
+            from: date
+        )
+    }
 
     static func encode<T: Encodable>(
         _ value: T
