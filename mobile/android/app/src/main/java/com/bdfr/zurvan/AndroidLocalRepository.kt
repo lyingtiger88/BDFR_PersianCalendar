@@ -27,6 +27,10 @@ class AndroidLocalRepository(
     val reminders: StateFlow<List<LocalReminder>> =
         _reminders.asStateFlow()
 
+    private val _notes = MutableStateFlow(loadNotes())
+    val notes: StateFlow<List<LocalDayNote>> =
+        _notes.asStateFlow()
+
     private val _uiPreferences = MutableStateFlow(loadUiPreferences())
     val uiPreferences: StateFlow<AndroidUiPreferences> =
         _uiPreferences.asStateFlow()
@@ -91,6 +95,28 @@ class AndroidLocalRepository(
         saveOccasions(
             _occasions.value.filterNot { it.id == id }
         )
+    }
+
+    fun saveNote(
+        dateKey: String,
+        text: String,
+        isPrivate: Boolean
+    ) {
+        val next = _notes.value
+            .filterNot { it.dateKey == dateKey }
+            .toMutableList()
+
+        if (text.isNotBlank()) {
+            next.add(
+                LocalDayNote(
+                    dateKey = dateKey,
+                    text = text.trim(),
+                    isPrivate = isPrivate
+                )
+            )
+        }
+
+        saveNotes(next)
     }
 
     fun addReminder(
@@ -251,6 +277,34 @@ class AndroidLocalRepository(
             )
         }
 
+    private fun saveNotes(
+        value: List<LocalDayNote>
+    ) {
+        _notes.value = value
+        val json = JSONArray()
+        value.forEach { item ->
+            json.put(
+                JSONObject()
+                    .put("dateKey", item.dateKey)
+                    .put("text", item.text)
+                    .put("private", item.isPrivate)
+            )
+        }
+
+        preferences.edit()
+            .putString(KEY_NOTES, json.toString())
+            .apply()
+    }
+
+    private fun loadNotes(): List<LocalDayNote> =
+        parseArray(KEY_NOTES) { item ->
+            LocalDayNote(
+                dateKey = item.getString("dateKey"),
+                text = item.optString("text", ""),
+                isPrivate = item.optBoolean("private", false)
+            )
+        }
+
     private fun saveReminders(
         value: List<LocalReminder>
     ) {
@@ -377,6 +431,7 @@ class AndroidLocalRepository(
         private const val KEY_PLANS = "plans"
         private const val KEY_OCCASIONS = "occasions"
         private const val KEY_REMINDERS = "reminders"
+        private const val KEY_NOTES = "notes"
         private const val KEY_CALENDAR_ORDER =
             "calendar_order"
         private const val KEY_CORNER_RADIUS =
