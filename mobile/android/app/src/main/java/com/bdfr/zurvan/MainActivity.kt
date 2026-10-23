@@ -201,6 +201,8 @@ private fun ZurvanMobileShell(
             ) { padding ->
                 ZurvanDestination(
                     tab = selected,
+                    licensed = licensed,
+                    onActivated = { licenseRevision++ },
                     appViewModel = appViewModel,
                     deskViewModel = deskViewModel,
                     modifier = Modifier.padding(padding)
