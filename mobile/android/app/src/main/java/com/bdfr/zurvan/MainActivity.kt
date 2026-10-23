@@ -1857,7 +1857,7 @@ private fun CompanionScreen(
                         )
                 ) {
                     Text(
-                        "جفت‌سازی شبیه SHAREit",
+                        "اتصال به نرم افزار همراه (دسکتاپ - موبایل)",
                         style =
                             MaterialTheme
                                 .typography
@@ -2250,6 +2250,7 @@ private fun SettingsScreen(
     val context = LocalContext.current
     val wallpaperPath = ZurvanThemes.wallpaper.current
     val setWallpaper = ZurvanThemes.setWallpaper.current
+    var pickingColorFor by remember { mutableStateOf<String?>(null) }
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
             runCatching {
@@ -2260,6 +2261,39 @@ private fun SettingsScreen(
                 setWallpaper(target.absolutePath)
             }
         }
+    }
+
+    pickingColorFor?.let { colorKey ->
+        var red by remember(colorKey) { mutableFloatStateOf(0.3f) }
+        var green by remember(colorKey) { mutableFloatStateOf(0.6f) }
+        var blue by remember(colorKey) { mutableFloatStateOf(0.8f) }
+        AlertDialog(
+            onDismissRequest = { pickingColorFor = null },
+            title = { Text("انتخاب رنگ") },
+            text = {
+                Column {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
+                        color = Color(red, green, blue)
+                    ) {}
+                    Text("قرمز")
+                    Slider(value = red, onValueChange = { red = it })
+                    Text("سبز")
+                    Slider(value = green, onValueChange = { green = it })
+                    Text("آبی")
+                    Slider(value = blue, onValueChange = { blue = it })
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val hex = String.format(java.util.Locale.US, "#%02X%02X%02X",
+                        (red * 255).toInt(), (green * 255).toInt(), (blue * 255).toInt())
+                    setColorOverride(colorKey, hex)
+                    pickingColorFor = null
+                }) { Text("اعمال") }
+            },
+            dismissButton = { TextButton(onClick = { pickingColorFor = null }) { Text("انصراف") } }
+        )
     }
 
     LazyColumn(
@@ -2309,6 +2343,9 @@ private fun SettingsScreen(
                                 singleLine = true,
                                 label = { Text("#RRGGBB") }
                             )
+                            TextButton(onClick = { pickingColorFor = key }) {
+                                Text("پالت")
+                            }
                             TextButton(onClick = { setColorOverride(key, null) }) {
                                 Text("پیش‌فرض")
                             }
