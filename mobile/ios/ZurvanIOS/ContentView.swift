@@ -141,7 +141,7 @@ private struct CompanionShellView: View {
                     spacing: 10
                 ) {
                     Text(
-                        "جفت‌سازی امن شبیه SHAREit"
+                        "اتصال به نرم افزار همراه (دسکتاپ - موبایل)"
                     )
                     .font(.headline)
 
