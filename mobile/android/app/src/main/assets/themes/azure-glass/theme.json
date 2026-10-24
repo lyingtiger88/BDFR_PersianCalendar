@@ -1,0 +1,21 @@
+{
+  "id": "azure-glass",
+  "displayName": "Azure Glass",
+  "windowBackground": "#FFEAF3FB",
+  "panelBackground": "#CCF5FAFF",
+  "cardBackground": "#BFEAF4FF",
+  "primaryText": "#FF17324D",
+  "secondaryText": "#FF5D7287",
+  "accent": "#FF8FC4F2",
+  "selectedDay": "#FF5DA9E8",
+  "holidayText": "#FFD25162",
+  "weekdayColors": [
+    "#FFDCEEFF",
+    "#FFD8EBFD",
+    "#FFDCEEFF",
+    "#FFD8EBFD",
+    "#FFDCEEFF",
+    "#FFD8EBFD",
+    "#FFF4DEE4"
+  ]
+}

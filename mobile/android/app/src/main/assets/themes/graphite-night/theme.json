@@ -1,0 +1,21 @@
+{
+  "id": "graphite-night",
+  "displayName": "Graphite Night",
+  "windowBackground": "#FF171A1F",
+  "panelBackground": "#E622262D",
+  "cardBackground": "#E02A2F37",
+  "primaryText": "#FFF1F5F9",
+  "secondaryText": "#FFA7B0BE",
+  "accent": "#FF4E596A",
+  "selectedDay": "#FF586D88",
+  "holidayText": "#FFFF7A86",
+  "weekdayColors": [
+    "#FF2B313A",
+    "#FF2D333C",
+    "#FF2B313A",
+    "#FF2D333C",
+    "#FF2B313A",
+    "#FF2D333C",
+    "#FF3A2D31"
+  ]
+}
