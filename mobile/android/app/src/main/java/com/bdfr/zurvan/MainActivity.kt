@@ -2433,31 +2433,50 @@ private fun SettingsScreen(
             }
         }
         item {
-            SettingsCard(title = "فعال‌سازی زروان") {
-                val deviceCode = remember { ZurvanActivation.deviceCode(context) }
-                var enteredCode by remember { mutableStateOf("") }
-                var status by remember { mutableStateOf("کد دستگاه را به صادرکننده لایسنس ارائه کنید.") }
-                Text("کد دستگاه: " + deviceCode)
-                TextButton(onClick = {
-                    (context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager)
-                        .setPrimaryClip(android.content.ClipData.newPlainText("Zurvan device code", deviceCode))
-                }) { Text("کپی کد دستگاه") }
-                OutlinedTextField(
-                    value = enteredCode,
-                    onValueChange = { enteredCode = it.take(8192) },
-                    label = { Text("کد فعال‌سازی") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Button(onClick = {
-                    if (ZurvanActivation.diagnose(context, enteredCode.trim()) == ZurvanActivation.Result.VALID) {
+            SettingsCard(title = "وضعیت لایسنس زروان") {
+                var activatedCode by remember {
+                    mutableStateOf(
                         context.getSharedPreferences("zurvan_license", Context.MODE_PRIVATE)
-                            .edit().putString("activation_code", enteredCode.trim()).apply()
-                        status = "لایسنس معتبر است."
-                    } else {
-                        status = ZurvanActivation.explanation(ZurvanActivation.diagnose(context, enteredCode.trim()))
+                            .getString("activation_code", null)
+                    )
+                }
+                val active = activatedCode?.let { ZurvanActivation.validate(context, it) } == true
+                if (active) {
+                    val ownerName = when (activatedCode?.trim()) {
+                        "elena13731005" -> "محبوب زیبای من ❤️❤️❤️"
+                        "zarasamtestmode" -> "ارزشمندترین دوست 😁🤔😍"
+                        else -> "دارنده لایسنس معتبر زروان"
                     }
-                }) { Text("بررسی و فعال‌سازی") }
-                Text(status, style = MaterialTheme.typography.bodySmall)
+                    Text("ثبت شده به نام : $ownerName")
+                    Text("لایسنس فعال است.", style = MaterialTheme.typography.bodySmall)
+                } else {
+                    val deviceCode = remember { ZurvanActivation.deviceCode(context) }
+                    var enteredCode by remember { mutableStateOf("") }
+                    var status by remember { mutableStateOf("کد دستگاه را به صادرکننده لایسنس ارائه کنید.") }
+                    Text("کد دستگاه: " + deviceCode)
+                    TextButton(onClick = {
+                        (context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager)
+                            .setPrimaryClip(android.content.ClipData.newPlainText("Zurvan device code", deviceCode))
+                    }) { Text("کپی کد دستگاه") }
+                    OutlinedTextField(
+                        value = enteredCode,
+                        onValueChange = { enteredCode = it.take(8192) },
+                        label = { Text("کد فعال‌سازی") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Button(onClick = {
+                        val code = enteredCode.trim()
+                        if (ZurvanActivation.validate(context, code)) {
+                            context.getSharedPreferences("zurvan_license", Context.MODE_PRIVATE)
+                                .edit().putString("activation_code", code).apply()
+                            activatedCode = code
+                            status = "لایسنس معتبر است."
+                        } else {
+                            status = ZurvanActivation.explanation(ZurvanActivation.diagnose(context, code))
+                        }
+                    }) { Text("بررسی و فعال‌سازی") }
+                    Text(status, style = MaterialTheme.typography.bodySmall)
+                }
             }
         }
         item {
