@@ -791,9 +791,8 @@ private fun CalendarScreen(
                 addReminderDate =
                     day.persianKey
             },
-            onTogglePlan = {
-                viewModel.togglePlan(it)
-            },
+            onTogglePlan = { viewModel.togglePlan(it) },
+            onDeletePlan = { viewModel.deletePlan(it) },
             onAcknowledgeReminder = {
                 viewModel
                     .acknowledgeReminder(it)
@@ -1170,6 +1169,7 @@ private fun DayDetailsSheet(
     onAddPlan: () -> Unit,
     onAddReminder: () -> Unit,
     onTogglePlan: (String) -> Unit,
+    onDeletePlan: (String) -> Unit,
     onAcknowledgeReminder:
         (String) -> Unit
 ) {
@@ -1301,6 +1301,14 @@ private fun DayDetailsSheet(
                 }
             }
 
+            if (note != null) {
+                item {
+                    TextButton(onClick = {
+                        onSaveNote("", privateNote)
+                        onDismiss()
+                    }) { Text("حذف یادداشت", color = MaterialTheme.colorScheme.error) }
+                }
+            }
             item {
                 Button(
                     onClick = {
@@ -1435,6 +1443,11 @@ private fun DayDetailsSheet(
                                     item.minute
                                 )
                             )
+                        },
+                        trailingContent = {
+                            IconButton(onClick = { onDeletePlan(item.id) }) {
+                                Icon(Icons.Outlined.Delete, contentDescription = "حذف رویداد")
+                            }
                         },
                         leadingContent = {
                             Checkbox(
