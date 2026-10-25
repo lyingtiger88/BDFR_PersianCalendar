@@ -1389,6 +1389,24 @@ public sealed partial class MainWindow : Window
         _settingsPanel.Padding = new Thickness(10);
         _settingsPanel.Visibility = Visibility.Collapsed;
 
+        // Reuse the existing tested time.ir year sync workflow from Settings.
+        _settingsPanel.Children.Add(new TextBlock
+        {
+            Text = "به‌روزرسانی پایگاه داده مناسبت‌های سالانه",
+            FontSize = 15,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Foreground = ThemeService.Brush(_theme.PrimaryText)
+        });
+        var updateOccasionsButton = MakeButton("🔄 دریافت مناسبت‌های سال جاری از time.ir");
+        updateOccasionsButton.Click += Sync_Click;
+        _settingsPanel.Children.Add(updateOccasionsButton);
+        _settingsPanel.Children.Add(new TextBlock
+        {
+            Text = "اطلاعات سال انتخابی دوباره دریافت و بررسی می‌شود؛ در صورت خطا، داده‌های محلی حفظ خواهند شد.",
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = ThemeService.Brush(_theme.SecondaryText)
+        });
+
         var isElena = string.Equals(
             _settings.AppearanceMode,
             "elena",
