@@ -219,7 +219,20 @@ fun ZurvanTeamPlanner(
                         status = "گروه در این دستگاه ذخیره شد."
                     }
                 }) { Text(if (store.get("group_name").isBlank()) "ساخت گروه" else "ذخیره نام گروه") }
-                Text("مدیر گروه: ${profileName.ifBlank { "پروفایل من" }}", fontWeight = FontWeight.SemiBold)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    if (avatar != null) {
+                        Image(avatar, contentDescription = "عکس مدیر گروه", contentScale = ContentScale.Crop,
+                            modifier = Modifier.size(52.dp).clip(CircleShape))
+                    } else {
+                        Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
+                            Text("👤", modifier = Modifier.padding(12.dp))
+                        }
+                    }
+                    Column {
+                        Text("مدیر گروه: ${profileName.ifBlank { "پروفایل من" }}", fontWeight = FontWeight.SemiBold)
+                        Text(profileId.ifBlank { "شناسه هنوز ثبت نشده" }, style = MaterialTheme.typography.labelSmall)
+                    }
+                }
                 OutlinedTextField(newMember, { newMember = it }, label = { Text("شناسه کاربری عضو") }, modifier = Modifier.fillMaxWidth())
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf("عضو", "دستیار مدیر").forEach { role ->
@@ -239,6 +252,11 @@ fun ZurvanTeamPlanner(
                 }) { Text("افزودن با شناسه کاربری") }
                 members.forEach { (id, role) ->
                     ListItem(headlineContent = { Text(id) }, supportingContent = { Text(role) },
+                        leadingContent = {
+                            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer) {
+                                Text(id.take(1).uppercase(), modifier = Modifier.padding(12.dp))
+                            }
+                        },
                         trailingContent = {
                             TextButton(onClick = {
                                 members = members.filterNot { it.first == id }
