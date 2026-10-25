@@ -939,7 +939,7 @@ private fun CalendarDayCard(
                 fontWeight =
                     FontWeight.Bold,
                 color = if (
-                    day.isFriday
+                    isHoliday
                 ) {
                     MaterialTheme
                         .colorScheme
@@ -977,11 +977,11 @@ private fun CalendarDayCard(
 
             if (isMourning) {
                 Text(
-                    text = "◢",
+                    text = "◤",
                     color = Color.Black,
                     style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.align(Alignment.TopStart),
-                    // Small black corner ribbon, distinct from holiday red text.
+                    modifier = Modifier.align(androidx.compose.ui.AbsoluteAlignment.TopLeft),
+                    // Physical top-left: independent of RTL layout direction.
                 )
             }
 
