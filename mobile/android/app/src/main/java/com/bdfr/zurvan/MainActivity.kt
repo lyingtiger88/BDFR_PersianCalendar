@@ -3632,7 +3632,7 @@ private fun PlanDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    if (title.isNotBlank() && (!selfDestruct || kind != "event" || retentionDays.toIntOrNull() in 0..3650)) {
+                    if (title.isNotBlank() && (!selfDestruct || kind != "event" || (retentionDays.toIntOrNull()?.let { it in 0..3650 } == true))) {
                         onSave(
                             title,
                             dateKey(
