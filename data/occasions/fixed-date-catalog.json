@@ -1,0 +1,85 @@
+{
+  "schema": 1,
+  "version": "2026-10-26",
+  "description": "Fixed-date starter occasions only. Lunar and year-specific official dates require separately verified annual feeds.",
+  "entries": [
+    {
+      "calendar": "gregorian",
+      "month": 11,
+      "day": 14,
+      "title": "روز جهانی دیابت"
+    },
+    {
+      "calendar": "gregorian",
+      "month": 11,
+      "day": 10,
+      "title": "روز جهانی علم در خدمت صلح و توسعه"
+    },
+    {
+      "calendar": "gregorian",
+      "month": 3,
+      "day": 8,
+      "title": "روز جهانی زنان"
+    },
+    {
+      "calendar": "gregorian",
+      "month": 6,
+      "day": 5,
+      "title": "روز جهانی محیط زیست"
+    },
+    {
+      "calendar": "gregorian",
+      "month": 12,
+      "day": 10,
+      "title": "روز جهانی حقوق بشر"
+    },
+    {
+      "calendar": "persian",
+      "month": 1,
+      "day": 1,
+      "title": "عید نوروز · تعطیل رسمی"
+    },
+    {
+      "calendar": "persian",
+      "month": 1,
+      "day": 2,
+      "title": "عید نوروز · تعطیل رسمی"
+    },
+    {
+      "calendar": "persian",
+      "month": 1,
+      "day": 3,
+      "title": "عید نوروز · تعطیل رسمی"
+    },
+    {
+      "calendar": "persian",
+      "month": 1,
+      "day": 4,
+      "title": "عید نوروز · تعطیل رسمی"
+    },
+    {
+      "calendar": "persian",
+      "month": 1,
+      "day": 12,
+      "title": "روز جمهوری اسلامی ایران · تعطیل رسمی"
+    },
+    {
+      "calendar": "persian",
+      "month": 1,
+      "day": 13,
+      "title": "روز طبیعت · تعطیل رسمی"
+    },
+    {
+      "calendar": "persian",
+      "month": 11,
+      "day": 22,
+      "title": "سالگرد پیروزی انقلاب اسلامی · تعطیل رسمی"
+    },
+    {
+      "calendar": "persian",
+      "month": 12,
+      "day": 29,
+      "title": "روز ملی شدن صنعت نفت · تعطیل رسمی"
+    }
+  ]
+}
