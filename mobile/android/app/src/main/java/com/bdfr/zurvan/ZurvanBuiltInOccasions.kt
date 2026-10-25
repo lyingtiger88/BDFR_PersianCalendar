@@ -34,6 +34,20 @@ object ZurvanBuiltInOccasions {
                 entry.title, entry.calendar, entry.month, entry.day, 0, 0)
         }
         val userOccasions = custom.filter { occasion ->
+            // Recurrence follows its source calendar; avoid nonexistent leap dates.
+            val existsThisYear = when (occasion.calendar) {
+                CalendarPriority.GREGORIAN -> runCatching {
+                    java.time.LocalDate.of(day.gregorianYear, occasion.month, occasion.day)
+                }.isSuccess
+                CalendarPriority.PERSIAN -> {
+                    occasion.month in 1..12 && occasion.day in 1..31 &&
+                        (occasion.month != 12 || occasion.day <= 29 ||
+                            AndroidCalendarEngine.buildPersianMonth(day.persianYear, 12)
+                                .days.any { it.persianMonth == 12 && it.persianDay == 30 })
+                }
+                CalendarPriority.HIJRI -> occasion.month in 1..12 && occasion.day in 1..30
+            }
+            if (!occasion.annual || !existsThisYear) return@filter false
             when (occasion.calendar) {
                 CalendarPriority.PERSIAN -> occasion.month == day.persianMonth && occasion.day == day.persianDay
                 CalendarPriority.GREGORIAN -> occasion.month == day.gregorianMonth && occasion.day == day.gregorianDay
