@@ -28,8 +28,15 @@ object ZurvanThemes {
     val setActive = staticCompositionLocalOf<(String) -> Unit> { {} }
     val customColors = staticCompositionLocalOf<Map<String, String>> { emptyMap() }
     val setCustomColor = staticCompositionLocalOf<(String, String?) -> Unit> { { _, _ -> } }
+    val weekdayColors = staticCompositionLocalOf<List<Color>> { emptyList() }
+    val setWeekdayColor = staticCompositionLocalOf<(Int, String?) -> Unit> { { _, _ -> } }
     val wallpaper = staticCompositionLocalOf<String?> { null }
     val setWallpaper = staticCompositionLocalOf<(String?) -> Unit> { {} }
+
+    private val zaraWeekdays = listOf(
+        "#F8DDD4", "#FFF0C5", "#DFF0DD", "#D5EFED", "#DCE9FB", "#E8E0FA", "#F8DDE7"
+    )
+    private val neutralWeekdays = List(7) { "#FFFFFF" }
 
     @Composable
     fun Apply(context: Context, content: @Composable () -> Unit) {
@@ -40,6 +47,16 @@ object ZurvanThemes {
             mutableStateOf(listOf("background","surface","card","ink","accent","holiday").mapNotNull { key ->
                 prefs.getString("color.$selected.$key", null)?.let { key to it }
             }.toMap())
+        }
+        var dayOverrides by remember(selected) {
+            mutableStateOf((0..6).mapNotNull { index ->
+                prefs.getString("weekday.$selected.$index", null)?.let { index to it }
+            }.toMap())
+        }
+        val weekdayDefaults = if (selected == "zara-pastel") zaraWeekdays else neutralWeekdays
+        val weekdayPalette = (0..6).map { index ->
+            val hex = dayOverrides[index] ?: weekdayDefaults[index]
+            Color(android.graphics.Color.parseColor(hex))
         }
         fun color(key: String, fallback: Color): Color =
             overrides[key]?.let { runCatching { Color(android.graphics.Color.parseColor(it)) }.getOrNull() } ?: fallback
@@ -64,7 +81,20 @@ object ZurvanThemes {
             primary=color("accent",palette.accent), primaryContainer=color("accent",palette.accent),
             onPrimaryContainer=color("ink",palette.ink), error=color("holiday",palette.holiday)
         )
-        CompositionLocalProvider(customColors provides overrides,
+        CompositionLocalProvider(
+            weekdayColors provides weekdayPalette,
+            setWeekdayColor provides { index, value ->
+                if (index in 0..6 && (value == null || Regex("^#[0-9A-Fa-f]{6}$").matches(value))) {
+                    dayOverrides = dayOverrides.toMutableMap().apply {
+                        if (value == null) remove(index) else put(index, value)
+                    }
+                    prefs.edit().apply {
+                        if (value == null) remove("weekday.$selected.$index")
+                        else putString("weekday.$selected.$index", value)
+                    }.apply()
+                }
+            },
+            customColors provides overrides,
             setCustomColor provides { key, hex ->
                 val allowed = setOf("background","surface","card","ink","accent","holiday")
                 if (key in allowed && (hex == null || Regex("^#[0-9A-Fa-f]{6}$").matches(hex))) {
