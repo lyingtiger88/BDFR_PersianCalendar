@@ -12,6 +12,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -226,14 +227,39 @@ private fun ZurvanMobileShell(
                     }
                 }
             ) { padding ->
-                ZurvanDestination(
-                    tab = selected,
-                    licensed = licensed,
-                    onActivated = { licenseRevision++ },
-                    appViewModel = appViewModel,
-                    deskViewModel = deskViewModel,
-                    modifier = Modifier.padding(padding)
-                )
+                var horizontalDistance by remember { mutableFloatStateOf(0f) }
+                Box(
+                    modifier = Modifier
+                        .padding(padding)
+                        .fillMaxSize()
+                        .pointerInput(selected, licensed) {
+                            androidx.compose.foundation.gestures.detectHorizontalDragGestures(
+                                onDragStart = { horizontalDistance = 0f },
+                                onHorizontalDrag = { _, amount -> horizontalDistance += amount },
+                                onDragCancel = { horizontalDistance = 0f },
+                                onDragEnd = {
+                                    if (kotlin.math.abs(horizontalDistance) > 90f) {
+                                        val allowed = ZurvanTab.entries.filter {
+                                            licensed || it == ZurvanTab.Calendar || it == ZurvanTab.Settings
+                                        }
+                                        val current = allowed.indexOf(selected).coerceAtLeast(0)
+                                        val change = if (horizontalDistance < 0) 1 else -1
+                                        selected = allowed[(current + change).coerceIn(0, allowed.lastIndex)]
+                                    }
+                                    horizontalDistance = 0f
+                                }
+                            )
+                        }
+                ) {
+                    ZurvanDestination(
+                        tab = selected,
+                        licensed = licensed,
+                        onActivated = { licenseRevision++ },
+                        appViewModel = appViewModel,
+                        deskViewModel = deskViewModel,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
             }
         }
     }
