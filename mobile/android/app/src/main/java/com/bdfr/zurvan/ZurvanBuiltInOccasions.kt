@@ -27,6 +27,17 @@ object ZurvanBuiltInOccasions {
         Record(CalendarPriority.PERSIAN, 12, 29, "روز ملی شدن صنعت نفت · تعطیل رسمی")
     )
 
+    fun validAnnualDate(calendar: CalendarPriority, month: Int, day: Int): Boolean {
+        if (month !in 1..12 || day !in 1..31) return false
+        return when (calendar) {
+            CalendarPriority.PERSIAN ->
+                day <= if (month <= 6) 31 else if (month <= 11) 30 else 30
+            CalendarPriority.GREGORIAN ->
+                runCatching { java.time.LocalDate.of(2024, month, day) }.isSuccess
+            CalendarPriority.HIJRI -> day <= 30
+        }
+    }
+
     fun onDay(day: CalendarDayCell, custom: List<LocalOccasion>): List<LocalOccasion> {
         val base = downloaded ?: entries.mapIndexed { index, entry ->
             LocalOccasion("builtin-${entry.calendar.key}-${entry.month}-${entry.day}-$index",
