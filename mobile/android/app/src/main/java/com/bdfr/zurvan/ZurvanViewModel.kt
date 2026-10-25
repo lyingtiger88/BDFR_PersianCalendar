@@ -43,7 +43,8 @@ class ZurvanViewModel(
         minute: Int,
         kind: String,
         isPrivate: Boolean,
-        icon: String = "📌"
+        icon: String = "📌",
+        deleteAfterDays: Int? = null
     ) = repository.addPlan(
         title,
         dateKey,
@@ -51,8 +52,11 @@ class ZurvanViewModel(
         minute,
         kind,
         isPrivate,
-        icon
+        icon,
+        deleteAfterDays
     )
+
+    fun purgeExpiredPlans() = repository.purgeExpiredPlans()
 
     fun togglePlan(id: String) =
         repository.togglePlan(id)
