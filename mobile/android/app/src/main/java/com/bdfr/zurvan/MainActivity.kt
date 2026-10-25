@@ -173,7 +173,7 @@ private fun ZurvanMobileShell(
                     topBar = {
                         TopAppBar(
                             title = {
-                                Text("Zurvan | زروان")
+                                ZurvanSecretTitle()
                             }
                         )
                     }
@@ -201,7 +201,7 @@ private fun ZurvanMobileShell(
                 topBar = {
                     TopAppBar(
                         title = {
-                            Text("Zurvan | زروان")
+                            ZurvanSecretTitle()
                         }
                     )
                 },
