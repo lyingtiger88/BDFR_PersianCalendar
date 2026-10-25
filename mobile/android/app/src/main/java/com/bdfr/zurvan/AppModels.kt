@@ -15,7 +15,8 @@ data class LocalPlan(
     val kind: String,
     val isPrivate: Boolean,
     val completed: Boolean = false,
-    val icon: String = "📌"
+    val icon: String = "📌",
+    val deleteAfterDays: Int? = null
 )
 
 data class LocalOccasion(
