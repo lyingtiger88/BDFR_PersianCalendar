@@ -14,7 +14,8 @@ data class LocalPlan(
     val minute: Int,
     val kind: String,
     val isPrivate: Boolean,
-    val completed: Boolean = false
+    val completed: Boolean = false,
+    val icon: String = "📌"
 )
 
 data class LocalOccasion(
