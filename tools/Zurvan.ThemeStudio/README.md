@@ -4,7 +4,7 @@ A standalone Windows Forms GUI for authoring Android Zurvan color palettes.
 
 ## Run locally
 
-Requires .NET 10 SDK on Windows.
+Requires .NET 9 SDK on Windows.
 
 ```powershell
 dotnet run --project tools/Zurvan.ThemeStudio/Zurvan.ThemeStudio.csproj
