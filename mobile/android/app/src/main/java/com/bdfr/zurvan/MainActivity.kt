@@ -809,14 +809,16 @@ private fun CalendarScreen(
                     hour,
                     minute,
                     kind,
-                    isPrivate ->
+                    isPrivate,
+                    icon ->
                 viewModel.addPlan(
                     title,
                     finalDateKey,
                     hour,
                     minute,
                     kind,
-                    isPrivate
+                    isPrivate,
+                    icon
                 )
                 addPlanDate = null
             }
@@ -1536,14 +1538,16 @@ private fun PlansScreen(
                     hour,
                     minute,
                     kind,
-                    isPrivate ->
+                    isPrivate,
+                    icon ->
                 viewModel.addPlan(
                     title,
                     dateKey,
                     hour,
                     minute,
                     kind,
-                    isPrivate
+                    isPrivate,
+                    icon
                 )
                 showDialog = false
             }
@@ -3426,7 +3430,8 @@ private fun PlanDialog(
         Int,
         Int,
         String,
-        Boolean
+        Boolean,
+        String
     ) -> Unit
 ) {
     val initialParts =
@@ -3476,6 +3481,8 @@ private fun PlanDialog(
     var isPrivate by remember {
         mutableStateOf(false)
     }
+    val iconOptions = listOf("📌","📚","🎓","💼","🏥","🏃","🎨","🎵","🎉","📝","💻","🏠","✈️","⚽","🛒","💊")
+    var chosenIcon by remember { mutableStateOf("📌") }
 
     AlertDialog(
         onDismissRequest =
@@ -3559,6 +3566,14 @@ private fun PlanDialog(
                     )
                 }
 
+                Text("نماد برنامه روی کارت روز")
+                androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                    items(iconOptions) { symbol ->
+                        FilterChip(selected = chosenIcon == symbol,
+                            onClick = { chosenIcon = symbol }, label = { Text(symbol) })
+                    }
+                }
+
                 Row(
                     verticalAlignment =
                         Alignment.CenterVertically
@@ -3600,7 +3615,8 @@ private fun PlanDialog(
                                 )
                                 ?: 0,
                             kind,
-                            isPrivate
+                            isPrivate,
+                            chosenIcon
                         )
                     }
                 }
