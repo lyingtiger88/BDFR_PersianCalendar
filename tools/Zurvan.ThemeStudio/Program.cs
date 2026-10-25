@@ -23,6 +23,13 @@ internal sealed class ThemeFile
     public string Name { get; set; } = "تم اختصاصی";
     public string ThemeId { get; set; } = "windows-light";
     public Dictionary<string, string> Colors { get; set; } = new();
+    public ThemeWallpaper? Wallpaper { get; set; };
+}
+
+internal sealed class ThemeWallpaper
+{
+    public string File { get; set; } = "wallpaper.jpg";
+    public string Fit { get; set; } = "cover";
 }
 
 internal sealed class Studio : Form
@@ -51,6 +58,8 @@ internal sealed class Studio : Form
     private readonly Label hex = new() { AutoSize = true, Font = new Font("Consolas", 12, FontStyle.Bold) };
     private readonly Panel preview = new() { Dock = DockStyle.Fill, BackColor = Color.White };
     private string selected = "accent";
+    private string? wallpaperFile;
+    private readonly Label wallpaperLabel = new() { AutoSize = true, Text = "بدون تصویر اختصاصی" };
     private readonly JsonSerializerOptions jsonOptions = new() { WriteIndented = true, PropertyNamingPolicy = JsonNamingPolicy.CamelCase, PropertyNameCaseInsensitive = true };
 
     public Studio()
@@ -93,10 +102,13 @@ internal sealed class Studio : Form
             row.Controls.Add(swatch, 1, 0);
             Add(editor, row, 45);
         }
+        Add(editor, new Label { Text = "تصویر اختصاصی تم", Font = new Font("Segoe UI", 11, FontStyle.Bold) }, 30);
+        Add(editor, wallpaperLabel, 35);
+        Add(editor, MakeButton("انتخاب تصویر", ChooseWallpaper), 45);
+        Add(editor, MakeButton("حذف تصویر تم", () => { wallpaperFile = null; wallpaperLabel.Text = "بدون تصویر اختصاصی"; preview.Invalidate(); }), 45);
         Add(editor, selectedLabel, 35);
         Add(editor, hex, 35);
-        Add(editor, MakeButton("خروجی JSON", () => Export(false)), 45);
-        Add(editor, MakeButton("خروجی ZIP (شامل theme.json)", () => Export(true)), 45);
+        Add(editor, MakeButton("خروجی هوشمند JSON / ZIP", Export), 45);
         Add(editor, MakeButton("باز کردن تم از JSON یا ZIP", Import), 45);
         Add(editor, MakeButton("بازنشانی رنگ‌ها", Reset), 45);
         Add(editor, new Label { Text = "خروجی با کلیدهای واقعی تم اندروید زروان سازگار است. فایل را برای اعمال در نسخه بعدی ارسال کنید.", ForeColor = Color.DimGray, Dock = DockStyle.Fill, AutoSize = true }, 64);
@@ -158,15 +170,31 @@ internal sealed class Studio : Form
         Colors = Fields.ToDictionary(x => x.Key, x => $"#{colors[x.Key].R:X2}{colors[x.Key].G:X2}{colors[x.Key].B:X2}")
     };
 
-    private void Export(bool zip)
+    private void ChooseWallpaper()
     {
+        using var dialog = new OpenFileDialog { Filter = "Images (*.jpg;*.jpeg;*.png;*.webp)|*.jpg;*.jpeg;*.png;*.webp" };
+        if (dialog.ShowDialog(this) != DialogResult.OK) return;
+        if (new FileInfo(dialog.FileName).Length > 12_000_000) {
+            MessageBox.Show(this, "حداکثر حجم تصویر ۱۲ مگابایت است."); return;
+        }
+        wallpaperFile = dialog.FileName;
+        wallpaperLabel.Text = Path.GetFileName(wallpaperFile);
+        preview.Invalidate();
+    }
+
+    private void Export()
+    {
+        var zip = wallpaperFile != null;
         if (string.IsNullOrWhiteSpace(themeName.Text)) { MessageBox.Show(this, "نام تم را وارد کنید."); return; }
         using var dialog = new SaveFileDialog {
             Filter = zip ? "Zurvan theme ZIP (*.zip)|*.zip" : "Zurvan theme JSON (*.json)|*.json",
             FileName = zip ? "zurvan-theme.zip" : "zurvan-theme.json"
         };
         if (dialog.ShowDialog(this) != DialogResult.OK) return;
-        var data = JsonSerializer.Serialize(Snapshot(), jsonOptions);
+        var snapshot = Snapshot();
+        var wallpaperName = wallpaperFile == null ? null : "wallpaper" + Path.GetExtension(wallpaperFile).ToLowerInvariant();
+        snapshot.Wallpaper = wallpaperName == null ? null : new ThemeWallpaper { File = wallpaperName };
+        var data = JsonSerializer.Serialize(snapshot, jsonOptions);
         try {
             if (!zip) File.WriteAllText(dialog.FileName, data);
             else {
@@ -175,6 +203,9 @@ internal sealed class Studio : Form
                 var entry = archive.CreateEntry("theme.json");
                 using var writer = new StreamWriter(entry.Open());
                 writer.Write(data);
+                writer.Flush();
+                if (wallpaperFile != null && wallpaperName != null)
+                    archive.CreateEntryFromFile(wallpaperFile, wallpaperName, CompressionLevel.Optimal);
             }
             MessageBox.Show(this, "فایل تم با موفقیت ذخیره شد.", "زروان");
         }
