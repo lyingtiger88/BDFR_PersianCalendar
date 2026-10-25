@@ -103,6 +103,9 @@ class AndroidLocalRepository(
         hour: Int,
         minute: Int
     ) {
+        require(ZurvanBuiltInOccasions.validAnnualDate(calendar, month, day)) {
+            "تاریخ مناسبت سالانه در تقویم انتخابی نامعتبر است"
+        }
         val next = _occasions.value + LocalOccasion(
             id = "occasion_${UUID.randomUUID()}",
             title = title.trim(),
