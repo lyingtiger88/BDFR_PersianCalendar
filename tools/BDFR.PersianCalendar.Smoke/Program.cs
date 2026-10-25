@@ -26,6 +26,13 @@ if (recurring.Recurrence != RecurrenceKind.Weekly ||
         $"QuickAdd recurrence failed. Recurrence={recurring.Recurrence}, Title=[{recurring.Title}]");
 }
 
+// A leap-day annual event must not silently move to 29 Esfand.
+var leapBirthday = new PersianDate(1399, 12, 30);
+if (RecurrenceEngine.OccursOn(leapBirthday, RecurrenceKind.Yearly, new PersianDate(1400, 12, 29)) ||
+    !RecurrenceEngine.OccursOn(leapBirthday, RecurrenceKind.Yearly, new PersianDate(1403, 12, 30)) ||
+    !RecurrenceEngine.OccursOn(new PersianDate(1400, 1, 1), RecurrenceKind.Yearly, new PersianDate(1405, 1, 1)))
+    throw new Exception("Yearly recurrence/leap-day matching failed.");
+
 var grid = MonthGridBuilder.Build(1405, 7, new PersianDate(1405, 7, 14));
 if (grid.Count != 42 || grid.Count(x => x.IsToday) != 1)
     throw new Exception("Month grid failed.");
