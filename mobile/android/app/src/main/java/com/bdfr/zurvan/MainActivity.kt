@@ -54,6 +54,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        ZurvanBuiltInOccasions.reload(this)
         ZurvanPlanExpirySchedule.register(this)
 
         if (
@@ -2403,6 +2404,9 @@ private fun SettingsScreen(
     var pickingColorFor by remember { mutableStateOf<String?>(null) }
     val refreshAppearance = ZurvanThemes.refreshAppearance.current
     var themeImportMessage by remember { mutableStateOf("") }
+    val databaseScope = rememberCoroutineScope()
+    var databaseStatus by remember { mutableStateOf("") }
+    var databaseBusy by remember { mutableStateOf(false) }
     val themePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             runCatching { ZurvanThemeImporter.import(context, uri) }
@@ -2475,6 +2479,27 @@ private fun SettingsScreen(
                         }
                     }
                 }
+            }
+        }
+        item {
+            SettingsCard(title = "به‌روزرسانی پایگاه داده") {
+                Text("نسخه فعلی: " + ZurvanOccasionDatabase.version(context))
+                Text("این گزینه مناسبت‌های تاریخ ثابت را دریافت می‌کند؛ مناسبت‌های قمری سالانه باید جداگانه اعتبارسنجی شوند.")
+                Button(enabled = !databaseBusy, onClick = {
+                    databaseBusy = true
+                    databaseScope.launch {
+                        runCatching { ZurvanOccasionDatabase.update(context) }
+                            .onSuccess { result ->
+                                ZurvanBuiltInOccasions.reload(context)
+                                databaseStatus = "دریافت شد: ${result.count} مناسبت، نسخه ${result.version}. صفحه تقویم را دوباره باز کنید."
+                            }
+                            .onFailure { error ->
+                                databaseStatus = "به‌روزرسانی ناموفق بود؛ اطلاعات قبلی حفظ شد: " + (error.message ?: "")
+                            }
+                        databaseBusy = false
+                    }
+                }) { Text(if (databaseBusy) "در حال بررسی..." else "به‌روزرسانی مناسبت‌ها") }
+                if (databaseStatus.isNotBlank()) Text(databaseStatus)
             }
         }
         item {
