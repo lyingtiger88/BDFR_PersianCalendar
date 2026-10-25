@@ -70,6 +70,7 @@ class MainActivity : ComponentActivity() {
             ZurvanThemes.Apply(this@MainActivity) {
                 val appViewModel: ZurvanViewModel = viewModel()
                 val deskViewModel: ZurvanDeskViewModel = viewModel()
+                LaunchedEffect(Unit) { appViewModel.purgeExpiredPlans() }
 
                 ZurvanMobileShell(
                     appViewModel = appViewModel,
@@ -811,7 +812,8 @@ private fun CalendarScreen(
                     minute,
                     kind,
                     isPrivate,
-                    icon ->
+                    icon,
+                    deleteAfterDays ->
                 viewModel.addPlan(
                     title,
                     finalDateKey,
@@ -819,7 +821,8 @@ private fun CalendarScreen(
                     minute,
                     kind,
                     isPrivate,
-                    icon
+                    icon,
+                    deleteAfterDays
                 )
                 addPlanDate = null
             }
@@ -1554,7 +1557,8 @@ private fun PlansScreen(
                     minute,
                     kind,
                     isPrivate,
-                    icon ->
+                    icon,
+                    deleteAfterDays ->
                 viewModel.addPlan(
                     title,
                     dateKey,
@@ -1562,7 +1566,8 @@ private fun PlansScreen(
                     minute,
                     kind,
                     isPrivate,
-                    icon
+                    icon,
+                    deleteAfterDays
                 )
                 showDialog = false
             }
@@ -3446,7 +3451,8 @@ private fun PlanDialog(
         Int,
         String,
         Boolean,
-        String
+        String,
+        Int?
     ) -> Unit
 ) {
     val initialParts =
@@ -3498,6 +3504,8 @@ private fun PlanDialog(
     }
     val iconOptions = listOf("📌","📚","🎓","💼","🏥","🏃","🎨","🎵","🎉","📝","💻","🏠","✈️","⚽","🛒","💊")
     var chosenIcon by remember { mutableStateOf("📌") }
+    var selfDestruct by remember { mutableStateOf(false) }
+    var retentionDays by remember { mutableStateOf("7") }
 
     AlertDialog(
         onDismissRequest =
@@ -3581,6 +3589,23 @@ private fun PlanDialog(
                     )
                 }
 
+                if (kind == "event") {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = selfDestruct, onCheckedChange = { selfDestruct = it })
+                        Text("حذف خودکار پس از رویداد")
+                    }
+                    if (selfDestruct) {
+                        OutlinedTextField(
+                            value = retentionDays,
+                            onValueChange = { value -> retentionDays = value.filter(Char::isDigit).take(4) },
+                            label = { Text("چند روز پس از زمان رویداد حذف شود؟ (۰ تا ۳۶۵۰)") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+                        Text("با پایان مهلت، هنگام اجرای برنامه، رویداد از حافظه محلی حذف می‌شود.",
+                            style = MaterialTheme.typography.bodySmall)
+                    }
+                }
                 Text("نماد برنامه روی کارت روز")
                 androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                     items(iconOptions) { symbol ->
@@ -3607,7 +3632,7 @@ private fun PlanDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    if (title.isNotBlank()) {
+                    if (title.isNotBlank() && (!selfDestruct || kind != "event" || retentionDays.toIntOrNull() in 0..3650)) {
                         onSave(
                             title,
                             dateKey(
@@ -3631,7 +3656,8 @@ private fun PlanDialog(
                                 ?: 0,
                             kind,
                             isPrivate,
-                            chosenIcon
+                            chosenIcon,
+                            if (kind == "event" && selfDestruct) retentionDays.toIntOrNull() else null
                         )
                     }
                 }
