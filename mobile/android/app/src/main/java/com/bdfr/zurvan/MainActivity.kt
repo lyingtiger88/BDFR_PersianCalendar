@@ -844,6 +844,7 @@ private fun CalendarDayCard(
     hasContent: Boolean,
     onClick: () -> Unit
 ) {
+    val weekdayColors = ZurvanThemes.weekdayColors.current
     val order = if (
         calendarOrder.size == 3
     ) {
@@ -886,6 +887,10 @@ private fun CalendarDayCard(
             CardDefaults.cardColors(
                 containerColor =
                     if (day.isToday) {
+                        MaterialTheme.colorScheme.primaryContainer
+                    } else if (day.weekColumn in 0..6 && weekdayColors.size == 7) {
+                        weekdayColors[day.weekColumn]
+                    } else if (day.isToday) {
                         MaterialTheme
                             .colorScheme
                             .primaryContainer
@@ -2325,6 +2330,8 @@ private fun SettingsScreen(
     val setPalette = ZurvanThemes.setActive.current
     val colorOverrides = ZurvanThemes.customColors.current
     val setColorOverride = ZurvanThemes.setCustomColor.current
+    val weekdayColors = ZurvanThemes.weekdayColors.current
+    val setWeekdayColor = ZurvanThemes.setWeekdayColor.current
     val context = LocalContext.current
     val wallpaperPath = ZurvanThemes.wallpaper.current
     val setWallpaper = ZurvanThemes.setWallpaper.current
@@ -2344,10 +2351,19 @@ private fun SettingsScreen(
     pickingColorFor?.let { colorKey ->
         ZurvanColorEditor(
             initialKey = colorKey,
-            overrides = colorOverrides,
+            overrides = colorOverrides + weekdayColors.mapIndexed { index, color ->
+                "weekday$index" to String.format(java.util.Locale.US, "#%06X", (android.graphics.Color.rgb((color.red * 255).toInt(), (color.green * 255).toInt(), (color.blue * 255).toInt())) and 0xFFFFFF)
+            }.toMap(),
             defaults = palette,
-            onApply = { key, hex -> setColorOverride(key, hex) },
-            onReset = { key -> setColorOverride(key, null) },
+            weekdayDefaults = weekdayColors,
+            onApply = { key, hex ->
+                if (key.startsWith("weekday")) setWeekdayColor(key.last().digitToInt(), hex)
+                else setColorOverride(key, hex)
+            },
+            onReset = { key ->
+                if (key.startsWith("weekday")) setWeekdayColor(key.last().digitToInt(), null)
+                else setColorOverride(key, null)
+            },
             onDismiss = { pickingColorFor = null }
         )
     }
@@ -2384,7 +2400,9 @@ private fun SettingsScreen(
                     "card" to "کارت‌ها",
                     "holiday" to "روز تعطیل",
                     "background" to "پس‌زمینه",
-                    "ink" to "رنگ متن"
+                    "ink" to "رنگ متن",
+                    "weekday0" to "شنبه", "weekday1" to "یکشنبه", "weekday2" to "دوشنبه",
+                    "weekday3" to "سه‌شنبه", "weekday4" to "چهارشنبه", "weekday5" to "پنجشنبه", "weekday6" to "جمعه"
                 ).forEach { (key, label) ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
