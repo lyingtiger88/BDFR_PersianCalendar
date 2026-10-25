@@ -2415,6 +2415,7 @@ private fun SettingsScreen(
                         "shirinquietfox" -> "شیطون باهوش و دوست‌داشتنی 🦊😉"
                         "nazaninstrongcare" -> "لجباز مهربون و حامی قشنگم 💪💗"
                         "mehrbanmomfriend" -> "مامان مهربون و رفیق بی‌نظیرم 🌸❤️"
+                        "jonoubsweetpearl" -> "مروارید نازنین جنوب، دختر دل‌نازک و دوست‌داشتنی 🌴🐚🤍"
                         else -> "دارنده لایسنس معتبر زروان"
                     }
                     Text("ثبت شده به نام : $ownerName")
