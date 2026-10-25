@@ -32,6 +32,7 @@ object ZurvanThemes {
     val setWeekdayColor = staticCompositionLocalOf<(Int, String?) -> Unit> { { _, _ -> } }
     val wallpaper = staticCompositionLocalOf<String?> { null }
     val setWallpaper = staticCompositionLocalOf<(String?) -> Unit> { {} }
+    val refreshAppearance = staticCompositionLocalOf<() -> Unit> { {} }
 
     private val zaraWeekdays = listOf(
         "#F8DDD4", "#FFF0C5", "#DFF0DD", "#D5EFED", "#DCE9FB", "#E8E0FA", "#F8DDE7"
@@ -43,12 +44,13 @@ object ZurvanThemes {
         val prefs = remember { context.getSharedPreferences("zurvan_appearance", Context.MODE_PRIVATE) }
         var selected by remember { mutableStateOf(prefs.getString("theme", "windows-light") ?: "windows-light") }
         var wallpaperPath by remember { mutableStateOf(prefs.getString("wallpaper", null)) }
-        var overrides by remember(selected) {
+        var appearanceRevision by remember { mutableIntStateOf(0) }
+        var overrides by remember(selected, appearanceRevision) {
             mutableStateOf(listOf("background","surface","card","ink","accent","holiday").mapNotNull { key ->
                 prefs.getString("color.$selected.$key", null)?.let { key to it }
             }.toMap())
         }
-        var dayOverrides by remember(selected) {
+        var dayOverrides by remember(selected, appearanceRevision) {
             mutableStateOf((0..6).mapNotNull { index ->
                 prefs.getString("weekday.$selected.$index", null)?.let { index to it }
             }.toMap())
@@ -83,6 +85,11 @@ object ZurvanThemes {
             onPrimaryContainer=color("ink",palette.ink), error=color("holiday",palette.holiday)
         )
         CompositionLocalProvider(
+            refreshAppearance provides {
+                selected = prefs.getString("theme", "windows-light") ?: "windows-light"
+                wallpaperPath = prefs.getString("wallpaper", null)
+                appearanceRevision++
+            },
             weekdayColors provides weekdayPalette,
             setWeekdayColor provides { index, value ->
                 if (index in 0..6 && (value == null || Regex("^#[0-9A-Fa-f]{6}$").matches(value))) {
