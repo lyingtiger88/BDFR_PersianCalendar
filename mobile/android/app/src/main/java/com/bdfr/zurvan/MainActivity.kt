@@ -632,6 +632,36 @@ private fun CalendarScreen(
             }
         }
 
+        val prayerContext = LocalContext.current
+        val prayerSettings = remember { ZurvanPrayerTimes.settings(prayerContext) }
+        val todayPrayers = remember(prayerSettings) {
+            runCatching {
+                ZurvanPrayerTimes.calculate(
+                    java.time.LocalDate.now(java.time.ZoneId.of(prayerSettings.zone)), prayerSettings
+                )
+            }.getOrDefault(emptyList())
+        }
+        if (todayPrayers.isNotEmpty()) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(Modifier.fillMaxWidth().padding(8.dp)) {
+                    Text("اوقات شرعی امروز · ${prayerSettings.city}",
+                        style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        todayPrayers.filter { it.key in listOf("fajr","sunrise","dhuhr","maghrib","isha") }
+                            .forEach { entry ->
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(entry.label, style = MaterialTheme.typography.labelSmall)
+                                    Text(entry.time.toString(), style = MaterialTheme.typography.labelSmall)
+                                }
+                            }
+                    }
+                }
+            }
+        }
+
         WeekdayHeader()
 
         LazyVerticalGrid(
