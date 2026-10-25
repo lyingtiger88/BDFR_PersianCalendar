@@ -675,8 +675,8 @@ private fun CalendarScreen(
                     day = day,
                     isHoliday = ZurvanDayFlags.isHoliday(day, occasions),
                     isMourning = ZurvanDayFlags.isMourning(day, occasions),
-                    hasOccasion = occasions.any { occasionMatches(day, it) },
-                    isCelebration = occasions.any { occasionMatches(day, it) &&
+                    hasOccasion = ZurvanBuiltInOccasions.onDay(day, occasions).isNotEmpty(),
+                    isCelebration = ZurvanBuiltInOccasions.onDay(day, occasions).any {
                         listOf("عید", "میلاد", "جشن", "ولادت").any { key -> it.title.contains(key) } },
                     calendarOrder =
                         preferences
@@ -721,13 +721,7 @@ private fun CalendarScreen(
                     it.dateKey ==
                         day.persianKey
                 },
-            occasions =
-                occasions.filter {
-                    occasionMatches(
-                        day,
-                        it
-                    )
-                },
+            occasions = ZurvanBuiltInOccasions.onDay(day, occasions),
             note = notes.firstOrNull {
                 it.dateKey ==
                     day.persianKey
