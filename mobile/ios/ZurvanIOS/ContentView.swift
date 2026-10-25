@@ -87,8 +87,8 @@ struct ContentView: View {
                 } else {
                     ZurvanLockedView()
                 }
-                    .navigationTitle("Companion")
             }
+            .navigationTitle("Companion")
             .tabItem {
                 Label("همراه", systemImage: "laptopcomputer.and.iphone")
             }
