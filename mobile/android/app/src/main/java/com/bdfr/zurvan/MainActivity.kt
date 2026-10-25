@@ -2370,6 +2370,18 @@ private fun SettingsScreen(
     val wallpaperPath = ZurvanThemes.wallpaper.current
     val setWallpaper = ZurvanThemes.setWallpaper.current
     var pickingColorFor by remember { mutableStateOf<String?>(null) }
+    val refreshAppearance = ZurvanThemes.refreshAppearance.current
+    var themeImportMessage by remember { mutableStateOf("") }
+    val themePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            runCatching { ZurvanThemeImporter.import(context, uri) }
+                .onSuccess { theme ->
+                    refreshAppearance()
+                    themeImportMessage = "تم «${theme.name}» نصب و فعال شد."
+                }
+                .onFailure { error -> themeImportMessage = error.message ?: "درون‌ریزی تم انجام نشد." }
+        }
+    }
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
             runCatching {
@@ -2413,6 +2425,15 @@ private fun SettingsScreen(
                 bottom = 24.dp
             )
     ) {
+        item {
+            SettingsCard(title = "افزودن قالب از فایل") {
+                Text("تم ساخته‌شده در Zurvan Theme Studio را از JSON یا ZIP وارد کنید.")
+                Button(onClick = { themePicker.launch(arrayOf("application/json", "application/zip", "application/octet-stream", "*/*")) }) {
+                    Text("درون‌ریزی تم (JSON / ZIP)")
+                }
+                if (themeImportMessage.isNotBlank()) Text(themeImportMessage)
+            }
+        }
         item {
             SettingsCard(title = "تصویر پس‌زمینه سفارشی") {
                 Button(onClick = { imagePicker.launch("image/*") }) { Text("انتخاب عکس از دستگاه") }
