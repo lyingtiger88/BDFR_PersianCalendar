@@ -24,6 +24,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -126,7 +127,7 @@ fun ZurvanTeamPlanner(
                     val picture = pendingPhoto ?: return@TextButton
                     runCatching {
                         val size = 512
-                        val source = android.graphics.Bitmap.createBitmap(picture.width, picture.height, android.graphics.Bitmap.Config.ARGB_8888)
+                        val source = picture.asAndroidBitmap()
                         // Save the same center-crop framing that was approved in the preview.
                         val raw = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888)
                         val canvas = android.graphics.Canvas(raw)
@@ -141,16 +142,12 @@ fun ZurvanTeamPlanner(
                         val height = picture.height * factor
                         val offsetX = (size - width) / 2f + moveX * size / 240f
                         val offsetY = (size - height) / 2f + moveY * size / 240f
-                        val buffer = java.nio.ByteBuffer.allocate(picture.width * picture.height * 4)
-                        picture.readPixels(buffer)
-                        buffer.rewind()
-                        source.copyPixelsFromBuffer(buffer)
                         canvas.drawBitmap(source, null,
                             android.graphics.RectF(offsetX, offsetY, offsetX + width, offsetY + height), paint)
                         File(context.filesDir, "zurvan_profile_photo").outputStream().use {
                             raw.compress(android.graphics.Bitmap.CompressFormat.PNG, 95, it)
                         }
-                        source.recycle(); raw.recycle()
+                        raw.recycle()
                     }.onSuccess { photoRevision++; pendingPhoto = null }
                         .onFailure { pendingError = it.message ?: "ذخیره عکس ناموفق بود." }
                 }) { Text("اعمال عکس") }
