@@ -42,14 +42,16 @@ class ZurvanViewModel(
         hour: Int,
         minute: Int,
         kind: String,
-        isPrivate: Boolean
+        isPrivate: Boolean,
+        icon: String = "📌"
     ) = repository.addPlan(
         title,
         dateKey,
         hour,
         minute,
         kind,
-        isPrivate
+        isPrivate,
+        icon
     )
 
     fun togglePlan(id: String) =
