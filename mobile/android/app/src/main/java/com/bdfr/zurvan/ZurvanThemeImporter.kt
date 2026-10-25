@@ -59,11 +59,12 @@ object ZurvanThemeImporter {
         }
         val described = json.optJSONObject("wallpaper")?.optString("file")
         if (described != null) require(isZip && described == imageName && rawImage != null) { "تصویر اعلام‌شده در بسته موجود نیست." }
-        val wallpaperPath = if (described != null && rawImage != null) {
+        val imageBytes = rawImage
+        val wallpaperPath = if (described != null && imageBytes != null) {
             val directory = File(context.filesDir, "zurvan_themes").apply { mkdirs() }
             val ext = described.substringAfterLast('.').lowercase()
             val file = File(directory, "imported_wallpaper.$ext")
-            FileOutputStream(file).use { it.write(rawImage) }
+            FileOutputStream(file).use { it.write(imageBytes) }
             file.absolutePath
         } else null
         val prefs = context.getSharedPreferences("zurvan_appearance", Context.MODE_PRIVATE)
