@@ -23,7 +23,17 @@ object ZurvanOccasionDatabase {
         }
         try {
             check(connection.responseCode == 200) { "خطای دریافت: ${connection.responseCode}" }
-            val data = connection.inputStream.use { it.readNBytes(500_001) }
+            val data = connection.inputStream.use { stream ->
+                val output = java.io.ByteArrayOutputStream()
+                val buffer = ByteArray(8192)
+                while (true) {
+                    val n = stream.read(buffer)
+                    if (n < 0) break
+                    output.write(buffer, 0, n)
+                    require(output.size() <= 500_000) { "فایل بیش از حد بزرگ است" }
+                }
+                output.toByteArray()
+            }
             require(data.size in 1..500_000) { "اندازه پایگاه داده نامعتبر است" }
             val text = data.toString(Charsets.UTF_8)
             val root = JSONObject(text)
