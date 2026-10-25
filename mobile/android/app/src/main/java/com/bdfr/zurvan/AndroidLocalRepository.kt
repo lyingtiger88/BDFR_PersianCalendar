@@ -45,7 +45,8 @@ class AndroidLocalRepository(
         hour: Int,
         minute: Int,
         kind: String,
-        isPrivate: Boolean
+        isPrivate: Boolean,
+        icon: String = "📌"
     ) {
         val next = _plans.value + LocalPlan(
             id = "plan_${UUID.randomUUID()}",
@@ -54,7 +55,8 @@ class AndroidLocalRepository(
             hour = hour.coerceIn(0, 23),
             minute = minute.coerceIn(0, 59),
             kind = kind,
-            isPrivate = isPrivate
+            isPrivate = isPrivate,
+            icon = icon
         )
         savePlans(next)
     }
@@ -1108,6 +1110,7 @@ class AndroidLocalRepository(
                     .put("kind", item.kind)
                     .put("private", item.isPrivate)
                     .put("completed", item.completed)
+                    .put("icon", item.icon)
             )
         }
         preferences.edit()
@@ -1128,7 +1131,8 @@ class AndroidLocalRepository(
                 completed = item.optBoolean(
                     "completed",
                     false
-                )
+                ),
+                icon = item.optString("icon", "📌")
             )
         }
 
