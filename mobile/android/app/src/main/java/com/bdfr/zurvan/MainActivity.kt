@@ -1261,6 +1261,64 @@ private fun DayDetailsSheet(
             }
 
             item {
+                SectionTitle("یادداشت")
+            }
+
+            item {
+                OutlinedTextField(
+                    value = noteText,
+                    onValueChange = {
+                        noteText = it
+                    },
+                    modifier =
+                        Modifier.fillMaxWidth(),
+                    minLines = 3,
+                    label = {
+                        Text(
+                            "یادداشت روز"
+                        )
+                    }
+                )
+            }
+
+            item {
+                Row(
+                    verticalAlignment =
+                        Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked =
+                            privateNote,
+                        onCheckedChange = {
+                            privateNote =
+                                it
+                        }
+                    )
+                    Text(
+                        "یادداشت خصوصی"
+                    )
+                }
+            }
+
+            item {
+                Button(
+                    onClick = {
+                        onSaveNote(
+                            noteText,
+                            privateNote
+                        )
+                        onDismiss()
+                    },
+                    modifier =
+                        Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        "ذخیره یادداشت"
+                    )
+                }
+            }
+
+            item {
                 Row(
                     horizontalArrangement =
                         Arrangement.spacedBy(
@@ -1447,62 +1505,7 @@ private fun DayDetailsSheet(
                 }
             }
 
-            item {
-                SectionTitle("یادداشت")
-            }
 
-            item {
-                OutlinedTextField(
-                    value = noteText,
-                    onValueChange = {
-                        noteText = it
-                    },
-                    modifier =
-                        Modifier.fillMaxWidth(),
-                    minLines = 3,
-                    label = {
-                        Text(
-                            "یادداشت روز"
-                        )
-                    }
-                )
-            }
-
-            item {
-                Row(
-                    verticalAlignment =
-                        Alignment.CenterVertically
-                ) {
-                    Checkbox(
-                        checked =
-                            privateNote,
-                        onCheckedChange = {
-                            privateNote =
-                                it
-                        }
-                    )
-                    Text(
-                        "یادداشت خصوصی"
-                    )
-                }
-            }
-
-            item {
-                Button(
-                    onClick = {
-                        onSaveNote(
-                            noteText,
-                            privateNote
-                        )
-                    },
-                    modifier =
-                        Modifier.fillMaxWidth()
-                ) {
-                    Text(
-                        "ذخیره یادداشت"
-                    )
-                }
-            }
         }
     }
 }
