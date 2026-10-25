@@ -26,6 +26,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -184,8 +185,8 @@ fun ZurvanColorEditor(
                         ) {
                             ZurvanHueWheel(
                                 hue, saturation, brightness,
-                                { hue = it },
-                                { valueS, valueV -> saturation = valueS; brightness = valueV },
+                                { hue = it; typed = "" },
+                                { valueS, valueV -> saturation = valueS; brightness = valueV; typed = "" },
                                 Modifier.size(216.dp)
                             )
                             Row(
@@ -243,7 +244,8 @@ private fun ZurvanHueWheel(
     hue: Float, saturation: Float, brightness: Float,
     onHue: (Float) -> Unit, onSV: (Float, Float) -> Unit, modifier: Modifier = Modifier
 ) {
-    val hueStops = listOf(Color.Red, Color.Magenta, Color.Blue, Color.Cyan, Color.Green, Color.Yellow, Color.Red)
+    // HSV increases clockwise from red at 12 o’clock; match touch angle and pointer exactly.
+    val hueStops = listOf(Color.Red, Color.Yellow, Color.Green, Color.Cyan, Color.Blue, Color.Magenta, Color.Red)
     fun handle(position: Offset, width: Float, height: Float) {
         val center = Offset(width / 2f, height / 2f)
         val size = min(width, height)
@@ -251,7 +253,9 @@ private fun ZurvanHueWheel(
         val dy = position.y - center.y
         val distance = sqrt(dx * dx + dy * dy)
         val squareSide = size * 0.45f
-        if (distance >= size * 0.32f) {
+        val ringRadius = size * 0.43f
+        val halfWidth = size * 0.07f
+        if (distance in (ringRadius - halfWidth)..(ringRadius + halfWidth)) {
             val degrees = (Math.toDegrees(atan2(dy.toDouble(), dx.toDouble())).toFloat() + 90f + 360f) % 360f
             onHue(degrees)
         } else if (kotlin.math.abs(dx) <= squareSide / 2 && kotlin.math.abs(dy) <= squareSide / 2) {
@@ -272,8 +276,10 @@ private fun ZurvanHueWheel(
         val center = Offset(size.width / 2f, size.height / 2f)
         val radius = side * 0.43f
         val ringWidth = side * 0.14f
-        drawCircle(Brush.sweepGradient(hueStops, center = center), radius = radius,
-            center = center, style = Stroke(width = ringWidth, cap = StrokeCap.Butt))
+        rotate(-90f, pivot = center) {
+            drawCircle(Brush.sweepGradient(hueStops, center = center), radius = radius,
+                center = center, style = Stroke(width = ringWidth, cap = StrokeCap.Butt))
+        }
         val radians = Math.toRadians((hue - 90f).toDouble())
         val ringPointer = Offset(center.x + kotlin.math.cos(radians).toFloat() * radius,
             center.y + kotlin.math.sin(radians).toFloat() * radius)
