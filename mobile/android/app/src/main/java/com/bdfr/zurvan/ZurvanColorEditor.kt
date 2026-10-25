@@ -123,6 +123,54 @@ fun ZurvanColorEditor(
                     }
                 }
                 Surface(shape = RoundedCornerShape(20.dp), color = Color.White) {
+                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text("پیش‌نمایش", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                        Text("تغییرات رنگ را در نمای واقعی برنامه مشاهده کنید.", fontSize = 12.sp, color = Color.Gray)
+                        Surface(color = Color(0xFFFCE8EF), shape = RoundedCornerShape(12.dp)) {
+                            Text("بخش در حال تغییر: " + targets.first { it.first == target }.second,
+                                Modifier.padding(10.dp), fontSize = 12.sp, color = Color(0xFFA92258))
+                        }
+                        val surfaceColor = if (target == "surface") chosen else defaults.surface
+                        val backgroundColor = if (target == "background") chosen else defaults.background
+                        val cardColor = if (target == "card") chosen else defaults.card
+                        val accentColor = if (target == "accent") chosen else defaults.accent
+                        val holidayColor = if (target == "holiday") chosen else defaults.holiday
+                        val inkColor = if (target == "ink") chosen else defaults.ink
+                        Column(Modifier.fillMaxWidth().border(1.dp, Color(0xFFE9E4E9), RoundedCornerShape(15.dp))
+                            .background(backgroundColor, RoundedCornerShape(15.dp))) {
+                            Row(Modifier.fillMaxWidth().background(surfaceColor).padding(13.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("تقویم زروان", color = inkColor, fontWeight = FontWeight.Bold)
+                                Text("☰    ◷", color = inkColor)
+                            }
+                            Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("فروردین ۱۴۰۳", color = inkColor, fontWeight = FontWeight.Bold)
+                                Text("‹   ›", color = inkColor)
+                            }
+                            Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp),
+                                horizontalArrangement = Arrangement.SpaceEvenly) {
+                                listOf("شنبه", "یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه").forEach {
+                                    Text(it, color = inkColor, fontSize = 8.sp)
+                                }
+                            }
+                            Row(Modifier.fillMaxWidth().padding(10.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
+                                listOf("۲۵", "۲۶", "۲۷", "۲۸", "۲۹", "۳۰", "۱").forEachIndexed { i, day ->
+                                    Text(day, Modifier.background(if (target == "weekday$i") chosen else weekdayDefaults.getOrNull(i) ?: cardColor,
+                                        RoundedCornerShape(6.dp)).padding(6.dp), color = inkColor, fontSize = 12.sp)
+                                }
+                            }
+                            Row(Modifier.fillMaxWidth().padding(10.dp), horizontalArrangement = Arrangement.End) {
+                                Surface(shape = RoundedCornerShape(12.dp), color = accentColor) {
+                                    Text("+ رویداد جدید", Modifier.padding(12.dp), color = Color.White, fontSize = 12.sp)
+                                }
+                            }
+                            Surface(Modifier.fillMaxWidth().padding(10.dp), shape = RoundedCornerShape(12.dp), color = cardColor) {
+                                Text("جلسه تیم طراحی      ۱۰:۰۰ - ۱۱:۳۰", Modifier.padding(12.dp), color = inkColor, fontSize = 12.sp)
+                            }
+                        }
+                    }
+                }
+                Surface(shape = RoundedCornerShape(20.dp), color = Color.White) {
                     Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text("رنگ انتخاب‌شده", fontWeight = FontWeight.SemiBold)
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -152,54 +200,6 @@ fun ZurvanColorEditor(
                                 Text("H: ${hue.toInt()}°", fontSize = 12.sp)
                                 Text("S: ${(saturation * 100).toInt()}%", fontSize = 12.sp)
                                 Text("V: ${(brightness * 100).toInt()}%", fontSize = 12.sp)
-                            }
-                        }
-                    }
-                }
-                Surface(shape = RoundedCornerShape(20.dp), color = Color.White) {
-                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text("پیش‌نمایش", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                        Text("تغییرات رنگ را در نمای واقعی برنامه مشاهده کنید.", fontSize = 12.sp, color = Color.Gray)
-                        Surface(color = Color(0xFFFCE8EF), shape = RoundedCornerShape(12.dp)) {
-                            Text("بخش در حال تغییر: " + targets.first { it.first == target }.second,
-                                Modifier.padding(10.dp), fontSize = 12.sp, color = Color(0xFFA92258))
-                        }
-                        val surfaceColor = if (target == "surface") chosen else defaults.surface
-                        val backgroundColor = if (target == "background") chosen else defaults.background
-                        val cardColor = if (target == "card") chosen else defaults.card
-                        val accentColor = if (target == "accent") chosen else defaults.accent
-                        val holidayColor = if (target == "holiday") chosen else defaults.holiday
-                        val inkColor = if (target == "ink") chosen else defaults.ink
-                        Column(Modifier.fillMaxWidth().border(1.dp, Color(0xFFE9E4E9), RoundedCornerShape(15.dp))
-                            .background(backgroundColor, RoundedCornerShape(15.dp))) {
-                            Row(Modifier.fillMaxWidth().background(surfaceColor).padding(13.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween) {
-                                Text("تقویم زروان", color = inkColor, fontWeight = FontWeight.Bold)
-                                Text("☰    ◷", color = inkColor)
-                            }
-                            Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                                Text("فروردین ۱۴۰۳", color = inkColor, fontWeight = FontWeight.Bold)
-                                Text("‹   ›", color = inkColor)
-                            }
-                            Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp),
-                                horizontalArrangement = Arrangement.SpaceEvenly) {
-                                listOf("ش", "ی", "د", "س", "چ", "پ", "ج").forEach {
-                                    Text(it, color = inkColor, fontSize = 12.sp)
-                                }
-                            }
-                            Row(Modifier.fillMaxWidth().padding(10.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
-                                listOf("۲۵", "۲۶", "۲۷", "۲۸", "۲۹", "۳۰", "۱").forEachIndexed { i, day ->
-                                    Text(day, Modifier.background(if (target == "weekday$i") chosen else weekdayDefaults.getOrNull(i) ?: cardColor,
-                                        RoundedCornerShape(6.dp)).padding(6.dp), color = inkColor, fontSize = 12.sp)
-                                }
-                            }
-                            Row(Modifier.fillMaxWidth().padding(10.dp), horizontalArrangement = Arrangement.End) {
-                                Surface(shape = RoundedCornerShape(12.dp), color = accentColor) {
-                                    Text("+ رویداد جدید", Modifier.padding(12.dp), color = Color.White, fontSize = 12.sp)
-                                }
-                            }
-                            Surface(Modifier.fillMaxWidth().padding(10.dp), shape = RoundedCornerShape(12.dp), color = cardColor) {
-                                Text("جلسه تیم طراحی      ۱۰:۰۰ - ۱۱:۳۰", Modifier.padding(12.dp), color = inkColor, fontSize = 12.sp)
                             }
                         }
                     }
