@@ -32,6 +32,27 @@ jobs:
         run: dotnet build server/Zurvan.Desk.Api/Zurvan.Desk.Api.csproj -c Release
 
 
+  theme-studio:
+    name: Build Windows Theme Studio
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+      - name: Publish Zurvan Theme Studio .NET 9
+        shell: pwsh
+        run: |
+          dotnet publish tools/Zurvan.ThemeStudio/Zurvan.ThemeStudio.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o artifacts/Zurvan-ThemeStudio
+          Compress-Archive -Path artifacts/Zurvan-ThemeStudio/* -DestinationPath artifacts/Zurvan-ThemeStudio-win-x64.zip -Force
+      - name: Upload Theme Studio
+        uses: actions/upload-artifact@v4
+        with:
+          name: Zurvan-ThemeStudio-win-x64
+          path: artifacts/Zurvan-ThemeStudio-win-x64.zip
+          retention-days: 30
+          if-no-files-found: error
+
   license-calculator:
     runs-on: windows-latest
     steps:
