@@ -890,10 +890,6 @@ private fun CalendarDayCard(
                         MaterialTheme.colorScheme.primaryContainer
                     } else if (day.weekColumn in 0..6 && weekdayColors.size == 7) {
                         weekdayColors[day.weekColumn]
-                    } else if (day.isToday) {
-                        MaterialTheme
-                            .colorScheme
-                            .primaryContainer
                     } else {
                         MaterialTheme
                             .colorScheme
