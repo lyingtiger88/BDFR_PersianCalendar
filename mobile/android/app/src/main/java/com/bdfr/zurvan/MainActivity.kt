@@ -1228,35 +1228,65 @@ private fun DayDetailsSheet(
                 }
             }
 
-            if (occasions.isNotEmpty()) {
+            item {
+                SectionTitle("مناسبت‌های این روز")
+            }
+
+            if (occasions.isEmpty()) {
                 item {
-                    SectionTitle(
-                        "مناسبت‌ها"
+                    Text(
+                        "برای این تاریخ مناسبتی در اطلاعات برنامه ثبت نشده است.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
                     )
                 }
-
-                items(
-                    occasions,
-                    key = { it.id }
-                ) { item ->
-                    ListItem(
-                        headlineContent = {
-                            Text(item.title)
-                        },
-                        supportingContent = {
-                            Text(
-                                item.calendar
-                                    .label
-                            )
-                        },
-                        leadingContent = {
-                            Icon(
-                                Icons.Outlined.Event,
-                                contentDescription =
-                                    null
-                            )
+            } else {
+                items(occasions, key = { "occasion-" + it.id }) { occasion ->
+                    val title = occasion.title
+                    val isMourning = listOf("شهادت", "رحلت", "وفات", "عزاداری", "سوگواری", "عاشورا", "تاسوعا", "اربعین")
+                        .any { title.contains(it) }
+                    val isHoliday = title.contains("تعطیل")
+                    val isCelebration = listOf("عید", "میلاد", "ولادت", "جشن")
+                        .any { title.contains(it) }
+                    val symbol = when {
+                        isMourning -> "🎗"
+                        isCelebration -> "🎉"
+                        isHoliday -> "🔴"
+                        title.contains("دیابت") -> "🔵"
+                        title.contains("صلح") -> "🕊️"
+                        title.contains("علم") -> "🎓"
+                        else -> "📅"
+                    }
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Text(symbol, style = MaterialTheme.typography.titleLarge)
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    title,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (isHoliday) MaterialTheme.colorScheme.error
+                                            else MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    occasion.calendar.label,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
-                    )
+                    }
                 }
             }
 
