@@ -20,7 +20,7 @@ class AndroidLocalRepository(
         Context.MODE_PRIVATE
     )
 
-    private val _plans = MutableStateFlow(loadPlans())
+    private val _plans = MutableStateFlow(loadPlans().filterNot(::isExpiredPlan))
     val plans: StateFlow<List<LocalPlan>> = _plans.asStateFlow()
 
     private val _occasions = MutableStateFlow(loadOccasions())
@@ -46,7 +46,8 @@ class AndroidLocalRepository(
         minute: Int,
         kind: String,
         isPrivate: Boolean,
-        icon: String = "📌"
+        icon: String = "📌",
+        deleteAfterDays: Int? = null
     ) {
         val next = _plans.value + LocalPlan(
             id = "plan_${UUID.randomUUID()}",
@@ -56,9 +57,26 @@ class AndroidLocalRepository(
             minute = minute.coerceIn(0, 59),
             kind = kind,
             isPrivate = isPrivate,
-            icon = icon
+            icon = icon,
+            deleteAfterDays = deleteAfterDays?.coerceIn(0,3650)
         )
         savePlans(next)
+    }
+
+    /** Expired entries are deleted from the persisted local source, not just hidden. */
+    fun purgeExpiredPlans() {
+        val kept = _plans.value.filterNot(::isExpiredPlan)
+        if (kept.size != _plans.value.size) savePlans(kept)
+        else if (loadPlans().size != kept.size) savePlans(kept)
+    }
+
+    private fun isExpiredPlan(plan: LocalPlan): Boolean {
+        val days = plan.deleteAfterDays ?: return false
+        if (plan.kind != "event") return false
+        val at = AndroidCalendarEngine.persianDateTimeToMillis(plan.dateKey, plan.hour, plan.minute) ?: return false
+        val deadline = java.time.Instant.ofEpochMilli(at).atZone(java.time.ZoneId.systemDefault())
+            .plusDays(days.toLong()).toInstant().toEpochMilli()
+        return System.currentTimeMillis() > deadline
     }
 
     fun togglePlan(id: String) {
@@ -1111,6 +1129,7 @@ class AndroidLocalRepository(
                     .put("private", item.isPrivate)
                     .put("completed", item.completed)
                     .put("icon", item.icon)
+                    .put("deleteAfterDays", item.deleteAfterDays ?: JSONObject.NULL)
             )
         }
         preferences.edit()
@@ -1132,7 +1151,8 @@ class AndroidLocalRepository(
                     "completed",
                     false
                 ),
-                icon = item.optString("icon", "📌")
+                icon = item.optString("icon", "📌"),
+                deleteAfterDays = if (item.isNull("deleteAfterDays")) null else item.optInt("deleteAfterDays").takeIf { it in 0..3650 }
             )
         }
 
