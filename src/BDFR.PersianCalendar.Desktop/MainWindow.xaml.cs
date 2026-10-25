@@ -5349,6 +5349,24 @@ public sealed partial class MainWindow : Window
                         _calendarHolidayOccasionLabels.Add(occasionLabel);
                 }
 
+                // Event icons match the Android calendar's at-a-glance badges.
+                var eventIcons = snapshot.Events
+                    .Select(x => string.IsNullOrWhiteSpace(x.Category) ? "📌" : x.Category!)
+                    .Distinct()
+                    .Take(3)
+                    .ToArray();
+                if (eventIcons.Length > 0)
+                {
+                    panel.Children.Add(new TextBlock
+                    {
+                        Text = string.Join(" ", eventIcons.Take(2)) +
+                            (eventIcons.Length > 2 ? " +" : ""),
+                        FontSize = 11,
+                        HorizontalAlignment = HorizontalAlignment.Center,
+                        TextTrimming = TextTrimming.CharacterEllipsis
+                    });
+                }
+
                 if (snapshot.Occasions.Count > visible.Length)
                 {
                     panel.Children.Add(new TextBlock
