@@ -5,6 +5,12 @@ import android.graphics.BitmapFactory
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clip
+import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -68,12 +74,89 @@ fun ZurvanTeamPlanner(
         val f = File(context.filesDir, "zurvan_profile_photo")
         if (f.exists()) BitmapFactory.decodeFile(f.absolutePath)?.asImageBitmap() else null
     }
+    var pendingPhoto by remember { mutableStateOf<ImageBitmap?>(null) }
+    var pendingError by remember { mutableStateOf("") }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) runCatching {
             context.contentResolver.openInputStream(uri)?.use { input ->
-                File(context.filesDir, "zurvan_profile_photo").outputStream().use { output -> input.copyTo(output) }
-            }
-        }.onSuccess { photoRevision++ }
+                val data = input.readBytes()
+                require(data.size <= 12_000_000) { "حجم عکس باید کمتر از ۱۲ مگابایت باشد." }
+                BitmapFactory.decodeByteArray(data, 0, data.size)?.asImageBitmap()
+                    ?: error("این تصویر قابل خواندن نیست.")
+            } ?: error("فایل باز نشد.")
+        }.onSuccess { pendingPhoto = it; pendingError = "" }
+            .onFailure { pendingError = it.message ?: "خواندن عکس انجام نشد." }
+    }
+    if (pendingPhoto != null) {
+        var zoom by remember(pendingPhoto) { mutableFloatStateOf(1f) }
+        var moveX by remember(pendingPhoto) { mutableFloatStateOf(0f) }
+        var moveY by remember(pendingPhoto) { mutableFloatStateOf(0f) }
+        AlertDialog(
+            onDismissRequest = { pendingPhoto = null },
+            title = { Text("ویرایش عکس پروفایل") },
+            text = {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("عکس را جابه‌جا کنید و با دو انگشت بزرگ‌نمایی کنید.")
+                    Box(Modifier.size(240.dp).clip(CircleShape), contentAlignment = Alignment.Center) {
+                        pendingPhoto?.let { picture ->
+                            Image(
+                                bitmap = picture, contentDescription = "پیش‌نمایش برش دایره‌ای",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                                    .pointerInput(picture) {
+                                        detectTransformGestures { _, pan, scale, _ ->
+                                            zoom = (zoom * scale).coerceIn(1f, 5f)
+                                            moveX += pan.x
+                                            moveY += pan.y
+                                        }
+                                    }
+                                    .graphicsLayer {
+                                        scaleX = zoom; scaleY = zoom
+                                        translationX = moveX; translationY = moveY
+                                    }
+                            )
+                        }
+                    }
+                    Text("بزرگ‌نمایی")
+                    Slider(value = zoom, onValueChange = { zoom = it }, valueRange = 1f..5f)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val picture = pendingPhoto ?: return@TextButton
+                    runCatching {
+                        val size = 512
+                        val source = android.graphics.Bitmap.createBitmap(picture.width, picture.height, android.graphics.Bitmap.Config.ARGB_8888)
+                        // Save the same center-crop framing that was approved in the preview.
+                        val raw = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888)
+                        val canvas = android.graphics.Canvas(raw)
+                        val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+                        val path = android.graphics.Path().apply {
+                            addCircle(size / 2f, size / 2f, size / 2f, android.graphics.Path.Direction.CW)
+                        }
+                        canvas.clipPath(path)
+                        val initialScale = maxOf(size.toFloat() / picture.width, size.toFloat() / picture.height)
+                        val factor = initialScale * zoom
+                        val width = picture.width * factor
+                        val height = picture.height * factor
+                        val offsetX = (size - width) / 2f + moveX * size / 240f
+                        val offsetY = (size - height) / 2f + moveY * size / 240f
+                        val buffer = java.nio.ByteBuffer.allocate(picture.width * picture.height * 4)
+                        picture.readPixels(buffer)
+                        buffer.rewind()
+                        source.copyPixelsFromBuffer(buffer)
+                        canvas.drawBitmap(source, null,
+                            android.graphics.RectF(offsetX, offsetY, offsetX + width, offsetY + height), paint)
+                        File(context.filesDir, "zurvan_profile_photo").outputStream().use {
+                            raw.compress(android.graphics.Bitmap.CompressFormat.PNG, 95, it)
+                        }
+                        source.recycle(); raw.recycle()
+                    }.onSuccess { photoRevision++; pendingPhoto = null }
+                        .onFailure { pendingError = it.message ?: "ذخیره عکس ناموفق بود." }
+                }) { Text("اعمال عکس") }
+            },
+            dismissButton = { TextButton(onClick = { pendingPhoto = null }) { Text("انصراف") } },
+        )
     }
     val tabs = listOf("زمان‌بندی", "گروه من", "پروفایل")
     Column(modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -170,9 +253,10 @@ fun ZurvanTeamPlanner(
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
             }
             2 -> {
-                if (avatar != null) Image(avatar, contentDescription = "تصویر پروفایل", modifier = Modifier.size(88.dp))
+                if (avatar != null) Image(avatar, contentDescription = "تصویر پروفایل", contentScale = ContentScale.Crop, modifier = Modifier.size(88.dp).clip(CircleShape))
                 else Surface(shape = CircleShape) { Text("👤", modifier = Modifier.padding(20.dp)) }
-                Button(onClick = { picker.launch("image/*") }) { Text("انتخاب عکس پروفایل") }
+                Button(onClick = { picker.launch("image/*") }) { Text("انتخاب و ویرایش عکس پروفایل") }
+                if (pendingError.isNotBlank()) Text(pendingError, color = MaterialTheme.colorScheme.error)
                 OutlinedTextField(profileName, { profileName = it }, label = { Text("نام نمایشی") }, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(profileId, { profileId = it }, label = { Text("شناسه کاربری دلخواه") }, modifier = Modifier.fillMaxWidth())
                 Button(onClick = {
