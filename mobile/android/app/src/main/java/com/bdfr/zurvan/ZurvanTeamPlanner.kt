@@ -6,6 +6,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -94,27 +96,40 @@ fun ZurvanTeamPlanner(
                     today.minusDays(((today.dayOfWeek.value + 1) % 7).toLong()).plusWeeks(weekOffset.toLong())
                 }
                 val dates = (0..6).map { saturday.plusDays(it.toLong()) }
-                Text("جدول هفتگی", style = MaterialTheme.typography.titleMedium)
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                    items(dates) { date ->
+                Text("جدول هفتگی · برای دیدن روزها به چپ و راست بکشید", style = MaterialTheme.typography.titleMedium)
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                    dates.forEachIndexed { index, date ->
                         val persian = android.icu.util.Calendar.getInstance(android.icu.util.ULocale("fa_IR@calendar=persian")).apply {
                             timeInMillis = date.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
                         }
                         val key = "%04d-%02d-%02d".format(persian.get(android.icu.util.Calendar.YEAR),
                             persian.get(android.icu.util.Calendar.MONTH) + 1, persian.get(android.icu.util.Calendar.DAY_OF_MONTH))
                         val dayPlans = plans.filter { it.dateKey == key }.sortedWith(compareBy({ it.hour }, { it.minute }))
-                        Card {
-                            Column(Modifier.fillMaxWidth().padding(12.dp)) {
-                                Text(listOf("شنبه","یکشنبه","دوشنبه","سه‌شنبه","چهارشنبه","پنجشنبه","جمعه")[dates.indexOf(date)] + " · " + key, fontWeight = FontWeight.SemiBold)
-                                if (dayPlans.isEmpty()) Text("برنامه‌ای ثبت نشده", style = MaterialTheme.typography.labelMedium)
+                        Card(modifier = Modifier.width(142.dp).heightIn(min = 290.dp),
+                            colors = CardDefaults.cardColors(containerColor =
+                                listOf(0xFFF8DDD4,0xFFFFF0C5,0xFFDFF0DD,0xFFD5EFED,0xFFDCE9FB,0xFFE8E0FA,0xFFF8DDE7)[index].let {
+                                    androidx.compose.ui.graphics.Color(it)
+                                })) {
+                            Column(Modifier.padding(9.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(listOf("شنبه","یکشنبه","دوشنبه","سه‌شنبه","چهارشنبه","پنجشنبه","جمعه")[index],
+                                    fontWeight = FontWeight.Bold)
+                                Text(key, style = MaterialTheme.typography.labelSmall)
+                                if (dayPlans.isEmpty()) Text("بدون برنامه", style = MaterialTheme.typography.labelSmall)
                                 dayPlans.forEach { plan ->
-                                    Text("%02d:%02d  %s".format(plan.hour, plan.minute, plan.title),
-                                        style = MaterialTheme.typography.bodyMedium)
+                                    ElevatedCard(shape = RoundedCornerShape(10.dp)) {
+                                        Column(Modifier.padding(8.dp)) {
+                                            Text(plan.title, fontWeight = FontWeight.SemiBold)
+                                            Text("%02d:%02d".format(plan.hour, plan.minute),
+                                                style = MaterialTheme.typography.labelSmall)
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
                 }
+
             }
             1 -> {
                 OutlinedTextField(groupName, { groupName = it }, label = { Text("نام گروه") }, modifier = Modifier.fillMaxWidth())
