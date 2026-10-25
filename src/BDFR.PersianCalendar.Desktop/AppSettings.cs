@@ -82,6 +82,14 @@ public sealed class AppSettings
     // Stable local identity used by Zurvan Companion pairing.
     public string CompanionDeviceId { get; set; } = "";
 
+    // Prayer-time calculation settings (local astronomical estimates).
+    public string PrayerSchool { get; set; } = "jafari";
+    public string PrayerMethod { get; set; } = "tehran";
+    public string PrayerCity { get; set; } = "تهران";
+    public double PrayerLatitude { get; set; } = 35.6892;
+    public double PrayerLongitude { get; set; } = 51.3890;
+    public string PrayerTimeZone { get; set; } = "Asia/Tehran";
+
     // Global UI typography.
     public string FontFamilyName { get; set; } = "Segoe UI Variable";
 
