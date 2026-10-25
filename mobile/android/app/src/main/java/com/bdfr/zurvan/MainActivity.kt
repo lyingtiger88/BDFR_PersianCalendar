@@ -11,6 +11,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.*
@@ -233,7 +235,7 @@ private fun ZurvanMobileShell(
                         .padding(padding)
                         .fillMaxSize()
                         .pointerInput(selected, licensed) {
-                            androidx.compose.foundation.gestures.detectHorizontalDragGestures(
+                            detectHorizontalDragGestures(
                                 onDragStart = { horizontalDistance = 0f },
                                 onHorizontalDrag = { _, amount -> horizontalDistance += amount },
                                 onDragCancel = { horizontalDistance = 0f },
