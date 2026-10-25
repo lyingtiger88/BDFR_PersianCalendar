@@ -34,8 +34,8 @@ struct ContentView: View {
                 } else {
                     ZurvanLockedView()
                 }
-                    .navigationTitle("Zurvan Desk")
             }
+            .navigationTitle("Zurvan Desk")
             .tabItem {
                 Label("زروان دسک", systemImage: "externaldrive.connected.to.line.below")
             }
