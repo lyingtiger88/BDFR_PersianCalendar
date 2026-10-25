@@ -5,6 +5,11 @@ package com.bdfr.zurvan
  * These are fixed Gregorian/Persian dates only; lunar occasions require a yearly verified source.
  */
 object ZurvanBuiltInOccasions {
+    @Volatile private var downloaded: List<LocalOccasion>? = null
+    fun reload(context: android.content.Context) {
+        downloaded = ZurvanOccasionDatabase.current(context)
+    }
+
     private data class Record(val calendar: CalendarPriority, val month: Int, val day: Int, val title: String)
     private val entries = listOf(
         Record(CalendarPriority.GREGORIAN, 11, 14, "روز جهانی دیابت"),
@@ -23,7 +28,14 @@ object ZurvanBuiltInOccasions {
     )
 
     fun onDay(day: CalendarDayCell, custom: List<LocalOccasion>): List<LocalOccasion> {
-        val builtIn = entries.filter { entry ->
+        val updated = downloaded
+        val builtIn = if (updated != null) updated.filter { entry ->
+            when (entry.calendar) {
+                CalendarPriority.PERSIAN -> entry.month == day.persianMonth && entry.day == day.persianDay
+                CalendarPriority.GREGORIAN -> entry.month == day.gregorianMonth && entry.day == day.gregorianDay
+                CalendarPriority.HIJRI -> false
+            }
+        } else entries.filter { entry ->
             when (entry.calendar) {
                 CalendarPriority.PERSIAN -> entry.month == day.persianMonth && entry.day == day.persianDay
                 CalendarPriority.GREGORIAN -> entry.month == day.gregorianMonth && entry.day == day.gregorianDay
