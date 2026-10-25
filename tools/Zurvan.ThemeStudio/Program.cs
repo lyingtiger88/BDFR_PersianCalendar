@@ -201,9 +201,7 @@ internal sealed class Studio : Form
                 using var stream = File.Create(dialog.FileName);
                 using var archive = new ZipArchive(stream, ZipArchiveMode.Create);
                 var entry = archive.CreateEntry("theme.json");
-                using var writer = new StreamWriter(entry.Open());
-                writer.Write(data);
-                writer.Flush();
+                using (var writer = new StreamWriter(entry.Open())) writer.Write(data);
                 if (wallpaperFile != null && wallpaperName != null)
                     archive.CreateEntryFromFile(wallpaperFile, wallpaperName, CompressionLevel.Optimal);
             }
@@ -235,6 +233,21 @@ internal sealed class Studio : Form
                 throw new InvalidDataException("رنگ‌های تم ناقص یا نامعتبر هستند.");
             if (!baseTheme.Items.Contains(data.ThemeId)) throw new InvalidDataException("تم پایه ناشناخته است.");
             foreach (var f in Fields) { colors[f.Key] = ColorTranslator.FromHtml(data.Colors[f.Key]); swatches[f.Key].BackColor = colors[f.Key]; }
+            wallpaperFile = null;
+            wallpaperLabel.Text = "بدون تصویر اختصاصی";
+            if (data.Wallpaper != null && dialog.FileName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+            {
+                var filename = data.Wallpaper.File;
+                if (!Regex.IsMatch(filename, @"^wallpaper\.(jpg|jpeg|png|webp)$", RegexOptions.IgnoreCase))
+                    throw new InvalidDataException("نام فایل تصویر نامعتبر است.");
+                using var imageArchive = ZipFile.OpenRead(dialog.FileName);
+                var imageEntry = imageArchive.GetEntry(filename) ?? throw new InvalidDataException("تصویر در بسته یافت نشد.");
+                if (imageEntry.Length > 12_000_000) throw new InvalidDataException("حجم تصویر بیش از حد است.");
+                var temp = Path.Combine(Path.GetTempPath(), "zurvan-theme-" + Guid.NewGuid().ToString("N") + Path.GetExtension(filename));
+                imageEntry.ExtractToFile(temp);
+                wallpaperFile = temp;
+                wallpaperLabel.Text = "تصویر تم: " + filename;
+            }
             themeName.Text = data.Name;
             baseTheme.SelectedItem = data.ThemeId;
             Select(selected);
