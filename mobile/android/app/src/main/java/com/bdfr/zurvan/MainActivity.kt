@@ -485,20 +485,39 @@ private fun CalendarScreen(
                 horizontalAlignment =
                     Alignment.CenterHorizontally
             ) {
-                Text(
-                    text =
-                        model.monthName +
-                            " " +
-                            toPersianDigits(
-                                model.year.toString()
-                            ),
-                    style =
-                        MaterialTheme
-                            .typography
-                            .titleLarge,
-                    fontWeight =
-                        FontWeight.Bold
-                )
+                var monthsMenu by remember { mutableStateOf(false) }
+                var yearsMenu by remember { mutableStateOf(false) }
+                val monthSymbols = listOf("🌷","🌱","☀️","🌞","🌻","🌾","🍂","🍁","🌧️","❄️","☃️","🌸")
+                val monthNames = listOf("فروردین","اردیبهشت","خرداد","تیر","مرداد","شهریور","مهر","آبان","آذر","دی","بهمن","اسفند")
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box {
+                        TextButton(onClick = { monthsMenu = true }) {
+                            Text(monthSymbols[month - 1] + " " + model.monthName + " ▾",
+                                fontWeight = FontWeight.Bold)
+                        }
+                        DropdownMenu(expanded = monthsMenu, onDismissRequest = { monthsMenu = false }) {
+                            monthNames.forEachIndexed { index, name ->
+                                DropdownMenuItem(
+                                    text = { Text(monthSymbols[index] + " " + name) },
+                                    onClick = { month = index + 1; monthsMenu = false }
+                                )
+                            }
+                        }
+                    }
+                    Box {
+                        TextButton(onClick = { yearsMenu = true }) {
+                            Text(toPersianDigits(year.toString()) + " ▾", fontWeight = FontWeight.Bold)
+                        }
+                        DropdownMenu(expanded = yearsMenu, onDismissRequest = { yearsMenu = false }) {
+                            ((year - 20)..(year + 20)).forEach { value ->
+                                DropdownMenuItem(
+                                    text = { Text(toPersianDigits(value.toString())) },
+                                    onClick = { year = value; yearsMenu = false }
+                                )
+                            }
+                        }
+                    }
+                }
 
                 Text(
                     text =
@@ -628,6 +647,9 @@ private fun CalendarScreen(
                     day = day,
                     isHoliday = ZurvanDayFlags.isHoliday(day, occasions),
                     isMourning = ZurvanDayFlags.isMourning(day, occasions),
+                    hasOccasion = occasions.any { occasionMatches(day, it) },
+                    isCelebration = occasions.any { occasionMatches(day, it) &&
+                        listOf("عید", "میلاد", "جشن", "ولادت").any { key -> it.title.contains(key) } },
                     calendarOrder =
                         preferences
                             .calendarOrder,
@@ -838,6 +860,8 @@ private fun CalendarDayCard(
     day: CalendarDayCell,
     isHoliday: Boolean,
     isMourning: Boolean,
+    hasOccasion: Boolean,
+    isCelebration: Boolean,
     calendarOrder:
         List<CalendarPriority>,
     cornerRadius: Float,
@@ -959,6 +983,20 @@ private fun CalendarDayCard(
                     modifier = Modifier.align(Alignment.TopStart),
                     // Small black corner ribbon, distinct from holiday red text.
                 )
+            }
+
+            if (!isMourning && isCelebration) {
+                Text("🎁", modifier = Modifier.align(Alignment.TopStart),
+                    style = MaterialTheme.typography.labelMedium)
+            } else if (!isMourning && hasOccasion) {
+                Box(Modifier.align(Alignment.TopStart).size(7.dp).background(
+                    if (isHoliday) Color.Red else MaterialTheme.colorScheme.primary,
+                    RoundedCornerShape(100)
+                ))
+            }
+            if (isHoliday && !day.isFriday) {
+                Box(Modifier.align(Alignment.TopEnd).size(6.dp)
+                    .background(Color.Red, RoundedCornerShape(100)))
             }
 
             if (hasContent) {
