@@ -2342,35 +2342,13 @@ private fun SettingsScreen(
     }
 
     pickingColorFor?.let { colorKey ->
-        var red by remember(colorKey) { mutableFloatStateOf(0.3f) }
-        var green by remember(colorKey) { mutableFloatStateOf(0.6f) }
-        var blue by remember(colorKey) { mutableFloatStateOf(0.8f) }
-        AlertDialog(
-            onDismissRequest = { pickingColorFor = null },
-            title = { Text("انتخاب رنگ") },
-            text = {
-                Column {
-                    Surface(
-                        modifier = Modifier.fillMaxWidth().height(48.dp),
-                        color = Color(red, green, blue)
-                    ) {}
-                    Text("قرمز")
-                    Slider(value = red, onValueChange = { red = it })
-                    Text("سبز")
-                    Slider(value = green, onValueChange = { green = it })
-                    Text("آبی")
-                    Slider(value = blue, onValueChange = { blue = it })
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    val hex = String.format(java.util.Locale.US, "#%02X%02X%02X",
-                        (red * 255).toInt(), (green * 255).toInt(), (blue * 255).toInt())
-                    setColorOverride(colorKey, hex)
-                    pickingColorFor = null
-                }) { Text("اعمال") }
-            },
-            dismissButton = { TextButton(onClick = { pickingColorFor = null }) { Text("انصراف") } }
+        ZurvanColorEditor(
+            initialKey = colorKey,
+            overrides = colorOverrides,
+            defaults = palette,
+            onApply = { key, hex -> setColorOverride(key, hex) },
+            onReset = { key -> setColorOverride(key, null) },
+            onDismiss = { pickingColorFor = null }
         )
     }
 
@@ -2394,44 +2372,32 @@ private fun SettingsScreen(
             }
         }
         item {
-            SettingsCard(title = "پالت اختصاصی رنگ عناصر") {
+            SettingsCard(title = "انتخاب رنگ عناصر") {
+                Text("چرخه رنگ حرفه‌ای با پیش‌نمایش زنده برای هر بخش برنامه")
+                Button(
+                    onClick = { pickingColorFor = "accent" },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("باز کردن پالت رنگ و پیش‌نمایش") }
                 listOf(
-                    "background" to "پس‌زمینه اصلی",
-                    "surface" to "پنل‌ها و سربرگ‌ها",
-                    "card" to "کارت‌ها و بخش‌ها",
-                    "ink" to "رنگ متن",
-                    "accent" to "دکمه‌ها و رنگ تأکیدی",
-                    "holiday" to "تعطیلات و هشدارها"
+                    "surface" to "نوار بالا",
+                    "accent" to "دکمه‌ها",
+                    "card" to "کارت‌ها",
+                    "holiday" to "روز تعطیل",
+                    "background" to "پس‌زمینه",
+                    "ink" to "رنگ متن"
                 ).forEach { (key, label) ->
-                    var value by remember(key, palette.id, colorOverrides[key]) {
-                        mutableStateOf(colorOverrides[key] ?: "")
-                    }
-                    Column {
-                        Text(label, style = MaterialTheme.typography.labelMedium)
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            OutlinedTextField(
-                                value = value,
-                                onValueChange = { next ->
-                                    value = next.take(7)
-                                    if (Regex("^#[0-9A-Fa-f]{6}$").matches(value)) {
-                                        setColorOverride(key, value)
-                                    }
-                                },
-                                modifier = Modifier.weight(1f),
-                                singleLine = true,
-                                label = { Text("#RRGGBB") }
-                            )
-                            TextButton(onClick = { pickingColorFor = key }) {
-                                Text("پالت")
-                            }
-                            TextButton(onClick = { setColorOverride(key, null) }) {
-                                Text("پیش‌فرض")
-                            }
-                        }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(label)
+                        TextButton(onClick = { pickingColorFor = key }) { Text("تغییر رنگ") }
                     }
                 }
             }
         }
+
         item {
             SettingsCard(title = "وضعیت لایسنس زروان") {
                 var activatedCode by remember {
