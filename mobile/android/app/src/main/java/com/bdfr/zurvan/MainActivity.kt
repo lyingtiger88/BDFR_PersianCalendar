@@ -2411,6 +2411,10 @@ private fun SettingsScreen(
                     val ownerName = when (activatedCode?.trim()) {
                         "elena13731005" -> "محبوب زیبای من ❤️❤️❤️"
                         "zarasamtestmode" -> "ارزشمندترین دوست 😁🤔😍"
+                        "delaramsoftheart" -> "دل آرام و قلب پاک من 🌷🤍"
+                        "shirinquietfox" -> "شیطون باهوش و دوست‌داشتنی 🦊😉"
+                        "nazaninstrongcare" -> "لجباز مهربون و حامی قشنگم 💪💗"
+                        "mehrbanmomfriend" -> "مامان مهربون و رفیق بی‌نظیرم 🌸❤️"
                         else -> "دارنده لایسنس معتبر زروان"
                     }
                     Text("ثبت شده به نام : $ownerName")
