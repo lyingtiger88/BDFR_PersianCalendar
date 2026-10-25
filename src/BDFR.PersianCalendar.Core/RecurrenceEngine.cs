@@ -16,7 +16,8 @@ public static class RecurrenceEngine
                 target.Day == Math.Min(start.Day, PersianDate.DaysInMonth(target.Year, target.Month)),
             RecurrenceKind.Yearly =>
                 target.Month == start.Month &&
-                target.Day == Math.Min(start.Day, PersianDate.DaysInMonth(target.Year, start.Month)),
+                start.Day <= PersianDate.DaysInMonth(target.Year, start.Month) &&
+                target.Day == start.Day,
             _ => false
         };
     }
