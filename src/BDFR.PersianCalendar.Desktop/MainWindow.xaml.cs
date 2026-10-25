@@ -1407,6 +1407,8 @@ public sealed partial class MainWindow : Window
             Foreground = ThemeService.Brush(_theme.SecondaryText)
         });
 
+        _settingsPanel.Children.Add(BuildDesktopPrayerSettings());
+
         var isElena = string.Equals(
             _settings.AppearanceMode,
             "elena",
