@@ -26,6 +26,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
@@ -4548,31 +4549,40 @@ private fun EmptyState(
 @Composable
 private fun SettingsCard(
     title: String,
-    content:
-        @Composable ColumnScope.() -> Unit
+    content: @Composable ColumnScope.() -> Unit
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.medium
-    ) {
-        Column(
-            modifier =
-                Modifier.padding(16.dp),
-            verticalArrangement =
-                Arrangement.spacedBy(
-                    8.dp
+    var expanded by rememberSaveable(title) { mutableStateOf(false) }
+    val symbol = when {
+        title.contains("تم") || title.contains("رنگ") || title.contains("قالب") -> "🎨"
+        title.contains("اذان") || title.contains("شرعی") -> "🕌"
+        title.contains("زبان") -> "🌐"
+        title.contains("لایسنس") -> "🔑"
+        title.contains("قفل") || title.contains("امنیت") -> "🔒"
+        title.contains("تصویر") -> "🖼️"
+        title.contains("تقویم") || title.contains("هفته") -> "📅"
+        title.contains("اعلان") || title.contains("یادآور") -> "🔔"
+        title.contains("Navigation") -> "↔️"
+        else -> "⚙️"
+    }
+    Card(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded }.padding(4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(symbol, style = MaterialTheme.typography.titleLarge)
+                Text(title, modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Icon(
+                    if (expanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
+                    contentDescription = if (expanded) "بستن بخش" else "باز کردن بخش"
                 )
-        ) {
-            Text(
-                title,
-                style =
-                    MaterialTheme
-                        .typography
-                        .titleMedium,
-                fontWeight =
-                    FontWeight.SemiBold
-            )
-            content()
+            }
+            if (expanded) {
+                HorizontalDivider()
+                content()
+            }
         }
     }
 }
