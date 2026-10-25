@@ -28,22 +28,16 @@ object ZurvanBuiltInOccasions {
     )
 
     fun onDay(day: CalendarDayCell, custom: List<LocalOccasion>): List<LocalOccasion> {
-        val updated = downloaded
-        val builtIn = if (updated != null) updated.filter { entry ->
-            when (entry.calendar) {
-                CalendarPriority.PERSIAN -> entry.month == day.persianMonth && entry.day == day.persianDay
-                CalendarPriority.GREGORIAN -> entry.month == day.gregorianMonth && entry.day == day.gregorianDay
-                CalendarPriority.HIJRI -> false
-            }
-        } else entries.filter { entry ->
+        val base = downloaded ?: entries.mapIndexed { index, entry ->
+            LocalOccasion("builtin-${entry.calendar.key}-${entry.month}-${entry.day}-$index",
+                entry.title, entry.calendar, entry.month, entry.day, 0, 0)
+        }
+        val builtIn = base.filter { entry ->
             when (entry.calendar) {
                 CalendarPriority.PERSIAN -> entry.month == day.persianMonth && entry.day == day.persianDay
                 CalendarPriority.GREGORIAN -> entry.month == day.gregorianMonth && entry.day == day.gregorianDay
                 CalendarPriority.HIJRI -> entry.month == day.hijriMonth && entry.day == day.hijriDay
             }
-        }.mapIndexed { index, entry ->
-            LocalOccasion("builtin-${entry.calendar.key}-${entry.month}-${entry.day}-$index",
-                entry.title, entry.calendar, entry.month, entry.day, 0, 0)
         }
         val userOccasions = custom.filter { occasion ->
             // Recurrence follows its source calendar; avoid nonexistent leap dates.
