@@ -2318,6 +2318,8 @@ private fun SettingsScreen(
     }
 
     val palette = ZurvanThemes.active.current
+    val selectedElenaImage = ZurvanThemes.elenaImage.current
+    val selectElenaImage = ZurvanThemes.setElenaImage.current
     val setPalette = ZurvanThemes.setActive.current
     val colorOverrides = ZurvanThemes.customColors.current
     val setColorOverride = ZurvanThemes.setCustomColor.current
@@ -2549,6 +2551,29 @@ private fun SettingsScreen(
                         Text(option.label, modifier = Modifier.clickable {
                             setPalette(option.id)
                         })
+                    }
+                }
+            }
+        }
+
+        if (palette.id == "elena-mode") {
+            item {
+                SettingsCard(title = "تصاویر اختصاصی Elena Mode") {
+                    Text("۱۱ تصویر در خود برنامه قرار دارند. حالت خودکار هر روز یک تصویر انتخاب می‌کند.")
+                    var elenaMenu by remember { mutableStateOf(false) }
+                    Box {
+                        OutlinedButton(onClick = { elenaMenu = true }) {
+                            Text(if (selectedElenaImage == 0) "تعویض خودکار روزانه" else "تصویر شماره $selectedElenaImage")
+                        }
+                        DropdownMenu(expanded = elenaMenu, onDismissRequest = { elenaMenu = false }) {
+                            DropdownMenuItem(text = { Text("خودکار (هر روز)") }, onClick = { selectElenaImage(0); elenaMenu = false })
+                            (1..11).forEach { imageIndex ->
+                                DropdownMenuItem(text = { Text("تصویر $imageIndex") }, onClick = {
+                                    selectElenaImage(imageIndex)
+                                    elenaMenu = false
+                                })
+                            }
+                        }
                     }
                 }
             }
