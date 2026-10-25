@@ -5526,7 +5526,7 @@ public sealed partial class MainWindow : Window
             {
                 EventsPanel.Children.Add(new TextBlock
                 {
-                    Text = $"{(item.Privacy == PrivacyLevel.Private ? "🔒 " : "")}{(item.StartTime is null ? "تمام‌روز" : item.StartTime.Value.ToString("HH:mm"))}  {item.Title}",
+                    Text = $"{(item.Privacy == PrivacyLevel.Private ? "🔒 " : "")}{(string.IsNullOrWhiteSpace(item.Category) ? "📌" : item.Category)} {(item.StartTime is null ? "تمام‌روز" : item.StartTime.Value.ToString("HH:mm"))}  {item.Title}",
                     TextWrapping = TextWrapping.Wrap
                 });
             }
@@ -6040,6 +6040,15 @@ public sealed partial class MainWindow : Window
             hourBox.Text = "09";
             minuteBox.Text = "00";
 
+            var iconPicker = new ComboBox
+            {
+                Header = "نماد کارت روز",
+                HorizontalAlignment = HorizontalAlignment.Stretch
+            };
+            foreach (var icon in new[] { "📌", "📚", "🎓", "💼", "🏥", "🏃", "🎨", "🎵", "🎉", "📝", "💻", "🏠", "✈️", "⚽", "🛒", "💊" })
+                iconPicker.Items.Add(icon);
+            iconPicker.SelectedIndex = 0;
+
             var privateCheck = new CheckBox
             {
                 Content = "خصوصی — جزئیات در اعلان ویندوز نمایش داده نشود",
@@ -6084,6 +6093,7 @@ public sealed partial class MainWindow : Window
             form.Children.Add(hourBox);
             form.Children.Add(minuteBox);
             form.Children.Add(privateCheck);
+            form.Children.Add(iconPicker);
             form.Children.Add(reminderBeforeBox);
             form.Children.Add(repeatCountBox);
             form.Children.Add(repeatIntervalBox);
@@ -6172,7 +6182,8 @@ public sealed partial class MainWindow : Window
                 reminderMinutes: [reminderBefore],
                 privacy: privacy,
                 reminderRepeatCount: repeatCount,
-                reminderRepeatIntervalMinutes: repeatInterval);
+                reminderRepeatIntervalMinutes: repeatInterval,
+                icon: iconPicker.SelectedItem?.ToString());
 
             _selected = eventDate.Persian;
             _year = _selected.Year;
