@@ -43,7 +43,9 @@ private val targets = listOf(
     "card" to "کارت‌ها",
     "holiday" to "روز تعطیل",
     "background" to "پس‌زمینه",
-    "ink" to "رنگ متن"
+    "ink" to "رنگ متن",
+    "weekday0" to "شنبه", "weekday1" to "یکشنبه", "weekday2" to "دوشنبه",
+    "weekday3" to "سه‌شنبه", "weekday4" to "چهارشنبه", "weekday5" to "پنجشنبه", "weekday6" to "جمعه"
 )
 
 private fun asHex(h: Float, s: Float, v: Float): String =
@@ -54,12 +56,14 @@ fun ZurvanColorEditor(
     initialKey: String,
     overrides: Map<String, String>,
     defaults: ZurvanPalette,
+    weekdayDefaults: List<Color> = emptyList(),
     onApply: (String, String) -> Unit,
     onReset: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
     var target by remember { mutableStateOf(initialKey) }
     fun fallback(key: String): Color = when (key) {
+        in listOf("weekday0","weekday1","weekday2","weekday3","weekday4","weekday5","weekday6") -> weekdayDefaults.getOrNull(key.last().digitToInt()) ?: Color.White
         "surface" -> defaults.surface
         "accent" -> defaults.accent
         "card" -> defaults.card
@@ -185,8 +189,8 @@ fun ZurvanColorEditor(
                             }
                             Row(Modifier.fillMaxWidth().padding(10.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
                                 listOf("۲۵", "۲۶", "۲۷", "۲۸", "۲۹", "۳۰", "۱").forEachIndexed { i, day ->
-                                    Text(day, Modifier.background(if (i == 4) holidayColor else Color.Transparent,
-                                        CircleShape).padding(6.dp), color = if (i == 4) Color.White else inkColor, fontSize = 12.sp)
+                                    Text(day, Modifier.background(if (target == "weekday$i") chosen else weekdayDefaults.getOrNull(i) ?: cardColor,
+                                        RoundedCornerShape(6.dp)).padding(6.dp), color = inkColor, fontSize = 12.sp)
                                 }
                             }
                             Row(Modifier.fillMaxWidth().padding(10.dp), horizontalArrangement = Arrangement.End) {
