@@ -17,7 +17,8 @@ public sealed class PlannerService(
         RecurrenceKind recurrence = RecurrenceKind.None,
         PrivacyLevel privacy = PrivacyLevel.Public,
         int reminderRepeatCount = 1,
-        int reminderRepeatIntervalMinutes = 5)
+        int reminderRepeatIntervalMinutes = 5,
+        string? icon = null)
     {
         var calendarEvent = new CalendarEvent(
             Guid.NewGuid().ToString("N"),
@@ -27,6 +28,7 @@ public sealed class PlannerService(
             start.AddMinutes(durationMinutes),
             false,
             Recurrence: recurrence,
+            Category: icon,
             Privacy: privacy);
 
         await repository.AddEventAsync(calendarEvent, cancellationToken);
