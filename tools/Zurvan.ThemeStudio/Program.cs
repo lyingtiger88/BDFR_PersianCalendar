@@ -23,7 +23,7 @@ internal sealed class ThemeFile
     public string Name { get; set; } = "تم اختصاصی";
     public string ThemeId { get; set; } = "windows-light";
     public Dictionary<string, string> Colors { get; set; } = new();
-    public ThemeWallpaper? Wallpaper { get; set; };
+    public ThemeWallpaper? Wallpaper { get; set; }
 }
 
 internal sealed class ThemeWallpaper
@@ -250,6 +250,18 @@ internal sealed class Studio : Form
         var h = preview.ClientSize.Height;
         if (w < 100 || h < 150) return;
         g.Clear(colors["background"]);
+        if (wallpaperFile != null && File.Exists(wallpaperFile))
+        {
+            try {
+                using var image = Image.FromFile(wallpaperFile);
+                var factor = Math.Max((float)w / image.Width, (float)h / image.Height);
+                var width = (int)(image.Width * factor);
+                var height = (int)(image.Height * factor);
+                g.DrawImage(image, new Rectangle((w - width) / 2, (h - height) / 2, width, height));
+                using var veil = new SolidBrush(Color.FromArgb(145, colors["background"]));
+                g.FillRectangle(veil, 0, 0, w, h);
+            } catch { /* a corrupt preview image never prevents exporting colors */ }
+        }
         using var ink = new SolidBrush(colors["ink"]);
         using var heading = new Font("Segoe UI", 15, FontStyle.Bold);
         using var body = new Font("Segoe UI", 10);
