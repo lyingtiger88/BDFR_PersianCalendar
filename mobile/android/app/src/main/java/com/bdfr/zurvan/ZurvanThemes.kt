@@ -33,6 +33,8 @@ object ZurvanThemes {
     val wallpaper = staticCompositionLocalOf<String?> { null }
     val setWallpaper = staticCompositionLocalOf<(String?) -> Unit> { {} }
     val refreshAppearance = staticCompositionLocalOf<() -> Unit> { {} }
+    val elenaImage = staticCompositionLocalOf<Int> { 0 }
+    val setElenaImage = staticCompositionLocalOf<(Int) -> Unit> { {} }
 
     private val zaraWeekdays = listOf(
         "#F8DDD4", "#FFF0C5", "#DFF0DD", "#D5EFED", "#DCE9FB", "#E8E0FA", "#F8DDE7"
@@ -45,6 +47,7 @@ object ZurvanThemes {
         var selected by remember { mutableStateOf(prefs.getString("theme", "windows-light") ?: "windows-light") }
         var wallpaperPath by remember { mutableStateOf(prefs.getString("wallpaper", null)) }
         var appearanceRevision by remember { mutableIntStateOf(0) }
+        var elenaImageIndex by remember { mutableIntStateOf(prefs.getInt("elena_picture", 0).coerceIn(0, 11)) }
         var overrides by remember(selected, appearanceRevision) {
             mutableStateOf(listOf("background","surface","card","ink","accent","holiday").mapNotNull { key ->
                 prefs.getString("color.$selected.$key", null)?.let { key to it }
@@ -88,7 +91,15 @@ object ZurvanThemes {
             refreshAppearance provides {
                 selected = prefs.getString("theme", "windows-light") ?: "windows-light"
                 wallpaperPath = prefs.getString("wallpaper", null)
+                elenaImageIndex = prefs.getInt("elena_picture", 0).coerceIn(0, 11)
                 appearanceRevision++
+            },
+            elenaImage provides elenaImageIndex,
+            setElenaImage provides { index ->
+                if (index in 0..11) {
+                    elenaImageIndex = index
+                    prefs.edit().putInt("elena_picture", index).apply()
+                }
             },
             weekdayColors provides weekdayPalette,
             setWeekdayColor provides { index, value ->
@@ -142,15 +153,22 @@ object ZurvanThemes {
             else -> "winter"
         }
         val prefs = remember { context.getSharedPreferences("zurvan_appearance", Context.MODE_PRIVATE) }
-        val elenaIndex = prefs.getInt("elena_picture", 1).coerceIn(1, 11)
+        val chosenIndex = elenaImage.current
+        val todayIndex = remember {
+            val cal = java.util.Calendar.getInstance()
+            (cal.get(java.util.Calendar.DAY_OF_YEAR) - 1) % 11 + 1
+        }
+        val elenaIndex = if (chosenIndex == 0) todayIndex else chosenIndex
         val asset = when (theme) {
             "season-vibe" -> "themes/season-vibe/$season.jpg"
-            "elena-mode" -> "themes/elena-mode/elena-%02d.jpg".format(elenaIndex)
+            "elena-mode" -> "themes/elena-mode/elena-%02d.jpg".format(java.util.Locale.US, elenaIndex)
             else -> null
         }
-        val bitmap = remember(path, asset) {
+        // Theme artwork takes precedence over unrelated custom wallpaper from another theme.
+        val activePath = if (asset != null) null else path
+        val bitmap = remember(activePath, asset) {
             runCatching {
-                if (path != null) BitmapFactory.decodeFile(path)?.asImageBitmap()
+                if (activePath != null) BitmapFactory.decodeFile(activePath)?.asImageBitmap()
                 else if (asset != null) context.assets.open(asset).use { stream ->
                     BitmapFactory.decodeStream(stream)?.asImageBitmap()
                 }
