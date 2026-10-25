@@ -15,6 +15,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -173,11 +175,25 @@ fun ZurvanColorEditor(
                 Surface(shape = RoundedCornerShape(20.dp), color = Color.White) {
                     Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text("رنگ انتخاب‌شده", fontWeight = FontWeight.SemiBold)
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            ZurvanHueWheel(hue, saturation, brightness, { hue = it }, { s, v -> saturation = s; brightness = v },
-                                Modifier.weight(1f).aspectRatio(1f))
-                            Column(Modifier.weight(0.75f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                                Box(Modifier.fillMaxWidth().height(52.dp).background(chosen, RoundedCornerShape(12.dp)))
+                        // Stack controls on phones: a side-by-side layout makes the wheel
+                        // compete with the HEX field and clips the interaction surface.
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            ZurvanHueWheel(
+                                hue, saturation, brightness,
+                                { hue = it },
+                                { valueS, valueV -> saturation = valueS; brightness = valueV },
+                                Modifier.size(216.dp)
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Box(Modifier.size(48.dp).background(chosen, RoundedCornerShape(10.dp)))
                                 OutlinedTextField(
                                     value = typed.ifEmpty { hex },
                                     onValueChange = { input ->
@@ -188,19 +204,23 @@ fun ZurvanColorEditor(
                                             hue = hsv[0]; saturation = hsv[1]; brightness = hsv[2]
                                         }
                                     },
-                                    label = { Text("HEX") }, singleLine = true,
-                                    modifier = Modifier.fillMaxWidth(),
-                                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp),
+                                    label = { Text("HEX") },
+                                    singleLine = true,
+                                    modifier = Modifier.weight(1f),
+                                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 14.sp),
                                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters)
                                 )
-                                OutlinedButton(onClick = {
+                                IconButton(onClick = {
                                     val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
                                     clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Color HEX", hex))
-                                }, modifier = Modifier.fillMaxWidth()) { Text("کپی HEX", fontSize = 11.sp) }
-                                Text("H: ${hue.toInt()}°", fontSize = 12.sp)
-                                Text("S: ${(saturation * 100).toInt()}%", fontSize = 12.sp)
-                                Text("V: ${(brightness * 100).toInt()}%", fontSize = 12.sp)
+                                }) {
+                                    Icon(Icons.Outlined.ContentCopy, contentDescription = "کپی کد HEX")
+                                }
                             }
+                            Text(
+                                "H: ${hue.toInt()}°     S: ${(saturation * 100).toInt()}%     V: ${(brightness * 100).toInt()}%",
+                                fontSize = 12.sp, color = Color.DarkGray
+                            )
                         }
                     }
                 }
