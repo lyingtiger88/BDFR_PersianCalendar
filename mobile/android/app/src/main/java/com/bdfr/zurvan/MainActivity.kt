@@ -2406,6 +2406,11 @@ private fun SettingsScreen(
             }
         }
         item {
+            SettingsCard(title = "اوقات شرعی و اذان") {
+                ZurvanPrayerSettings()
+            }
+        }
+        item {
             SettingsCard(title = "افزودن قالب از فایل") {
                 Text("تم ساخته‌شده در Zurvan Theme Studio را از JSON یا ZIP وارد کنید.")
                 Button(onClick = { themePicker.launch(arrayOf("application/json", "application/zip", "application/octet-stream", "*/*")) }) {
