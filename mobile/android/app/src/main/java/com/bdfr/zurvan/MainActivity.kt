@@ -725,6 +725,7 @@ private fun CalendarScreen(
                     cornerRadius =
                         preferences
                             .cornerRadius,
+                    planIcons = plans.filter { it.dateKey == day.persianKey }.map { it.icon },
                     hasContent =
                         dayHasContent,
                     onClick = {
@@ -931,6 +932,7 @@ private fun CalendarDayCard(
         List<CalendarPriority>,
     cornerRadius: Float,
     hasContent: Boolean,
+    planIcons: List<String>,
     onClick: () -> Unit
 ) {
     val weekdayColors = ZurvanThemes.weekdayColors.current
@@ -1064,6 +1066,19 @@ private fun CalendarDayCard(
                     .background(Color.Red, RoundedCornerShape(100)))
             }
 
+            if (planIcons.isNotEmpty()) {
+                Row(
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                    horizontalArrangement = Arrangement.spacedBy(1.dp)
+                ) {
+                    planIcons.distinct().take(2).forEach { symbol ->
+                        Text(symbol, style = MaterialTheme.typography.labelSmall)
+                    }
+                    if (planIcons.distinct().size > 2) {
+                        Text("+", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+            }
             if (hasContent) {
                 Box(
                     modifier =
