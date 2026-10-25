@@ -1171,6 +1171,7 @@ class AndroidLocalRepository(
                     .put("day", item.day)
                     .put("hour", item.hour)
                     .put("minute", item.minute)
+                    .put("annual", item.annual)
             )
         }
         preferences.edit()
@@ -1194,7 +1195,8 @@ class AndroidLocalRepository(
                 month = item.optInt("month", 1),
                 day = item.optInt("day", 1),
                 hour = item.optInt("hour", 9),
-                minute = item.optInt("minute", 0)
+                minute = item.optInt("minute", 0),
+                annual = item.optBoolean("annual", true)
             )
         }
 
