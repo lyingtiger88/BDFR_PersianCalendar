@@ -53,11 +53,6 @@ object ZurvanThemes {
                 prefs.getString("weekday.$selected.$index", null)?.let { index to it }
             }.toMap())
         }
-        val weekdayDefaults = if (selected == "zara-pastel") zaraWeekdays else neutralWeekdays
-        val weekdayPalette = (0..6).map { index ->
-            val hex = dayOverrides[index] ?: weekdayDefaults[index]
-            Color(android.graphics.Color.parseColor(hex))
-        }
         fun color(key: String, fallback: Color): Color =
             overrides[key]?.let { runCatching { Color(android.graphics.Color.parseColor(it)) }.getOrNull() } ?: fallback
         val season = when (AndroidCalendarEngine.currentPersianYearMonth().second) {
@@ -73,6 +68,12 @@ object ZurvanThemes {
             ZurvanPalette("season-vibe","Season Vibe",Color(0xFFE7F1FB),Color(0xFFF1F7FC),Color(0xFFE4F0FC),Color(0xFF19304A),Color(0xFF6AA4D8),Color(0xFFCE4452))
         )[season]
         val palette = if (selected == "season-vibe") seasonalPalette else presets.firstOrNull { it.id == selected } ?: presets.first()
+        val weekdayPalette = (0..6).map { index ->
+            val custom = dayOverrides[index]
+            if (custom != null) Color(android.graphics.Color.parseColor(custom))
+            else if (selected == "zara-pastel") Color(android.graphics.Color.parseColor(zaraWeekdays[index]))
+            else palette.card
+        }
         val isDark = selected == "graphite-night"
         val base = if (isDark) darkColorScheme() else lightColorScheme()
         val colors = base.copy(
