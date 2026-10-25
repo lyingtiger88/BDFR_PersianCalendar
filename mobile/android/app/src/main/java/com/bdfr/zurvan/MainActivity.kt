@@ -132,6 +132,15 @@ private fun ZurvanMobileShell(
         }
         return
     }
+    var appLanguage by remember { mutableStateOf(ZurvanLanguages.load(context)) }
+    val localePrefs = remember(context) { context.getSharedPreferences("zurvan_locale", Context.MODE_PRIVATE) }
+    DisposableEffect(localePrefs) {
+        val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == "language") appLanguage = ZurvanLanguages.load(context)
+        }
+        localePrefs.registerOnSharedPreferenceChangeListener(listener)
+        onDispose { localePrefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
     var selected by remember { mutableStateOf(ZurvanTab.Calendar) }
     LaunchedEffect(licensed) {
         if (!licensed && selected !in listOf(ZurvanTab.Calendar, ZurvanTab.Settings)) selected = ZurvanTab.Calendar
@@ -141,6 +150,7 @@ private fun ZurvanMobileShell(
         .uiPreferences
         .collectAsStateWithLifecycle()
 
+    CompositionLocalProvider(ZurvanLanguages.current provides appLanguage) {
     MaterialTheme(
         shapes = Shapes(
             extraSmall = RoundedCornerShape(uiPreferences.cornerRadius.dp),
@@ -222,7 +232,7 @@ private fun ZurvanMobileShell(
                                     )
                                 },
                                 label = {
-                                    Text(tab.label)
+                                    Text(ZurvanLanguages.text(ZurvanLanguages.current.current, tab.name.lowercase()))
                                 }
                             )
                         }
@@ -264,6 +274,7 @@ private fun ZurvanMobileShell(
                 }
             }
         }
+    }
     }
     }
 }
@@ -318,7 +329,7 @@ private fun ZurvanNavigationRail(
                     )
                 },
                 label = {
-                    Text(tab.label)
+                    Text(ZurvanLanguages.text(ZurvanLanguages.current.current, tab.name.lowercase()))
                 }
             )
         }
@@ -2371,6 +2382,27 @@ private fun SettingsScreen(
                 bottom = 24.dp
             )
     ) {
+        item {
+            val language = ZurvanLanguages.current.current
+            var languageMenu by remember { mutableStateOf(false) }
+            SettingsCard(title = ZurvanLanguages.text(language, "language")) {
+                Text(ZurvanLanguages.text(language, "languageNote"))
+                Box {
+                    OutlinedButton(onClick = { languageMenu = true }) {
+                        Text(ZurvanLanguages.options[language] ?: "فارسی")
+                        Icon(Icons.Outlined.ArrowDropDown, contentDescription = null)
+                    }
+                    DropdownMenu(expanded = languageMenu, onDismissRequest = { languageMenu = false }) {
+                        ZurvanLanguages.options.forEach { (code, label) ->
+                            DropdownMenuItem(text = { Text(label) }, onClick = {
+                                ZurvanLanguages.save(context, code)
+                                languageMenu = false
+                            })
+                        }
+                    }
+                }
+            }
+        }
         item {
             SettingsCard(title = "افزودن قالب از فایل") {
                 Text("تم ساخته‌شده در Zurvan Theme Studio را از JSON یا ZIP وارد کنید.")
