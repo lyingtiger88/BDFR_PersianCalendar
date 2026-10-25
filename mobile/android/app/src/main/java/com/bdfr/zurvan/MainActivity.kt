@@ -3973,6 +3973,10 @@ private fun OccasionDialog(
         mutableStateOf("00")
     }
 
+    val validAnnualDate = ZurvanBuiltInOccasions.validAnnualDate(
+        calendar, month.toIntOrNull() ?: -1, day.toIntOrNull() ?: -1
+    )
+
     AlertDialog(
         onDismissRequest =
             onDismiss,
@@ -4061,12 +4065,23 @@ private fun OccasionDialog(
                     { hour = it },
                     { minute = it }
                 )
+                if (!validAnnualDate) {
+                    Text("ماه یا روز در تقویم انتخاب‌شده معتبر نیست.",
+                        color = MaterialTheme.colorScheme.error)
+                } else if (calendar == CalendarPriority.PERSIAN &&
+                    month.toIntOrNull() == 12 && day.toIntOrNull() == 30) {
+                    Text("۳۰ اسفند فقط در سال‌های کبیسه نمایش داده می‌شود.")
+                } else if (calendar == CalendarPriority.GREGORIAN &&
+                    month.toIntOrNull() == 2 && day.toIntOrNull() == 29) {
+                    Text("۲۹ فوریه فقط در سال‌های کبیسه نمایش داده می‌شود.")
+                }
             }
         },
         confirmButton = {
             Button(
+                enabled = title.isNotBlank() && validAnnualDate,
                 onClick = {
-                    if (title.isNotBlank()) {
+                    if (title.isNotBlank() && validAnnualDate) {
                         onSave(
                             title,
                             calendar,
