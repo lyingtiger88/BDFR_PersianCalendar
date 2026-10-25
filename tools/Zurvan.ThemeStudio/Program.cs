@@ -34,7 +34,14 @@ internal sealed class Studio : Form
         ("card", "کارت‌ها", "#FFFFFF"),
         ("ink", "متن و نوشته‌ها", "#202631"),
         ("accent", "دکمه‌ها و رنگ تأکیدی", "#9DC7F5"),
-        ("holiday", "روز تعطیل و هشدار", "#D34E5E")
+        ("holiday", "روز تعطیل و هشدار", "#D34E5E"),
+        ("weekday0", "شنبه", "#F8DDD4"),
+        ("weekday1", "یکشنبه", "#FFF0C5"),
+        ("weekday2", "دوشنبه", "#DFF0DD"),
+        ("weekday3", "سه‌شنبه", "#D5EFED"),
+        ("weekday4", "چهارشنبه", "#DCE9FB"),
+        ("weekday5", "پنجشنبه", "#E8E0FA"),
+        ("weekday6", "جمعه", "#F8DDE7")
     ];
     private readonly Dictionary<string, Color> colors = Fields.ToDictionary(x => x.Key, x => ColorTranslator.FromHtml(x.Value));
     private readonly Dictionary<string, Button> swatches = new();
@@ -57,6 +64,9 @@ internal sealed class Studio : Form
         RightToLeftLayout = true;
         baseTheme.Items.AddRange(["windows-light", "azure-glass", "graphite-night", "warm-sand", "zara-pastel", "season-vibe", "elena-mode"]);
         baseTheme.SelectedIndex = 0;
+        baseTheme.SelectedIndexChanged += (_, _) => {
+            if (baseTheme.SelectedItem?.ToString() == "zara-pastel") ApplyZaraPastel();
+        };
 
         var split = new SplitContainer { Dock = DockStyle.Fill, SplitterDistance = 380, FixedPanel = FixedPanel.Panel1 };
         Controls.Add(split);
@@ -120,6 +130,18 @@ internal sealed class Studio : Form
         colors[key] = dialog.Color;
         swatches[key].BackColor = dialog.Color;
         Select(key);
+    }
+
+    private void ApplyZaraPastel()
+    {
+        var pastels = new[] { "#F8DDD4", "#FFF0C5", "#DFF0DD", "#D5EFED", "#DCE9FB", "#F8DDE7" };
+        for (var i = 0; i < 7; i++)
+        {
+            var key = "weekday" + i;
+            colors[key] = ColorTranslator.FromHtml(pastels[i]);
+            if (swatches.TryGetValue(key, out var button)) button.BackColor = colors[key];
+        }
+        Select(selected);
     }
 
     private void Reset()
@@ -212,11 +234,16 @@ internal sealed class Studio : Form
         var names = new[] { "ش", "ی", "د", "س", "چ", "پ", "ج" };
         for (var i = 0; i < 7; i++) {
             var x = 18 + i * col;
+            Fill(colors["weekday" + i], new Rectangle(x + 2, 155, col - 4, 28));
             Label(names[i], body, ink, new Rectangle(x, 155, col, 28));
             for (var row = 0; row < 4; row++) {
                 var rect = new Rectangle(x + 3, 194 + row * 49, col - 6, 39);
-                if (i == 5 && row == 2) { Fill(colors["holiday"], rect); using var white = new SolidBrush(Color.White); Label((row * 7 + i + 1).ToString("00"), body, white, rect); }
-                else Label((row * 7 + i + 1).ToString("00"), body, ink, rect);
+                Fill(colors["weekday" + i], rect);
+                if (i == 6 && row == 2) {
+                    using var border = new Pen(colors["holiday"], 2);
+                    g.DrawRectangle(border, rect);
+                }
+                Label((row * 7 + i + 1).ToString("00"), body, ink, rect);
             }
         }
         var btn = new Rectangle(w / 2, Math.Min(h - 147, 415), Math.Max(130, w / 2 - 20), 44);
@@ -228,7 +255,8 @@ internal sealed class Studio : Form
         Label("جلسه تیم طراحی       ۱۰:۰۰ - ۱۱:۳۰", body, ink, card);
         var highlight = selected switch {
             "surface" => header, "accent" => btn, "card" => card,
-            "holiday" => new Rectangle(18 + 5 * col + 3, 194 + 2 * 49, col - 6, 39),
+            "holiday" => new Rectangle(18 + 6 * col + 3, 194 + 2 * 49, col - 6, 39),
+            var k when k.StartsWith("weekday") => new Rectangle(18 + int.Parse(k[^1..]) * col + 3, 194, col - 6, 4 * 49),
             _ => new Rectangle(0, 0, w - 1, h - 1)
         };
         using var pen = new Pen(Color.FromArgb(225, 213, 59, 120), 3) { DashStyle = DashStyle.Dash };
