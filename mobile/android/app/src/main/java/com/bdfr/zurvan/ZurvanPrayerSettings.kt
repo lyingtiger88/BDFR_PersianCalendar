@@ -8,6 +8,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.LocalContext
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.ZoneId
@@ -23,6 +25,18 @@ fun ZurvanPrayerSettings() {
     var zone by remember { mutableStateOf(settings.zone) }
     var message by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
+    var adhanEnabled by remember { mutableStateOf(ZurvanAdhanAudio.enabled(context)) }
+    var audioMessage by remember { mutableStateOf("") }
+    val audioPickerJafari = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) runCatching { ZurvanAdhanAudio.importRecording(context,"jafari",uri) }
+            .onSuccess { audioMessage = "فایل اذان جعفری ذخیره شد." }
+            .onFailure { audioMessage = it.message ?: "خطای خواندن فایل صوتی" }
+    }
+    val audioPickerSunni = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) runCatching { ZurvanAdhanAudio.importRecording(context,"hanafi",uri) }
+            .onSuccess { audioMessage = "فایل اذان اهل‌سنت ذخیره شد." }
+            .onFailure { audioMessage = it.message ?: "خطای خواندن فایل صوتی" }
+    }
     var worldCities by remember { mutableStateOf<List<ZurvanWorldCities.City>>(emptyList()) }
     var loadingCities by remember { mutableStateOf(false) }
     var datasetMessage by remember { mutableStateOf("") }
@@ -152,6 +166,32 @@ fun ZurvanPrayerSettings() {
         }
         OutlinedTextField(zone,{ zone=it },label={ Text("منطقه زمانی؛ مانند Asia/Tehran") },
             modifier=Modifier.fillMaxWidth(),singleLine=true)
+        Text("پخش صوتی اذان بر اساس مذهب", fontWeight = FontWeight.SemiBold)
+        Text("برای جعفری و اهل‌سنت می‌توانید فایل صوتی جداگانه انتخاب کنید. فایل پیش‌فرض همراه برنامه نیست.",
+            style = MaterialTheme.typography.bodySmall)
+        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            Checkbox(checked = adhanEnabled, onCheckedChange = {
+                adhanEnabled = it
+                ZurvanAdhanAudio.setEnabled(context,it)
+                ZurvanPrayerAlerts.schedule(context,settings)
+            })
+            Text("پخش خودکار اذان در اوقات تنظیم‌شده")
+        }
+        listOf("jafari" to "جعفری", "hanafi" to "اهل‌سنت").forEach { (schoolCode,label) ->
+            Text("فایل اذان $label", style = MaterialTheme.typography.labelLarge)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                OutlinedButton(onClick = {
+                    if (schoolCode == "jafari") audioPickerJafari.launch(arrayOf("audio/*"))
+                    else audioPickerSunni.launch(arrayOf("audio/*"))
+                }) { Text("انتخاب فایل") }
+                OutlinedButton(
+                    enabled = ZurvanAdhanAudio.hasRecording(context,schoolCode),
+                    onClick = { ZurvanAdhanAudio.play(context,schoolCode,true) }
+                ) { Text("پیش‌شنیدن") }
+                TextButton(onClick = { ZurvanAdhanAudio.stop(context) }) { Text("توقف") }
+            }
+        }
+        if(audioMessage.isNotBlank()) Text(audioMessage)
         var offsetsExpanded by remember { mutableStateOf(false) }
         OutlinedButton(onClick = { offsetsExpanded = !offsetsExpanded },
             modifier = Modifier.fillMaxWidth()) {
