@@ -28,6 +28,7 @@ import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -68,6 +69,7 @@ fun ZurvanTeamPlanner(
     var selectedRole by remember { mutableStateOf("عضو") }
     var photoRevision by remember { mutableIntStateOf(0) }
     var weekOffset by remember { mutableIntStateOf(0) }
+    var expandedDay by remember { mutableStateOf<String?>(null) }
     var alertMinutes by remember { mutableStateOf(store.get("alert_minutes").ifBlank { "30" }) }
     var activeSection by remember { mutableStateOf(0) }
     var status by remember { mutableStateOf("") }
@@ -176,30 +178,86 @@ fun ZurvanTeamPlanner(
                     today.minusDays(((today.dayOfWeek.value + 1) % 7).toLong()).plusWeeks(weekOffset.toLong())
                 }
                 val dates = (0..6).map { saturday.plusDays(it.toLong()) }
-                Text("جدول هفتگی · برای دیدن روزها به چپ و راست بکشید", style = MaterialTheme.typography.titleMedium)
-                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                    dates.forEachIndexed { index, date ->
-                        val persian = android.icu.util.Calendar.getInstance(android.icu.util.ULocale("fa_IR@calendar=persian")).apply {
-                            timeInMillis = date.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
-                        }
-                        val key = "%04d-%02d-%02d".format(persian.get(android.icu.util.Calendar.YEAR),
-                            persian.get(android.icu.util.Calendar.MONTH) + 1, persian.get(android.icu.util.Calendar.DAY_OF_MONTH))
-                        val dayPlans = plans.filter { it.dateKey == key }.sortedWith(compareBy({ it.hour }, { it.minute }))
-                        Card(modifier = Modifier.width(142.dp).heightIn(min = 290.dp),
-                            colors = CardDefaults.cardColors(containerColor =
-                                listOf(0xFFF8DDD4,0xFFFFF0C5,0xFFDFF0DD,0xFFD5EFED,0xFFDCE9FB,0xFFE8E0FA,0xFFF8DDE7)[index].let {
-                                    androidx.compose.ui.graphics.Color(it)
-                                })) {
-                            Column(Modifier.padding(9.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text(listOf("شنبه","یکشنبه","دوشنبه","سه‌شنبه","چهارشنبه","پنجشنبه","جمعه")[index],
+                Text("برنامه هفتگی · برای باز کردن برنامه‌ها روی هر روز بزنید",
+                    style = MaterialTheme.typography.titleMedium)
+                val weekdays = listOf("شنبه","یکشنبه","دوشنبه","سه‌شنبه","چهارشنبه","پنجشنبه","جمعه")
+                val palette = listOf(0xFFF8DDD4,0xFFFFF0C5,0xFFDFF0DD,0xFFD5EFED,0xFFDCE9FB,0xFFE8E0FA,0xFFF8DDE7)
+                val weekDays = dates.mapIndexed { index, date ->
+                    val persian = android.icu.util.Calendar.getInstance(
+                        android.icu.util.ULocale("fa_IR@calendar=persian")
+                    ).apply {
+                        timeInMillis = date.atStartOfDay(java.time.ZoneId.systemDefault())
+                            .toInstant().toEpochMilli()
+                    }
+                    val key = "%04d-%02d-%02d".format(
+                        persian.get(android.icu.util.Calendar.YEAR),
+                        persian.get(android.icu.util.Calendar.MONTH) + 1,
+                        persian.get(android.icu.util.Calendar.DAY_OF_MONTH)
+                    )
+                    Triple(index, key, plans.filter { it.dateKey == key }.sortedWith(compareBy({ it.hour }, { it.minute })))
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    weekDays.forEach { (index, key, dayPlans) ->
+                        val selected = expandedDay == key
+                        Card(
+                            modifier = Modifier.weight(1f).clickable {
+                                expandedDay = if (selected) null else key
+                            },
+                            colors = CardDefaults.cardColors(
+                                containerColor = androidx.compose.ui.graphics.Color(palette[index])
+                            ),
+                            border = if (selected) androidx.compose.foundation.BorderStroke(
+                                2.dp, MaterialTheme.colorScheme.primary
+                            ) else null
+                        ) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 9.dp, horizontal = 1.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(5.dp)
+                            ) {
+                                Text(weekdays[index],
+                                    fontSize = 9.sp,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    maxLines = 2,
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                                Text(key.takeLast(2), style = MaterialTheme.typography.labelSmall)
+                                Text(if (dayPlans.isEmpty()) "–" else dayPlans.size.toString(),
+                                    style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.Bold)
-                                Text(key, style = MaterialTheme.typography.labelSmall)
-                                if (dayPlans.isEmpty()) Text("بدون برنامه", style = MaterialTheme.typography.labelSmall)
-                                dayPlans.forEach { plan ->
-                                    ElevatedCard(shape = RoundedCornerShape(10.dp)) {
-                                        Column(Modifier.padding(8.dp)) {
-                                            Text(plan.title, fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+                    }
+                }
+                expandedDay?.let { selectedKey ->
+                    val expanded = weekDays.firstOrNull { it.second == selectedKey }
+                    if (expanded != null) {
+                        val (index, key, selectedPlans) = expanded
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(
+                                containerColor = androidx.compose.ui.graphics.Color(palette[index])
+                            )
+                        ) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth().padding(12.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(weekdays[index] + " · " + key, fontWeight = FontWeight.Bold)
+                                    TextButton(onClick = { expandedDay = null }) { Text("بستن") }
+                                }
+                                if (selectedPlans.isEmpty()) Text("برنامه‌ای ثبت نشده است.")
+                                selectedPlans.forEach { plan ->
+                                    ElevatedCard {
+                                        Column(Modifier.fillMaxWidth().padding(9.dp)) {
+                                            Text(plan.icon + " " + plan.title, fontWeight = FontWeight.SemiBold)
                                             Text("%02d:%02d".format(plan.hour, plan.minute),
                                                 style = MaterialTheme.typography.labelSmall)
                                         }
