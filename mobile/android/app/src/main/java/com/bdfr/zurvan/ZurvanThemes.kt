@@ -33,6 +33,8 @@ object ZurvanThemes {
     val setCustomColor = staticCompositionLocalOf<(String, String?) -> Unit> { { _, _ -> } }
     val weekdayColors = staticCompositionLocalOf<List<Color>> { emptyList() }
     val setWeekdayColor = staticCompositionLocalOf<(Int, String?) -> Unit> { { _, _ -> } }
+    val weekRightToLeft = staticCompositionLocalOf { true }
+    val setWeekRightToLeft = staticCompositionLocalOf<(Boolean) -> Unit> { {} }
     val displayedPersianMonth = staticCompositionLocalOf { AndroidCalendarEngine.currentPersianYearMonth().second }
     val setDisplayedPersianMonth = staticCompositionLocalOf<(Int) -> Unit> { {} }
     val wallpaper = staticCompositionLocalOf<String?> { null }
@@ -49,6 +51,10 @@ object ZurvanThemes {
     @Composable
     fun Apply(context: Context, content: @Composable () -> Unit) {
         val prefs = remember { context.getSharedPreferences("zurvan_appearance", Context.MODE_PRIVATE) }
+        val calendarLayoutPrefs = remember(context) {
+            context.getSharedPreferences("zurvan_calendar_layout", Context.MODE_PRIVATE)
+        }
+        var weekRtl by remember { mutableStateOf(calendarLayoutPrefs.getBoolean("week_rtl", true)) }
         var shownMonth by remember { mutableIntStateOf(AndroidCalendarEngine.currentPersianYearMonth().second) }
         var selected by remember { mutableStateOf(prefs.getString("theme", "windows-light") ?: "windows-light") }
         var wallpaperPath by remember { mutableStateOf(prefs.getString("wallpaper", null)) }
@@ -94,6 +100,11 @@ object ZurvanThemes {
             onPrimaryContainer=color("ink",palette.ink), error=color("holiday",palette.holiday)
         )
         CompositionLocalProvider(
+            weekRightToLeft provides weekRtl,
+            setWeekRightToLeft provides { rtl ->
+                weekRtl = rtl
+                calendarLayoutPrefs.edit().putBoolean("week_rtl", rtl).apply()
+            },
             displayedPersianMonth provides shownMonth,
             setDisplayedPersianMonth provides { selectedMonth -> if (selectedMonth in 1..12) shownMonth = selectedMonth },
             refreshAppearance provides {
