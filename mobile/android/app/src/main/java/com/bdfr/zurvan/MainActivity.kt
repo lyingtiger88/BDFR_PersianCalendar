@@ -13,6 +13,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.*
@@ -237,7 +238,9 @@ private fun ZurvanMobileShell(
                     )
                 },
                 bottomBar = {
-                    NavigationBar {
+                    NavigationBar(containerColor = if (ZurvanThemes.active.current.id == "liquid-glass")
+                        MaterialTheme.colorScheme.surface.copy(alpha = 0.75f)
+                        else MaterialTheme.colorScheme.surface) {
                         ZurvanTab.entries.filter { it.name in ZurvanTabConfig.visible.current }.forEach { tab ->
                             NavigationBarItem(
                                 selected = selected == tab,
@@ -334,7 +337,9 @@ private fun ZurvanNavigationRail(
     onSelected: (ZurvanTab) -> Unit
 ) {
     NavigationRail(
-        modifier = Modifier.fillMaxHeight()
+        modifier = Modifier.fillMaxHeight(),
+        containerColor = if (ZurvanThemes.active.current.id == "liquid-glass")
+            MaterialTheme.colorScheme.surface.copy(alpha = 0.75f) else MaterialTheme.colorScheme.surface
     ) {
         Spacer(Modifier.height(12.dp))
 
@@ -4689,7 +4694,14 @@ private fun SettingsCard(
         title.contains("Navigation") -> "↔️"
         else -> "⚙️"
     }
-    Card(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium) {
+    val glass = ZurvanThemes.active.current.id == "liquid-glass"
+    Card(modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        border = if (glass) BorderStroke(1.dp, Color.White.copy(alpha = 0.72f)) else null,
+        colors = CardDefaults.cardColors(containerColor =
+            if (glass) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.76f)
+            else MaterialTheme.colorScheme.surfaceVariant)
+    ) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded }.padding(4.dp),
