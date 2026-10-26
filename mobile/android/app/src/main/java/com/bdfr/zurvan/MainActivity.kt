@@ -764,6 +764,7 @@ private fun CalendarScreen(
                     planIcons = plans.filter { it.dateKey == day.persianKey }.map { it.icon },
                     hasContent =
                         dayHasContent,
+                    hasNote = notes.any { it.dateKey == day.persianKey },
                     onClick = {
                         selectedDay = day
                     }
@@ -948,6 +949,7 @@ private fun CalendarDayCard(
         List<CalendarPriority>,
     cornerRadius: Float,
     hasContent: Boolean,
+    hasNote: Boolean,
     planIcons: List<String>,
     onClick: () -> Unit
 ) {
@@ -1099,7 +1101,10 @@ private fun CalendarDayCard(
                     }
                 }
             }
-            if (hasContent) {
+            if (hasNote) {
+                Text("📝", modifier = Modifier.align(Alignment.BottomEnd),
+                    style = MaterialTheme.typography.labelMedium)
+            } else if (hasContent) {
                 Box(
                     modifier =
                         Modifier
