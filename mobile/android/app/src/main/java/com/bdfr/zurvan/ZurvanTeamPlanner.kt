@@ -57,7 +57,8 @@ private class TeamStore(private val context: Context) {
 fun ZurvanTeamPlanner(
     modifier: Modifier = Modifier,
     onAddSchedule: () -> Unit,
-    plans: List<LocalPlan>
+    plans: List<LocalPlan>,
+    onTogglePlan: (String) -> Unit
 ) {
     val context = LocalContext.current
     val store = remember { TeamStore(context) }
@@ -167,107 +168,11 @@ fun ZurvanTeamPlanner(
         }
         when (activeSection) {
             0 -> {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    TextButton(onClick = { weekOffset-- }) { Text("هفته قبل") }
-                    Text("هفته ${if (weekOffset == 0) "جاری" else (if (weekOffset > 0) "+$weekOffset" else "$weekOffset")}")
-                    TextButton(onClick = { weekOffset++ }) { Text("هفته بعد") }
-                }
-                Button(onClick = onAddSchedule) { Text("افزودن برنامه") }
-                val today = remember { java.time.LocalDate.now() }
-                val saturday = remember(weekOffset) {
-                    today.minusDays(((today.dayOfWeek.value + 1) % 7).toLong()).plusWeeks(weekOffset.toLong())
-                }
-                val dates = (0..6).map { saturday.plusDays(it.toLong()) }
-                Text("برنامه هفتگی · برای باز کردن برنامه‌ها روی هر روز بزنید",
-                    style = MaterialTheme.typography.titleMedium)
-                val weekdays = listOf("شنبه","یکشنبه","دوشنبه","سه‌شنبه","چهارشنبه","پنجشنبه","جمعه")
-                val palette = listOf(0xFFF8DDD4,0xFFFFF0C5,0xFFDFF0DD,0xFFD5EFED,0xFFDCE9FB,0xFFE8E0FA,0xFFF8DDE7)
-                val weekDays = dates.mapIndexed { index, date ->
-                    val persian = android.icu.util.Calendar.getInstance(
-                        android.icu.util.ULocale("fa_IR@calendar=persian")
-                    ).apply {
-                        timeInMillis = date.atStartOfDay(java.time.ZoneId.systemDefault())
-                            .toInstant().toEpochMilli()
-                    }
-                    val key = "%04d-%02d-%02d".format(
-                        persian.get(android.icu.util.Calendar.YEAR),
-                        persian.get(android.icu.util.Calendar.MONTH) + 1,
-                        persian.get(android.icu.util.Calendar.DAY_OF_MONTH)
-                    )
-                    Triple(index, key, plans.filter { it.dateKey == key }.sortedWith(compareBy({ it.hour }, { it.minute })))
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(2.dp)
-                ) {
-                    weekDays.forEach { (index, key, dayPlans) ->
-                        val selected = expandedDay == key
-                        Card(
-                            modifier = Modifier.weight(1f).clickable {
-                                expandedDay = if (selected) null else key
-                            },
-                            colors = CardDefaults.cardColors(
-                                containerColor = androidx.compose.ui.graphics.Color(palette[index])
-                            ),
-                            border = if (selected) androidx.compose.foundation.BorderStroke(
-                                2.dp, MaterialTheme.colorScheme.primary
-                            ) else null
-                        ) {
-                            Column(
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 9.dp, horizontal = 1.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(5.dp)
-                            ) {
-                                Text(weekdays[index],
-                                    fontSize = 9.sp,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    maxLines = 2,
-                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-                                Text(key.takeLast(2), style = MaterialTheme.typography.labelSmall)
-                                Text(if (dayPlans.isEmpty()) "–" else dayPlans.size.toString(),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
-                }
-                expandedDay?.let { selectedKey ->
-                    val expanded = weekDays.firstOrNull { it.second == selectedKey }
-                    if (expanded != null) {
-                        val (index, key, selectedPlans) = expanded
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(
-                                containerColor = androidx.compose.ui.graphics.Color(palette[index])
-                            )
-                        ) {
-                            Column(
-                                modifier = Modifier.fillMaxWidth().padding(12.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(weekdays[index] + " · " + key, fontWeight = FontWeight.Bold)
-                                    TextButton(onClick = { expandedDay = null }) { Text("بستن") }
-                                }
-                                if (selectedPlans.isEmpty()) Text("برنامه‌ای ثبت نشده است.")
-                                selectedPlans.forEach { plan ->
-                                    ElevatedCard {
-                                        Column(Modifier.fillMaxWidth().padding(9.dp)) {
-                                            Text(plan.icon + " " + plan.title, fontWeight = FontWeight.SemiBold)
-                                            Text("%02d:%02d".format(plan.hour, plan.minute),
-                                                style = MaterialTheme.typography.labelSmall)
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
+                ZurvanPlanningViews(
+                    plans = plans,
+                    onAddSchedule = onAddSchedule,
+                    onToggleCompleted = onTogglePlan
+                )
             }
             1 -> {
                 OutlinedTextField(groupName, { groupName = it }, label = { Text("نام گروه") }, modifier = Modifier.fillMaxWidth())
