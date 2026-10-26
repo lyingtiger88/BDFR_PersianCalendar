@@ -19,7 +19,7 @@ data class ZurvanPalette(val id: String, val label: String, val background: Colo
 object ZurvanThemes {
     val presets = listOf(
         ZurvanPalette("windows-light","Windows Light",Color(0xFFF5F6F8),Color.White,Color.White,Color(0xFF202631),Color(0xFF9DC7F5),Color(0xFFD34E5E)),
-        ZurvanPalette("liquid-glass","Liquid Glass · شیشه مایع",Color(0xFFF0F5FA),Color(0x44F8FCFF),Color(0x33F5FAFF),Color(0xFF152D44),Color(0xFF598FC9),Color(0xFFB73C55)),
+        ZurvanPalette("liquid-glass","Liquid Glass · شیشه مایع",Color.Transparent,Color(0x30F8FCFF),Color(0x28F5FAFF),Color(0xFF152D44),Color(0xFF598FC9),Color(0xFFB73C55)),
         ZurvanPalette("azure-glass","Azure Glass",Color(0xFFEAF3FB),Color(0xFFF5FAFF),Color(0xFFEAF4FF),Color(0xFF17324D),Color(0xFF5DA9E8),Color(0xFFD25162)),
         ZurvanPalette("graphite-night","Graphite Night",Color(0xFF171A1F),Color(0xFF22262D),Color(0xFF2A2F37),Color(0xFFF1F5F9),Color(0xFF586D88),Color(0xFFFF7A86)),
         ZurvanPalette("warm-sand","Warm Sand",Color(0xFFFFF8F3),Color(0xFFFFF9F0),Color(0xFFFFFDF8),Color(0xFF40362C),Color(0xFFDDB78B),Color(0xFFC95C57)),
@@ -186,10 +186,13 @@ object ZurvanThemes {
         // Theme artwork takes precedence over unrelated custom wallpaper from another theme.
         val activePath = if (asset != null) null else path
         if (theme == "liquid-glass") {
+            // Very light tint; the pixels of the activity behind this window remain visible.
             androidx.compose.foundation.layout.Box(modifier.background(
-                Brush.linearGradient(listOf(Color(0xFF9FC8E8), Color(0xFFDAE8F8),
-                    Color(0xFFCAD7F1), Color(0xFF8CCCD1)))))
+                Brush.linearGradient(listOf(Color(0x149FC8E8), Color(0x0CFFFFFF), Color(0x148CCCD1)))))
+            return
         }
+        // Translucent window must stay opaque for all other themes.
+        androidx.compose.foundation.layout.Box(modifier.background(active.current.background))
         val bitmap = remember(activePath, asset) {
             runCatching {
                 if (activePath != null) BitmapFactory.decodeFile(activePath)?.asImageBitmap()
