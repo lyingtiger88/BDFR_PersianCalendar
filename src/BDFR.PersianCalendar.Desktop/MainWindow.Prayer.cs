@@ -57,6 +57,75 @@ public sealed partial class MainWindow
         UpdateMethods();
         panel.Children.Add(methodBox);
 
+        var locationStatus = new TextBlock { TextWrapping = TextWrapping.Wrap,
+            Text = "GeoNames: شهرها و آبادی‌های با جمعیت دست‌کم ۵۰۰ نفر؛ فهرست تمام آبادی‌های جهان نیست." };
+        panel.Children.Add(locationStatus);
+        var countryBox = new ComboBox { Header = "کشور", HorizontalAlignment = HorizontalAlignment.Stretch,
+            IsEditable = true, PlaceholderText = "کشور را انتخاب کنید" };
+        var countryList = PrayerWorldCities.Countries;
+        foreach (var country in countryList)
+            countryBox.Items.Add(country.Name + " (" + country.Code + ")");
+        panel.Children.Add(countryBox);
+        var citySearch = new TextBox { Header = "جست‌وجوی شهر در کشور انتخاب‌شده",
+            PlaceholderText = "نام شهر را وارد کنید" };
+        panel.Children.Add(citySearch);
+        var cityResults = new ListView { MaxHeight = 220, SelectionMode = ListViewSelectionMode.Single };
+        panel.Children.Add(cityResults);
+        IReadOnlyList<PrayerWorldCities.City> catalogue = [];
+        List<PrayerWorldCities.City> visibleCities = [];
+        string CountryCode()
+        {
+            var index = countryBox.SelectedIndex;
+            if (index >= 0 && index < countryList.Count) return countryList[index].Code;
+            var text = countryBox.Text ?? "";
+            return countryList.FirstOrDefault(x => text.Equals(x.Name, StringComparison.OrdinalIgnoreCase)
+                || text.Equals(x.Code, StringComparison.OrdinalIgnoreCase)).Code ?? "";
+        }
+        void FilterCities()
+        {
+            var code = CountryCode();
+            var query = citySearch.Text?.Trim() ?? "";
+            visibleCities = catalogue.Where(x => x.Country.Equals(code, StringComparison.OrdinalIgnoreCase) &&
+                (query.Length == 0 || x.Name.Contains(query, StringComparison.OrdinalIgnoreCase)))
+                .Take(80).ToList();
+            cityResults.Items.Clear();
+            foreach (var item in visibleCities)
+                cityResults.Items.Add(item.Name + " · " +
+                    item.Lat.ToString(CultureInfo.InvariantCulture) + ", " +
+                    item.Lon.ToString(CultureInfo.InvariantCulture));
+        }
+        countryBox.SelectionChanged += (_, _) => FilterCities();
+        citySearch.TextChanged += (_, _) => FilterCities();
+        var updateLocations = MakeButton("دریافت / به‌روزرسانی شهرهای جهان");
+        panel.Children.Add(updateLocations);
+        updateLocations.Click += async (_, _) =>
+        {
+            updateLocations.IsEnabled = false;
+            locationStatus.Text = "در حال دریافت پایگاه جهانی…";
+            try
+            {
+                catalogue = await PrayerWorldCities.UpdateAsync();
+                FilterCities();
+                locationStatus.Text = catalogue.Count + " موقعیت ذخیره شد؛ در استفاده بعدی آفلاین خواهد بود.";
+            }
+            catch (Exception ex)
+            {
+                locationStatus.Text = "دریافت ناموفق: " + ex.Message;
+            }
+            finally { updateLocations.IsEnabled = true; }
+        };
+        _ = LoadCachedLocationsAsync();
+        async System.Threading.Tasks.Task LoadCachedLocationsAsync()
+        {
+            try
+            {
+                catalogue = await PrayerWorldCities.LoadAsync();
+                FilterCities();
+                if (catalogue.Count > 0)
+                    locationStatus.Text = catalogue.Count + " موقعیت از حافظه آفلاین بارگذاری شد.";
+            }
+            catch (Exception ex) { locationStatus.Text = "خواندن پایگاه شهرها ناموفق: " + ex.Message; }
+        }
         var city = new TextBox { Header = "شهر", Text = _settings.PrayerCity };
         var latitude = new TextBox { Header = "عرض جغرافیایی", Text = _settings.PrayerLatitude.ToString(CultureInfo.InvariantCulture) };
         var longitude = new TextBox { Header = "طول جغرافیایی", Text = _settings.PrayerLongitude.ToString(CultureInfo.InvariantCulture) };
@@ -65,6 +134,17 @@ public sealed partial class MainWindow
         panel.Children.Add(latitude);
         panel.Children.Add(longitude);
         panel.Children.Add(timeZone);
+        cityResults.SelectionChanged += (_, _) =>
+        {
+            var index = cityResults.SelectedIndex;
+            if (index < 0 || index >= visibleCities.Count) return;
+            var selected = visibleCities[index];
+            city.Text = selected.Name;
+            latitude.Text = selected.Lat.ToString(CultureInfo.InvariantCulture);
+            longitude.Text = selected.Lon.ToString(CultureInfo.InvariantCulture);
+            timeZone.Text = selected.Zone;
+        };
+
         var result = new TextBlock { TextWrapping = TextWrapping.Wrap };
         panel.Children.Add(result);
 
