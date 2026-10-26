@@ -33,6 +33,8 @@ object ZurvanThemes {
     val setCustomColor = staticCompositionLocalOf<(String, String?) -> Unit> { { _, _ -> } }
     val weekdayColors = staticCompositionLocalOf<List<Color>> { emptyList() }
     val setWeekdayColor = staticCompositionLocalOf<(Int, String?) -> Unit> { { _, _ -> } }
+    val displayedPersianMonth = staticCompositionLocalOf { AndroidCalendarEngine.currentPersianYearMonth().second }
+    val setDisplayedPersianMonth = staticCompositionLocalOf<(Int) -> Unit> { {} }
     val wallpaper = staticCompositionLocalOf<String?> { null }
     val setWallpaper = staticCompositionLocalOf<(String?) -> Unit> { {} }
     val refreshAppearance = staticCompositionLocalOf<() -> Unit> { {} }
@@ -47,6 +49,7 @@ object ZurvanThemes {
     @Composable
     fun Apply(context: Context, content: @Composable () -> Unit) {
         val prefs = remember { context.getSharedPreferences("zurvan_appearance", Context.MODE_PRIVATE) }
+        var shownMonth by remember { mutableIntStateOf(AndroidCalendarEngine.currentPersianYearMonth().second) }
         var selected by remember { mutableStateOf(prefs.getString("theme", "windows-light") ?: "windows-light") }
         var wallpaperPath by remember { mutableStateOf(prefs.getString("wallpaper", null)) }
         var appearanceRevision by remember { mutableIntStateOf(0) }
@@ -63,7 +66,7 @@ object ZurvanThemes {
         }
         fun color(key: String, fallback: Color): Color =
             overrides[key]?.let { runCatching { Color(android.graphics.Color.parseColor(it)) }.getOrNull() } ?: fallback
-        val season = when (AndroidCalendarEngine.currentPersianYearMonth().second) {
+        val season = when (shownMonth) {
             in 1..3 -> 0
             in 4..6 -> 1
             in 7..9 -> 2
@@ -91,6 +94,8 @@ object ZurvanThemes {
             onPrimaryContainer=color("ink",palette.ink), error=color("holiday",palette.holiday)
         )
         CompositionLocalProvider(
+            displayedPersianMonth provides shownMonth,
+            setDisplayedPersianMonth provides { selectedMonth -> if (selectedMonth in 1..12) shownMonth = selectedMonth },
             refreshAppearance provides {
                 selected = prefs.getString("theme", "windows-light") ?: "windows-light"
                 wallpaperPath = prefs.getString("wallpaper", null)
@@ -148,7 +153,7 @@ object ZurvanThemes {
         val context = LocalContext.current
         val path = wallpaper.current
         val theme = active.current.id
-        val seasonMonth = AndroidCalendarEngine.currentPersianYearMonth().second
+        val seasonMonth = displayedPersianMonth.current
         val season = when (seasonMonth) {
             in 1..3 -> "spring"
             in 4..6 -> "summer"
