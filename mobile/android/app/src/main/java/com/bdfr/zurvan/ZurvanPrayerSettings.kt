@@ -8,6 +8,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -21,6 +22,21 @@ fun ZurvanPrayerSettings() {
     var lon by remember { mutableStateOf(settings.longitude.toString()) }
     var zone by remember { mutableStateOf(settings.zone) }
     var message by remember { mutableStateOf("") }
+    val scope = rememberCoroutineScope()
+    var worldCities by remember { mutableStateOf<List<ZurvanWorldCities.City>>(emptyList()) }
+    var loadingCities by remember { mutableStateOf(false) }
+    var datasetMessage by remember { mutableStateOf("") }
+    var selectedCountry by remember { mutableStateOf("") }
+    var countrySearch by remember { mutableStateOf("") }
+    var citySearch by remember { mutableStateOf("") }
+    var countriesExpanded by remember { mutableStateOf(false) }
+    var citiesExpanded by remember { mutableStateOf(false) }
+    val countries = remember { ZurvanWorldCities.countries() }
+    LaunchedEffect(context) {
+        if (ZurvanWorldCities.available(context)) {
+            worldCities = runCatching { ZurvanWorldCities.load(context) }.getOrDefault(emptyList())
+        }
+    }
     val schools = ZurvanPrayerTimes.schools
     val shia = settings.school == "jafari"
     val allowed = ZurvanPrayerTimes.methods.filter {
@@ -59,7 +75,76 @@ fun ZurvanPrayerSettings() {
                 }
             }
         }
-        Text("موقعیت محاسبه (به‌صورت دستی)", fontWeight = FontWeight.SemiBold)
+        Text("انتخاب موقعیت جهانی", fontWeight = FontWeight.SemiBold)
+        Text("پایگاه GeoNames شامل شهرها و آبادی‌های با جمعیت حداقل ۵۰۰ نفر است؛ همه آبادی‌های جهان را پوشش نمی‌دهد.",
+            style = MaterialTheme.typography.bodySmall)
+        Button(onClick = {
+            scope.launch {
+                loadingCities = true
+                datasetMessage = ""
+                try {
+                    worldCities = ZurvanWorldCities.download(context)
+                    datasetMessage = "${worldCities.size} موقعیت دریافت و برای استفاده آفلاین ذخیره شد."
+                } catch (ex: Exception) {
+                    datasetMessage = "دریافت فهرست ناموفق بود: ${ex.message}"
+                } finally { loadingCities = false }
+            }
+        }, enabled = !loadingCities) {
+            Text(if (loadingCities) "در حال دریافت پایگاه جهانی…" else
+                if (worldCities.isEmpty()) "دریافت فهرست جهانی شهرها" else "به‌روزرسانی فهرست شهرها")
+        }
+        if (datasetMessage.isNotBlank()) Text(datasetMessage)
+        if (worldCities.isNotEmpty()) {
+            Text("کشور")
+            OutlinedTextField(value = countrySearch, onValueChange = {
+                countrySearch = it
+                countriesExpanded = true
+            }, label = { Text("جست‌وجوی کشور") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+            Box {
+                OutlinedButton(onClick = { countriesExpanded = true }) {
+                    Text(countries.firstOrNull { it.first == selectedCountry }?.second ?: "انتخاب کشور")
+                }
+                DropdownMenu(expanded = countriesExpanded, onDismissRequest = { countriesExpanded = false }) {
+                    val validCodes = remember(worldCities) { worldCities.asSequence().map { it.countryCode }.toSet() }
+                    countries.filter { it.first in validCodes &&
+                        (countrySearch.isBlank() || it.second.contains(countrySearch, true) ||
+                            it.first.contains(countrySearch, true)) }
+                        .take(80).forEach { (code, name) ->
+                            DropdownMenuItem(text = { Text(name) }, onClick = {
+                                selectedCountry = code
+                                countrySearch = name
+                                citySearch = ""
+                                countriesExpanded = false
+                            })
+                        }
+                }
+            }
+            if (selectedCountry.isNotEmpty()) {
+                OutlinedTextField(value = citySearch, onValueChange = {
+                    citySearch = it
+                    citiesExpanded = true
+                }, label = { Text("جست‌وجوی شهر") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                Box {
+                    OutlinedButton(onClick = { citiesExpanded = true }) { Text("انتخاب شهر") }
+                    DropdownMenu(expanded = citiesExpanded, onDismissRequest = { citiesExpanded = false }) {
+                        worldCities.asSequence().filter { it.countryCode == selectedCountry &&
+                            (citySearch.isBlank() || it.name.contains(citySearch, true)) }
+                            .take(80).forEach { place ->
+                                DropdownMenuItem(text = { Text("${place.name} · ${place.latitude}, ${place.longitude}") },
+                                    onClick = {
+                                        city = place.name
+                                        lat = place.latitude.toString()
+                                        lon = place.longitude.toString()
+                                        zone = place.timeZone
+                                        citySearch = place.name
+                                        citiesExpanded = false
+                                    })
+                            }
+                    }
+                }
+            }
+        }
+        Text("موقعیت انتخاب‌شده (قابل ویرایش دستی)", fontWeight = FontWeight.SemiBold)
         OutlinedTextField(city,{ city=it },label={ Text("شهر") },modifier=Modifier.fillMaxWidth(),singleLine=true)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(lat,{ lat=it },label={ Text("عرض جغرافیایی") },modifier=Modifier.weight(1f),singleLine=true)
