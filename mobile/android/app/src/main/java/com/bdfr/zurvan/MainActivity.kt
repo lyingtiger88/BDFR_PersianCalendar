@@ -145,6 +145,7 @@ private fun ZurvanMobileShell(
         localePrefs.registerOnSharedPreferenceChangeListener(listener)
         onDispose { localePrefs.unregisterOnSharedPreferenceChangeListener(listener) }
     }
+    var visibleTabs by remember { mutableStateOf(ZurvanTabConfig.load(context)) }
     var selected by remember { mutableStateOf(ZurvanTab.Calendar) }
     LaunchedEffect(licensed) {
         if (!licensed && selected !in listOf(ZurvanTab.Calendar, ZurvanTab.Settings)) selected = ZurvanTab.Calendar
@@ -154,7 +155,20 @@ private fun ZurvanMobileShell(
         .uiPreferences
         .collectAsStateWithLifecycle()
 
-    CompositionLocalProvider(ZurvanLanguages.current provides appLanguage) {
+    CompositionLocalProvider(
+        ZurvanLanguages.current provides appLanguage,
+        ZurvanTabConfig.visible provides visibleTabs,
+        ZurvanTabConfig.update provides { requested ->
+            visibleTabs = ZurvanTabConfig.save(context, requested)
+            if (selected.name !in visibleTabs) selected = ZurvanTab.Settings
+        },
+        ZurvanTabConfig.open provides { name ->
+            ZurvanTab.entries.firstOrNull { it.name == name }?.let { destination ->
+                if (licensed || destination == ZurvanTab.Calendar || destination == ZurvanTab.Settings)
+                    selected = destination
+            }
+        }
+    ) {
     MaterialTheme(
         shapes = Shapes(
             extraSmall = RoundedCornerShape(uiPreferences.cornerRadius.dp),
@@ -221,7 +235,7 @@ private fun ZurvanMobileShell(
                 },
                 bottomBar = {
                     NavigationBar {
-                        ZurvanTab.entries.forEach { tab ->
+                        ZurvanTab.entries.filter { it.name in ZurvanTabConfig.visible.current }.forEach { tab ->
                             NavigationBarItem(
                                 selected = selected == tab,
                                 enabled = licensed || tab == ZurvanTab.Calendar || tab == ZurvanTab.Settings,
@@ -256,7 +270,8 @@ private fun ZurvanMobileShell(
                                 onDragEnd = {
                                     if (kotlin.math.abs(horizontalDistance) > 90f) {
                                         val allowed = ZurvanTab.entries.filter {
-                                            licensed || it == ZurvanTab.Calendar || it == ZurvanTab.Settings
+                                            it.name in visibleTabs &&
+                                                (licensed || it == ZurvanTab.Calendar || it == ZurvanTab.Settings)
                                         }
                                         val current = allowed.indexOf(selected).coerceAtLeast(0)
                                         val change = if (horizontalDistance < 0) 1 else -1
@@ -320,7 +335,7 @@ private fun ZurvanNavigationRail(
     ) {
         Spacer(Modifier.height(12.dp))
 
-        ZurvanTab.entries.forEach { tab ->
+        ZurvanTab.entries.filter { it.name in ZurvanTabConfig.visible.current }.forEach { tab ->
             NavigationRailItem(
                 selected = selected == tab,
                 onClick = {
@@ -2399,6 +2414,9 @@ private fun SettingsScreen(
     val weekdayColors = ZurvanThemes.weekdayColors.current
     val setWeekdayColor = ZurvanThemes.setWeekdayColor.current
     val context = LocalContext.current
+    val tabsShown = ZurvanTabConfig.visible.current
+    val updateTabs = ZurvanTabConfig.update.current
+    val navigateTab = ZurvanTabConfig.open.current
     val wallpaperPath = ZurvanThemes.wallpaper.current
     val setWallpaper = ZurvanThemes.setWallpaper.current
     var pickingColorFor by remember { mutableStateOf<String?>(null) }
@@ -2460,6 +2478,33 @@ private fun SettingsScreen(
                 bottom = 24.dp
             )
     ) {
+        item {
+            SettingsCard(title = "مدیریت سربرگ‌های صفحه اصلی") {
+                Text("تب‌های تقویم و تنظیمات ثابت‌اند. سایر بخش‌ها را برای نوار اصلی انتخاب یا حذف کنید.")
+                ZurvanTab.entries.forEach { tab ->
+                    val required = tab == ZurvanTab.Calendar || tab == ZurvanTab.Settings
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = tab.name in tabsShown,
+                            enabled = !required,
+                            onCheckedChange = { checked ->
+                                updateTabs(if (checked) tabsShown + tab.name else tabsShown - tab.name)
+                            }
+                        )
+                        Text(tab.label, modifier = Modifier.weight(1f))
+                        if (tab.name !in tabsShown) {
+                            TextButton(onClick = { navigateTab(tab.name) }) { Text("باز کردن") }
+                        }
+                    }
+                }
+                OutlinedButton(onClick = { updateTabs(ZurvanTabConfig.defaults) }) {
+                    Text("بازگردانی پنج سربرگ پیش‌فرض")
+                }
+            }
+        }
         item {
             val language = ZurvanLanguages.current.current
             var languageMenu by remember { mutableStateOf(false) }
