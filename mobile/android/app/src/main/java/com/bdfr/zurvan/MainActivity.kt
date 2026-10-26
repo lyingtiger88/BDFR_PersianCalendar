@@ -234,6 +234,7 @@ private fun ZurvanMobileShell(
                 containerColor = Color.Transparent,
                 topBar = {
                     TopAppBar(
+                        colors = TopAppBarDefaults.topAppBarColors(containerColor = if (liquidGlass) Color.White.copy(alpha = 0.18f) else MaterialTheme.colorScheme.surface),
                         title = {
                             ZurvanSecretTitle()
                         }
