@@ -2496,7 +2496,8 @@ private fun SettingsScreen(
                     Triple("language", "زبان و منطقه", "زبان برنامه"),
                     Triple("security", "امنیت و لایسنس", "قفل و فعال‌سازی"),
                     Triple("cloud", "حساب و همگام‌سازی", "Zurvan Desk"),
-                    Triple("accessibility", "دسترس‌پذیری و زروان گویا", "گفتار به متن و متن به گفتار فارسی")
+                    Triple("accessibility", "دسترس‌پذیری و زروان گویا", "گفتار به متن و متن به گفتار فارسی"),
+                    Triple("about", "درباره ما", "داستان زروان، توسعه‌دهنده و سپاسگزاری")
                 ).forEach { section ->
                     OutlinedCard(
                         onClick = { settingsCategory = section.first },
@@ -2517,6 +2518,25 @@ private fun SettingsScreen(
                     Icon(Icons.Outlined.ArrowBack, contentDescription = null)
                     Text("بازگشت به دسته‌ها")
                 }
+            }
+        }
+        if (settingsCategory == "about") item {
+            SettingsCard(title = "درباره زروان") {
+                Text("زروان | زمان، به سبک زندگی تو",
+                    style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text("زروان فقط یک تقویم نیست؛ تلاشی است برای اینکه روزهای پرمشغله، قرارهای کوچک و آرزوهای بزرگ، همگی جای روشنی در زندگی داشته باشند. این برنامه با عشق به زبان فارسی، احترام به فرهنگ‌ها و اشتیاق به ساختن ابزاری ساده، زیبا و کاربردی شکل گرفته است.")
+                HorizontalDivider()
+                Text("درباره توسعه‌دهنده",
+                    style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text("من، بهزاد، زروان را با یک باور ساده می‌سازم: فناوری وقتی ارزشمند است که در کنار دقت و کارایی، حس خوبی هم به آدم‌ها بدهد. هر جزئیات زروان حاصل یادگیری، آزمون‌وخطا و شوق بهتر کردن تجربه هر روز است؛ مسیری که با ایده‌های تازه و همراهی آدم‌های عزیز ادامه پیدا می‌کند.")
+                HorizontalDivider()
+                Text("با مهر و سپاس",
+                    style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text("از Elen عزیزم، برای همراهی صمیمانه، صبر و بردباری قشنگش در تمام فراز و نشیب‌های این مسیر، از ته دل سپاسگزارم. حضورت دلگرمی بزرگی است.")
+                Text("از خواهر عزیزم که با ایده‌ها و نگاه خلاقانه‌اش به بهتر شدن زروان کمک کرد، صمیمانه ممنونم.")
+                Text("و از همه دوستان مهربانی که با پیشنهادها، دلگرمی‌ها و همراهی‌شان کنار این پروژه بودند، به‌ویژه Zara عزیز، سپاسگزارم. سهم شما در این مسیر فراموش‌نشدنی است.")
+                Text("ساخته‌شده با عشق، برای لحظه‌هایی که ارزش به‌یادماندن دارند. 💛",
+                    style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
             }
         }
         if (settingsCategory == "appearance") item {
