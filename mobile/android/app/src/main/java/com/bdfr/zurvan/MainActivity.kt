@@ -79,6 +79,19 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             ZurvanThemes.Apply(this@MainActivity) {
+                val glassEnabled = ZurvanThemes.active.current.id == "liquid-glass"
+                SideEffect {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        if (glassEnabled) {
+                            window.addFlags(android.view.WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
+                            val attrs = window.attributes
+                            attrs.setBlurBehindRadius(24)
+                            window.attributes = attrs
+                        } else {
+                            window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
+                        }
+                    }
+                }
                 val appViewModel: ZurvanViewModel = viewModel()
                 val deskViewModel: ZurvanDeskViewModel = viewModel()
                 LaunchedEffect(Unit) { appViewModel.purgeExpiredPlans() }
@@ -4748,12 +4761,21 @@ private fun SettingsCard(
     val glass = ZurvanThemes.active.current.id == "liquid-glass"
     Card(modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.medium,
-        border = if (glass) BorderStroke(1.dp, Color.White.copy(alpha = 0.72f)) else null,
+        border = if (glass) BorderStroke(1.5.dp, androidx.compose.ui.graphics.Brush.linearGradient(listOf(Color.White.copy(alpha = 0.94f), Color(0x557FC3EF), Color.White.copy(alpha = 0.27f)))) else null,
         colors = CardDefaults.cardColors(containerColor =
-            if (glass) Color.White.copy(alpha = 0.22f)
+            if (glass) Color.White.copy(alpha = 0.37f)
             else MaterialTheme.colorScheme.surfaceVariant)
     ) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(
+            Modifier.background(
+                if (glass) androidx.compose.ui.graphics.Brush.verticalGradient(listOf(
+                    Color.White.copy(alpha = 0.23f),
+                    Color(0x1484BDDF),
+                    Color.White.copy(alpha = 0.03f)
+                )) else androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color.Transparent, Color.Transparent))
+            ).padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
             Row(
                 modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded }.padding(4.dp),
                 verticalAlignment = Alignment.CenterVertically,
