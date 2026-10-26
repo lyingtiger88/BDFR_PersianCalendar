@@ -695,17 +695,7 @@ private fun CalendarScreen(
             }
         }
 
-        val calendarContext = LocalContext.current
-        val layoutPrefs = remember { calendarContext.getSharedPreferences("zurvan_calendar_layout", Context.MODE_PRIVATE) }
-        var weekRightToLeft by remember { mutableStateOf(layoutPrefs.getBoolean("week_rtl", true)) }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically) {
-            Text("چیدمان هفته", style = MaterialTheme.typography.labelMedium)
-            TextButton(onClick = {
-                weekRightToLeft = !weekRightToLeft
-                layoutPrefs.edit().putBoolean("week_rtl", weekRightToLeft).apply()
-            }) { Text(if (weekRightToLeft) "راست به چپ" else "چپ به راست") }
-        }
+        val weekRightToLeft = ZurvanThemes.weekRightToLeft.current
         CompositionLocalProvider(LocalLayoutDirection provides
             if (weekRightToLeft) LayoutDirection.Rtl else LayoutDirection.Ltr) {
         WeekdayHeader()
@@ -2521,6 +2511,25 @@ private fun SettingsScreen(
                     Icon(Icons.Outlined.ArrowBack, contentDescription = null)
                     Text("بازگشت به دسته‌ها")
                 }
+            }
+        }
+        if (settingsCategory == "appearance") item {
+            SettingsCard(title = "جهت نمایش تقویم") {
+                val weekRtl = ZurvanThemes.weekRightToLeft.current
+                val setWeekRtl = ZurvanThemes.setWeekRightToLeft.current
+                Text("جهت نمایش ستون‌های هفته در صفحه تقویم را انتخاب کنید.")
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(selected = weekRtl, onClick = { setWeekRtl(true) })
+                    Text("راست به چپ — شنبه در سمت راست",
+                        modifier = Modifier.clickable { setWeekRtl(true) })
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(selected = !weekRtl, onClick = { setWeekRtl(false) })
+                    Text("چپ به راست — شنبه در سمت چپ",
+                        modifier = Modifier.clickable { setWeekRtl(false) })
+                }
+                Text("تغییر بلافاصله روی تقویم اعمال و برای اجرای بعدی ذخیره می‌شود.",
+                    style = MaterialTheme.typography.bodySmall)
             }
         }
         if (settingsCategory == "appearance") item {
