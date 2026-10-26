@@ -152,6 +152,36 @@ fun ZurvanPrayerSettings() {
         }
         OutlinedTextField(zone,{ zone=it },label={ Text("منطقه زمانی؛ مانند Asia/Tehran") },
             modifier=Modifier.fillMaxWidth(),singleLine=true)
+        var offsetsExpanded by remember { mutableStateOf(false) }
+        OutlinedButton(onClick = { offsetsExpanded = !offsetsExpanded },
+            modifier = Modifier.fillMaxWidth()) {
+            Text(if (offsetsExpanded) "بستن تنظیم دقیقه‌های اوقات شرعی" else
+                "تنظیم دقیقه‌های اوقات شرعی (۶۰− تا ۶۰+)")
+        }
+        if (offsetsExpanded) {
+            Text("برای هر وقت، زمان محاسبه‌شده را مستقل جلو یا عقب ببرید. صفر یعنی بدون تغییر.",
+                style = MaterialTheme.typography.bodySmall)
+            val labels = mapOf("fajr" to "اذان صبح", "sunrise" to "طلوع آفتاب",
+                "dhuhr" to "اذان ظهر", "asr" to "نماز عصر", "sunset" to "غروب آفتاب",
+                "maghrib" to "اذان مغرب", "isha" to "نماز عشا")
+            ZurvanPrayerTimes.prayerKeys.forEach { key ->
+                val offset = settings.offsets[key] ?: 0
+                Row(modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(labels[key] ?: key, modifier = Modifier.weight(1f))
+                    Text(if (offset > 0) "+$offset دقیقه" else "$offset دقیقه")
+                }
+                Slider(value = offset.toFloat(),
+                    onValueChange = { value ->
+                        settings = settings.copy(offsets = settings.offsets +
+                            (key to value.toInt().coerceIn(-60, 60)))
+                    },
+                    valueRange = -60f..60f, steps = 119)
+            }
+            TextButton(onClick = {
+                settings = settings.copy(offsets = ZurvanPrayerTimes.prayerKeys.associateWith { 0 })
+            }) { Text("بازگردانی همه تغییرات به صفر") }
+        }
         Row {
             Checkbox(checked=settings.alerts,onCheckedChange={ settings=settings.copy(alerts=it) })
             Text("اعلان اوقات شرعی",modifier=Modifier.padding(top=12.dp))
