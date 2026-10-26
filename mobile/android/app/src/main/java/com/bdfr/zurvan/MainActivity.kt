@@ -2462,6 +2462,7 @@ private fun SettingsScreen(
         )
     }
 
+    var settingsCategory by rememberSaveable { mutableStateOf("home") }
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
@@ -2473,7 +2474,40 @@ private fun SettingsScreen(
                 bottom = 24.dp
             )
     ) {
+
         item {
+            if (settingsCategory == "home") {
+                Text("تنظیمات", style = MaterialTheme.typography.headlineSmall)
+                listOf(
+                    Triple("appearance", "رابط کاربری", "تم، رنگ، تصویر و چیدمان"),
+                    Triple("calendar", "تقویم و مناسبت‌ها", "چیدمان تاریخ و به‌روزرسانی"),
+                    Triple("alerts", "صدا، اعلان‌ها و اوقات شرعی", "اذان و اعلان‌های زمانی"),
+                    Triple("language", "زبان و منطقه", "زبان برنامه"),
+                    Triple("security", "امنیت و لایسنس", "قفل و فعال‌سازی"),
+                    Triple("cloud", "حساب و همگام‌سازی", "Zurvan Desk")
+                ).forEach { section ->
+                    OutlinedCard(
+                        onClick = { settingsCategory = section.first },
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)
+                    ) {
+                        Row(Modifier.fillMaxWidth().padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text(section.second, fontWeight = FontWeight.SemiBold)
+                                Text(section.third, style = MaterialTheme.typography.bodySmall)
+                            }
+                            Icon(Icons.Outlined.ChevronLeft, contentDescription = null)
+                        }
+                    }
+                }
+            } else {
+                TextButton(onClick = { settingsCategory = "home" }) {
+                    Icon(Icons.Outlined.ArrowBack, contentDescription = null)
+                    Text("بازگشت به دسته‌ها")
+                }
+            }
+        }
+        if (settingsCategory == "appearance") item {
             SettingsCard(title = "مدیریت سربرگ‌های صفحه اصلی") {
                 Text("تب‌های تقویم و تنظیمات ثابت‌اند. سایر بخش‌ها را برای نوار اصلی انتخاب یا حذف کنید.")
                 ZurvanTab.entries.forEach { tab ->
@@ -2500,7 +2534,7 @@ private fun SettingsScreen(
                 }
             }
         }
-        item {
+        if (settingsCategory == "language") item {
             val language = ZurvanLanguages.current.current
             var languageMenu by remember { mutableStateOf(false) }
             SettingsCard(title = ZurvanLanguages.text(language, "language")) {
@@ -2521,7 +2555,7 @@ private fun SettingsScreen(
                 }
             }
         }
-        item {
+        if (settingsCategory == "calendar") item {
             SettingsCard(title = "به‌روزرسانی پایگاه داده") {
                 Text("نسخه فعلی: " + ZurvanOccasionDatabase.version(context))
                 Text("این گزینه مناسبت‌های تاریخ ثابت را دریافت می‌کند؛ مناسبت‌های قمری سالانه باید جداگانه اعتبارسنجی شوند.")
@@ -2542,12 +2576,12 @@ private fun SettingsScreen(
                 if (databaseStatus.isNotBlank()) Text(databaseStatus)
             }
         }
-        item {
+        if (settingsCategory == "alerts") item {
             SettingsCard(title = "اوقات شرعی و اذان") {
                 ZurvanPrayerSettings()
             }
         }
-        item {
+        if (settingsCategory == "appearance") item {
             SettingsCard(title = "افزودن قالب از فایل") {
                 Text("تم ساخته‌شده در Zurvan Theme Studio را از JSON یا ZIP وارد کنید.")
                 Button(onClick = { themePicker.launch(arrayOf("application/json", "application/zip", "application/octet-stream", "*/*")) }) {
@@ -2556,7 +2590,7 @@ private fun SettingsScreen(
                 if (themeImportMessage.isNotBlank()) Text(themeImportMessage)
             }
         }
-        item {
+        if (settingsCategory == "appearance") item {
             SettingsCard(title = "تصویر پس‌زمینه سفارشی") {
                 Button(onClick = { imagePicker.launch("image/*") }) { Text("انتخاب عکس از دستگاه") }
                 if (wallpaperPath != null) {
@@ -2564,7 +2598,7 @@ private fun SettingsScreen(
                 }
             }
         }
-        item {
+        if (settingsCategory == "appearance") item {
             SettingsCard(title = "انتخاب رنگ عناصر") {
                 Text("چرخه رنگ حرفه‌ای با پیش‌نمایش زنده برای هر بخش برنامه")
                 Button(
@@ -2593,7 +2627,7 @@ private fun SettingsScreen(
             }
         }
 
-        item {
+        if (settingsCategory == "security") item {
             SettingsCard(title = "وضعیت لایسنس زروان") {
                 var activatedCode by remember {
                     mutableStateOf(
@@ -2645,7 +2679,7 @@ private fun SettingsScreen(
                 }
             }
         }
-        item {
+        if (settingsCategory == "security") item {
             SettingsCard(title = "قفل برنامه") {
                 var lockEnabled by remember { mutableStateOf(ZurvanAppLock.enabled(context)) }
                 var pin by remember { mutableStateOf("") }
@@ -2682,7 +2716,7 @@ private fun SettingsScreen(
                 Text(feedback)
             }
         }
-        item {
+        if (settingsCategory == "appearance") item {
             SettingsCard(title = "تم ظاهری") {
                 ZurvanThemes.presets.forEach { option ->
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -2698,7 +2732,7 @@ private fun SettingsScreen(
             }
         }
 
-        if (palette.id == "elena-mode") {
+        if (settingsCategory == "appearance" && palette.id == "elena-mode") {
             item {
                 SettingsCard(title = "تصاویر اختصاصی Elena Mode") {
                     Text("۱۱ تصویر در خود برنامه قرار دارند. حالت خودکار هر روز یک تصویر انتخاب می‌کند.")
@@ -2721,17 +2755,8 @@ private fun SettingsScreen(
             }
         }
 
-        item {
-            Text(
-                "تنظیمات",
-                style =
-                    MaterialTheme
-                        .typography
-                        .headlineSmall
-            )
-        }
 
-        item {
+        if (settingsCategory == "calendar") item {
             SettingsCard(
                 title =
                     "ترتیب نمایش تقویم‌ها"
@@ -2805,7 +2830,7 @@ private fun SettingsScreen(
             }
         }
 
-        item {
+        if (settingsCategory == "appearance") item {
             SettingsCard(
                 title =
                     "گردی گوشه‌ها"
@@ -2835,7 +2860,7 @@ private fun SettingsScreen(
             }
         }
 
-        item {
+        if (settingsCategory == "appearance") item {
             SettingsCard(
                 title =
                     "محل Navigation Rail"
@@ -2889,7 +2914,7 @@ private fun SettingsScreen(
             }
         }
 
-        item {
+        if (settingsCategory == "cloud") item {
             SettingsCard(
                 title =
                     "Zurvan Desk"
