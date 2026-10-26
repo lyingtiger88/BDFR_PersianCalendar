@@ -2484,7 +2484,8 @@ private fun SettingsScreen(
                     Triple("alerts", "صدا، اعلان‌ها و اوقات شرعی", "اذان و اعلان‌های زمانی"),
                     Triple("language", "زبان و منطقه", "زبان برنامه"),
                     Triple("security", "امنیت و لایسنس", "قفل و فعال‌سازی"),
-                    Triple("cloud", "حساب و همگام‌سازی", "Zurvan Desk")
+                    Triple("cloud", "حساب و همگام‌سازی", "Zurvan Desk"),
+                    Triple("accessibility", "دسترس‌پذیری و زروان گویا", "گفتار به متن و متن به گفتار فارسی")
                 ).forEach { section ->
                     OutlinedCard(
                         onClick = { settingsCategory = section.first },
@@ -2911,6 +2912,12 @@ private fun SettingsScreen(
                             .typography
                             .bodySmall
                 )
+            }
+        }
+
+        if (settingsCategory == "accessibility") item {
+            SettingsCard(title = "ابزارهای صوتی دسترس‌پذیری") {
+                ZurvanVoiceAccessibility()
             }
         }
 
