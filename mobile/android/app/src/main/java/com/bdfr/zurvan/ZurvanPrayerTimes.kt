@@ -26,8 +26,10 @@ object ZurvanPrayerTimes {
     )
     data class Settings(val school: String, val method: String, val city: String,
                         val latitude: Double, val longitude: Double, val zone: String,
-                        val alerts: Boolean, val beforeMinutes: Int)
+                        val alerts: Boolean, val beforeMinutes: Int,
+                        val offsets: Map<String, Int> = emptyMap())
     data class Entry(val key: String, val label: String, val time: LocalTime)
+    val prayerKeys = listOf("fajr", "sunrise", "dhuhr", "asr", "sunset", "maghrib", "isha")
     fun settings(context: Context): Settings {
         val p = context.getSharedPreferences("zurvan_prayer", Context.MODE_PRIVATE)
         return Settings(p.getString("school","jafari") ?: "jafari",
@@ -36,16 +38,19 @@ object ZurvanPrayerTimes {
             p.getString("lat","35.6892")!!.toDoubleOrNull() ?: 35.6892,
             p.getString("lon","51.3890")!!.toDoubleOrNull() ?: 51.3890,
             p.getString("zone","Asia/Tehran") ?: "Asia/Tehran",
-            p.getBoolean("alerts",false),p.getInt("before",0))
+            p.getBoolean("alerts",false),p.getInt("before",0),
+            prayerKeys.associateWith { p.getInt("offset_$it", 0).coerceIn(-60, 60) })
     }
     fun save(context: Context, s: Settings) {
         require(s.latitude in -90.0..90.0 && s.longitude in -180.0..180.0)
         ZoneId.of(s.zone)
-        context.getSharedPreferences("zurvan_prayer", Context.MODE_PRIVATE).edit()
+        val edit = context.getSharedPreferences("zurvan_prayer", Context.MODE_PRIVATE).edit()
             .putString("school",s.school).putString("method",s.method).putString("city",s.city)
             .putString("lat",s.latitude.toString()).putString("lon",s.longitude.toString())
             .putString("zone",s.zone).putBoolean("alerts",s.alerts)
-            .putInt("before",s.beforeMinutes).apply()
+            .putInt("before",s.beforeMinutes)
+        prayerKeys.forEach { key -> edit.putInt("offset_$key", (s.offsets[key] ?: 0).coerceIn(-60, 60)) }
+        edit.apply()
     }
     private fun rad(x: Double) = Math.toRadians(x)
     private fun deg(x: Double) = Math.toDegrees(x)
@@ -67,7 +72,7 @@ object ZurvanPrayerTimes {
         val altitude=deg(atan(1.0/(factor+tan(abs(rad(latitude)-declination)))))
         return angleHour(latitude,declination,altitude)
     }
-    fun calculate(day: LocalDate, s: Settings): List<Entry> {
+    fun calculate(day: LocalDate, s: Settings, applyOffsets: Boolean = true): List<Entry> {
         val method=methods.firstOrNull { it.id==s.method } ?: methods.first()
         val noonUtc=12.0-s.longitude/15.0-solar(day).first/60.0
         val dec=solar(day).second
@@ -83,7 +88,7 @@ object ZurvanPrayerTimes {
             return instant.atZone(zone).toLocalTime().withSecond(0).withNano(0)
         }
         val maghrib=noonUtc+sunsetHour
-        return listOf(
+        val entries = listOf(
             Entry("fajr","اذان صبح",clock(noonUtc-fajr)),
             Entry("sunrise","طلوع آفتاب",clock(noonUtc-sunrise)),
             Entry("dhuhr","اذان ظهر",clock(noonUtc)),
@@ -92,5 +97,8 @@ object ZurvanPrayerTimes {
             Entry("maghrib","اذان مغرب",clock(maghrib)),
             Entry("isha","عشا",clock(if(method.ishaMinutes>0) maghrib+method.ishaMinutes/60.0 else noonUtc+(isha ?: sunsetHour)))
         )
+        return if (applyOffsets) entries.map { entry ->
+            entry.copy(time = entry.time.plusMinutes((s.offsets[entry.key] ?: 0).coerceIn(-60, 60).toLong()))
+        } else entries
     }
 }
