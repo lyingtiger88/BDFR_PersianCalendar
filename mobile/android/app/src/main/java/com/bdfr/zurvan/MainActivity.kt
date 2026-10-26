@@ -33,6 +33,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -681,6 +683,19 @@ private fun CalendarScreen(
             }
         }
 
+        val calendarContext = LocalContext.current
+        val layoutPrefs = remember { calendarContext.getSharedPreferences("zurvan_calendar_layout", Context.MODE_PRIVATE) }
+        var weekRightToLeft by remember { mutableStateOf(layoutPrefs.getBoolean("week_rtl", true)) }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically) {
+            Text("چیدمان هفته", style = MaterialTheme.typography.labelMedium)
+            TextButton(onClick = {
+                weekRightToLeft = !weekRightToLeft
+                layoutPrefs.edit().putBoolean("week_rtl", weekRightToLeft).apply()
+            }) { Text(if (weekRightToLeft) "راست به چپ" else "چپ به راست") }
+        }
+        CompositionLocalProvider(LocalLayoutDirection provides
+            if (weekRightToLeft) LayoutDirection.Rtl else LayoutDirection.Ltr) {
         WeekdayHeader()
 
         LazyVerticalGrid(
@@ -752,6 +767,7 @@ private fun CalendarScreen(
                     }
                 )
             }
+        }
         }
     }
 
@@ -900,42 +916,20 @@ private fun CalendarScreen(
 
 @Composable
 private fun WeekdayHeader() {
-    val names = listOf(
-        "ش",
-        "ی",
-        "د",
-        "س",
-        "چ",
-        "پ",
-        "ج"
-    )
-
-    Row(
-        modifier =
-            Modifier.fillMaxWidth()
-    ) {
-        names.forEachIndexed {
-                index,
-                value ->
+    val names = listOf("شنبه", "یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه")
+    Row(modifier = Modifier.fillMaxWidth()) {
+        names.forEachIndexed { index, value ->
             Text(
                 text = value,
-                modifier =
-                    Modifier.weight(1f),
-                textAlign =
-                    TextAlign.Center,
-                fontWeight =
-                    FontWeight.SemiBold,
-                color = if (
-                    index == 6
-                ) {
-                    MaterialTheme
-                        .colorScheme
-                        .error
-                } else {
-                    MaterialTheme
-                        .colorScheme
-                        .onSurface
-                }
+                modifier = Modifier.weight(1f),
+                fontSize = androidx.compose.ui.unit.TextUnit(9f, androidx.compose.ui.unit.TextUnitType.Sp),
+                maxLines = 2,
+                softWrap = true,
+                lineHeight = androidx.compose.ui.unit.TextUnit(11f, androidx.compose.ui.unit.TextUnitType.Sp),
+                textAlign = TextAlign.Center,
+                fontWeight = FontWeight.SemiBold,
+                color = if (index == 6) MaterialTheme.colorScheme.error
+                        else MaterialTheme.colorScheme.onSurface
             )
         }
     }
