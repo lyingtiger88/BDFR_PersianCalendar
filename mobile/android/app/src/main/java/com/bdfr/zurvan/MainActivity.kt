@@ -58,6 +58,10 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Preserve the transparent pixels of the Activity so Android can composite
+        // the previously visible app beneath Liquid Glass surfaces.
+        window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
+        window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND)
         ZurvanBuiltInOccasions.reload(this)
         ZurvanPlanExpirySchedule.register(this)
 
