@@ -130,7 +130,7 @@ fun ZurvanPlanningViews(
                 val model=remember(year,month) { AndroidCalendarEngine.buildPersianMonth(year,month) }
                 val days=model.days.filter { it.persianYear == year && it.persianMonth == month }
                 val leading=model.leadingBlankCount
-                val cells: List<String?>=List(leading) { null } + days.map { it.persianKey }
+                val cells: List<String?> = List<String?>(leading) { null } + days.map { it.persianKey }
                 Text("در هر خانه تعداد برنامه‌ها نمایش داده می‌شود؛ روز را برای مشاهده انتخاب کنید.",
                     style=MaterialTheme.typography.bodySmall)
                 LazyVerticalGrid(columns=GridCells.Fixed(7), modifier=Modifier.height(330.dp),
