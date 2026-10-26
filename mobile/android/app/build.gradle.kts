@@ -24,8 +24,8 @@ android {
         buildConfigField("String", "LICENSE_PUBLIC_KEY_B64", "\"" + issuerPublicKey + "\"")
         minSdk = 26
         targetSdk = 35
-        versionCode = 60
-        versionName = "0.6.0-beta.1"
+        versionCode = 61
+        versionName = "0.6.0-beta.2"
         buildConfigField(
             "String",
             "DESK_API_BASE_URL",
