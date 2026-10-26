@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.mlkit.vision.codescanner.GmsBarcodeScannerOptions
@@ -922,10 +923,10 @@ private fun WeekdayHeader() {
             Text(
                 text = value,
                 modifier = Modifier.weight(1f),
-                fontSize = androidx.compose.ui.unit.TextUnit(9f, androidx.compose.ui.unit.TextUnitType.Sp),
+                fontSize = 9.sp,
                 maxLines = 2,
                 softWrap = true,
-                lineHeight = androidx.compose.ui.unit.TextUnit(11f, androidx.compose.ui.unit.TextUnitType.Sp),
+                lineHeight = 11.sp,
                 textAlign = TextAlign.Center,
                 fontWeight = FontWeight.SemiBold,
                 color = if (index == 6) MaterialTheme.colorScheme.error
