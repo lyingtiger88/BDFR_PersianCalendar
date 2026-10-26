@@ -10,6 +10,8 @@ import android.graphics.BitmapFactory
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.foundation.background
 
 data class ZurvanPalette(val id: String, val label: String, val background: Color,
     val surface: Color, val card: Color, val ink: Color, val accent: Color, val holiday: Color)
@@ -17,6 +19,7 @@ data class ZurvanPalette(val id: String, val label: String, val background: Colo
 object ZurvanThemes {
     val presets = listOf(
         ZurvanPalette("windows-light","Windows Light",Color(0xFFF5F6F8),Color.White,Color.White,Color(0xFF202631),Color(0xFF9DC7F5),Color(0xFFD34E5E)),
+        ZurvanPalette("liquid-glass","Liquid Glass · شیشه مایع",Color(0xFFF0F5FA),Color(0xDDF8FCFF),Color(0xB8F5FAFF),Color(0xFF152D44),Color(0xFF598FC9),Color(0xFFB73C55)),
         ZurvanPalette("azure-glass","Azure Glass",Color(0xFFEAF3FB),Color(0xFFF5FAFF),Color(0xFFEAF4FF),Color(0xFF17324D),Color(0xFF5DA9E8),Color(0xFFD25162)),
         ZurvanPalette("graphite-night","Graphite Night",Color(0xFF171A1F),Color(0xFF22262D),Color(0xFF2A2F37),Color(0xFFF1F5F9),Color(0xFF586D88),Color(0xFFFF7A86)),
         ZurvanPalette("warm-sand","Warm Sand",Color(0xFFFFF8F3),Color(0xFFFFF9F0),Color(0xFFFFFDF8),Color(0xFF40362C),Color(0xFFDDB78B),Color(0xFFC95C57)),
@@ -166,6 +169,11 @@ object ZurvanThemes {
         }
         // Theme artwork takes precedence over unrelated custom wallpaper from another theme.
         val activePath = if (asset != null) null else path
+        if (theme == "liquid-glass") {
+            androidx.compose.foundation.layout.Box(modifier.background(
+                Brush.linearGradient(listOf(Color(0xFF9FC8E8), Color(0xFFDAE8F8),
+                    Color(0xFFCAD7F1), Color(0xFF8CCCD1)))))
+        }
         val bitmap = remember(activePath, asset) {
             runCatching {
                 if (activePath != null) BitmapFactory.decodeFile(activePath)?.asImageBitmap()
@@ -176,6 +184,7 @@ object ZurvanThemes {
             }.getOrNull()
         } ?: return
         Image(bitmap = bitmap, contentDescription = null,
-            modifier = modifier, contentScale = ContentScale.Crop, alpha = 0.28f)
+            modifier = modifier, contentScale = ContentScale.Crop,
+            alpha = if (theme == "liquid-glass") 0.5f else 0.28f)
     }
 }
