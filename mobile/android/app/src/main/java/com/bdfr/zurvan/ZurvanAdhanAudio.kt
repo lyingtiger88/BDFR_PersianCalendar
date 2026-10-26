@@ -62,6 +62,10 @@ class ZurvanAdhanService : Service() {
     private var player: MediaPlayer? = null
     override fun onBind(intent: Intent?): IBinder? = null
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == "com.bdfr.zurvan.ADHAN_STOP") {
+            stopSelf()
+            return START_NOT_STICKY
+        }
         if (intent?.action != "com.bdfr.zurvan.ADHAN_PLAY") {
             stopSelf(startId)
             return START_NOT_STICKY
