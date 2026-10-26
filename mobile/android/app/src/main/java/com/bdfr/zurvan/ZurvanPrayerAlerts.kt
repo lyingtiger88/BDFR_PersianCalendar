@@ -15,18 +15,19 @@ import java.time.ZoneId
 /** Schedules next day's estimated prayer-time reminders without exact-alarm privilege. */
 object ZurvanPrayerAlerts {
     private val keys = setOf("fajr","dhuhr","asr","maghrib","isha")
-    private fun token(context:Context,key:String):PendingIntent {
+    private fun token(context:Context,key:String, audio:Boolean=false):PendingIntent {
         val i=Intent(context,ZurvanPrayerReceiver::class.java).apply {
-            action="com.bdfr.zurvan.PRAYER_$key"
+            action="com.bdfr.zurvan.PRAYER_${key}_${if(audio) "AUDIO" else "NOTICE"}"
+            putExtra("audio", audio)
             putExtra("key",key)
         }
-        return PendingIntent.getBroadcast(context,20000+key.hashCode().and(0x3fff),i,
+        return PendingIntent.getBroadcast(context,(if(audio) 40000 else 20000)+key.hashCode().and(0x3fff),i,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
     }
     fun schedule(context:Context,s:ZurvanPrayerTimes.Settings) {
         val alarm=context.getSystemService(AlarmManager::class.java)
-        keys.forEach { alarm.cancel(token(context,it)) }
-        if(!s.alerts) return
+        keys.forEach { alarm.cancel(token(context,it)); alarm.cancel(token(context,it,true)) }
+        if(!s.alerts && !ZurvanAdhanAudio.enabled(context)) return
         val zone=runCatching { ZoneId.of(s.zone) }.getOrNull() ?: return
         val today=LocalDate.now(zone)
         val now=System.currentTimeMillis()
@@ -38,7 +39,20 @@ object ZurvanPrayerAlerts {
                         ((s.offsets[key] ?: 0).coerceIn(-60,60) - s.beforeMinutes)*60000L
                 }
             }.firstOrNull { it>now } ?: continue
-            alarm.setWindow(AlarmManager.RTC_WAKEUP,instant,60_000L,token(context,key))
+            if (s.alerts) alarm.setWindow(AlarmManager.RTC_WAKEUP,instant,60_000L,token(context,key))
+            if (ZurvanAdhanAudio.enabled(context) && ZurvanAdhanAudio.hasRecording(context,s.school)) {
+                val candidates = (0..3).asSequence().mapNotNull { offset ->
+                    val date = today.plusDays(offset.toLong())
+                    ZurvanPrayerTimes.calculate(date,s,applyOffsets=false)
+                        .firstOrNull { it.key == key }?.let { entry ->
+                            date.atTime(entry.time).atZone(zone).toInstant().toEpochMilli() +
+                                (s.offsets[key] ?: 0).coerceIn(-60,60) * 60000L
+                        }
+                }
+                val audioAt = candidates.firstOrNull { it > now }
+                if (audioAt != null) alarm.setWindow(AlarmManager.RTC_WAKEUP,audioAt,
+                    60_000L,token(context,key,true))
+            }
         }
     }
 }
@@ -46,6 +60,11 @@ object ZurvanPrayerAlerts {
 class ZurvanPrayerReceiver:BroadcastReceiver() {
     override fun onReceive(context:Context,intent:Intent?) {
         val settings=ZurvanPrayerTimes.settings(context)
+        if (intent?.getBooleanExtra("audio",false) == true) {
+            if (ZurvanAdhanAudio.enabled(context)) ZurvanAdhanAudio.play(context,settings.school,false)
+            ZurvanPrayerAlerts.schedule(context,settings)
+            return
+        }
         if(!settings.alerts) return
         val key=intent?.getStringExtra("key") ?: return
         val labels=mapOf("fajr" to "اذان صبح","dhuhr" to "اذان ظهر",
