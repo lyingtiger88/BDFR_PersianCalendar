@@ -20,6 +20,9 @@ fun ZurvanVoiceAccessibility() {
     var text by remember { mutableStateOf("") }
     var status by remember { mutableStateOf("") }
     var speaking by remember { mutableStateOf(false) }
+    val voicePrefs = remember(context) { context.getSharedPreferences("zurvan_voice", android.content.Context.MODE_PRIVATE) }
+    var ttsEnabled by remember { mutableStateOf(voicePrefs.getBoolean("tts_enabled", false)) }
+    var initResult by remember { mutableIntStateOf(-1) }
     var ttsReady by remember { mutableStateOf(false) }
     var engine by remember { mutableStateOf<TextToSpeech?>(null) }
     val speechInput = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -30,17 +33,7 @@ fun ZurvanVoiceAccessibility() {
         } else status = "متنی دریافت نشد یا تشخیص گفتار لغو شد."
     }
     DisposableEffect(context) {
-        val tts = TextToSpeech(context) { code ->
-            if (code == TextToSpeech.SUCCESS) {
-                engine?.let { instance ->
-                    val available = instance.setLanguage(Locale.forLanguageTag("fa-IR"))
-                    ttsReady = available != TextToSpeech.LANG_MISSING_DATA &&
-                        available != TextToSpeech.LANG_NOT_SUPPORTED
-                    status = if (ttsReady) "موتور گفتار فارسی آماده است." else
-                        "صدای فارسی نصب نیست؛ از تنظیمات گوشی بسته فارسی موتور گفتار را نصب کنید."
-                }
-            } else status = "موتور متن‌به‌گفتار روی دستگاه آماده نیست."
-        }
+        val tts = TextToSpeech(context) { code -> initResult = code }
         engine = tts
         onDispose {
             tts.stop()
@@ -48,10 +41,41 @@ fun ZurvanVoiceAccessibility() {
             engine = null
         }
     }
+    LaunchedEffect(engine, initResult) {
+        val currentEngine = engine
+        if (initResult == TextToSpeech.SUCCESS && currentEngine != null) {
+            val language = currentEngine.setLanguage(Locale.forLanguageTag("fa-IR"))
+            ttsReady = language != TextToSpeech.LANG_MISSING_DATA &&
+                language != TextToSpeech.LANG_NOT_SUPPORTED
+            status = if (ttsReady) "موتور گفتار فارسی آماده است." else
+                "صدای فارسی در موتور گفتار گوشی موجود نیست؛ بسته فارسی را در تنظیمات گوشی نصب کنید."
+        } else if (initResult != -1) {
+            ttsReady = false
+            status = "موتور متن‌به‌گفتار روی دستگاه آماده نیست."
+        }
+    }
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text("گفتار به متن و متن به گفتار", style = MaterialTheme.typography.titleMedium)
         Text("پشتیبانی از فارسی به سرویس تشخیص گفتار و موتور صوتی نصب‌شده روی گوشی بستگی دارد. پردازش گفتار ممکن است توسط سرویس دستگاه به‌صورت آنلاین انجام شود.",
             style = MaterialTheme.typography.bodySmall)
+        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            Switch(checked = ttsEnabled, onCheckedChange = { enabled ->
+                ttsEnabled = enabled
+                voicePrefs.edit().putBoolean("tts_enabled", enabled).apply()
+                if (!enabled) {
+                    engine?.stop()
+                    speaking = false
+                    status = "خواندن صوتی غیرفعال شد."
+                }
+            })
+            Text("فعال‌سازی متن به گفتار فارسی", modifier = Modifier.padding(start = 8.dp))
+        }
+        OutlinedButton(enabled = ttsEnabled && ttsReady, onClick = {
+            val testText = "سلام. به زروان خوش آمدید. این یک آزمایش خواندن متن فارسی است."
+            val result = engine?.speak(testText, TextToSpeech.QUEUE_FLUSH, null, "zurvan_tts_test")
+            status = if (result == TextToSpeech.SUCCESS) "درخواست آزمایش صدا ارسال شد." else "آزمایش صدا شروع نشد."
+            speaking = result == TextToSpeech.SUCCESS
+        }, modifier = Modifier.fillMaxWidth()) { Text("آزمایش صدای فارسی") }
         OutlinedTextField(value = text, onValueChange = { text = it },
             label = { Text("متن برای خواندن یا ویرایش") },
             modifier = Modifier.fillMaxWidth(), minLines = 3)
@@ -66,7 +90,7 @@ fun ZurvanVoiceAccessibility() {
             catch (_: Exception) { status = "سرویس تشخیص گفتار روی این گوشی در دسترس نیست." }
         }, modifier = Modifier.fillMaxWidth()) { Text("تبدیل صدا به متن") }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(enabled = ttsReady && text.isNotBlank(), onClick = {
+            Button(enabled = ttsEnabled && ttsReady && text.isNotBlank(), onClick = {
                 engine?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "zurvan_voice_preview")
                 speaking = true
             }) { Text("خواندن متن") }
