@@ -33,8 +33,9 @@ object ZurvanPrayerAlerts {
         for(key in keys) {
             val instant=(0..2).asSequence().mapNotNull { dayOffset ->
                 val date=today.plusDays(dayOffset.toLong())
-                ZurvanPrayerTimes.calculate(date,s).firstOrNull { it.key==key }?.let {
-                    date.atTime(it.time).atZone(zone).toInstant().toEpochMilli()-s.beforeMinutes*60000L
+                ZurvanPrayerTimes.calculate(date,s,applyOffsets=false).firstOrNull { it.key==key }?.let {
+                    date.atTime(it.time).atZone(zone).toInstant().toEpochMilli() +
+                        ((s.offsets[key] ?: 0).coerceIn(-60,60) - s.beforeMinutes)*60000L
                 }
             }.firstOrNull { it>now } ?: continue
             alarm.setWindow(AlarmManager.RTC_WAKEUP,instant,60_000L,token(context,key))
