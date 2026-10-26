@@ -2769,6 +2769,8 @@ private fun SettingsScreen(
         }
         if (settingsCategory == "appearance") item {
             SettingsCard(title = "تم ظاهری") {
+                Text("Liquid Glass · شیشه مایع: پنجره زروان نیمه‌شفاف می‌شود و محتوای برنامه پشت آن، از بخش‌های شفاف دیده می‌شود. نتیجه در گوشی‌ها و نسخه‌های مختلف اندروید ممکن است متفاوت باشد.",
+                    style = MaterialTheme.typography.bodySmall)
                 ZurvanThemes.presets.forEach { option ->
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         RadioButton(
