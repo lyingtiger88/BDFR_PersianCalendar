@@ -30,7 +30,8 @@ object ZurvanActivation {
         if (BuildConfig.DEBUG && code.trim() in setOf(
             "elena13731005", "zarasamtestmode",
             "delaramsoftheart", "shirinquietfox",
-            "nazaninstrongcare", "mehrbanmomfriend", "jonoubsweetpearl"
+            "nazaninstrongcare", "mehrbanmomfriend", "jonoubsweetpearl",
+            "kurdishlovelymoon", "kindheartedfriend"
         )) return Result.VALID
         val encodedKey = BuildConfig.LICENSE_PUBLIC_KEY_B64.trim()
         if (encodedKey.isEmpty()) return Result.MISSING_PUBLIC_KEY
