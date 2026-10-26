@@ -186,6 +186,7 @@ private fun ZurvanMobileShell(
         modifier = Modifier.fillMaxSize()
     ) {
         ZurvanThemes.Wallpaper(modifier = Modifier.fillMaxSize())
+        val liquidGlass = ZurvanThemes.active.current.id == "liquid-glass"
         val wide = maxWidth >= 760.dp
 
         if (wide) {
@@ -204,6 +205,7 @@ private fun ZurvanMobileShell(
                     modifier = Modifier.weight(1f),
                     topBar = {
                         TopAppBar(
+                            colors = TopAppBarDefaults.topAppBarColors(containerColor = if (liquidGlass) Color.White.copy(alpha = 0.18f) else MaterialTheme.colorScheme.surface),
                             title = {
                                 ZurvanSecretTitle()
                             }
@@ -239,7 +241,7 @@ private fun ZurvanMobileShell(
                 },
                 bottomBar = {
                     NavigationBar(containerColor = if (ZurvanThemes.active.current.id == "liquid-glass")
-                        MaterialTheme.colorScheme.surface.copy(alpha = 0.75f)
+                        Color.White.copy(alpha = 0.24f)
                         else MaterialTheme.colorScheme.surface) {
                         ZurvanTab.entries.filter { it.name in ZurvanTabConfig.visible.current }.forEach { tab ->
                             NavigationBarItem(
@@ -339,7 +341,7 @@ private fun ZurvanNavigationRail(
     NavigationRail(
         modifier = Modifier.fillMaxHeight(),
         containerColor = if (ZurvanThemes.active.current.id == "liquid-glass")
-            MaterialTheme.colorScheme.surface.copy(alpha = 0.75f) else MaterialTheme.colorScheme.surface
+            Color.White.copy(alpha = 0.24f) else MaterialTheme.colorScheme.surface
     ) {
         Spacer(Modifier.height(12.dp))
 
@@ -670,7 +672,8 @@ private fun CalendarScreen(
         }
         if (todayPrayers.isNotEmpty()) {
             Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                colors = CardDefaults.cardColors(containerColor = if (ZurvanThemes.active.current.id == "liquid-glass")
+                    Color.White.copy(alpha = 0.22f) else MaterialTheme.colorScheme.surfaceVariant),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(Modifier.fillMaxWidth().padding(8.dp)) {
@@ -983,6 +986,7 @@ private fun CalendarDayCard(
             order[2]
         )
 
+    val isGlassDay = ZurvanThemes.active.current.id == "liquid-glass"
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -994,10 +998,13 @@ private fun CalendarDayCard(
             RoundedCornerShape(
                 cornerRadius.dp
             ),
+        border = if (isGlassDay) BorderStroke(0.8.dp, Color.White.copy(alpha = 0.65f)) else null,
         colors =
             CardDefaults.cardColors(
                 containerColor =
-                    if (day.isToday) {
+                    if (isGlassDay) {
+                        if (day.isToday) Color(0x775B9FE6) else Color.White.copy(alpha = 0.19f)
+                    } else if (day.isToday) {
                         MaterialTheme.colorScheme.primaryContainer
                     } else if (day.weekColumn in 0..6 && weekdayColors.size == 7) {
                         weekdayColors[day.weekColumn]
@@ -4699,7 +4706,7 @@ private fun SettingsCard(
         shape = MaterialTheme.shapes.medium,
         border = if (glass) BorderStroke(1.dp, Color.White.copy(alpha = 0.72f)) else null,
         colors = CardDefaults.cardColors(containerColor =
-            if (glass) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.76f)
+            if (glass) Color.White.copy(alpha = 0.22f)
             else MaterialTheme.colorScheme.surfaceVariant)
     ) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
