@@ -1575,7 +1575,8 @@ private fun PlansScreen(
     ZurvanTeamPlanner(
         modifier = modifier,
         plans = plans,
-        onAddSchedule = { showDialog = true }
+        onAddSchedule = { showDialog = true },
+        onTogglePlan = { viewModel.togglePlan(it) }
     )
 
     if (showDialog) {
