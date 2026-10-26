@@ -480,6 +480,8 @@ private fun CalendarScreen(
     var month by remember {
         mutableIntStateOf(initial.second)
     }
+    val updateSeasonArtwork = ZurvanThemes.setDisplayedPersianMonth.current
+    LaunchedEffect(month) { updateSeasonArtwork(month) }
 
     var selectedDay by remember {
         mutableStateOf<CalendarDayCell?>(null)
