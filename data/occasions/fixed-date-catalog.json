@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "version": "2026-10-26",
-  "description": "Fixed-date starter occasions only. Lunar and year-specific official dates require separately verified annual feeds.",
+  "version": "2026-10-30",
+  "description": "Verified recurring fixed-date starter occasions for Iran. Official lunar holidays require year-specific Iranian calendar data; tabular Islamic dates are not used to infer public holidays.",
   "entries": [
     {
       "calendar": "gregorian",
@@ -80,6 +80,18 @@
       "month": 12,
       "day": 29,
       "title": "روز ملی شدن صنعت نفت · تعطیل رسمی"
+    },
+    {
+      "calendar": "persian",
+      "month": 3,
+      "day": 14,
+      "title": "رحلت امام خمینی · تعطیل رسمی"
+    },
+    {
+      "calendar": "persian",
+      "month": 3,
+      "day": 15,
+      "title": "قیام ۱۵ خرداد · تعطیل رسمی"
     }
   ]
 }
