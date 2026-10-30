@@ -64,6 +64,7 @@ object ZurvanBuiltInOccasions {
         }
         val builtIn = base.filter { entry ->
             when (entry.calendar) {
+                if (entry.targetPersianYear != null && entry.targetPersianYear != day.persianYear) return@filter false
                 CalendarPriority.PERSIAN -> entry.month == day.persianMonth && entry.day == day.persianDay
                 CalendarPriority.GREGORIAN -> entry.month == day.gregorianMonth && entry.day == day.gregorianDay
                 CalendarPriority.HIJRI -> entry.month == day.hijriMonth && entry.day == day.hijriDay
@@ -83,7 +84,7 @@ object ZurvanBuiltInOccasions {
                 }
                 CalendarPriority.HIJRI -> occasion.month in 1..12 && occasion.day in 1..30
             }
-            if (!occasion.annual || !existsThisYear) return@filter false
+            if ((!occasion.annual && occasion.targetPersianYear == null) || !existsThisYear) return@filter false
             when (occasion.calendar) {
                 CalendarPriority.PERSIAN -> occasion.month == day.persianMonth && occasion.day == day.persianDay
                 CalendarPriority.GREGORIAN -> occasion.month == day.gregorianMonth && occasion.day == day.gregorianDay
