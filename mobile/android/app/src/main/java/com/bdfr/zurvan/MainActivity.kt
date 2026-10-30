@@ -789,7 +789,6 @@ private fun CalendarScreen(
             }
         }
         }
-        val referenceDay = model.days[model.days.size / 2]
         val gregorianMonthNames = listOf(
             "ژانویه", "فوریه", "مارس", "آوریل", "مه", "ژوئن",
             "ژوئیه", "اوت", "سپتامبر", "اکتبر", "نوامبر", "دسامبر"
@@ -799,18 +798,26 @@ private fun CalendarScreen(
             "جمادی‌الثانی", "رجب", "شعبان", "رمضان", "شوال",
             "ذی‌القعده", "ذی‌الحجه"
         )
+        val gregorianMonthsInRange = model.days
+            .map { it.gregorianMonth }
+            .distinct()
+            .mapNotNull { gregorianMonthNames.getOrNull(it - 1) }
+        val hijriMonthsInRange = model.days
+            .map { it.hijriMonth }
+            .distinct()
+            .mapNotNull { hijriMonthNames.getOrNull(it - 1) }
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                "میلادی: " + gregorianMonthNames.getOrElse(referenceDay.gregorianMonth - 1) { "—" },
+                "میلادی: " + gregorianMonthsInRange.joinToString(" / "),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(
-                "قمری: " + hijriMonthNames.getOrElse(referenceDay.hijriMonth - 1) { "—" },
+                "قمری: " + hijriMonthsInRange.joinToString(" / "),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
