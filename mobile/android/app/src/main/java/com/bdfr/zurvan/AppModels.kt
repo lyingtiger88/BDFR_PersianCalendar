@@ -55,5 +55,6 @@ data class AndroidUiPreferences(
         CalendarPriority.GREGORIAN
     ),
     val cornerRadius: Float = 18f,
-    val railSide: String = "left"
+    val railSide: String = "left",
+    val hijriDayOffset: Int = 0
 )
