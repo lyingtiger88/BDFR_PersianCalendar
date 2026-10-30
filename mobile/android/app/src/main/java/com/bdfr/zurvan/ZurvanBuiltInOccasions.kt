@@ -25,6 +25,8 @@ object ZurvanBuiltInOccasions {
         Record(CalendarPriority.PERSIAN, 1, 13, "روز طبیعت · تعطیل رسمی"),
         Record(CalendarPriority.PERSIAN, 3, 14, "رحلت امام خمینی · تعطیل رسمی"),
         Record(CalendarPriority.PERSIAN, 3, 15, "قیام ۱۵ خرداد · تعطیل رسمی"),
+        Record(CalendarPriority.PERSIAN, 3, 23, "روز شهدای اقتدار و اتحاد ملی ایران"),
+        Record(CalendarPriority.PERSIAN, 7, 1, "روز پرچم ایران"),
         Record(CalendarPriority.PERSIAN, 11, 22, "سالگرد پیروزی انقلاب اسلامی · تعطیل رسمی"),
         Record(CalendarPriority.PERSIAN, 12, 29, "روز ملی شدن صنعت نفت · تعطیل رسمی")
     )
