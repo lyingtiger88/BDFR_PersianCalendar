@@ -48,6 +48,9 @@ data class PersianMonthModel(
 )
 
 object AndroidCalendarEngine {
+    @Volatile var hijriDayOffset: Int = 0
+        set(value) { field = value.coerceIn(-1, 1) }
+
     private val persianMonthNames = listOf(
         "فروردین", "اردیبهشت", "خرداد",
         "تیر", "مرداد", "شهریور",
@@ -147,7 +150,8 @@ object AndroidCalendarEngine {
                         "ar_SA@calendar=islamic-civil"
                     )
                 ).apply {
-                    time = Date(millis)
+                    // Correction affects Hijri labels only, never Gregorian/Persian dates.
+                    time = Date(millis + hijriDayOffset * 86_400_000L)
                 }
 
             val dow =
