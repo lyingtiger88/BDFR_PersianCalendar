@@ -27,7 +27,8 @@ data class LocalOccasion(
     val day: Int,
     val hour: Int,
     val minute: Int,
-    val annual: Boolean = true
+    val annual: Boolean = true,
+    val targetPersianYear: Int? = null
 )
 
 data class LocalDayNote(
