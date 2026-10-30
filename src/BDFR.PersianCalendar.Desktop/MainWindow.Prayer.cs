@@ -119,10 +119,18 @@ public sealed partial class MainWindow
         {
             try
             {
-                catalogue = await PrayerWorldCities.LoadAsync();
+                if (PrayerWorldCities.HasCache)
+                {
+                    catalogue = await PrayerWorldCities.LoadAsync();
+                    locationStatus.Text = catalogue.Count + " شهر و موقعیت دارای مختصات جغرافیایی از حافظه آفلاین بارگذاری شد.";
+                }
+                else
+                {
+                    locationStatus.Text = "در حال دریافت خودکار فهرست جهانی شهرها و مختصات…";
+                    catalogue = await PrayerWorldCities.UpdateAsync();
+                    locationStatus.Text = catalogue.Count + " شهر و موقعیت دارای مختصات جغرافیایی دریافت و برای استفاده آفلاین ذخیره شد.";
+                }
                 FilterCities();
-                if (catalogue.Count > 0)
-                    locationStatus.Text = catalogue.Count + " موقعیت از حافظه آفلاین بارگذاری شد.";
             }
             catch (Exception ex) { locationStatus.Text = "خواندن پایگاه شهرها ناموفق: " + ex.Message; }
         }
