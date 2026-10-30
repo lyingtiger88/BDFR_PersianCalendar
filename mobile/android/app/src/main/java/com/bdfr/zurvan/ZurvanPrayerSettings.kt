@@ -47,8 +47,15 @@ fun ZurvanPrayerSettings() {
     var citiesExpanded by remember { mutableStateOf(false) }
     val countries = remember { ZurvanWorldCities.countries() }
     LaunchedEffect(context) {
-        if (ZurvanWorldCities.available(context)) {
-            worldCities = runCatching { ZurvanWorldCities.load(context) }.getOrDefault(emptyList())
+        loadingCities = true
+        datasetMessage = "در حال آماده‌سازی فهرست شهرها و مختصات جغرافیایی…"
+        try {
+            worldCities = if (ZurvanWorldCities.available(context)) ZurvanWorldCities.load(context) else ZurvanWorldCities.download(context)
+            datasetMessage = if (worldCities.isEmpty()) "فهرست شهرها خالی است؛ اتصال اینترنت را بررسی و دوباره تلاش کنید." else "${worldCities.size} شهر و منطقه دارای مختصات جغرافیایی و منطقه زمانی آماده شد."
+        } catch (ex: Exception) {
+            datasetMessage = "دریافت خودکار فهرست شهرها ممکن نشد. برای دریافت دوباره از دکمه زیر استفاده کنید. ${ex.message ?: ""}"
+        } finally {
+            loadingCities = false
         }
     }
     val schools = ZurvanPrayerTimes.schools
@@ -90,7 +97,7 @@ fun ZurvanPrayerSettings() {
             }
         }
         Text("انتخاب موقعیت جهانی", fontWeight = FontWeight.SemiBold)
-        Text("پایگاه GeoNames شامل شهرها و آبادی‌های با جمعیت حداقل ۵۰۰ نفر است؛ همه آبادی‌های جهان را پوشش نمی‌دهد.",
+        Text("کشورها و شهرها به‌ترتیب انتخاب می‌شوند. با انتخاب شهر، عرض و طول جغرافیایی و منطقه زمانی آن خودکار ثبت می‌شود. داده‌ها از GeoNames دریافت و برای استفاده آفلاین ذخیره می‌شوند. این مجموعه مکان‌های مسکونی با جمعیت حداقل ۵۰۰ نفر را پوشش می‌دهد و شامل تمام روستاها و آبادی‌های کوچک جهان نیست.",
             style = MaterialTheme.typography.bodySmall)
         Button(onClick = {
             scope.launch {
@@ -105,7 +112,7 @@ fun ZurvanPrayerSettings() {
             }
         }, enabled = !loadingCities) {
             Text(if (loadingCities) "در حال دریافت پایگاه جهانی…" else
-                if (worldCities.isEmpty()) "دریافت فهرست جهانی شهرها" else "به‌روزرسانی فهرست شهرها")
+                if (worldCities.isEmpty()) "دریافت فهرست شهرها و مختصات" else "به‌روزرسانی شهرها و مختصات")
         }
         if (datasetMessage.isNotBlank()) Text(datasetMessage)
         if (worldCities.isNotEmpty()) {
