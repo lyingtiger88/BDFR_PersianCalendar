@@ -789,6 +789,32 @@ private fun CalendarScreen(
             }
         }
         }
+        val referenceDay = model.days[model.days.size / 2]
+        val gregorianMonthNames = listOf(
+            "ژانویه", "فوریه", "مارس", "آوریل", "مه", "ژوئن",
+            "ژوئیه", "اوت", "سپتامبر", "اکتبر", "نوامبر", "دسامبر"
+        )
+        val hijriMonthNames = listOf(
+            "محرم", "صفر", "ربیع‌الاول", "ربیع‌الثانی", "جمادی‌الاول",
+            "جمادی‌الثانی", "رجب", "شعبان", "رمضان", "شوال",
+            "ذی‌القعده", "ذی‌الحجه"
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                "میلادی: " + gregorianMonthNames.getOrElse(referenceDay.gregorianMonth - 1) { "—" },
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                "قمری: " + hijriMonthNames.getOrElse(referenceDay.hijriMonth - 1) { "—" },
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 
     LaunchedEffect(
