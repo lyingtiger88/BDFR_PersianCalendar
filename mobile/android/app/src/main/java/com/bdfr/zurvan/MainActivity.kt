@@ -765,12 +765,14 @@ private fun CalendarScreen(
                         )
                     }
 
+                val dayOccasions = ZurvanBuiltInOccasions.onDay(day, occasions)
                 CalendarDayCard(
                     day = day,
                     isHoliday = ZurvanDayFlags.isHoliday(day, occasions),
                     isMourning = ZurvanDayFlags.isMourning(day, occasions),
-                    hasOccasion = ZurvanBuiltInOccasions.onDay(day, occasions).isNotEmpty(),
-                    isCelebration = ZurvanBuiltInOccasions.onDay(day, occasions).any {
+                    occasionIcons = dayOccasions.map { ZurvanBuiltInOccasions.iconFor(it.title) }.distinct(),
+                    hasOccasion = dayOccasions.isNotEmpty(),
+                    isCelebration = dayOccasions.any {
                         listOf("عید", "میلاد", "جشن", "ولادت").any { key -> it.title.contains(key) } },
                     calendarOrder =
                         preferences
@@ -993,6 +995,7 @@ private fun CalendarDayCard(
     day: CalendarDayCell,
     isHoliday: Boolean,
     isMourning: Boolean,
+    occasionIcons: List<String>,
     hasOccasion: Boolean,
     isCelebration: Boolean,
     calendarOrder:
@@ -1114,25 +1117,20 @@ private fun CalendarDayCard(
                         .labelSmall
             )
 
-            if (isMourning) {
-                Text(
-                    text = "◤",
-                    color = Color.Black,
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.align(androidx.compose.ui.AbsoluteAlignment.TopLeft),
-                    // Physical top-left: independent of RTL layout direction.
-                )
+            if (occasionIcons.isNotEmpty()) {
+                Row(
+                    modifier = Modifier.align(Alignment.TopStart),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    occasionIcons.take(2).forEach { emoji ->
+                        Text(emoji, style = MaterialTheme.typography.labelMedium)
+                    }
+                    if (occasionIcons.size > 2) {
+                        Text("+", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
             }
 
-            if (!isMourning && isCelebration) {
-                Text("🎁", modifier = Modifier.align(Alignment.TopStart),
-                    style = MaterialTheme.typography.labelMedium)
-            } else if (!isMourning && hasOccasion) {
-                Box(Modifier.align(Alignment.TopStart).size(7.dp).background(
-                    if (isHoliday) Color.Red else MaterialTheme.colorScheme.primary,
-                    RoundedCornerShape(100)
-                ))
-            }
             if (isHoliday && !day.isFriday) {
                 Box(Modifier.align(Alignment.TopEnd).size(6.dp)
                     .background(Color.Red, RoundedCornerShape(100)))
