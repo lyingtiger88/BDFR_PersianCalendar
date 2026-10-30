@@ -63,12 +63,12 @@ object ZurvanBuiltInOccasions {
                 entry.title, entry.calendar, entry.month, entry.day, 0, 0)
         }
         val builtIn = base.filter { entry ->
-            when (entry.calendar) {
-                if (entry.targetPersianYear != null && entry.targetPersianYear != day.persianYear) return@filter false
-                CalendarPriority.PERSIAN -> entry.month == day.persianMonth && entry.day == day.persianDay
-                CalendarPriority.GREGORIAN -> entry.month == day.gregorianMonth && entry.day == day.gregorianDay
-                CalendarPriority.HIJRI -> entry.month == day.hijriMonth && entry.day == day.hijriDay
-            }
+            (entry.targetPersianYear == null || entry.targetPersianYear == day.persianYear) &&
+                when (entry.calendar) {
+                    CalendarPriority.PERSIAN -> entry.month == day.persianMonth && entry.day == day.persianDay
+                    CalendarPriority.GREGORIAN -> entry.month == day.gregorianMonth && entry.day == day.gregorianDay
+                    CalendarPriority.HIJRI -> entry.month == day.hijriMonth && entry.day == day.hijriDay
+                }
         }
         val userOccasions = custom.filter { occasion ->
             // Recurrence follows its source calendar; avoid nonexistent leap dates.
