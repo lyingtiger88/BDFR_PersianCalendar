@@ -65,7 +65,7 @@ class MainActivity : ComponentActivity() {
         window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND)
         ZurvanBuiltInOccasions.reload(this)
         lifecycleScope.launch {
-            runCatching { ZurvanOccasionDatabase.update(this@MainActivity, 1405) }
+            runCatching { ZurvanOccasionDatabase.update(this@MainActivity, AndroidCalendarEngine.currentPersianYearMonth().first) }
                 .onSuccess { ZurvanBuiltInOccasions.reload(this@MainActivity) }
         }
         ZurvanPlanExpirySchedule.register(this)
@@ -2662,11 +2662,11 @@ private fun SettingsScreen(
         if (settingsCategory == "calendar") item {
             SettingsCard(title = "به‌روزرسانی پایگاه داده") {
                 Text("نسخه فعلی: " + ZurvanOccasionDatabase.version(context))
-                Text("این گزینه تقویم کامل سال ۱۴۰۵ شامل مناسبت‌های رسمی، مذهبی، ملی و فرهنگی را دریافت می‌کند. داده‌ها سال‌محور هستند و با تغییر سال باید نسخه همان سال دریافت شود.")
+                Text("این گزینه تقویم کامل سال جاری شامل مناسبت‌های رسمی، مذهبی، ملی و فرهنگی را دریافت می‌کند. داده‌ها سال‌محور هستند و با تغییر سال، نسخه همان سال دریافت می‌شود.")
                 Button(enabled = !databaseBusy, onClick = {
                     databaseBusy = true
                     databaseScope.launch {
-                        runCatching { ZurvanOccasionDatabase.update(context, 1405) }
+                        runCatching { ZurvanOccasionDatabase.update(context, AndroidCalendarEngine.currentPersianYearMonth().first) }
                             .onSuccess { result ->
                                 ZurvanBuiltInOccasions.reload(context)
                                 databaseStatus = "دریافت شد: ${result.count} مناسبت، نسخه ${result.version}. صفحه تقویم را دوباره باز کنید."
