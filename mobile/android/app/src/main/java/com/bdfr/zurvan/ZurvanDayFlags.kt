@@ -23,10 +23,13 @@ object ZurvanDayFlags {
                     .any { word -> occasion.title.contains(word) }
         }
 
-    private fun matches(day: CalendarDayCell, occasion: LocalOccasion): Boolean =
+    private fun matches(day: CalendarDayCell, occasion: LocalOccasion): Boolean {
+        if (occasion.targetPersianYear != null && occasion.targetPersianYear != day.persianYear) return false
+        return
         when (occasion.calendar) {
             CalendarPriority.PERSIAN -> occasion.month == day.persianMonth && occasion.day == day.persianDay
             CalendarPriority.HIJRI -> occasion.month == day.hijriMonth && occasion.day == day.hijriDay
             CalendarPriority.GREGORIAN -> occasion.month == day.gregorianMonth && occasion.day == day.gregorianDay
         }
+    }
 }
