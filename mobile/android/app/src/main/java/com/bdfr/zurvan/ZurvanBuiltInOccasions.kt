@@ -23,10 +23,27 @@ object ZurvanBuiltInOccasions {
         Record(CalendarPriority.PERSIAN, 1, 4, "عید نوروز · تعطیل رسمی"),
         Record(CalendarPriority.PERSIAN, 1, 12, "روز جمهوری اسلامی ایران · تعطیل رسمی"),
         Record(CalendarPriority.PERSIAN, 1, 13, "روز طبیعت · تعطیل رسمی"),
+        Record(CalendarPriority.PERSIAN, 3, 14, "رحلت امام خمینی · تعطیل رسمی"),
+        Record(CalendarPriority.PERSIAN, 3, 15, "قیام ۱۵ خرداد · تعطیل رسمی"),
         Record(CalendarPriority.PERSIAN, 11, 22, "سالگرد پیروزی انقلاب اسلامی · تعطیل رسمی"),
         Record(CalendarPriority.PERSIAN, 12, 29, "روز ملی شدن صنعت نفت · تعطیل رسمی")
     )
 
+    fun iconFor(title: String): String {
+        val t = title.replace('ي', 'ی').replace('ك', 'ک').lowercase()
+        return when {
+            listOf("شهادت", "رحلت", "وفات", "عاشورا", "تاسوعا", "اربعین", "سوگواری", "درگذشت").any(t::contains) -> "🏴"
+            listOf("عید", "نوروز", "جشن", "میلاد", "ولادت", "مبعث", "غدیر", "فطر", "قربان").any(t::contains) -> "🎉"
+            listOf("محیط زیست", "درخت", "زمین", "آب", "هواشناسی").any(t::contains) -> "🌱"
+            listOf("سلامت", "دیابت", "پزشک", "بهداشت", "ایدز", "سرطان").any(t::contains) -> "🩺"
+            listOf("زن", "مادر", "خانواده", "کودک", "نوجوان").any(t::contains) -> "👨‍👩‍👧"
+            listOf("علم", "دانش", "پژوهش", "فناوری", "مهندس", "دانشگاه").any(t::contains) -> "🔬"
+            listOf("حقوق بشر", "صلح", "آزادی").any(t::contains) -> "🕊️"
+            listOf("انقلاب", "جمهوری اسلامی", "استقلال", "دفاع مقدس", "ارتش", "نیروی").any(t::contains) -> "🇮🇷"
+            listOf("شعر", "ادبیات", "کتاب", "بزرگداشت", "فرهنگ").any(t::contains) -> "📚"
+            else -> "📌"
+        }
+    }
     fun validAnnualDate(calendar: CalendarPriority, month: Int, day: Int): Boolean {
         if (month !in 1..12 || day !in 1..31) return false
         return when (calendar) {
