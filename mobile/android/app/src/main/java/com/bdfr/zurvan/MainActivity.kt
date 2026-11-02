@@ -1724,7 +1724,7 @@ private fun OccasionsScreen(
                         entries.forEach { item ->
                             Row(Modifier.fillMaxWidth().padding(start = 4.dp, top = 3.dp, bottom = 3.dp), verticalAlignment = Alignment.Top) {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(42.dp)) {
-                                    Text(item.day.toString().toPersianDigits(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                    Text(toPersianDigits(item.day.toString()), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                                     Box(Modifier.padding(top = 3.dp).width(2.dp).height(28.dp).background(MaterialTheme.colorScheme.outlineVariant))
                                 }
                                 Column(Modifier.weight(1f).padding(start = 8.dp, bottom = 8.dp)) {
