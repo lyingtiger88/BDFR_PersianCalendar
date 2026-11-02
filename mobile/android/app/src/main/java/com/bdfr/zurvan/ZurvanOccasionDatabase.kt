@@ -72,6 +72,34 @@ object ZurvanOccasionDatabase {
             }
         }.getOrNull()
     }
+    fun officialTimeline(context: Context, year: Int): List<OfficialAnnualOccasion> {
+        val raw = context.getSharedPreferences(prefs, Context.MODE_PRIVATE)
+            .getString("catalog", null) ?: return emptyList()
+        return runCatching {
+            val root = JSONObject(raw)
+            require(root.optInt("year") == year) { "پایگاه مناسبت سال در دسترس نیست" }
+            val entries = root.getJSONArray("entries")
+            (0 until entries.length()).mapNotNull { index ->
+                val item = entries.getJSONObject(index)
+                if (item.optInt("year") != year || item.optString("calendar") != "persian") return@mapNotNull null
+                val month = item.optInt("month")
+                val day = item.optInt("day")
+                if (month !in 1..12 || day !in 1..31) return@mapNotNull null
+                val categories = item.optJSONArray("categories")
+                OfficialAnnualOccasion(
+                    id = "official-$year-$month-$day-$index",
+                    year = year,
+                    month = month,
+                    day = day,
+                    title = item.optString("title"),
+                    isHoliday = item.optBoolean("holiday", false),
+                    categories = if (categories == null) emptyList() else
+                        (0 until categories.length()).map { categories.optString(it) }
+                )
+            }.sortedWith(compareBy<OfficialAnnualOccasion> { it.month }.thenBy { it.day }.thenBy { it.title })
+        }.getOrDefault(emptyList())
+    }
+
     fun version(context: Context): String =
         context.getSharedPreferences(prefs,Context.MODE_PRIVATE)
             .getString("version","نسخه داخلی") ?: "نسخه داخلی"
