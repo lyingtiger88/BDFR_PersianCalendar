@@ -1694,8 +1694,8 @@ private fun OccasionsScreen(
             Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                     Column {
-                        Text("تقویم رسمی سال \${currentYear}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        Text("\${officialItems.size} مناسبت در تایملاین سالانه", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("تقویم رسمی سال ${currentYear}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text("${officialItems.size} مناسبت در تایملاین سالانه", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     IconButton(enabled = !updating, onClick = { updating = true }) {
                         Icon(Icons.Outlined.Refresh, contentDescription = "به‌روزرسانی مناسبت‌ها")
@@ -1720,7 +1720,7 @@ private fun OccasionsScreen(
                                 Text(monthNames[month - 1], modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp), color = MaterialTheme.colorScheme.onPrimaryContainer, fontWeight = FontWeight.SemiBold)
                             }
                             Spacer(Modifier.weight(1f))
-                            Text("\${entries.size} رویداد", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("${entries.size} رویداد", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         entries.forEach { item ->
                             Row(Modifier.fillMaxWidth().padding(start = 4.dp, top = 3.dp, bottom = 3.dp), verticalAlignment = Alignment.Top) {
@@ -1734,7 +1734,7 @@ private fun OccasionsScreen(
                                         Text(item.title, style = MaterialTheme.typography.bodyMedium, fontWeight = if (item.isHoliday) FontWeight.Bold else FontWeight.Normal)
                                     }
                                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                                        Text("\${item.day} \${monthNames[month - 1]}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Text("${item.day} ${monthNames[month - 1]}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                         if (item.isHoliday) Text("تعطیل رسمی", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
                                     }
                                 }
@@ -1759,7 +1759,7 @@ private fun OccasionsScreen(
                     occasions.sortedWith(compareBy<LocalOccasion> { it.calendar.ordinal }.thenBy { it.month }.thenBy { it.day }).forEach { item ->
                         ListItem(
                             headlineContent = { Text(item.title) },
-                            supportingContent = { Text("\${item.calendar.label} · \${item.month}/\${item.day} · \${formatTime(item.hour, item.minute)} · سالانه") },
+                            supportingContent = { Text("${item.calendar.label} · ${item.month}/${item.day} · ${formatTime(item.hour, item.minute)} · سالانه") },
                             leadingContent = { Icon(Icons.Outlined.Event, contentDescription = null) },
                             trailingContent = { IconButton(onClick = { viewModel.deleteOccasion(item.id) }) { Icon(Icons.Outlined.Delete, contentDescription = "حذف") } }
                         )
@@ -1829,7 +1829,7 @@ private fun MediaLibrarySection(
                 }
             }
             OutlinedTextField(value = search, onValueChange = { search = it }, modifier = Modifier.fillMaxWidth(), singleLine = true, label = { Text("جست‌وجو بر اساس نام یا تگ") }, leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) })
-            Text("\${mediaTags.size} فایل برچسب‌گذاری‌شده", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("${mediaTags.size} فایل برچسب‌گذاری‌شده", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (filtered.isEmpty()) {
                 Text("هنوز فایلی به آرشیو اضافه نشده است. برای شروع، یکی از دو گزینه بالا را انتخاب کن.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             } else {
@@ -1866,7 +1866,7 @@ private fun MediaLibrarySection(
             title = { Text("برچسب‌گذاری فایل‌های انتخاب‌شده") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("\${pendingUris.size} فایل انتخاب شده است. تگ‌ها را با ویرگول جدا کن.")
+                    Text("${pendingUris.size} فایل انتخاب شده است. تگ‌ها را با ویرگول جدا کن.")
                     OutlinedTextField(value = tagInput, onValueChange = { tagInput = it }, label = { Text("مثلاً خانوادگی، سفر، مدارک") }, modifier = Modifier.fillMaxWidth())
                 }
             },
