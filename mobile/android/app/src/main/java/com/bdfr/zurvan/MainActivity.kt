@@ -1673,132 +1673,226 @@ private fun OccasionsScreen(
     viewModel: ZurvanViewModel,
     modifier: Modifier = Modifier
 ) {
-    val occasions by viewModel
-        .occasions
-        .collectAsStateWithLifecycle()
-
-    var showDialog by remember {
-        mutableStateOf(false)
-    }
+    val context = LocalContext.current
+    val occasions by viewModel.occasions.collectAsStateWithLifecycle()
+    val mediaTags by viewModel.mediaTags.collectAsStateWithLifecycle()
+    val currentYear = remember { AndroidCalendarEngine.currentPersianYearMonth().first }
+    var officialItems by remember(currentYear) { mutableStateOf(ZurvanOccasionDatabase.officialTimeline(context, currentYear)) }
+    var updating by remember { mutableStateOf(false) }
+    var showDialog by remember { mutableStateOf(false) }
 
     Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(12.dp),
-        verticalArrangement =
-            Arrangement.spacedBy(8.dp)
+        modifier = modifier.fillMaxSize().verticalScroll(androidx.compose.foundation.rememberScrollState()).padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        ScreenHeader(
-            title = "مناسبت‌ها",
-            actionText = "افزودن",
-            onAction = {
-                showDialog = true
-            }
-        )
-
-        if (occasions.isEmpty()) {
-            EmptyState(
-                title =
-                    "مناسبت شخصی ثبت نشده",
-                icon =
-                    Icons.Outlined.Event
-            )
-        } else {
-            LazyColumn(
-                verticalArrangement =
-                    Arrangement.spacedBy(
-                        6.dp
-                    )
-            ) {
-                items(
-                    occasions.sortedWith(
-                        compareBy<LocalOccasion> {
-                            it.calendar.ordinal
-                        }.thenBy {
-                            it.month
-                        }.thenBy {
-                            it.day
+        ScreenHeader(title = "مناسبت‌ها", actionText = "افزودن", onAction = { showDialog = true })
+        Card(Modifier.fillMaxWidth()) {
+            Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                    Column {
+                        Text("تقویم رسمی سال \${currentYear}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text("\${officialItems.size} مناسبت در تایملاین سالانه", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    IconButton(enabled = !updating, onClick = { updating = true }) {
+                        Icon(Icons.Outlined.Refresh, contentDescription = "به‌روزرسانی مناسبت‌ها")
+                    }
+                }
+                LaunchedEffect(currentYear, updating) {
+                    if (updating) {
+                        withContext(Dispatchers.IO) { runCatching { ZurvanOccasionDatabase.update(context, currentYear) } }
+                        ZurvanBuiltInOccasions.reload(context)
+                        officialItems = ZurvanOccasionDatabase.officialTimeline(context, currentYear)
+                        updating = false
+                    }
+                }
+                if (updating) LinearProgressIndicator(Modifier.fillMaxWidth())
+                if (officialItems.isEmpty()) {
+                    Text("تقویم رسمی این سال هنوز دریافت نشده است. برای دریافت، دکمه به‌روزرسانی را بزنید.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                } else {
+                    val monthNames = listOf("فروردین","اردیبهشت","خرداد","تیر","مرداد","شهریور","مهر","آبان","آذر","دی","بهمن","اسفند")
+                    officialItems.groupBy { it.month }.toSortedMap().forEach { (month, entries) ->
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                            Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = RoundedCornerShape(10.dp)) {
+                                Text(monthNames[month - 1], modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp), color = MaterialTheme.colorScheme.onPrimaryContainer, fontWeight = FontWeight.SemiBold)
+                            }
+                            Spacer(Modifier.weight(1f))
+                            Text("\${entries.size} رویداد", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                    ),
-                    key = { it.id }
-                ) { item ->
-                    Card(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                    ) {
-                        ListItem(
-                            headlineContent = {
-                                Text(item.title)
-                            },
-                            supportingContent = {
-                                Text(
-                                    item.calendar
-                                        .label +
-                                        " · " +
-                                        item.month +
-                                        "/" +
-                                        item.day +
-                                        " · " +
-                                        formatTime(
-                                            item.hour,
-                                            item.minute
-                                        ) +
-                                        " · سالانه"
-                                )
-                            },
-                            leadingContent = {
-                                Icon(
-                                    Icons.Outlined.Event,
-                                    contentDescription =
-                                        null
-                                )
-                            },
-                            trailingContent = {
-                                IconButton(
-                                    onClick = {
-                                        viewModel
-                                            .deleteOccasion(
-                                                item.id
-                                            )
+                        entries.forEach { item ->
+                            Row(Modifier.fillMaxWidth().padding(start = 4.dp, top = 3.dp, bottom = 3.dp), verticalAlignment = Alignment.Top) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(42.dp)) {
+                                    Text(item.day.toString().toPersianDigits(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                    Box(Modifier.padding(top = 3.dp).width(2.dp).height(28.dp).background(MaterialTheme.colorScheme.outlineVariant))
+                                }
+                                Column(Modifier.weight(1f).padding(start = 8.dp, bottom = 8.dp)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                                        Text(ZurvanBuiltInOccasions.iconFor(item.title), style = MaterialTheme.typography.bodyMedium)
+                                        Text(item.title, style = MaterialTheme.typography.bodyMedium, fontWeight = if (item.isHoliday) FontWeight.Bold else FontWeight.Normal)
                                     }
-                                ) {
-                                    Icon(
-                                        Icons.Outlined.Delete,
-                                        contentDescription =
-                                            "حذف"
-                                    )
+                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        Text("\${item.day} \${monthNames[month - 1]}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        if (item.isHoliday) Text("تعطیل رسمی", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                                    }
                                 }
                             }
+                        }
+                    }
+                }
+            }
+        }
+        MediaLibrarySection(
+            mediaTags = mediaTags,
+            onAdd = { uri, name, mime, tags -> viewModel.addMediaTag(uri, name, mime, tags) },
+            onUpdateTags = viewModel::updateMediaTags,
+            onDelete = viewModel::deleteMediaTag
+        )
+        Card(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("مناسبت‌های شخصی", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                if (occasions.isEmpty()) {
+                    EmptyState(title = "مناسبت شخصی ثبت نشده", icon = Icons.Outlined.Event)
+                } else {
+                    occasions.sortedWith(compareBy<LocalOccasion> { it.calendar.ordinal }.thenBy { it.month }.thenBy { it.day }).forEach { item ->
+                        ListItem(
+                            headlineContent = { Text(item.title) },
+                            supportingContent = { Text("\${item.calendar.label} · \${item.month}/\${item.day} · \${formatTime(item.hour, item.minute)} · سالانه") },
+                            leadingContent = { Icon(Icons.Outlined.Event, contentDescription = null) },
+                            trailingContent = { IconButton(onClick = { viewModel.deleteOccasion(item.id) }) { Icon(Icons.Outlined.Delete, contentDescription = "حذف") } }
                         )
+                        HorizontalDivider()
                     }
                 }
             }
         }
     }
-
     if (showDialog) {
         OccasionDialog(
-            onDismiss = {
-                showDialog = false
-            },
-            onSave = {
-                    title,
-                    calendar,
-                    month,
-                    day,
-                    hour,
-                    minute ->
-                viewModel.addOccasion(
-                    title,
-                    calendar,
-                    month,
-                    day,
-                    hour,
-                    minute
-                )
+            onDismiss = { showDialog = false },
+            onSave = { title, calendar, month, day, hour, minute ->
+                viewModel.addOccasion(title, calendar, month, day, hour, minute)
                 showDialog = false
             }
+        )
+    }
+}
+
+@Composable
+private fun MediaLibrarySection(
+    mediaTags: List<LocalMediaTag>,
+    onAdd: (String, String, String, List<String>) -> Unit,
+    onUpdateTags: (String, List<String>) -> Unit,
+    onDelete: (String) -> Unit
+) {
+    val context = LocalContext.current
+    var pendingUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
+    var tagInput by remember { mutableStateOf("") }
+    var editingItem by remember { mutableStateOf<LocalMediaTag?>(null) }
+    var search by remember { mutableStateOf("") }
+    fun stageSelection(uris: List<Uri>) { pendingUris = uris; tagInput = "" }
+    val visualPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(50)) { uris ->
+        if (uris.isNotEmpty()) stageSelection(uris)
+    }
+    val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        if (uris.isNotEmpty()) stageSelection(uris)
+    }
+    val filtered = mediaTags.filter { item ->
+        val q = search.trim().removePrefix("#")
+        q.isBlank() || item.displayName.contains(q, true) || item.tags.any { it.contains(q, true) }
+    }.sortedByDescending { it.addedAt }
+
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Outlined.Collections, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("آرشیو رسانه و فایل‌ها", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text("فقط با انتخاب خودت؛ بدون درخواست دسترسی سراسری به گالری", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(modifier = Modifier.weight(1f), onClick = {
+                    visualPicker.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
+                }) {
+                    Icon(Icons.Outlined.PhotoLibrary, contentDescription = null)
+                    Spacer(Modifier.width(5.dp))
+                    Text("تصویر و ویدیو")
+                }
+                OutlinedButton(modifier = Modifier.weight(1f), onClick = { filePicker.launch(arrayOf("*/*")) }) {
+                    Icon(Icons.Outlined.AttachFile, contentDescription = null)
+                    Spacer(Modifier.width(5.dp))
+                    Text("سایر فایل‌ها")
+                }
+            }
+            OutlinedTextField(value = search, onValueChange = { search = it }, modifier = Modifier.fillMaxWidth(), singleLine = true, label = { Text("جست‌وجو بر اساس نام یا تگ") }, leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) })
+            Text("\${mediaTags.size} فایل برچسب‌گذاری‌شده", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (filtered.isEmpty()) {
+                Text("هنوز فایلی به آرشیو اضافه نشده است. برای شروع، یکی از دو گزینه بالا را انتخاب کن.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else {
+                filtered.forEach { item ->
+                    Row(Modifier.fillMaxWidth().clickable {
+                        runCatching {
+                            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+                                setDataAndType(Uri.parse(item.uri), item.mimeType)
+                                addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            }
+                            context.startActivity(intent)
+                        }
+                    }.padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            if (item.mimeType.startsWith("image/")) Icons.Outlined.Image else if (item.mimeType.startsWith("video/")) Icons.Outlined.VideoFile else Icons.Outlined.InsertDriveFile,
+                            contentDescription = null
+                        )
+                        Column(Modifier.weight(1f).padding(horizontal = 8.dp)) {
+                            Text(item.displayName, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
+                            Text(if (item.tags.isEmpty()) "بدون تگ" else item.tags.joinToString("  ") { "#$it" }, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, maxLines = 2)
+                        }
+                        IconButton(onClick = { editingItem = item; tagInput = item.tags.joinToString(", ") }) { Icon(Icons.Outlined.Edit, contentDescription = "ویرایش تگ‌ها") }
+                        IconButton(onClick = { onDelete(item.id) }) { Icon(Icons.Outlined.Delete, contentDescription = "حذف از آرشیو") }
+                    }
+                    HorizontalDivider()
+                }
+            }
+        }
+    }
+
+    if (pendingUris.isNotEmpty()) {
+        AlertDialog(
+            onDismissRequest = { pendingUris = emptyList() },
+            title = { Text("برچسب‌گذاری فایل‌های انتخاب‌شده") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("\${pendingUris.size} فایل انتخاب شده است. تگ‌ها را با ویرگول جدا کن.")
+                    OutlinedTextField(value = tagInput, onValueChange = { tagInput = it }, label = { Text("مثلاً خانوادگی، سفر، مدارک") }, modifier = Modifier.fillMaxWidth())
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val tags = tagInput.split(",").map { it.trim() }.filter { it.isNotBlank() }
+                    pendingUris.forEach { uri ->
+                        runCatching { context.contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+                        val name = runCatching {
+                            context.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+                                if (cursor.moveToFirst()) cursor.getString(0) else null
+                            }
+                        }.getOrNull() ?: uri.lastPathSegment ?: "فایل"
+                        val mime = context.contentResolver.getType(uri) ?: "application/octet-stream"
+                        onAdd(uri.toString(), name, mime, tags)
+                    }
+                    pendingUris = emptyList()
+                }) { Text("ذخیره در آرشیو") }
+            },
+            dismissButton = { TextButton(onClick = { pendingUris = emptyList() }) { Text("انصراف") } }
+        )
+    }
+
+    editingItem?.let { item ->
+        AlertDialog(
+            onDismissRequest = { editingItem = null },
+            title = { Text("ویرایش برچسب‌ها") },
+            text = { OutlinedTextField(value = tagInput, onValueChange = { tagInput = it }, modifier = Modifier.fillMaxWidth(), label = { Text("تگ‌ها با ویرگول جدا شوند") }) },
+            confirmButton = { TextButton(onClick = { onUpdateTags(item.id, tagInput.split(",").map { it.trim() }.filter { it.isNotBlank() }); editingItem = null }) { Text("ذخیره") } },
+            dismissButton = { TextButton(onClick = { editingItem = null }) { Text("انصراف") } }
         )
     }
 }
