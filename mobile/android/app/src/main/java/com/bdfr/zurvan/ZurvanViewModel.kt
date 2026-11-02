@@ -32,6 +32,8 @@ class ZurvanViewModel(
     val notes: StateFlow<List<LocalDayNote>> =
         repository.notes
 
+    val mediaTags: StateFlow<List<LocalMediaTag>> = repository.mediaTags
+
     val uiPreferences:
         StateFlow<AndroidUiPreferences> =
         repository.uiPreferences
@@ -82,6 +84,13 @@ class ZurvanViewModel(
 
     fun deleteOccasion(id: String) =
         repository.deleteOccasion(id)
+
+    fun addMediaTag(uri: String, displayName: String, mimeType: String, tags: List<String>) =
+        repository.addMediaTag(uri, displayName, mimeType, tags)
+
+    fun updateMediaTags(id: String, tags: List<String>) = repository.updateMediaTags(id, tags)
+
+    fun deleteMediaTag(id: String) = repository.deleteMediaTag(id)
 
     fun saveNote(
         dateKey: String,
