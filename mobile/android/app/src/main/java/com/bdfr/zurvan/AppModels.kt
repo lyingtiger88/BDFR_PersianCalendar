@@ -59,3 +59,23 @@ data class AndroidUiPreferences(
     val railSide: String = "left",
     val hijriDayOffset: Int = 0
 )
+
+
+data class OfficialAnnualOccasion(
+    val id: String,
+    val year: Int,
+    val month: Int,
+    val day: Int,
+    val title: String,
+    val isHoliday: Boolean,
+    val categories: List<String>
+)
+
+data class LocalMediaTag(
+    val id: String,
+    val uri: String,
+    val displayName: String,
+    val mimeType: String,
+    val tags: List<String>,
+    val addedAt: Long
+)
