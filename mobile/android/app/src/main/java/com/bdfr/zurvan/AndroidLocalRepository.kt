@@ -124,6 +124,19 @@ class AndroidLocalRepository(
         )
     }
 
+    fun addMediaTag(uri: String, displayName: String, mimeType: String, tags: List<String>) {
+        val cleanTags = tags.map { it.trim().removePrefix("#") }.filter { it.isNotBlank() }.distinct().take(20)
+        val item = LocalMediaTag("media_${UUID.randomUUID()}", uri, displayName.take(240), mimeType.take(160), cleanTags, System.currentTimeMillis())
+        saveMediaTags((_mediaTags.value + item).takeLast(500))
+    }
+
+    fun updateMediaTags(id: String, tags: List<String>) {
+        val cleanTags = tags.map { it.trim().removePrefix("#") }.filter { it.isNotBlank() }.distinct().take(20)
+        saveMediaTags(_mediaTags.value.map { if (it.id == id) it.copy(tags = cleanTags) else it })
+    }
+
+    fun deleteMediaTag(id: String) = saveMediaTags(_mediaTags.value.filterNot { it.id == id })
+
     fun saveNote(
         dateKey: String,
         text: String,
@@ -1203,6 +1216,26 @@ class AndroidLocalRepository(
             )
         }
 
+    private fun saveMediaTags(value: List<LocalMediaTag>) {
+        _mediaTags.value = value
+        val json = JSONArray()
+        value.forEach { item ->
+            json.put(JSONObject().put("id", item.id).put("uri", item.uri)
+                .put("displayName", item.displayName).put("mimeType", item.mimeType)
+                .put("tags", JSONArray(item.tags)).put("addedAt", item.addedAt))
+        }
+        preferences.edit().putString(KEY_MEDIA_TAGS, json.toString()).apply()
+    }
+
+    private fun loadMediaTags(): List<LocalMediaTag> =
+        parseArray(KEY_MEDIA_TAGS) { item ->
+            val tags = item.optJSONArray("tags")
+            LocalMediaTag(item.getString("id"), item.getString("uri"),
+                item.optString("displayName", "فایل بدون نام"),
+                item.optString("mimeType", "application/octet-stream"),
+                if (tags == null) emptyList() else (0 until tags.length()).map { tags.optString(it) },
+                item.optLong("addedAt", 0L))
+        }
     private fun saveNotes(
         value: List<LocalDayNote>
     ) {
@@ -1358,6 +1391,7 @@ class AndroidLocalRepository(
         private const val KEY_OCCASIONS = "occasions"
         private const val KEY_REMINDERS = "reminders"
         private const val KEY_NOTES = "notes"
+        private const val KEY_MEDIA_TAGS = "media_tags"
         private const val KEY_CALENDAR_ORDER =
             "calendar_order"
         private const val KEY_CORNER_RADIUS =
