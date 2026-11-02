@@ -135,7 +135,11 @@ class AndroidLocalRepository(
         saveMediaTags(_mediaTags.value.map { if (it.id == id) it.copy(tags = cleanTags) else it })
     }
 
-    fun deleteMediaTag(id: String) = saveMediaTags(_mediaTags.value.filterNot { it.id == id })
+    fun deleteMediaTag(id: String) {
+        val item = _mediaTags.value.firstOrNull { it.id == id } ?: return
+        runCatching { appContext.contentResolver.releasePersistableUriPermission(android.net.Uri.parse(item.uri), android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+        saveMediaTags(_mediaTags.value.filterNot { it.id == id })
+    }
 
     fun saveNote(
         dateKey: String,
