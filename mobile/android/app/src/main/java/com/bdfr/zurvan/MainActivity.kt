@@ -1680,6 +1680,9 @@ private fun OccasionsScreen(
     var officialItems by remember(currentYear) { mutableStateOf(ZurvanOccasionDatabase.officialTimeline(context, currentYear)) }
     var updating by remember { mutableStateOf(false) }
     var showDialog by remember { mutableStateOf(false) }
+    LaunchedEffect(currentYear) {
+        if (officialItems.isEmpty()) updating = true
+    }
 
     Column(
         modifier = modifier.fillMaxSize().verticalScroll(androidx.compose.foundation.rememberScrollState()).padding(12.dp),
