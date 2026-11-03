@@ -140,8 +140,11 @@ class AndroidLocalRepository(
 
     fun deleteMediaTag(id: String) {
         val item = _mediaTags.value.firstOrNull { it.id == id } ?: return
-        runCatching { appContext.contentResolver.releasePersistableUriPermission(android.net.Uri.parse(item.uri), android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) }
-        saveMediaTags(_mediaTags.value.filterNot { it.id == id })
+        val remaining = _mediaTags.value.filterNot { it.id == id }
+        if (remaining.none { it.uri == item.uri }) {
+            runCatching { appContext.contentResolver.releasePersistableUriPermission(android.net.Uri.parse(item.uri), android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+        }
+        saveMediaTags(remaining)
     }
 
     fun setDayMediaEnabled(enabled: Boolean) {
