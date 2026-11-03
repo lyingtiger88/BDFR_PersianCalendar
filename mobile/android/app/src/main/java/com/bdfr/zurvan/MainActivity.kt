@@ -792,6 +792,7 @@ private fun CalendarScreen(
                     hasContent =
                         dayHasContent,
                     hasNote = notes.any { it.dateKey == day.persianKey },
+                    hasMedia = preferences.dayMediaEnabled && mediaTags.any { it.dateKey == day.persianKey },
                     onClick = {
                         selectedDay = day
                     }
@@ -1016,6 +1017,7 @@ private fun CalendarDayCard(
     cornerRadius: Float,
     hasContent: Boolean,
     hasNote: Boolean,
+    hasMedia: Boolean,
     planIcons: List<String>,
     onClick: () -> Unit
 ) {
@@ -1147,6 +1149,15 @@ private fun CalendarDayCard(
             if (isHoliday && !day.isFriday) {
                 Box(Modifier.align(Alignment.TopEnd).size(6.dp)
                     .background(Color.Red, RoundedCornerShape(100)))
+            }
+
+            if (hasMedia) {
+                Icon(
+                    Icons.Outlined.Collections,
+                    contentDescription = "رسانه پیوندخورده",
+                    modifier = Modifier.align(Alignment.BottomEnd).size(13.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
             }
 
             if (planIcons.isNotEmpty()) {
