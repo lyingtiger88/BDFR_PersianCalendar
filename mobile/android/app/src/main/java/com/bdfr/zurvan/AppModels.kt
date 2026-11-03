@@ -57,7 +57,8 @@ data class AndroidUiPreferences(
     ),
     val cornerRadius: Float = 18f,
     val railSide: String = "left",
-    val hijriDayOffset: Int = 0
+    val hijriDayOffset: Int = 0,
+    val dayMediaEnabled: Boolean = false
 )
 
 
@@ -77,5 +78,6 @@ data class LocalMediaTag(
     val displayName: String,
     val mimeType: String,
     val tags: List<String>,
-    val addedAt: Long
+    val addedAt: Long,
+    val dateKey: String = ""
 )
