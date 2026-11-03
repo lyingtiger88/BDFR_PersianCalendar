@@ -85,8 +85,8 @@ class ZurvanViewModel(
     fun deleteOccasion(id: String) =
         repository.deleteOccasion(id)
 
-    fun addMediaTag(uri: String, displayName: String, mimeType: String, tags: List<String>) =
-        repository.addMediaTag(uri, displayName, mimeType, tags)
+    fun addMediaTag(dateKey: String, uri: String, displayName: String, mimeType: String, tags: List<String>) =
+        repository.addMediaTag(dateKey, uri, displayName, mimeType, tags)
 
     fun updateMediaTags(id: String, tags: List<String>) = repository.updateMediaTags(id, tags)
 
@@ -152,6 +152,8 @@ class ZurvanViewModel(
 
     fun setRailSide(value: String) =
         repository.setRailSide(value)
+
+    fun setDayMediaEnabled(enabled: Boolean) = repository.setDayMediaEnabled(enabled)
 
     fun startCompanionMaster() =
         companionManager.startMaster()
