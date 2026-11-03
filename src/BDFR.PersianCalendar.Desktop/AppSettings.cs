@@ -22,6 +22,11 @@ public sealed class AppearanceColorOverrides
 
 public sealed class AppSettings
 {
+    // Optional links to user-selected media, indexed by Persian date key (yyyy/MM/dd).
+    // Disabled by default; file paths remain references to the original files.
+    public bool DayMediaEnabled { get; set; }
+    public Dictionary<string, List<DayMediaLink>> DayMediaLinks { get; set; } = new();
+
     // AppearanceMode: "elena" or "theme".
     public string AppearanceMode { get; set; } = "";
 
@@ -106,4 +111,12 @@ public sealed class AppSettings
     // Per-appearance color overrides. Theme modes get their own palette and
     // Elena gets one palette per season (spring/summer/autumn/winter).
     public Dictionary<string, AppearanceColorOverrides> ColorOverrides { get; set; } = new();
+}
+
+public sealed class DayMediaLink
+{
+    public string Path { get; set; } = "";
+    public string DisplayName { get; set; } = "";
+    public string MimeType { get; set; } = "";
+    public List<string> Tags { get; set; } = new();
 }
