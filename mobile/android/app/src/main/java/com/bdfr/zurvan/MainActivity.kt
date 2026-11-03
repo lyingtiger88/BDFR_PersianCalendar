@@ -2627,6 +2627,9 @@ private fun SettingsScreen(
     val databaseScope = rememberCoroutineScope()
     var databaseStatus by remember { mutableStateOf("") }
     var databaseBusy by remember { mutableStateOf(false) }
+    var updateCheckBusy by remember { mutableStateOf(false) }
+    var updateCheckStatus by remember { mutableStateOf("") }
+    var updateReleaseUrl by remember { mutableStateOf<String?>(null) }
     val themePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             runCatching { ZurvanThemeImporter.import(context, uri) }
@@ -2860,6 +2863,34 @@ private fun SettingsScreen(
                     Switch(checked = dayMediaEnabled, onCheckedChange = viewModel::setDayMediaEnabled)
                 }
                 Text(if (dayMediaEnabled) "فعال است؛ می‌توانی در جزئیات هر روز رسانه اضافه کنی." else "غیرفعال است (حالت پیش‌فرض).", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        if (settingsCategory == "calendar") item {
+            SettingsCard(title = "بررسی نسخه جدید زروان") {
+                Text("نسخه نصب‌شده: " + BuildConfig.VERSION_NAME)
+                Text("بررسی فقط با انتخاب شما انجام می‌شود. نسخه‌های آزمایشی و Debug به‌عنوان انتشار پایدار پیشنهاد نمی‌شوند.", style = MaterialTheme.typography.bodySmall)
+                Button(enabled = !updateCheckBusy, onClick = {
+                    updateCheckBusy = true
+                    updateCheckStatus = ""
+                    updateReleaseUrl = null
+                    databaseScope.launch {
+                        runCatching { ZurvanUpdateChecker.latestStable() }
+                            .onSuccess { release ->
+                                updateCheckStatus = "آخرین نسخه پایدار منتشرشده: " + release.version
+                                updateReleaseUrl = release.page
+                            }
+                            .onFailure { error ->
+                                updateCheckStatus = error.message ?: "بررسی نسخه ناموفق بود."
+                            }
+                        updateCheckBusy = false
+                    }
+                }) { Text(if (updateCheckBusy) "در حال بررسی..." else "بررسی دستی به‌روزرسانی") }
+                if (updateCheckStatus.isNotBlank()) Text(updateCheckStatus)
+                updateReleaseUrl?.let { url ->
+                    TextButton(onClick = {
+                        context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, Uri.parse(url)))
+                    }) { Text("مشاهده اطلاعات انتشار در GitHub") }
+                }
             }
         }
         if (settingsCategory == "calendar") item {
