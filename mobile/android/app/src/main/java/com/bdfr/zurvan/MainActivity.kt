@@ -487,6 +487,8 @@ private fun CalendarScreen(
     val notes by viewModel.notes
         .collectAsStateWithLifecycle()
 
+    val mediaTags by viewModel.mediaTags.collectAsStateWithLifecycle()
+
     val preferences by viewModel
         .uiPreferences
         .collectAsStateWithLifecycle()
@@ -864,6 +866,11 @@ private fun CalendarScreen(
                 it.dateKey ==
                     day.persianKey
             },
+            dayMediaEnabled = preferences.dayMediaEnabled,
+            mediaTags = mediaTags.filter { it.dateKey == day.persianKey },
+            onAddMedia = { uri, name, mime, tags -> viewModel.addMediaTag(day.persianKey, uri, name, mime, tags) },
+            onUpdateMediaTags = viewModel::updateMediaTags,
+            onDeleteMedia = viewModel::deleteMediaTag,
             onDismiss = {
                 selectedDay = null
             },
@@ -1236,6 +1243,11 @@ private fun DayDetailsSheet(
     reminders: List<LocalReminder>,
     occasions: List<LocalOccasion>,
     note: LocalDayNote?,
+    dayMediaEnabled: Boolean,
+    mediaTags: List<LocalMediaTag>,
+    onAddMedia: (String, String, String, List<String>) -> Unit,
+    onUpdateMediaTags: (String, List<String>) -> Unit,
+    onDeleteMedia: (String) -> Unit,
     onDismiss: () -> Unit,
     onSaveNote: (
         String,
@@ -1423,6 +1435,18 @@ private fun DayDetailsSheet(
                     ) {
                         Text("یادآور")
                     }
+                }
+            }
+
+            if (dayMediaEnabled) {
+                item(key = "day_media_" + day.persianKey) {
+                    DayMediaSection(
+                        dateKey = day.persianKey,
+                        mediaTags = mediaTags,
+                        onAdd = onAddMedia,
+                        onUpdateTags = onUpdateMediaTags,
+                        onDelete = onDeleteMedia
+                    )
                 }
             }
 
@@ -1676,7 +1700,6 @@ private fun OccasionsScreen(
 ) {
     val context = LocalContext.current
     val occasions by viewModel.occasions.collectAsStateWithLifecycle()
-    val mediaTags by viewModel.mediaTags.collectAsStateWithLifecycle()
     val currentYear = remember { AndroidCalendarEngine.currentPersianYearMonth().first }
     var officialItems by remember(currentYear) { mutableStateOf(ZurvanOccasionDatabase.officialTimeline(context, currentYear)) }
     var updating by remember { mutableStateOf(false) }
@@ -1758,14 +1781,6 @@ private fun OccasionsScreen(
                 }
             }
         }
-        item(key = "media_library") {
-            MediaLibrarySection(
-                mediaTags = mediaTags,
-                onAdd = { uri, name, mime, tags -> viewModel.addMediaTag(uri, name, mime, tags) },
-                onUpdateTags = viewModel::updateMediaTags,
-                onDelete = viewModel::deleteMediaTag
-            )
-        }
         item(key = "personal_occasions") {
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1799,7 +1814,8 @@ private fun OccasionsScreen(
 }
 
 @Composable
-private fun MediaLibrarySection(
+private fun DayMediaSection(
+    dateKey: String,
     mediaTags: List<LocalMediaTag>,
     onAdd: (String, String, String, List<String>) -> Unit,
     onUpdateTags: (String, List<String>) -> Unit,
@@ -1828,8 +1844,8 @@ private fun MediaLibrarySection(
                 Icon(Icons.Outlined.Collections, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("آرشیو رسانه و فایل‌ها", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Text("فقط با انتخاب خودت؛ بدون درخواست دسترسی سراسری به گالری", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("رسانه‌ها و خاطرات این روز", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text("فایل‌های پیوندخورده به تاریخ " + dateKey, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
