@@ -127,9 +127,9 @@ class AndroidLocalRepository(
         )
     }
 
-    fun addMediaTag(uri: String, displayName: String, mimeType: String, tags: List<String>) {
+    fun addMediaTag(dateKey: String, uri: String, displayName: String, mimeType: String, tags: List<String>) {
         val cleanTags = tags.map { it.trim().removePrefix("#") }.filter { it.isNotBlank() }.distinct().take(20)
-        val item = LocalMediaTag("media_${UUID.randomUUID()}", uri, displayName.take(240), mimeType.take(160), cleanTags, System.currentTimeMillis())
+        val item = LocalMediaTag("media_${UUID.randomUUID()}", uri, displayName.take(240), mimeType.take(160), cleanTags, System.currentTimeMillis(), dateKey)
         saveMediaTags((_mediaTags.value + item).takeLast(500))
     }
 
@@ -142,6 +142,10 @@ class AndroidLocalRepository(
         val item = _mediaTags.value.firstOrNull { it.id == id } ?: return
         runCatching { appContext.contentResolver.releasePersistableUriPermission(android.net.Uri.parse(item.uri), android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) }
         saveMediaTags(_mediaTags.value.filterNot { it.id == id })
+    }
+
+    fun setDayMediaEnabled(enabled: Boolean) {
+        saveUiPreferences(_uiPreferences.value.copy(dayMediaEnabled = enabled))
     }
 
     fun saveNote(
@@ -1229,7 +1233,7 @@ class AndroidLocalRepository(
         value.forEach { item ->
             json.put(JSONObject().put("id", item.id).put("uri", item.uri)
                 .put("displayName", item.displayName).put("mimeType", item.mimeType)
-                .put("tags", JSONArray(item.tags)).put("addedAt", item.addedAt))
+                .put("tags", JSONArray(item.tags)).put("addedAt", item.addedAt).put("dateKey", item.dateKey))
         }
         preferences.edit().putString(KEY_MEDIA_TAGS, json.toString()).apply()
     }
@@ -1241,7 +1245,8 @@ class AndroidLocalRepository(
                 item.optString("displayName", "فایل بدون نام"),
                 item.optString("mimeType", "application/octet-stream"),
                 if (tags == null) emptyList() else (0 until tags.length()).map { tags.optString(it) },
-                item.optLong("addedAt", 0L))
+                item.optLong("addedAt", 0L),
+                item.optString("dateKey", ""))
         }
     private fun saveNotes(
         value: List<LocalDayNote>
@@ -1340,6 +1345,7 @@ class AndroidLocalRepository(
                 KEY_RAIL_SIDE,
                 value.railSide
             )
+            .putBoolean(KEY_DAY_MEDIA_ENABLED, value.dayMediaEnabled)
             .apply()
     }
 
@@ -1370,7 +1376,8 @@ class AndroidLocalRepository(
             railSide = preferences.getString(
                 KEY_RAIL_SIDE,
                 "left"
-            ) ?: "left"
+            ) ?: "left",
+            dayMediaEnabled = preferences.getBoolean(KEY_DAY_MEDIA_ENABLED, false)
         )
     }
 
@@ -1399,6 +1406,7 @@ class AndroidLocalRepository(
         private const val KEY_REMINDERS = "reminders"
         private const val KEY_NOTES = "notes"
         private const val KEY_MEDIA_TAGS = "media_tags"
+        private const val KEY_DAY_MEDIA_ENABLED = "day_media_enabled"
         private const val KEY_CALENDAR_ORDER =
             "calendar_order"
         private const val KEY_CORNER_RADIUS =
