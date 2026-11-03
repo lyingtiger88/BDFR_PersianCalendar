@@ -6099,7 +6099,7 @@ public sealed partial class MainWindow : Window
         }
         finally
         {
-            if (sender is Button button) button.IsEnabled = true;
+            if (sender is Button enabledButton) enabledButton.IsEnabled = true;
         }
     }
     private void SetDayMediaEnabled(bool enabled)
