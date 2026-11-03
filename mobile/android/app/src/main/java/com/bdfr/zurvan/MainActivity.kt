@@ -1710,8 +1710,8 @@ private fun OccasionsScreen(
         item(key = "official_timeline_header") {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("تقویم رسمی سال \${currentYear}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Text("\${officialItems.size} مناسبت در تایملاین سالانه", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("تقویم رسمی سال ${currentYear}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text("${officialItems.size} مناسبت در تایملاین سالانه", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 IconButton(enabled = !updating, onClick = { updating = true }) {
                     Icon(Icons.Outlined.Refresh, contentDescription = "به‌روزرسانی مناسبت‌ها")
@@ -1725,7 +1725,7 @@ private fun OccasionsScreen(
             }
         } else {
             groupedItems.forEach { (month, entries) ->
-                item(key = "month_\${month}") {
+                item(key = "month_${month}") {
                     Row(
                         Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 2.dp),
                         verticalAlignment = Alignment.CenterVertically
@@ -1734,7 +1734,7 @@ private fun OccasionsScreen(
                             Text(monthNames[month - 1], modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp), color = MaterialTheme.colorScheme.onPrimaryContainer, fontWeight = FontWeight.SemiBold)
                         }
                         Spacer(Modifier.weight(1f))
-                        Text("\${entries.size} رویداد", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("${entries.size} رویداد", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
                 items(entries, key = { it.id }) { item ->
@@ -1750,7 +1750,7 @@ private fun OccasionsScreen(
                                 Text(item.title, style = MaterialTheme.typography.bodyMedium, fontWeight = if (item.isHoliday) FontWeight.Bold else FontWeight.Normal)
                             }
                             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text("\${item.day} \${monthNames[month - 1]}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("${item.day} ${monthNames[month - 1]}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 if (item.isHoliday) Text("تعطیل رسمی", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
                             }
                         }
@@ -1776,7 +1776,7 @@ private fun OccasionsScreen(
                         personalOccasions.forEach { item ->
                             ListItem(
                                 headlineContent = { Text(item.title) },
-                                supportingContent = { Text("\${item.calendar.label} · \${item.month}/\${item.day} · \${formatTime(item.hour, item.minute)} · سالانه") },
+                                supportingContent = { Text("${item.calendar.label} · ${item.month}/${item.day} · ${formatTime(item.hour, item.minute)} · سالانه") },
                                 leadingContent = { Icon(Icons.Outlined.Event, contentDescription = null) },
                                 trailingContent = { IconButton(onClick = { viewModel.deleteOccasion(item.id) }) { Icon(Icons.Outlined.Delete, contentDescription = "حذف") } }
                             )
