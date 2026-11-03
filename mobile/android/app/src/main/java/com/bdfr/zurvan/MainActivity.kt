@@ -534,7 +534,8 @@ private fun CalendarScreen(
 
     val model = remember(
         year,
-        month
+        month,
+        preferences.hijriDayOffset
     ) {
         AndroidCalendarEngine
             .buildPersianMonth(
@@ -2813,6 +2814,22 @@ private fun SettingsScreen(
                     Switch(checked = dayMediaEnabled, onCheckedChange = viewModel::setDayMediaEnabled)
                 }
                 Text(if (dayMediaEnabled) "فعال است؛ می‌توانی در جزئیات هر روز رسانه اضافه کنی." else "غیرفعال است (حالت پیش‌فرض).", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        if (settingsCategory == "calendar") item {
+            SettingsCard(title = "اصلاح تاریخ قمری (رؤیت هلال)") {
+                Text("تقویم قمری بر اساس islamic-civil محاسبه می‌شود؛ می‌توانید روز آن را یک روز عقب یا جلو ببرید.")
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(-1, 0, 1).forEach { offset ->
+                        FilterChip(
+                            selected = preferences.hijriDayOffset == offset,
+                            onClick = { viewModel.setHijriDayOffset(offset) },
+                            label = { Text(when (offset) { -1 -> "۱−"; 1 -> "۱+"; else -> "بدون اصلاح" }) }
+                        )
+                    }
+                }
+                Text("این گزینه فقط تاریخ قمری و مناسبت‌های قمری را جابه‌جا می‌کند؛ تاریخ شمسی و میلادی تغییر نمی‌کند.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         if (settingsCategory == "calendar") item {
