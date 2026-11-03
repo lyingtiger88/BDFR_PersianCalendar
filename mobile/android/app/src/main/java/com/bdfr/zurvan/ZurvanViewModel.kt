@@ -147,6 +147,8 @@ class ZurvanViewModel(
         value: List<CalendarPriority>
     ) = repository.setCalendarOrder(value)
 
+    fun setHijriDayOffset(value: Int) = repository.setHijriDayOffset(value)
+
     fun setCornerRadius(value: Float) =
         repository.setCornerRadius(value)
 
