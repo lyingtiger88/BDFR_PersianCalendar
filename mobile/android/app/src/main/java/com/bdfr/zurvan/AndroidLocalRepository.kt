@@ -39,6 +39,7 @@ class AndroidLocalRepository(
     val mediaTags: StateFlow<List<LocalMediaTag>> = _mediaTags.asStateFlow()
 
     private val _uiPreferences = MutableStateFlow(loadUiPreferences())
+    init { AndroidCalendarEngine.hijriDayOffset = _uiPreferences.value.hijriDayOffset }
     val uiPreferences: StateFlow<AndroidUiPreferences> =
         _uiPreferences.asStateFlow()
 
@@ -236,6 +237,12 @@ class AndroidLocalRepository(
                 calendarOrder = normalized
             )
         )
+    }
+
+    fun setHijriDayOffset(value: Int) {
+        val normalized = value.coerceIn(-1, 1)
+        AndroidCalendarEngine.hijriDayOffset = normalized
+        saveUiPreferences(_uiPreferences.value.copy(hijriDayOffset = normalized))
     }
 
     fun setCornerRadius(value: Float) {
@@ -1349,6 +1356,7 @@ class AndroidLocalRepository(
                 value.railSide
             )
             .putBoolean(KEY_DAY_MEDIA_ENABLED, value.dayMediaEnabled)
+            .putInt(KEY_HIJRI_OFFSET, value.hijriDayOffset.coerceIn(-1, 1))
             .apply()
     }
 
@@ -1380,7 +1388,8 @@ class AndroidLocalRepository(
                 KEY_RAIL_SIDE,
                 "left"
             ) ?: "left",
-            dayMediaEnabled = preferences.getBoolean(KEY_DAY_MEDIA_ENABLED, false)
+            dayMediaEnabled = preferences.getBoolean(KEY_DAY_MEDIA_ENABLED, false),
+            hijriDayOffset = preferences.getInt(KEY_HIJRI_OFFSET, 0).coerceIn(-1, 1)
         )
     }
 
@@ -1410,6 +1419,7 @@ class AndroidLocalRepository(
         private const val KEY_NOTES = "notes"
         private const val KEY_MEDIA_TAGS = "media_tags"
         private const val KEY_DAY_MEDIA_ENABLED = "day_media_enabled"
+        private const val KEY_HIJRI_OFFSET = "hijri_day_offset"
         private const val KEY_CALENDAR_ORDER =
             "calendar_order"
         private const val KEY_CORNER_RADIUS =
