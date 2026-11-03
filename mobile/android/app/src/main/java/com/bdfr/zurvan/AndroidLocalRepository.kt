@@ -35,6 +35,9 @@ class AndroidLocalRepository(
     val notes: StateFlow<List<LocalDayNote>> =
         _notes.asStateFlow()
 
+    private val _mediaTags = MutableStateFlow(loadMediaTags())
+    val mediaTags: StateFlow<List<LocalMediaTag>> = _mediaTags.asStateFlow()
+
     private val _uiPreferences = MutableStateFlow(loadUiPreferences())
     val uiPreferences: StateFlow<AndroidUiPreferences> =
         _uiPreferences.asStateFlow()
