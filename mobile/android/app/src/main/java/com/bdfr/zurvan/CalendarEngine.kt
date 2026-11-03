@@ -254,7 +254,7 @@ object AndroidCalendarEngine {
             set(Calendar.SECOND, 0)
         }
 
-        val millis = source.timeInMillis
+        val millis = source.timeInMillis - (if (calendar == CalendarPriority.HIJRI) hijriDayOffset else 0) * 86_400_000L
 
         val persian = Calendar.getInstance(
             ULocale(
@@ -277,7 +277,7 @@ object AndroidCalendarEngine {
                 "ar_SA@calendar=islamic-civil"
             )
         ).apply {
-            time = Date(millis)
+            time = Date(millis + hijriDayOffset * 86_400_000L)
         }
 
         return AndroidDateConversion(
