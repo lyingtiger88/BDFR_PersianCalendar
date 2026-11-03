@@ -1428,6 +1428,26 @@ public sealed partial class MainWindow : Window
             Foreground = ThemeService.Brush(_theme.SecondaryText)
         });
 
+        _settingsPanel.Children.Add(new TextBlock
+        {
+            Text = "بررسی به‌روزرسانی زروان",
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Foreground = ThemeService.Brush(_theme.PrimaryText)
+        });
+        _settingsPanel.Children.Add(new TextBlock
+        {
+            Text = "نسخه برنامه: " + (typeof(MainWindow).Assembly.GetName().Version?.ToString() ?? "نامشخص"),
+            Foreground = ThemeService.Brush(_theme.SecondaryText)
+        });
+        var checkUpdateButton = MakeButton("بررسی دستی نسخه پایدار جدید");
+        checkUpdateButton.Click += CheckForStableUpdate_Click;
+        _settingsPanel.Children.Add(checkUpdateButton);
+        _settingsPanel.Children.Add(new TextBlock
+        {
+            Text = "بررسی فقط با درخواست شما انجام می‌شود؛ نصب خودکار یا نصب نسخه آزمایشی انجام نمی‌شود.",
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = ThemeService.Brush(_theme.SecondaryText)
+        });
         _settingsPanel.Children.Add(BuildDesktopPrayerSettings());
 
         var isElena = string.Equals(
@@ -6043,6 +6063,45 @@ public sealed partial class MainWindow : Window
     }
 
 
+    private async void CheckForStableUpdate_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button button) button.IsEnabled = false;
+        try
+        {
+            using var client = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(8) };
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("Zurvan-Windows");
+            client.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
+            using var response = await client.GetAsync("https://api.github.com/repos/lyingtiger88/BDFR_PersianCalendar/releases/latest");
+            response.EnsureSuccessStatusCode();
+            using var doc = System.Text.Json.JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            var root = doc.RootElement;
+            if (root.GetProperty("draft").GetBoolean() || root.GetProperty("prerelease").GetBoolean())
+                throw new InvalidOperationException("انتشار دریافت‌شده پایدار نیست.");
+            var tag = root.GetProperty("tag_name").GetString() ?? "";
+            var url = root.GetProperty("html_url").GetString() ?? "";
+            if (string.IsNullOrWhiteSpace(tag) || !url.StartsWith("https://github.com/lyingtiger88/BDFR_PersianCalendar/releases/", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("آدرس انتشار معتبر نیست.");
+            StatusText.Text = "آخرین انتشار پایدار: " + tag;
+            var dialog = new ContentDialog
+            {
+                Title = "انتشار پایدار زروان: " + tag,
+                Content = "صفحه انتشار در GitHub باز شود؟ نصب نسخه جدید خودکار نیست.",
+                PrimaryButtonText = "مشاهده انتشار",
+                CloseButtonText = "بستن",
+                XamlRoot = Content.XamlRoot
+            };
+            if (await dialog.ShowAsync() == ContentDialogResult.Primary)
+                Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = "بررسی به‌روزرسانی: انتشار پایدار در دسترس نیست یا ارتباط ناموفق بود. " + ex.Message;
+        }
+        finally
+        {
+            if (sender is Button enabledButton) enabledButton.IsEnabled = true;
+        }
+    }
     private void SetDayMediaEnabled(bool enabled)
     {
         _settings.DayMediaEnabled = enabled;

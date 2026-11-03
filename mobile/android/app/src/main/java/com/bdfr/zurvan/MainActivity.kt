@@ -2627,6 +2627,9 @@ private fun SettingsScreen(
     val databaseScope = rememberCoroutineScope()
     var databaseStatus by remember { mutableStateOf("") }
     var databaseBusy by remember { mutableStateOf(false) }
+    var updateCheckBusy by remember { mutableStateOf(false) }
+    var updateCheckStatus by remember { mutableStateOf("") }
+    var updateReleaseUrl by remember { mutableStateOf<String?>(null) }
     val themePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             runCatching { ZurvanThemeImporter.import(context, uri) }
@@ -2670,6 +2673,9 @@ private fun SettingsScreen(
     }
 
     var settingsCategory by rememberSaveable { mutableStateOf("home") }
+    val settingsLayoutPrefs = remember(context) { context.getSharedPreferences("zurvan_settings_layout", Context.MODE_PRIVATE) }
+    var settingsGrid by rememberSaveable { mutableStateOf(settingsLayoutPrefs.getBoolean("grid", false)) }
+    var showSettingsHelp by rememberSaveable { mutableStateOf(false) }
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
@@ -2685,7 +2691,38 @@ private fun SettingsScreen(
         item {
             if (settingsCategory == "home") {
                 Text("تنظیمات", style = MaterialTheme.typography.headlineSmall)
-                listOf(
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("شیوه نمایش:", style = MaterialTheme.typography.bodySmall)
+                    FilterChip(selected = !settingsGrid, onClick = {
+                        settingsGrid = false
+                        settingsLayoutPrefs.edit().putBoolean("grid", false).apply()
+                    }, label = { Text("فهرستی") })
+                    FilterChip(selected = settingsGrid, onClick = {
+                        settingsGrid = true
+                        settingsLayoutPrefs.edit().putBoolean("grid", true).apply()
+                    }, label = { Text("جدولی") })
+                }
+                TextButton(onClick = { showSettingsHelp = !showSettingsHelp }) {
+                    Icon(Icons.Outlined.HelpOutline, contentDescription = null)
+                    Spacer(Modifier.width(6.dp))
+                    Text(if (showSettingsHelp) "بستن راهنما" else "راهنمای تنظیمات")
+                }
+                if (showSettingsHelp) {
+                    Card(Modifier.fillMaxWidth()) {
+                        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("راهنمای دسته‌های تنظیمات", fontWeight = FontWeight.SemiBold)
+                            Text("رابط کاربری: پوسته، رنگ‌ها و چیدمان را تنظیم کنید.")
+                            Text("تقویم و مناسبت‌ها: ترتیب تقویم‌ها، مناسبت‌ها و رسانه روزانه را مدیریت کنید.")
+                            Text("صدا و اعلان‌ها: اذان، یادآوری‌ها و هشدارها را تنظیم کنید.")
+                            Text("زبان و منطقه: زبان زروان را تغییر دهید.")
+                            Text("امنیت و لایسنس: قفل برنامه و فعال‌سازی را مدیریت کنید.")
+                            Text("حساب و همگام‌سازی: امکانات اتصال Zurvan Desk را مدیریت کنید.")
+                            Text("دسترس‌پذیری: گزینه‌های گفتاری و کمکی را بررسی کنید.")
+                            Text("برای باز کردن جزئیات هر گروه روی کارت آن بزنید.", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+                val sections = listOf(
                     Triple("appearance", "رابط کاربری", "تم، رنگ، تصویر و چیدمان"),
                     Triple("calendar", "تقویم و مناسبت‌ها", "چیدمان تاریخ و به‌روزرسانی"),
                     Triple("alerts", "صدا، اعلان‌ها و اوقات شرعی", "اذان و اعلان‌های زمانی"),
@@ -2693,19 +2730,32 @@ private fun SettingsScreen(
                     Triple("security", "امنیت و لایسنس", "قفل و فعال‌سازی"),
                     Triple("cloud", "حساب و همگام‌سازی", "Zurvan Desk"),
                     Triple("accessibility", "دسترس‌پذیری و زروان گویا", "گفتار به متن و متن به گفتار فارسی"),
-                    Triple("about", "درباره ما", "داستان زروان، توسعه‌دهنده و سپاسگزاری")
-                ).forEach { section ->
-                    OutlinedCard(
-                        onClick = { settingsCategory = section.first },
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)
-                    ) {
-                        Row(Modifier.fillMaxWidth().padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) {
-                                Text(section.second, fontWeight = FontWeight.SemiBold)
-                                Text(section.third, style = MaterialTheme.typography.bodySmall)
+                    Triple("about", "درباره ما", "داستان زروان و سپاسگزاری")
+                )
+                if (settingsGrid) {
+                    sections.chunked(2).forEach { pair ->
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            pair.forEach { section ->
+                                OutlinedCard(onClick = { settingsCategory = section.first }, modifier = Modifier.weight(1f).heightIn(min = 100.dp)) {
+                                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        Text(section.second, fontWeight = FontWeight.SemiBold)
+                                        Text(section.third, style = MaterialTheme.typography.bodySmall)
+                                    }
+                                }
                             }
-                            Icon(Icons.Outlined.ChevronLeft, contentDescription = null)
+                            if (pair.size == 1) Spacer(Modifier.weight(1f))
+                        }
+                    }
+                } else {
+                    sections.forEach { section ->
+                        OutlinedCard(onClick = { settingsCategory = section.first }, modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
+                            Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(section.second, fontWeight = FontWeight.SemiBold)
+                                    Text(section.third, style = MaterialTheme.typography.bodySmall)
+                                }
+                                Icon(Icons.Outlined.ChevronLeft, contentDescription = null)
+                            }
                         }
                     }
                 }
@@ -2813,6 +2863,34 @@ private fun SettingsScreen(
                     Switch(checked = dayMediaEnabled, onCheckedChange = viewModel::setDayMediaEnabled)
                 }
                 Text(if (dayMediaEnabled) "فعال است؛ می‌توانی در جزئیات هر روز رسانه اضافه کنی." else "غیرفعال است (حالت پیش‌فرض).", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        if (settingsCategory == "calendar") item {
+            SettingsCard(title = "بررسی نسخه جدید زروان") {
+                Text("نسخه نصب‌شده: " + BuildConfig.VERSION_NAME)
+                Text("بررسی فقط با انتخاب شما انجام می‌شود. نسخه‌های آزمایشی و Debug به‌عنوان انتشار پایدار پیشنهاد نمی‌شوند.", style = MaterialTheme.typography.bodySmall)
+                Button(enabled = !updateCheckBusy, onClick = {
+                    updateCheckBusy = true
+                    updateCheckStatus = ""
+                    updateReleaseUrl = null
+                    databaseScope.launch {
+                        runCatching { ZurvanUpdateChecker.latestStable() }
+                            .onSuccess { release ->
+                                updateCheckStatus = "آخرین نسخه پایدار منتشرشده: " + release.version
+                                updateReleaseUrl = release.page
+                            }
+                            .onFailure { error ->
+                                updateCheckStatus = error.message ?: "بررسی نسخه ناموفق بود."
+                            }
+                        updateCheckBusy = false
+                    }
+                }) { Text(if (updateCheckBusy) "در حال بررسی..." else "بررسی دستی به‌روزرسانی") }
+                if (updateCheckStatus.isNotBlank()) Text(updateCheckStatus)
+                updateReleaseUrl?.let { url ->
+                    TextButton(onClick = {
+                        context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, Uri.parse(url)))
+                    }) { Text("مشاهده اطلاعات انتشار در GitHub") }
+                }
             }
         }
         if (settingsCategory == "calendar") item {
