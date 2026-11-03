@@ -2688,7 +2688,38 @@ private fun SettingsScreen(
         item {
             if (settingsCategory == "home") {
                 Text("تنظیمات", style = MaterialTheme.typography.headlineSmall)
-                listOf(
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("شیوه نمایش:", style = MaterialTheme.typography.bodySmall)
+                    FilterChip(selected = !settingsGrid, onClick = {
+                        settingsGrid = false
+                        settingsLayoutPrefs.edit().putBoolean("grid", false).apply()
+                    }, label = { Text("فهرستی") })
+                    FilterChip(selected = settingsGrid, onClick = {
+                        settingsGrid = true
+                        settingsLayoutPrefs.edit().putBoolean("grid", true).apply()
+                    }, label = { Text("جدولی") })
+                }
+                TextButton(onClick = { showSettingsHelp = !showSettingsHelp }) {
+                    Icon(Icons.Outlined.HelpOutline, contentDescription = null)
+                    Spacer(Modifier.width(6.dp))
+                    Text(if (showSettingsHelp) "بستن راهنما" else "راهنمای تنظیمات")
+                }
+                if (showSettingsHelp) {
+                    Card(Modifier.fillMaxWidth()) {
+                        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("راهنمای دسته‌های تنظیمات", fontWeight = FontWeight.SemiBold)
+                            Text("رابط کاربری: پوسته، رنگ‌ها و چیدمان را تنظیم کنید.")
+                            Text("تقویم و مناسبت‌ها: ترتیب تقویم‌ها، مناسبت‌ها و رسانه روزانه را مدیریت کنید.")
+                            Text("صدا و اعلان‌ها: اذان، یادآوری‌ها و هشدارها را تنظیم کنید.")
+                            Text("زبان و منطقه: زبان زروان را تغییر دهید.")
+                            Text("امنیت و لایسنس: قفل برنامه و فعال‌سازی را مدیریت کنید.")
+                            Text("حساب و همگام‌سازی: امکانات اتصال Zurvan Desk را مدیریت کنید.")
+                            Text("دسترس‌پذیری: گزینه‌های گفتاری و کمکی را بررسی کنید.")
+                            Text("برای باز کردن جزئیات هر گروه روی کارت آن بزنید.", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+                val sections = listOf(
                     Triple("appearance", "رابط کاربری", "تم، رنگ، تصویر و چیدمان"),
                     Triple("calendar", "تقویم و مناسبت‌ها", "چیدمان تاریخ و به‌روزرسانی"),
                     Triple("alerts", "صدا، اعلان‌ها و اوقات شرعی", "اذان و اعلان‌های زمانی"),
@@ -2696,19 +2727,32 @@ private fun SettingsScreen(
                     Triple("security", "امنیت و لایسنس", "قفل و فعال‌سازی"),
                     Triple("cloud", "حساب و همگام‌سازی", "Zurvan Desk"),
                     Triple("accessibility", "دسترس‌پذیری و زروان گویا", "گفتار به متن و متن به گفتار فارسی"),
-                    Triple("about", "درباره ما", "داستان زروان، توسعه‌دهنده و سپاسگزاری")
-                ).forEach { section ->
-                    OutlinedCard(
-                        onClick = { settingsCategory = section.first },
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)
-                    ) {
-                        Row(Modifier.fillMaxWidth().padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) {
-                                Text(section.second, fontWeight = FontWeight.SemiBold)
-                                Text(section.third, style = MaterialTheme.typography.bodySmall)
+                    Triple("about", "درباره ما", "داستان زروان و سپاسگزاری")
+                )
+                if (settingsGrid) {
+                    sections.chunked(2).forEach { pair ->
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            pair.forEach { section ->
+                                OutlinedCard(onClick = { settingsCategory = section.first }, modifier = Modifier.weight(1f).heightIn(min = 100.dp)) {
+                                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        Text(section.second, fontWeight = FontWeight.SemiBold)
+                                        Text(section.third, style = MaterialTheme.typography.bodySmall)
+                                    }
+                                }
                             }
-                            Icon(Icons.Outlined.ChevronLeft, contentDescription = null)
+                            if (pair.size == 1) Spacer(Modifier.weight(1f))
+                        }
+                    }
+                } else {
+                    sections.forEach { section ->
+                        OutlinedCard(onClick = { settingsCategory = section.first }, modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
+                            Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(section.second, fontWeight = FontWeight.SemiBold)
+                                    Text(section.third, style = MaterialTheme.typography.bodySmall)
+                                }
+                                Icon(Icons.Outlined.ChevronLeft, contentDescription = null)
+                            }
                         }
                     }
                 }
