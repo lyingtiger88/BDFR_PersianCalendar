@@ -80,6 +80,7 @@ public sealed partial class MainWindow : Window
     private readonly StackPanel OccasionsPanel = new();
     private readonly StackPanel EventsPanel = new();
     private readonly StackPanel TasksPanel = new();
+    private readonly StackPanel _dayMediaPanel = new();
     private readonly TextBox NoteBox = new();
     private readonly TextBox EventTitleBox = new();
     private readonly TextBox EventTimeBox = new();
@@ -1097,6 +1098,10 @@ public sealed partial class MainWindow : Window
         saveNote.Click += SaveNote_Click;
         stack.Children.Add(saveNote);
 
+        _dayMediaPanel.Spacing = 6;
+        stack.Children.Add(_dayMediaPanel);
+        RefreshDayMediaPanel();
+
         var remindersTitle = SectionTitle("رویداد و یادآور");
         _remindersSectionAnchor = remindersTitle;
         stack.Children.Add(remindersTitle);
@@ -1400,6 +1405,22 @@ public sealed partial class MainWindow : Window
         var updateOccasionsButton = MakeButton("🔄 دریافت مناسبت‌های سال جاری از time.ir");
         updateOccasionsButton.Click += Sync_Click;
         _settingsPanel.Children.Add(updateOccasionsButton);
+
+        var dayMediaToggle = new CheckBox
+        {
+            Content = "فعال‌سازی پیوند رسانه به کارت روز (عکس، ویدیو و فایل)",
+            IsChecked = _settings.DayMediaEnabled,
+            Foreground = ThemeService.Brush(_theme.PrimaryText)
+        };
+        dayMediaToggle.Checked += (_, _) => SetDayMediaEnabled(true);
+        dayMediaToggle.Unchecked += (_, _) => SetDayMediaEnabled(false);
+        _settingsPanel.Children.Add(dayMediaToggle);
+        _settingsPanel.Children.Add(new TextBlock
+        {
+            Text = "به‌صورت پیش‌فرض خاموش است. پس از فعال‌سازی می‌توانی فایل‌های انتخابی را به تاریخ مشخص پیوند بدهی.",
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = ThemeService.Brush(_theme.SecondaryText)
+        });
         _settingsPanel.Children.Add(new TextBlock
         {
             Text = "اطلاعات سال انتخابی دوباره دریافت و بررسی می‌شود؛ در صورت خطا، داده‌های محلی حفظ خواهند شد.",
@@ -5466,6 +5487,7 @@ public sealed partial class MainWindow : Window
             var snapshot = await _repository.GetDayAsync(_selected);
             ApplySelectedDateCalendarOrder();
             NoteBox.Text = snapshot.Note?.Text ?? string.Empty;
+            RefreshDayMediaPanel();
 
             OccasionsPanel.Children.Clear();
             _selectedHolidayOccasionLabels.Clear();
@@ -6018,6 +6040,145 @@ public sealed partial class MainWindow : Window
         if (_month == 13) { _month = 1; _year++; }
         BuildCalendar();
         QueueSeasonCarouselRefreshForDisplayedMonth();
+    }
+
+
+    private void SetDayMediaEnabled(bool enabled)
+    {
+        _settings.DayMediaEnabled = enabled;
+        _settingsService.Save(_settings);
+        RefreshDayMediaPanel();
+        StatusText.Text = enabled
+            ? "پیوند رسانه به کارت روز فعال شد."
+            : "پیوند رسانه به کارت روز غیرفعال شد.";
+    }
+
+    private void RefreshDayMediaPanel()
+    {
+        _dayMediaPanel.Children.Clear();
+        if (!_settings.DayMediaEnabled)
+            return;
+
+        _dayMediaPanel.Children.Add(SectionTitle("رسانه‌ها و خاطرات این روز"));
+        _dayMediaPanel.Children.Add(new TextBlock
+        {
+            Text = "فایل‌های انتخابی فقط به تاریخ " + _selected + " پیوند داده می‌شوند؛ فایل اصلی جابه‌جا یا کپی نمی‌شود.",
+            TextWrapping = TextWrapping.Wrap,
+            Opacity = 0.7,
+            Foreground = ThemeService.Brush(_theme.SecondaryText)
+        });
+
+        var add = MakeButton("＋ پیوند عکس، ویدیو یا فایل");
+        add.Click += AddDayMedia_Click;
+        _dayMediaPanel.Children.Add(add);
+
+        if (!_settings.DayMediaLinks.TryGetValue(_selected.ToString(), out var links) || links.Count == 0)
+        {
+            _dayMediaPanel.Children.Add(new TextBlock
+            {
+                Text = "هنوز فایلی برای این روز پیوند نشده است.",
+                Opacity = 0.65,
+                Foreground = ThemeService.Brush(_theme.SecondaryText)
+            });
+            return;
+        }
+
+        foreach (var link in links.ToList())
+        {
+            var row = new Grid { ColumnSpacing = 6 };
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            var open = MakeButton("📎 " + link.DisplayName + (link.Tags.Count == 0 ? "" : "  #" + string.Join(" #", link.Tags)));
+            open.HorizontalAlignment = HorizontalAlignment.Stretch;
+            open.Click += (_, _) =>
+            {
+                try
+                {
+                    if (File.Exists(link.Path))
+                        Process.Start(new ProcessStartInfo(link.Path) { UseShellExecute = true });
+                    else
+                        StatusText.Text = "فایل اصلی پیدا نشد؛ ممکن است جابه‌جا یا حذف شده باشد.";
+                }
+                catch (Exception ex) { StatusText.Text = "باز کردن فایل ناموفق بود: " + ex.Message; }
+            };
+            Grid.SetColumn(open, 0);
+            row.Children.Add(open);
+            var remove = MakeButton("حذف");
+            remove.Click += (_, _) =>
+            {
+                links.Remove(link);
+                if (links.Count == 0) _settings.DayMediaLinks.Remove(_selected.ToString());
+                _settingsService.Save(_settings);
+                RefreshDayMediaPanel();
+            };
+            Grid.SetColumn(remove, 1);
+            row.Children.Add(remove);
+            _dayMediaPanel.Children.Add(row);
+        }
+    }
+
+    private async void AddDayMedia_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_settings.DayMediaEnabled)
+            return;
+
+        try
+        {
+            var picker = new FileOpenPicker
+            {
+                SuggestedStartLocation = PickerLocationId.PicturesLibrary,
+                ViewMode = PickerViewMode.List
+            };
+            picker.FileTypeFilter.Add("*");
+            var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+            WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
+            var files = await picker.PickMultipleFilesAsync();
+            if (files is null || files.Count == 0)
+                return;
+
+            var tagBox = new TextBox
+            {
+                PlaceholderText = "تگ‌ها را با ویرگول جدا کن؛ مثل سفر، خانواده، خاطره",
+                AcceptsReturn = false
+            };
+            var dialog = new ContentDialog
+            {
+                Title = "برچسب‌گذاری فایل‌های این روز",
+                Content = tagBox,
+                PrimaryButtonText = "پیوند به این روز",
+                CloseButtonText = "انصراف",
+                XamlRoot = Content.XamlRoot
+            };
+            if (await dialog.ShowAsync() != ContentDialogResult.Primary)
+                return;
+
+            var tags = (tagBox.Text ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).Take(20).ToList();
+            if (!_settings.DayMediaLinks.TryGetValue(_selected.ToString(), out var links))
+            {
+                links = new List<DayMediaLink>();
+                _settings.DayMediaLinks[_selected.ToString()] = links;
+            }
+
+            foreach (var file in files)
+            {
+                links.Add(new DayMediaLink
+                {
+                    Path = file.Path,
+                    DisplayName = file.Name,
+                    MimeType = file.ContentType,
+                    Tags = tags
+                });
+            }
+            _settingsService.Save(_settings);
+            RefreshDayMediaPanel();
+            StatusText.Text = files.Count + " فایل به " + _selected + " پیوند داده شد.";
+        }
+        catch (Exception ex)
+        {
+            StartupDiagnostics.Log("Add day media failed: " + ex);
+            StatusText.Text = "افزودن فایل به روز ناموفق بود: " + ex.Message;
+        }
     }
 
     private async void SaveNote_Click(object sender, RoutedEventArgs e)
