@@ -1681,89 +1681,107 @@ private fun OccasionsScreen(
     var officialItems by remember(currentYear) { mutableStateOf(ZurvanOccasionDatabase.officialTimeline(context, currentYear)) }
     var updating by remember { mutableStateOf(false) }
     var showDialog by remember { mutableStateOf(false) }
+    val monthNames = remember { listOf("فروردین","اردیبهشت","خرداد","تیر","مرداد","شهریور","مهر","آبان","آذر","دی","بهمن","اسفند") }
+    val groupedItems = remember(officialItems) { officialItems.groupBy { it.month }.toSortedMap() }
+    val personalOccasions = remember(occasions) {
+        occasions.sortedWith(compareBy<LocalOccasion> { it.calendar.ordinal }.thenBy { it.month }.thenBy { it.day })
+    }
+
     LaunchedEffect(currentYear) {
         if (officialItems.isEmpty()) updating = true
     }
+    LaunchedEffect(currentYear, updating) {
+        if (updating) {
+            withContext(Dispatchers.IO) { runCatching { ZurvanOccasionDatabase.update(context, currentYear) } }
+            ZurvanBuiltInOccasions.reload(context)
+            officialItems = ZurvanOccasionDatabase.officialTimeline(context, currentYear)
+            updating = false
+        }
+    }
 
-    Column(
-        modifier = modifier.fillMaxSize().verticalScroll(androidx.compose.foundation.rememberScrollState()).padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+    LazyColumn(
+        modifier = modifier.fillMaxSize(),
+        contentPadding = PaddingValues(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        ScreenHeader(title = "مناسبت‌ها", actionText = "افزودن", onAction = { showDialog = true })
-        Card(Modifier.fillMaxWidth()) {
-            Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                    Column {
-                        Text("تقویم رسمی سال ${currentYear}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        Text("${officialItems.size} مناسبت در تایملاین سالانه", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    IconButton(enabled = !updating, onClick = { updating = true }) {
-                        Icon(Icons.Outlined.Refresh, contentDescription = "به‌روزرسانی مناسبت‌ها")
-                    }
+        item(key = "occasions_header") {
+            ScreenHeader(title = "مناسبت‌ها", actionText = "افزودن", onAction = { showDialog = true })
+        }
+        item(key = "official_timeline_header") {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("تقویم رسمی سال \${currentYear}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text("\${officialItems.size} مناسبت در تایملاین سالانه", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                LaunchedEffect(currentYear, updating) {
-                    if (updating) {
-                        withContext(Dispatchers.IO) { runCatching { ZurvanOccasionDatabase.update(context, currentYear) } }
-                        ZurvanBuiltInOccasions.reload(context)
-                        officialItems = ZurvanOccasionDatabase.officialTimeline(context, currentYear)
-                        updating = false
-                    }
+                IconButton(enabled = !updating, onClick = { updating = true }) {
+                    Icon(Icons.Outlined.Refresh, contentDescription = "به‌روزرسانی مناسبت‌ها")
                 }
-                if (updating) LinearProgressIndicator(Modifier.fillMaxWidth())
-                if (officialItems.isEmpty()) {
-                    Text("تقویم رسمی این سال هنوز دریافت نشده است. برای دریافت، دکمه به‌روزرسانی را بزنید.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
-                } else {
-                    val monthNames = listOf("فروردین","اردیبهشت","خرداد","تیر","مرداد","شهریور","مهر","آبان","آذر","دی","بهمن","اسفند")
-                    officialItems.groupBy { it.month }.toSortedMap().forEach { (month, entries) ->
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                            Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = RoundedCornerShape(10.dp)) {
-                                Text(monthNames[month - 1], modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp), color = MaterialTheme.colorScheme.onPrimaryContainer, fontWeight = FontWeight.SemiBold)
-                            }
-                            Spacer(Modifier.weight(1f))
-                            Text("${entries.size} رویداد", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (updating) LinearProgressIndicator(Modifier.fillMaxWidth())
+        }
+        if (officialItems.isEmpty()) {
+            item(key = "official_timeline_empty") {
+                Text("تقویم رسمی این سال هنوز دریافت نشده است.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+            }
+        } else {
+            groupedItems.forEach { (month, entries) ->
+                item(key = "month_\${month}") {
+                    Row(
+                        Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = RoundedCornerShape(10.dp)) {
+                            Text(monthNames[month - 1], modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp), color = MaterialTheme.colorScheme.onPrimaryContainer, fontWeight = FontWeight.SemiBold)
                         }
-                        entries.forEach { item ->
-                            Row(Modifier.fillMaxWidth().padding(start = 4.dp, top = 3.dp, bottom = 3.dp), verticalAlignment = Alignment.Top) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(42.dp)) {
-                                    Text(toPersianDigits(item.day.toString()), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                                    Box(Modifier.padding(top = 3.dp).width(2.dp).height(28.dp).background(MaterialTheme.colorScheme.outlineVariant))
-                                }
-                                Column(Modifier.weight(1f).padding(start = 8.dp, bottom = 8.dp)) {
-                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                                        Text(ZurvanBuiltInOccasions.iconFor(item.title), style = MaterialTheme.typography.bodyMedium)
-                                        Text(item.title, style = MaterialTheme.typography.bodyMedium, fontWeight = if (item.isHoliday) FontWeight.Bold else FontWeight.Normal)
-                                    }
-                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                                        Text("${item.day} ${monthNames[month - 1]}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                        if (item.isHoliday) Text("تعطیل رسمی", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
-                                    }
-                                }
+                        Spacer(Modifier.weight(1f))
+                        Text("\${entries.size} رویداد", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                items(entries, key = { it.id }) { item ->
+                    Row(
+                        Modifier.fillMaxWidth().padding(start = 4.dp, top = 2.dp, bottom = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(toPersianDigits(item.day.toString()), modifier = Modifier.width(42.dp), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                        Box(Modifier.width(2.dp).height(34.dp).background(MaterialTheme.colorScheme.outlineVariant))
+                        Column(Modifier.weight(1f).padding(start = 10.dp, top = 4.dp, bottom = 4.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                                Text(ZurvanBuiltInOccasions.iconFor(item.title), style = MaterialTheme.typography.bodyMedium)
+                                Text(item.title, style = MaterialTheme.typography.bodyMedium, fontWeight = if (item.isHoliday) FontWeight.Bold else FontWeight.Normal)
+                            }
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text("\${item.day} \${monthNames[month - 1]}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                if (item.isHoliday) Text("تعطیل رسمی", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
                 }
             }
         }
-        MediaLibrarySection(
-            mediaTags = mediaTags,
-            onAdd = { uri, name, mime, tags -> viewModel.addMediaTag(uri, name, mime, tags) },
-            onUpdateTags = viewModel::updateMediaTags,
-            onDelete = viewModel::deleteMediaTag
-        )
-        Card(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("مناسبت‌های شخصی", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                if (occasions.isEmpty()) {
-                    EmptyState(title = "مناسبت شخصی ثبت نشده", icon = Icons.Outlined.Event)
-                } else {
-                    occasions.sortedWith(compareBy<LocalOccasion> { it.calendar.ordinal }.thenBy { it.month }.thenBy { it.day }).forEach { item ->
-                        ListItem(
-                            headlineContent = { Text(item.title) },
-                            supportingContent = { Text("${item.calendar.label} · ${item.month}/${item.day} · ${formatTime(item.hour, item.minute)} · سالانه") },
-                            leadingContent = { Icon(Icons.Outlined.Event, contentDescription = null) },
-                            trailingContent = { IconButton(onClick = { viewModel.deleteOccasion(item.id) }) { Icon(Icons.Outlined.Delete, contentDescription = "حذف") } }
-                        )
-                        HorizontalDivider()
+        item(key = "media_library") {
+            MediaLibrarySection(
+                mediaTags = mediaTags,
+                onAdd = { uri, name, mime, tags -> viewModel.addMediaTag(uri, name, mime, tags) },
+                onUpdateTags = viewModel::updateMediaTags,
+                onDelete = viewModel::deleteMediaTag
+            )
+        }
+        item(key = "personal_occasions") {
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("مناسبت‌های شخصی", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    if (personalOccasions.isEmpty()) {
+                        EmptyState(title = "مناسبت شخصی ثبت نشده", icon = Icons.Outlined.Event)
+                    } else {
+                        personalOccasions.forEach { item ->
+                            ListItem(
+                                headlineContent = { Text(item.title) },
+                                supportingContent = { Text("\${item.calendar.label} · \${item.month}/\${item.day} · \${formatTime(item.hour, item.minute)} · سالانه") },
+                                leadingContent = { Icon(Icons.Outlined.Event, contentDescription = null) },
+                                trailingContent = { IconButton(onClick = { viewModel.deleteOccasion(item.id) }) { Icon(Icons.Outlined.Delete, contentDescription = "حذف") } }
+                            )
+                            HorizontalDivider()
+                        }
                     }
                 }
             }
