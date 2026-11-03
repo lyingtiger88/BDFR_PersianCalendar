@@ -2670,6 +2670,9 @@ private fun SettingsScreen(
     }
 
     var settingsCategory by rememberSaveable { mutableStateOf("home") }
+    val settingsLayoutPrefs = remember(context) { context.getSharedPreferences("zurvan_settings_layout", Context.MODE_PRIVATE) }
+    var settingsGrid by rememberSaveable { mutableStateOf(settingsLayoutPrefs.getBoolean("grid", false)) }
+    var showSettingsHelp by rememberSaveable { mutableStateOf(false) }
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
