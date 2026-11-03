@@ -2792,6 +2792,19 @@ private fun SettingsScreen(
             }
         }
         if (settingsCategory == "calendar") item {
+            SettingsCard(title = "رسانه و خاطرات روزانه") {
+                val dayMediaEnabled = preferences.dayMediaEnabled
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("پیوند عکس، ویدیو و فایل به کارت روز")
+                        Text("در حالت خاموش، بخش رسانه در جزئیات روز نمایش داده نمی‌شود. برای انتخاب فایل فقط از انتخاب‌گر خود سیستم استفاده می‌شود.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Switch(checked = dayMediaEnabled, onCheckedChange = viewModel::setDayMediaEnabled)
+                }
+                Text(if (dayMediaEnabled) "فعال است؛ می‌توانی در جزئیات هر روز رسانه اضافه کنی." else "غیرفعال است (حالت پیش‌فرض).", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        if (settingsCategory == "calendar") item {
             SettingsCard(title = "به‌روزرسانی پایگاه داده") {
                 Text("نسخه فعلی: " + ZurvanOccasionDatabase.version(context))
                 Text("این گزینه تقویم کامل سال جاری شامل مناسبت‌های رسمی، مذهبی، ملی و فرهنگی را دریافت می‌کند. داده‌ها سال‌محور هستند و با تغییر سال، نسخه همان سال دریافت می‌شود.")
