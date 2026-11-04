@@ -365,6 +365,91 @@ jobs:
           (Get-FileHash artifacts/Zurvan-Setup-x64.exe -Algorithm SHA256).Hash |
             Out-File artifacts/Zurvan-Setup-x64.exe.sha256 -Encoding ascii
 
+      - name: Authenticode sign Windows installer when certificate is configured
+        if: github.event_name == 'push'
+        shell: pwsh
+        env:
+          ZURVAN_WINDOWS_SIGN_PFX_B64: ${{ secrets.ZURVAN_WINDOWS_SIGN_PFX_B64 }}
+          ZURVAN_WINDOWS_SIGN_PFX_PASSWORD: ${{ secrets.ZURVAN_WINDOWS_SIGN_PFX_PASSWORD }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ([string]::IsNullOrWhiteSpace($env:ZURVAN_WINDOWS_SIGN_PFX_B64) -or
+              [string]::IsNullOrWhiteSpace($env:ZURVAN_WINDOWS_SIGN_PFX_PASSWORD)) {
+            Add-Content $env:GITHUB_STEP_SUMMARY 'Windows signing certificate is not configured; installer remains unsigned.'
+            exit 0
+          }
+          $pfx = Join-Path $env:RUNNER_TEMP 'zurvan-signing.pfx'
+          try {
+            [System.IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:ZURVAN_WINDOWS_SIGN_PFX_B64))
+            $sdk = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10\bin'
+            $signTool = Get-ChildItem $sdk -Filter signtool.exe -Recurse -ErrorAction Stop |
+              Where-Object { $_.FullName -match '\\x64\\signtool.exe        uses: actions/upload-artifact@v4
+        with:
+          name: Zurvan-win-x64
+          path: |
+            artifacts/Zurvan-win-x64.zip
+            artifacts/Zurvan-win-x64.zip.sha256
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload lightweight debug patch artifact
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Zurvan-DebugPatch-x64
+          path: |
+            artifacts/Zurvan-DebugPatch-x64.zip
+            artifacts/Zurvan-DebugPatch-x64.zip.sha256
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload installer artifact
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Zurvan-Setup-x64
+          path: |
+            artifacts/Zurvan-Setup-x64.exe
+            artifacts/Zurvan-Setup-x64.exe.sha256
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publish GitHub test pre-release
+        if: github.event_name == 'push'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "test-${{ github.run_number }}"
+          $title = "Zurvan Test Build #${{ github.run_number }}"
+          $releaseTarget = (git rev-parse HEAD).Trim()
+          $notes = "Automated Zurvan Windows x64 test build from main. Commit: $releaseTarget. Includes portable ZIP, installer EXE and SHA256 checksums."
+
+          gh release create $tag `
+            artifacts/Zurvan-win-x64.zip `
+            artifacts/Zurvan-win-x64.zip.sha256 `
+            artifacts/Zurvan-DebugPatch-x64.zip `
+            artifacts/Zurvan-DebugPatch-x64.zip.sha256 `
+            artifacts/Zurvan-Setup-x64.exe `
+            artifacts/Zurvan-Setup-x64.exe.sha256 `
+            --repo "${{ github.repository }}" `
+            --target $releaseTarget `
+            --title $title `
+            --notes $notes `
+            --prerelease
+ } |
+              Sort-Object -Property FullName -Descending | Select-Object -First 1
+            if (-not $signTool) { throw 'SignTool x64 not found in Windows SDK.' }
+            & $signTool.FullName sign /f $pfx /p $env:ZURVAN_WINDOWS_SIGN_PFX_PASSWORD /fd SHA256 /tr https://timestamp.digicert.com /td SHA256 'artifacts/Zurvan-Setup-x64.exe'
+            if ($LASTEXITCODE -ne 0) { throw 'Authenticode signing failed.' }
+            & $signTool.FullName verify /pa 'artifacts/Zurvan-Setup-x64.exe'
+            if ($LASTEXITCODE -ne 0) { throw 'Authenticode verification failed.' }
+            (Get-FileHash 'artifacts/Zurvan-Setup-x64.exe' -Algorithm SHA256).Hash |
+              Out-File 'artifacts/Zurvan-Setup-x64.exe.sha256' -Encoding ascii
+            Add-Content $env:GITHUB_STEP_SUMMARY 'Windows installer successfully Authenticode-signed and checksum updated.'
+          } finally {
+            Remove-Item $pfx -Force -ErrorAction SilentlyContinue
+          }
       - name: Upload portable test artifact
         uses: actions/upload-artifact@v4
         with:
