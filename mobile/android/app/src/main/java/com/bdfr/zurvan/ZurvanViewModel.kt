@@ -38,6 +38,20 @@ class ZurvanViewModel(
         StateFlow<AndroidUiPreferences> =
         repository.uiPreferences
 
+    fun exportManualBackup(): String = ZurvanLocalBackup.export(getApplication())
+
+    fun restoreManualBackup(raw: String, merge: Boolean): Int {
+        val previous = repository.reminders.value
+        // Validate and commit before cancelling any alarms.
+        val count = ZurvanLocalBackup.import(getApplication(), raw, merge)
+        repository.reloadAfterRestore()
+        previous.forEach { AndroidReminderScheduler.cancel(getApplication(), it.id) }
+        repository.reminders.value.filterNot { it.acknowledged }.forEach {
+            AndroidReminderScheduler.schedule(getApplication(), it)
+        }
+        return count
+    }
+
     fun addPlan(
         title: String,
         dateKey: String,

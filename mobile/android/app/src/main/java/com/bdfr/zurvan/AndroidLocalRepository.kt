@@ -42,6 +42,16 @@ class AndroidLocalRepository(
     val uiPreferences: StateFlow<AndroidUiPreferences> =
         _uiPreferences.asStateFlow()
 
+    /** Reload persisted state after a validated, atomic manual backup restoration. */
+    fun reloadAfterRestore() {
+        _plans.value = loadPlans().filterNot(::isExpiredPlan)
+        _occasions.value = loadOccasions()
+        _reminders.value = loadReminders()
+        _notes.value = loadNotes()
+        _mediaTags.value = loadMediaTags()
+        _uiPreferences.value = loadUiPreferences()
+    }
+
     fun addPlan(
         title: String,
         dateKey: String,
