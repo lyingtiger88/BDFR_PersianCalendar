@@ -108,6 +108,12 @@ internal sealed class ZurvanAuthClient
         return true;
     }
 
+    internal async Task SendPasswordRecoveryAsync(string email)
+    {
+        if (string.IsNullOrWhiteSpace(email)) throw new ArgumentException("Email is required.");
+        using var _ = await RequestAsync("/auth/v1/recover", new { email = email.Trim() });
+    }
+
     internal async Task<bool> RefreshAsync()
     {
         var session = Load();
