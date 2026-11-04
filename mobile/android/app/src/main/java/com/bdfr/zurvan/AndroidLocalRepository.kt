@@ -1165,6 +1165,7 @@ class AndroidLocalRepository(
         preferences.edit()
             .putString(KEY_PLANS, json.toString())
             .apply()
+        ZurvanHomeWidget.updateAll(appContext)
     }
 
     private fun loadPlans(): List<LocalPlan> =
