@@ -115,6 +115,43 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Build signed Android release APK and AAB when credentials exist
+        id: release_build
+        if: github.event_name == 'push'
+        shell: bash
+        env:
+          ZURVAN_ANDROID_KEYSTORE_B64: ${{ secrets.ZURVAN_ANDROID_KEYSTORE_B64 }}
+          ZURVAN_ANDROID_STORE_PASSWORD: ${{ secrets.ZURVAN_ANDROID_STORE_PASSWORD }}
+          ZURVAN_ANDROID_KEY_ALIAS: ${{ secrets.ZURVAN_ANDROID_KEY_ALIAS }}
+          ZURVAN_ANDROID_KEY_PASSWORD: ${{ secrets.ZURVAN_ANDROID_KEY_PASSWORD }}
+          ZURVAN_PUBLIC_KEY_B64: ${{ vars.ZURVAN_LICENSE_PUBLIC_KEY_B64 }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${ZURVAN_ANDROID_KEYSTORE_B64:-}" || -z "${ZURVAN_ANDROID_STORE_PASSWORD:-}" || -z "${ZURVAN_ANDROID_KEY_ALIAS:-}" || -z "${ZURVAN_ANDROID_KEY_PASSWORD:-}" ]]; then
+            echo 'Release signing secrets are not configured; skipping signed artifacts.' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          export ZURVAN_ANDROID_KEYSTORE_PATH="$RUNNER_TEMP/zurvan-release.jks"
+          trap 'rm -f "$ZURVAN_ANDROID_KEYSTORE_PATH"' EXIT
+          printf '%s' "$ZURVAN_ANDROID_KEYSTORE_B64" | base64 --decode > "$ZURVAN_ANDROID_KEYSTORE_PATH"
+          chmod 600 "$ZURVAN_ANDROID_KEYSTORE_PATH"
+          gradle -p mobile/android :app:assembleRelease :app:bundleRelease --stacktrace "-PZURVAN_LICENSE_PUBLIC_KEY_B64=${ZURVAN_PUBLIC_KEY_B64}"
+          test -s mobile/android/app/build/outputs/apk/release/app-release.apk
+          test -s mobile/android/app/build/outputs/bundle/release/app-release.aab
+          sha256sum mobile/android/app/build/outputs/apk/release/app-release.apk mobile/android/app/build/outputs/bundle/release/app-release.aab > mobile/android/release-SHA256SUMS.txt
+          echo 'built=true' >> "$GITHUB_OUTPUT"
+
+      - name: Upload signed Android release artifacts
+        if: github.event_name == 'push' && steps.release_build.outputs.built == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Zurvan-Android-signed-release
+          path: |
+            mobile/android/app/build/outputs/apk/release/app-release.apk
+            mobile/android/app/build/outputs/bundle/release/app-release.aab
+            mobile/android/release-SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 30
   ios:
     runs-on: macos-latest
     steps:
