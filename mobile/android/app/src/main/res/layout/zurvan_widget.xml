@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/zurvan_widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/zurvan_widget_background"
+    android:padding="12dp"
+    android:layoutDirection="rtl">
+
+    <TextView
+        android:id="@+id/zurvan_widget_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="زروان"
+        android:textDirection="rtl"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:textColor="#184A73" />
+
+    <TextView
+        android:id="@+id/zurvan_widget_date"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:text="تاریخ امروز"
+        android:textDirection="rtl"
+        android:textSize="17sp"
+        android:textStyle="bold"
+        android:textColor="#123452" />
+
+    <TextView
+        android:id="@+id/zurvan_widget_next"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="5dp"
+        android:text="برنامه‌های پیش‌رو"
+        android:textDirection="rtl"
+        android:textSize="11sp"
+        android:textColor="#526D83" />
+
+    <TextView
+        android:id="@+id/zurvan_widget_task1"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:textDirection="rtl"
+        android:textSize="12sp"
+        android:textColor="#123452" />
+    <TextView
+        android:id="@+id/zurvan_widget_task2"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:textDirection="rtl"
+        android:textSize="12sp"
+        android:textColor="#123452" />
+    <TextView
+        android:id="@+id/zurvan_widget_task3"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:textDirection="rtl"
+        android:textSize="12sp"
+        android:textColor="#123452" />
+</LinearLayout>
