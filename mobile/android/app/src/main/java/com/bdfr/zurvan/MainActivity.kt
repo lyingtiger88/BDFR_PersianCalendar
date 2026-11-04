@@ -2630,6 +2630,33 @@ private fun SettingsScreen(
     var backupMessage by remember { mutableStateOf("") }
     var pendingBackup by remember { mutableStateOf<String?>(null) }
     val backupMeta = remember(context) { context.getSharedPreferences("zurvan_backup_metadata", Context.MODE_PRIVATE) }
+    var autoBackupEnabled by remember { mutableStateOf(backupMeta.getBoolean("auto_enabled", false)) }
+    val autoBackupCreate = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        if (uri != null) {
+            databaseScope.launch {
+                runCatching {
+                    withContext(Dispatchers.IO) {
+                        context.contentResolver.takePersistableUriPermission(
+                            uri, android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                        )
+                        val data = viewModel.exportManualBackup()
+                        context.contentResolver.openOutputStream(uri, "wt")?.use {
+                            it.write(data.toByteArray(Charsets.UTF_8))
+                            it.flush()
+                        } ?: error("فایل پشتیبان قابل نوشتن نیست.")
+                    }
+                    ZurvanAutoBackupWorker.enable(context, uri)
+                }.onSuccess {
+                    autoBackupEnabled = true
+                    backupMeta.edit().putString("last_auto_success_utc", java.time.Instant.now().toString()).apply()
+                    backupMessage = "پشتیبان خودکار روزانه فعال شد."
+                }.onFailure {
+                    backupMessage = "فعال‌سازی پشتیبان خودکار ناموفق بود: " + (it.message ?: "نامشخص")
+                }
+            }
+        }
+    }
+
     val backupCreate = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
         if (uri != null) {
             databaseScope.launch {
@@ -2890,6 +2917,30 @@ private fun SettingsScreen(
                 }) { Text("ذخیره پشتیبان دستی") }
                 OutlinedButton(onClick = { backupOpen.launch(arrayOf("application/json", "text/plain", "*/*")) }) {
                     Text("بازیابی از فایل")
+                }
+                HorizontalDivider()
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("پشتیبان‌گیری خودکار روزانه")
+                        Text("فقط در فایل انتخابی شما؛ با WorkManager و در شرایط مناسب باتری. اجرای دقیق در ساعت مشخص تضمین نمی‌شود.",
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Switch(checked = autoBackupEnabled, onCheckedChange = { enabled ->
+                        if (enabled) autoBackupCreate.launch("Zurvan-auto-backup.json")
+                        else {
+                            ZurvanAutoBackupWorker.disable(context)
+                            autoBackupEnabled = false
+                            backupMessage = "پشتیبان‌گیری خودکار غیرفعال شد؛ فایل پشتیبان حذف نشد."
+                        }
+                    })
+                }
+                if (autoBackupEnabled) {
+                    Text("آخرین اجرای موفق خودکار: " +
+                        (backupMeta.getString("last_auto_success_utc", null) ?: "در انتظار اجرا"),
+                        style = MaterialTheme.typography.bodySmall)
+                    backupMeta.getString("last_auto_error", null)?.let {
+                        Text("خطای آخر: " + it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                    }
                 }
                 if (backupMessage.isNotBlank()) Text(backupMessage)
             }
