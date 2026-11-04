@@ -20,6 +20,17 @@
             android:value="barcode_ui" />
         <service android:name=".ZurvanAdhanService" android:exported="false" android:foregroundServiceType="mediaPlayback" />
         <receiver android:name=".ZurvanPrayerReceiver" android:exported="false" />
+        <service
+            android:name=".ZurvanHijriQuickTile"
+            android:label="تاریخ قمری زروان"
+            android:icon="@drawable/zurvan_launcher"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
         <receiver
             android:name=".ReminderReceiver"
             android:exported="false" />
