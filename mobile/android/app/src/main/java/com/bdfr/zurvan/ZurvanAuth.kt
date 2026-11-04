@@ -43,7 +43,7 @@ class ZurvanAuth(private val context: Context) {
         prefs.edit().putString("iv", Base64.encodeToString(cipher.iv, Base64.NO_WRAP))
             .putString("payload", Base64.encodeToString(encrypted, Base64.NO_WRAP)).apply()
     }
-    fun session(): ZurvanAuthSession? = try {
+    fun session(): ZurvanAuthSession? { return try {
         val iv = Base64.decode(prefs.getString("iv", null) ?: return null, Base64.DEFAULT)
         val payload = Base64.decode(prefs.getString("payload", null) ?: return null, Base64.DEFAULT)
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
@@ -55,7 +55,7 @@ class ZurvanAuth(private val context: Context) {
     } catch (_: Exception) {
         clearLocal()
         null
-    }
+    } }
     private fun clearLocal() { prefs.edit().clear().apply() }
     suspend fun signIn(email: String, password: String): ZurvanAuthSession = withContext(Dispatchers.IO) {
         require(configured) { "Supabase is not configured for this build" }
