@@ -22,6 +22,10 @@ android {
         val issuerPublicKey = providers.gradleProperty("ZURVAN_LICENSE_PUBLIC_KEY_B64")
             .orElse("").get()
         buildConfigField("String", "LICENSE_PUBLIC_KEY_B64", "\"" + issuerPublicKey + "\"")
+        val supabaseUrl = providers.gradleProperty("ZURVAN_SUPABASE_URL").orElse("").get()
+        val supabaseKey = providers.gradleProperty("ZURVAN_SUPABASE_PUBLISHABLE_KEY").orElse("").get()
+        buildConfigField("String", "SUPABASE_URL", "\"" + supabaseUrl + "\"")
+        buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"" + supabaseKey + "\"")
         minSdk = 26
         targetSdk = 35
         versionCode = 68

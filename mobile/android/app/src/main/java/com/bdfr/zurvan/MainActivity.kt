@@ -354,6 +354,8 @@ private fun ZurvanActivationScreen(modifier: Modifier, onActivated: () -> Unit) 
             } else message = ZurvanActivation.explanation(ZurvanActivation.diagnose(context, code))
         }) { Text("فعال‌سازی") }
         Text(message)
+        HorizontalDivider()
+        ZurvanAuthScreen()
     }
 }
 
@@ -2715,6 +2717,9 @@ private fun SettingsScreen(
                     Text("بازگشت به دسته‌ها")
                 }
             }
+        }
+        if (settingsCategory == "cloud") item {
+            SettingsCard(title = "ورود و مدیریت حساب") { ZurvanAuthScreen() }
         }
         if (settingsCategory == "about") item {
             SettingsCard(title = "درباره زروان") {
