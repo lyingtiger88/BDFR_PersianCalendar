@@ -2718,6 +2718,9 @@ private fun SettingsScreen(
                 }
             }
         }
+        if (settingsCategory == "cloud") item {
+            SettingsCard(title = "ورود و مدیریت حساب") { ZurvanAuthScreen() }
+        }
         if (settingsCategory == "about") item {
             SettingsCard(title = "درباره زروان") {
                 Text("زروان | زمان، به سبک زندگی تو",
