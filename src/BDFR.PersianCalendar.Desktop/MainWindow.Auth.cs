@@ -22,23 +22,24 @@ public sealed partial class MainWindow
         var signIn = new Button { Content = "ورود" };
         var signUp = new Button { Content = "ثبت‌نام" };
         var signOut = new Button { Content = "خروج از حساب" };
+        var recovery = new Button { Content = "بازیابی رمز عبور" };
         void Update()
         {
             var user = _authClient.SignedInEmail;
             var enabled = _authClient.Configured;
             status.Text = !enabled ? "پیکربندی Supabase در این نسخه انجام نشده است."
                 : user is null ? "هنوز وارد حساب نشده‌اید." : $"حساب فعال: {user}";
-            email.Visibility = password.Visibility = signIn.Visibility = signUp.Visibility =
+            email.Visibility = password.Visibility = signIn.Visibility = signUp.Visibility = recovery.Visibility =
                 enabled && user is null ? Visibility.Visible : Visibility.Collapsed;
             signOut.Visibility = enabled && user is not null ? Visibility.Visible : Visibility.Collapsed;
         }
         async Task Run(Func<Task> action)
         {
-            signIn.IsEnabled = signUp.IsEnabled = signOut.IsEnabled = false;
+            signIn.IsEnabled = signUp.IsEnabled = signOut.IsEnabled = recovery.IsEnabled = false;
             status.Text = "در حال برقراری ارتباط امن...";
             try { await action(); password.Password = ""; Update(); }
             catch (Exception error) { status.Text = error.Message; }
-            finally { signIn.IsEnabled = signUp.IsEnabled = signOut.IsEnabled = true; }
+            finally { signIn.IsEnabled = signUp.IsEnabled = signOut.IsEnabled = recovery.IsEnabled = true; }
         }
         signIn.Click += async (_, _) => await Run(() => _authClient.SignInAsync(email.Text, password.Password));
         signUp.Click += async (_, _) => await Run(async () =>
@@ -47,6 +48,7 @@ public sealed partial class MainWindow
             if (!signedIn)
                 status.Text = "لطفاً ایمیل خود را تأیید کرده و سپس وارد شوید.";
         });
+        recovery.Click += async (_, _) => await Run(() => _authClient.SendPasswordRecoveryAsync(email.Text));
         signOut.Click += async (_, _) => await Run(() => _authClient.SignOutAsync());
         panel.Children.Add(status);
         panel.Children.Add(email);
@@ -54,6 +56,7 @@ public sealed partial class MainWindow
         var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
         actions.Children.Add(signIn);
         actions.Children.Add(signUp);
+        actions.Children.Add(recovery);
         actions.Children.Add(signOut);
         panel.Children.Add(actions);
         Update();
