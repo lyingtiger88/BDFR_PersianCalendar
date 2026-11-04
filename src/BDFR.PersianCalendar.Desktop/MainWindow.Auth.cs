@@ -36,8 +36,15 @@ public sealed partial class MainWindow
         async Task Run(Func<Task> action)
         {
             signIn.IsEnabled = signUp.IsEnabled = signOut.IsEnabled = recovery.IsEnabled = false;
-            status.Text = "در حال برقراری ارتباط امن...";
-            try { await action(); password.Password = ""; Update(); }
+            const string pending = "در حال برقراری ارتباط امن...";
+            status.Text = pending;
+            try {
+                await action();
+                var feedback = status.Text;
+                password.Password = "";
+                Update();
+                if (feedback != pending) status.Text = feedback;
+            }
             catch (Exception error) { status.Text = error.Message; }
             finally { signIn.IsEnabled = signUp.IsEnabled = signOut.IsEnabled = recovery.IsEnabled = true; }
         }
@@ -48,7 +55,10 @@ public sealed partial class MainWindow
             if (!signedIn)
                 status.Text = "لطفاً ایمیل خود را تأیید کرده و سپس وارد شوید.";
         });
-        recovery.Click += async (_, _) => await Run(() => _authClient.SendPasswordRecoveryAsync(email.Text));
+        recovery.Click += async (_, _) => await Run(async () => {
+            await _authClient.SendPasswordRecoveryAsync(email.Text);
+            status.Text = "اگر حسابی با این ایمیل وجود داشته باشد، پیام بازیابی ارسال می‌شود.";
+        });
         signOut.Click += async (_, _) => await Run(() => _authClient.SignOutAsync());
         panel.Children.Add(status);
         panel.Children.Add(email);
