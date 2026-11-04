@@ -58,7 +58,8 @@ data class AndroidUiPreferences(
     val cornerRadius: Float = 18f,
     val railSide: String = "left",
     val hijriDayOffset: Int = 0,
-    val dayMediaEnabled: Boolean = false
+    val dayMediaEnabled: Boolean = false,
+    val visibleOccasionCalendars: Set<CalendarPriority> = CalendarPriority.entries.toSet()
 )
 
 

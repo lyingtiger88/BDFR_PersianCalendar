@@ -57,12 +57,21 @@ object ZurvanBuiltInOccasions {
         }
     }
 
-    fun onDay(day: CalendarDayCell, custom: List<LocalOccasion>): List<LocalOccasion> {
-        val base = downloaded ?: entries.mapIndexed { index, entry ->
+    fun onDay(
+        day: CalendarDayCell,
+        custom: List<LocalOccasion>,
+        visibleCalendars: Set<CalendarPriority> = CalendarPriority.entries.toSet()
+    ): List<LocalOccasion> {
+        // The cached catalog is year-specific: never hide recurring starter events in other years.
+        val catalogForYear = downloaded?.takeIf { catalog ->
+            catalog.any { it.targetPersianYear == day.persianYear }
+        }
+        val base = catalogForYear ?: entries.mapIndexed { index, entry ->
             LocalOccasion("builtin-${entry.calendar.key}-${entry.month}-${entry.day}-$index",
                 entry.title, entry.calendar, entry.month, entry.day, 0, 0)
         }
         val builtIn = base.filter { entry ->
+            entry.calendar in visibleCalendars &&
             (entry.targetPersianYear == null || entry.targetPersianYear == day.persianYear) &&
                 when (entry.calendar) {
                     CalendarPriority.PERSIAN -> entry.month == day.persianMonth && entry.day == day.persianDay
@@ -84,7 +93,8 @@ object ZurvanBuiltInOccasions {
                 }
                 CalendarPriority.HIJRI -> occasion.month in 1..12 && occasion.day in 1..30
             }
-            if ((!occasion.annual && occasion.targetPersianYear == null) || !existsThisYear) return@filter false
+            if (occasion.calendar !in visibleCalendars ||
+                (!occasion.annual && occasion.targetPersianYear == null) || !existsThisYear) return@filter false
             when (occasion.calendar) {
                 CalendarPriority.PERSIAN -> occasion.month == day.persianMonth && occasion.day == day.persianDay
                 CalendarPriority.GREGORIAN -> occasion.month == day.gregorianMonth && occasion.day == day.gregorianDay

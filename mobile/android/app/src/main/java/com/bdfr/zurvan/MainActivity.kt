@@ -767,17 +767,14 @@ private fun CalendarScreen(
                             day.persianKey
                     } ||
                     occasions.any {
-                        occasionMatches(
-                            day,
-                            it
-                        )
+                        it.calendar in preferences.visibleOccasionCalendars && occasionMatches(day, it)
                     }
 
-                val dayOccasions = ZurvanBuiltInOccasions.onDay(day, occasions)
+                val dayOccasions = ZurvanBuiltInOccasions.onDay(day, occasions, preferences.visibleOccasionCalendars)
                 CalendarDayCard(
                     day = day,
                     isHoliday = ZurvanDayFlags.isHoliday(day, occasions),
-                    isMourning = ZurvanDayFlags.isMourning(day, occasions),
+                    isMourning = ZurvanDayFlags.isMourning(day, dayOccasions),
                     occasionIcons = dayOccasions.map { ZurvanBuiltInOccasions.iconFor(it.title) }.distinct(),
                     hasOccasion = dayOccasions.isNotEmpty(),
                     isCelebration = dayOccasions.any {
@@ -862,7 +859,7 @@ private fun CalendarScreen(
                     it.dateKey ==
                         day.persianKey
                 },
-            occasions = ZurvanBuiltInOccasions.onDay(day, occasions),
+            occasions = ZurvanBuiltInOccasions.onDay(day, occasions, preferences.visibleOccasionCalendars),
             note = notes.firstOrNull {
                 it.dateKey ==
                     day.persianKey
@@ -2813,6 +2810,26 @@ private fun SettingsScreen(
                     Switch(checked = dayMediaEnabled, onCheckedChange = viewModel::setDayMediaEnabled)
                 }
                 Text(if (dayMediaEnabled) "فعال است؛ می‌توانی در جزئیات هر روز رسانه اضافه کنی." else "غیرفعال است (حالت پیش‌فرض).", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        if (settingsCategory == "calendar") item {
+            SettingsCard(title = "نوع مناسبت‌های قابل نمایش") {
+                Text("می‌توان چند تقویم را هم‌زمان انتخاب کرد. این فیلتر مستقل از ترتیب نمایش تاریخ‌هاست.")
+                CalendarPriority.entries.forEach { source ->
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text("مناسبت‌های " + source.label, modifier = Modifier.weight(1f))
+                        Checkbox(
+                            checked = source in preferences.visibleOccasionCalendars,
+                            onCheckedChange = { checked ->
+                                val updated = preferences.visibleOccasionCalendars.toMutableSet()
+                                if (checked) updated.add(source) else updated.remove(source)
+                                viewModel.setVisibleOccasionCalendars(updated)
+                            }
+                        )
+                    }
+                }
+                Text("تعطیلات رسمی ثابت و داده‌های سالانه ایران جداگانه مدیریت می‌شوند؛ منبع کشورهای دیگر هنوز افزوده نشده است.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         if (settingsCategory == "calendar") item {

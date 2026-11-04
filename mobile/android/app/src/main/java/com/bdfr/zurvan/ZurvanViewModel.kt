@@ -155,6 +155,8 @@ class ZurvanViewModel(
 
     fun setDayMediaEnabled(enabled: Boolean) = repository.setDayMediaEnabled(enabled)
 
+    fun setVisibleOccasionCalendars(values: Set<CalendarPriority>) = repository.setVisibleOccasionCalendars(values)
+
     fun startCompanionMaster() =
         companionManager.startMaster()
 
