@@ -33,6 +33,9 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.util.UUID
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** On-device team planner. Remote membership and cross-device sync require a service. */
 private class TeamStore(private val context: Context) {
@@ -74,6 +77,81 @@ fun ZurvanTeamPlanner(
     var alertMinutes by remember { mutableStateOf(store.get("alert_minutes").ifBlank { "30" }) }
     var activeSection by remember { mutableStateOf(0) }
     var status by remember { mutableStateOf("") }
+    val exportScope = rememberCoroutineScope()
+    var showExportDialog by remember { mutableStateOf(false) }
+    var exportStartDate by remember { mutableStateOf("") }
+    var exportEndDate by remember { mutableStateOf("") }
+    var exportPrivate by remember { mutableStateOf(false) }
+    var exportPlans by remember { mutableStateOf<List<LocalPlan>>(emptyList()) }
+    var exportStatus by remember { mutableStateOf("") }
+    val pdfExportPicker = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")) { uri ->
+        if (uri != null) exportScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    context.contentResolver.openOutputStream(uri)?.use { ZurvanPlannerExport.pdf(exportPlans, it) }
+                        ?: error("فایل PDF قابل نوشتن نیست.")
+                }
+            }.onSuccess { exportStatus = "فایل PDF برنامه‌ریزی ذخیره شد." }
+                .onFailure { exportStatus = it.message ?: "ذخیره PDF ناموفق بود." }
+        }
+    }
+    val excelExportPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    ) { uri ->
+        if (uri != null) exportScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    context.contentResolver.openOutputStream(uri)?.use { ZurvanPlannerExport.excel(exportPlans, it) }
+                        ?: error("فایل Excel قابل نوشتن نیست.")
+                }
+            }.onSuccess { exportStatus = "فایل Excel برنامه‌ریزی ذخیره شد." }
+                .onFailure { exportStatus = it.message ?: "ذخیره Excel ناموفق بود." }
+        }
+    }
+    if (showExportDialog) {
+        AlertDialog(
+            onDismissRequest = { showExportDialog = false },
+            title = { Text("خروجی برنامه‌ریزی") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("بازه شمسی اختیاری به شکل YYYY-MM-DD. خالی یعنی همه تاریخ‌ها.")
+                    OutlinedTextField(value = exportStartDate, onValueChange = { exportStartDate = it },
+                        label = { Text("از تاریخ") }, singleLine = true)
+                    OutlinedTextField(value = exportEndDate, onValueChange = { exportEndDate = it },
+                        label = { Text("تا تاریخ") }, singleLine = true)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = exportPrivate, onCheckedChange = { exportPrivate = it })
+                        Text("شامل برنامه‌های خصوصی")
+                    }
+                    Text("اطلاعات فقط در فایل انتخابی شما ذخیره می‌شود.")
+                }
+            },
+            confirmButton = {
+                Row {
+                    TextButton(onClick = {
+                        runCatching {
+                            ZurvanPlannerExport.selected(plans, exportStartDate, exportEndDate, exportPrivate)
+                        }.onSuccess {
+                            exportPlans = it
+                            showExportDialog = false
+                            pdfExportPicker.launch("Zurvan-planner.pdf")
+                        }.onFailure { exportStatus = it.message ?: "بازه زمانی نامعتبر است." }
+                    }) { Text("PDF") }
+                    TextButton(onClick = {
+                        runCatching {
+                            ZurvanPlannerExport.selected(plans, exportStartDate, exportEndDate, exportPrivate)
+                        }.onSuccess {
+                            exportPlans = it
+                            showExportDialog = false
+                            excelExportPicker.launch("Zurvan-planner.xlsx")
+                        }.onFailure { exportStatus = it.message ?: "بازه زمانی نامعتبر است." }
+                    }) { Text("Excel") }
+                }
+            },
+            dismissButton = { TextButton(onClick = { showExportDialog = false }) { Text("انصراف") } }
+        )
+    }
+
     val avatar = remember(photoRevision) {
         val f = File(context.filesDir, "zurvan_profile_photo")
         if (f.exists()) BitmapFactory.decodeFile(f.absolutePath)?.asImageBitmap() else null
@@ -161,6 +239,12 @@ fun ZurvanTeamPlanner(
     val tabs = listOf("زمان‌بندی", "گروه من", "پروفایل")
     Column(modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text("برنامه‌ریزی و گروه‌ها", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        if (activeSection == 0) {
+            OutlinedButton(onClick = { showExportDialog = true }) {
+                Text("خروجی PDF / Excel")
+            }
+            if (exportStatus.isNotBlank()) Text(exportStatus, style = MaterialTheme.typography.bodySmall)
+        }
         TabRow(selectedTabIndex = activeSection) {
             tabs.forEachIndexed { i, title ->
                 Tab(selected = activeSection == i, onClick = { activeSection = i }, text = { Text(title) })
