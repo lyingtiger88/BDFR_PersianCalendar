@@ -354,6 +354,8 @@ private fun ZurvanActivationScreen(modifier: Modifier, onActivated: () -> Unit) 
             } else message = ZurvanActivation.explanation(ZurvanActivation.diagnose(context, code))
         }) { Text("فعال‌سازی") }
         Text(message)
+        HorizontalDivider()
+        ZurvanAuthScreen()
     }
 }
 
