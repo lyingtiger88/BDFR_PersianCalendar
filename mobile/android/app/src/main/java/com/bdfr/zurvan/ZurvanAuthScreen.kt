@@ -66,6 +66,16 @@ fun ZurvanAuthScreen(modifier: Modifier = Modifier) {
                     }
                 }) { Text("ثبت‌نام") }
             }
+            TextButton(enabled = !busy, onClick = {
+                busy = true
+                scope.launch {
+                    try {
+                        auth.sendPasswordRecovery(email)
+                        message = "اگر این ایمیل حسابی داشته باشد، راهنمای بازیابی ارسال می‌شود."
+                    } catch (e: Exception) { message = e.message ?: "ارسال بازیابی ناموفق" }
+                    finally { busy = false }
+                }
+            }) { Text("بازیابی رمز عبور") }
         }
         if (busy) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
         if (message.isNotBlank()) Text(message, style = MaterialTheme.typography.bodySmall)
