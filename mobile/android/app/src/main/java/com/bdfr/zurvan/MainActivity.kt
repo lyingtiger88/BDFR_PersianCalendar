@@ -2627,6 +2627,51 @@ private fun SettingsScreen(
     val databaseScope = rememberCoroutineScope()
     var databaseStatus by remember { mutableStateOf("") }
     var databaseBusy by remember { mutableStateOf(false) }
+    var backupMessage by remember { mutableStateOf("") }
+    var pendingBackup by remember { mutableStateOf<String?>(null) }
+    val backupMeta = remember(context) { context.getSharedPreferences("zurvan_backup_metadata", Context.MODE_PRIVATE) }
+    val backupCreate = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        if (uri != null) {
+            databaseScope.launch {
+                runCatching {
+                    withContext(Dispatchers.IO) {
+                        val json = viewModel.exportManualBackup()
+                        context.contentResolver.openOutputStream(uri, "w")?.use {
+                            it.write(json.toByteArray(Charsets.UTF_8))
+                            it.flush()
+                        } ?: error("فایل خروجی قابل نوشتن نیست.")
+                    }
+                }.onSuccess {
+                    val stamp = java.time.Instant.now().toString()
+                    backupMeta.edit().putString("last_success_utc", stamp).apply()
+                    backupMessage = "پشتیبان با موفقیت ذخیره شد: " + stamp
+                }.onFailure { backupMessage = "خطای ذخیره پشتیبان: " + (it.message ?: "نامشخص") }
+            }
+        }
+    }
+    val backupOpen = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            databaseScope.launch {
+                runCatching {
+                    withContext(Dispatchers.IO) {
+                        context.contentResolver.openInputStream(uri)?.use { input ->
+                            val buffer = ByteArray(8192)
+                            val out = java.io.ByteArrayOutputStream()
+                            while (true) {
+                                val size = input.read(buffer)
+                                if (size < 0) break
+                                out.write(buffer, 0, size)
+                                require(out.size() <= 2_000_000) { "حجم فایل پشتیبان بیش از حد مجاز است." }
+                            }
+                            out.toString(Charsets.UTF_8.name())
+                        } ?: error("فایل پشتیبان قابل خواندن نیست.")
+                    }
+                }.onSuccess { pendingBackup = it }
+                    .onFailure { backupMessage = "خطای خواندن فایل: " + (it.message ?: "نامشخص") }
+            }
+        }
+    }
+
     val themePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             runCatching { ZurvanThemeImporter.import(context, uri) }
@@ -2666,6 +2711,33 @@ private fun SettingsScreen(
                 else setColorOverride(key, null)
             },
             onDismiss = { pickingColorFor = null }
+        )
+    }
+
+    pendingBackup?.let { json ->
+        AlertDialog(
+            onDismissRequest = { pendingBackup = null },
+            title = { Text("تأیید بازیابی اطلاعات") },
+            text = { Text("ادغام: اطلاعات فعلی نگه داشته می‌شود و شناسه‌های جدید افزوده می‌شوند. جایگزینی: برنامه‌ها و یادداشت‌ها و یادآورها جایگزین می‌شوند. پیش از جایگزینی، از اطلاعات فعلی پشتیبان تهیه کنید.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    runCatching { viewModel.restoreManualBackup(json, merge = true) }
+                        .onSuccess { backupMessage = "بازیابی با ادغام انجام شد؛ تعداد کل رکوردها: " + it }
+                        .onFailure { backupMessage = "بازیابی ناموفق: " + (it.message ?: "نامشخص") }
+                    pendingBackup = null
+                }) { Text("ادغام") }
+            },
+            dismissButton = {
+                Row {
+                    TextButton(onClick = {
+                        runCatching { viewModel.restoreManualBackup(json, merge = false) }
+                            .onSuccess { backupMessage = "بازیابی با جایگزینی انجام شد؛ تعداد رکوردها: " + it }
+                            .onFailure { backupMessage = "بازیابی ناموفق: " + (it.message ?: "نامشخص") }
+                        pendingBackup = null
+                    }) { Text("جایگزینی") }
+                    TextButton(onClick = { pendingBackup = null }) { Text("انصراف") }
+                }
+            }
         )
     }
 
@@ -2800,6 +2872,26 @@ private fun SettingsScreen(
                         }
                     }
                 }
+            }
+        }
+
+        if (settingsCategory == "calendar") item {
+            SettingsCard(title = "پشتیبان‌گیری و بازیابی اطلاعات") {
+                Text("پشتیبان محلی JSON شامل برنامه‌ها، وظایف، مناسبت‌های شخصی، یادداشت‌ها، یادآورها، پیوند رسانه‌ها و تنظیمات پایه است.")
+                Text("فایل‌ها و ویدیوهای اصلی در پشتیبان قرار نمی‌گیرند؛ پیوند آن‌ها ممکن است پس از انتقال به دستگاه دیگر کار نکند.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("هشدار: فایل پشتیبان رمزگذاری نشده و ممکن است یادداشت‌های خصوصی داشته باشد. فقط در محل امن ذخیره کنید.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                Text("آخرین پشتیبان موفق: " +
+                    (backupMeta.getString("last_success_utc", null) ?: "هنوز ثبت نشده"),
+                    style = MaterialTheme.typography.bodySmall)
+                Button(onClick = {
+                    backupCreate.launch("Zurvan-backup-" + java.time.LocalDate.now() + ".json")
+                }) { Text("ذخیره پشتیبان دستی") }
+                OutlinedButton(onClick = { backupOpen.launch(arrayOf("application/json", "text/plain", "*/*")) }) {
+                    Text("بازیابی از فایل")
+                }
+                if (backupMessage.isNotBlank()) Text(backupMessage)
             }
         }
         if (settingsCategory == "calendar") item {
