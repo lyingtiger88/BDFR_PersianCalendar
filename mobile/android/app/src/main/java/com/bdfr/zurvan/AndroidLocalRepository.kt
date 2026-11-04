@@ -147,6 +147,10 @@ class AndroidLocalRepository(
         saveMediaTags(remaining)
     }
 
+    fun setVisibleOccasionCalendars(values: Set<CalendarPriority>) {
+        saveUiPreferences(_uiPreferences.value.copy(visibleOccasionCalendars = values))
+    }
+
     fun setDayMediaEnabled(enabled: Boolean) {
         saveUiPreferences(_uiPreferences.value.copy(dayMediaEnabled = enabled))
     }
@@ -1349,6 +1353,7 @@ class AndroidLocalRepository(
                 value.railSide
             )
             .putBoolean(KEY_DAY_MEDIA_ENABLED, value.dayMediaEnabled)
+            .putString(KEY_VISIBLE_OCCASION_CALENDARS, value.visibleOccasionCalendars.joinToString(",") { it.key })
             .apply()
     }
 
@@ -1380,7 +1385,10 @@ class AndroidLocalRepository(
                 KEY_RAIL_SIDE,
                 "left"
             ) ?: "left",
-            dayMediaEnabled = preferences.getBoolean(KEY_DAY_MEDIA_ENABLED, false)
+            dayMediaEnabled = preferences.getBoolean(KEY_DAY_MEDIA_ENABLED, false),
+            visibleOccasionCalendars = preferences.getString(KEY_VISIBLE_OCCASION_CALENDARS, null)
+                ?.split(",")?.mapNotNull { key -> CalendarPriority.entries.firstOrNull { it.key == key } }?.toSet()
+                ?: CalendarPriority.entries.toSet()
         )
     }
 
@@ -1410,6 +1418,7 @@ class AndroidLocalRepository(
         private const val KEY_NOTES = "notes"
         private const val KEY_MEDIA_TAGS = "media_tags"
         private const val KEY_DAY_MEDIA_ENABLED = "day_media_enabled"
+        private const val KEY_VISIBLE_OCCASION_CALENDARS = "visible_occasion_calendars"
         private const val KEY_CALENDAR_ORDER =
             "calendar_order"
         private const val KEY_CORNER_RADIUS =
