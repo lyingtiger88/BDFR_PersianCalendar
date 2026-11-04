@@ -72,6 +72,12 @@ class ZurvanAuth(private val context: Context) {
         if (reply.optString("access_token").isNotBlank()) saveResponse(reply)
         reply.optString("access_token").isNotBlank()
     }
+    suspend fun sendPasswordRecovery(email: String) = withContext(Dispatchers.IO) {
+        require(configured) { "Supabase is not configured for this build" }
+        require(email.isNotBlank()) { "Enter your email address" }
+        request("/auth/v1/recover", JSONObject().put("email", email.trim()))
+        Unit
+    }
     suspend fun validSession(): ZurvanAuthSession? = withContext(Dispatchers.IO) {
         val current = session() ?: return@withContext null
         if (System.currentTimeMillis() / 1000 + 60 < current.expiresAt) return@withContext current
