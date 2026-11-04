@@ -33,6 +33,27 @@ android {
         )
     }
 
+    val releaseKeystore = providers.environmentVariable("ZURVAN_ANDROID_KEYSTORE_PATH").orNull
+    val releaseStorePassword = providers.environmentVariable("ZURVAN_ANDROID_STORE_PASSWORD").orNull
+    val releaseKeyAlias = providers.environmentVariable("ZURVAN_ANDROID_KEY_ALIAS").orNull
+    val releaseKeyPassword = providers.environmentVariable("ZURVAN_ANDROID_KEY_PASSWORD").orNull
+
+    if (!releaseKeystore.isNullOrBlank() &&
+        !releaseStorePassword.isNullOrBlank() &&
+        !releaseKeyAlias.isNullOrBlank() &&
+        !releaseKeyPassword.isNullOrBlank()
+    ) {
+        signingConfigs {
+            create("production") {
+                storeFile = file(releaseKeystore)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+        buildTypes.getByName("release").signingConfig = signingConfigs.getByName("production")
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
