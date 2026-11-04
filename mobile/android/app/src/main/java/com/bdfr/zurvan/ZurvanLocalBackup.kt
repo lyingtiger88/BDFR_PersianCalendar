@@ -27,7 +27,7 @@ object ZurvanLocalBackup {
         "occasions" to listOf("id", "title", "calendar", "month", "day"),
         "reminders" to listOf("id", "title", "dateKey", "hour", "minute"),
         "notes" to listOf("dateKey", "text"),
-        "media_tags" to listOf("id", "uri", "dateKey")
+        "media_tags" to listOf("id", "uri")
     )
     private val dateFormat = Regex("""^\d{4}-\d{2}-\d{2}$""")
 
