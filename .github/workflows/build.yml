@@ -365,6 +365,35 @@ jobs:
           (Get-FileHash artifacts/Zurvan-Setup-x64.exe -Algorithm SHA256).Hash |
             Out-File artifacts/Zurvan-Setup-x64.exe.sha256 -Encoding ascii
 
+      - name: Optional Authenticode signature for Windows installer
+        if: github.event_name == 'push'
+        shell: pwsh
+        env:
+          ZURVAN_WINDOWS_SIGN_PFX_B64: ${{ secrets.ZURVAN_WINDOWS_SIGN_PFX_B64 }}
+          ZURVAN_WINDOWS_SIGN_PFX_PASSWORD: ${{ secrets.ZURVAN_WINDOWS_SIGN_PFX_PASSWORD }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ([string]::IsNullOrWhiteSpace($env:ZURVAN_WINDOWS_SIGN_PFX_B64) -or
+              [string]::IsNullOrWhiteSpace($env:ZURVAN_WINDOWS_SIGN_PFX_PASSWORD)) {
+            Add-Content $env:GITHUB_STEP_SUMMARY 'Signing credentials missing; installer is an unsigned test build.'
+            exit 0
+          }
+          $pfx = Join-Path $env:RUNNER_TEMP 'zurvan-signing.pfx'
+          try {
+            [System.IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:ZURVAN_WINDOWS_SIGN_PFX_B64))
+            $sdk = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10\bin'
+            $tool = Get-ChildItem $sdk -Recurse -Filter signtool.exe -ErrorAction Stop |
+              Where-Object { $_.FullName.Contains('x64') } | Select-Object -First 1
+            if (-not $tool) { throw 'Windows SDK SignTool not found.' }
+            & $tool.FullName sign /f $pfx /p $env:ZURVAN_WINDOWS_SIGN_PFX_PASSWORD /fd SHA256 /tr https://timestamp.digicert.com /td SHA256 'artifacts/Zurvan-Setup-x64.exe'
+            if ($LASTEXITCODE -ne 0) { throw 'Authenticode sign failed.' }
+            & $tool.FullName verify /pa 'artifacts/Zurvan-Setup-x64.exe'
+            if ($LASTEXITCODE -ne 0) { throw 'Authenticode verify failed.' }
+            (Get-FileHash 'artifacts/Zurvan-Setup-x64.exe' -Algorithm SHA256).Hash |
+              Out-File 'artifacts/Zurvan-Setup-x64.exe.sha256' -Encoding ascii
+          } finally {
+            Remove-Item $pfx -Force -ErrorAction SilentlyContinue
+          }
       - name: Upload portable test artifact
         uses: actions/upload-artifact@v4
         with:
