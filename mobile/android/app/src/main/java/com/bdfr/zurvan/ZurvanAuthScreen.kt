@@ -43,11 +43,10 @@ fun ZurvanAuthScreen(modifier: Modifier = Modifier) {
     var message by remember { mutableStateOf("") }
     var licenseStatus by remember { mutableStateOf<ZurvanLicenseStatus?>(null) }
     var licenseBusy by remember { mutableStateOf(false) }
+    // An already active account with a missing license-side record needs
+    // server reconciliation, not a second device enrollment (which returns 409).
     val needsEnrollment = licenseStatus?.let {
-        it.accountState == "registration_required" ||
-            it.accountState == "provisional" ||
-            it.licenseAccountState == "not_found" ||
-            it.licenseAccountState == "not_linked"
+        it.accountState == "registration_required" || it.accountState == "provisional"
     } == true
 
     LaunchedEffect(Unit) {
@@ -70,9 +69,9 @@ fun ZurvanAuthScreen(modifier: Modifier = Modifier) {
                     Text("شناسه کاربری دلخواه خود را وارد کنید تا حساب و دستگاه به زروان متصل شوند.")
                     OutlinedTextField(
                         value = enrollmentUsername,
-                        onValueChange = { enrollmentUsername = it.lowercase().filter { c -> c.isLetterOrDigit() || c == '_' || c == '-' }.take(24) },
+                        onValueChange = { enrollmentUsername = it.lowercase().filter { c -> c in 'a'..'z' || c in '0'..'9' || c == '_' }.take(24) },
                         label = { Text("شناسه کاربری زروان") },
-                        supportingText = { Text("حروف انگلیسی، عدد، خط تیره یا زیرخط") },
+                        supportingText = { Text("۴ تا ۲۴ کاراکتر؛ شروع با حرف انگلیسی، سپس حرف، عدد یا زیرخط") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -80,7 +79,7 @@ fun ZurvanAuthScreen(modifier: Modifier = Modifier) {
             },
             confirmButton = {
                 Button(
-                    enabled = !busy && enrollmentUsername.length >= 3,
+                    enabled = !busy && enrollmentUsername.matches(Regex("^[a-z][a-z0-9_]{3,23}$")),
                     onClick = {
                         showEnrollmentDialog = false
                         busy = true
@@ -159,7 +158,7 @@ fun ZurvanAuthScreen(modifier: Modifier = Modifier) {
                             status.accountState == "registration_required" || status.accountState == "provisional" ->
                                 Text("برای تکمیل حساب، شناسه کاربری و اتصال دستگاه را ثبت کنید.", color = ZurvanInk)
                             status.licenseAccountState == "not_found" || status.licenseAccountState == "not_linked" ->
-                                Text("حساب کاربری فعال است؛ حساب لایسنس هنوز به آن متصل نشده است.", color = ZurvanInk)
+                                Text("حساب شما فعال است، اما اتصال آن به سیستم لایسنس در سرور کامل نیست. ثبت‌نام مجدد لازم نیست؛ پس از اصلاح سرور، وضعیت را تازه‌سازی کنید.", color = ZurvanInk)
                             status.licenses.isEmpty() ->
                                 Text("حساب متصل است؛ هنوز لایسنسی برای آن صادر نشده است.", color = ZurvanInk)
                             else -> Text("تعداد لایسنس‌ها: ${status.licenses.size}", color = ZurvanInk)
