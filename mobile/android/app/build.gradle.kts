@@ -28,7 +28,7 @@ android {
         buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"" + supabaseKey + "\"")
         minSdk = 26
         targetSdk = 35
-        versionCode = 72
+        versionCode = 73
         versionName = "0.6.0-beta.9"
         val ciRunNumber = providers.gradleProperty("ZURVAN_CI_RUN_NUMBER").orElse("local").get()
         buildConfigField("String", "CI_RUN_NUMBER", "\"$ciRunNumber\"")
