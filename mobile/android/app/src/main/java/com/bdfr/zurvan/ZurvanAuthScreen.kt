@@ -42,7 +42,10 @@ fun ZurvanAuthScreen(modifier: Modifier = Modifier) {
     var licenseStatus by remember { mutableStateOf<ZurvanLicenseStatus?>(null) }
     var licenseBusy by remember { mutableStateOf(false) }
     val needsEnrollment = licenseStatus?.let {
-        it.accountState == "registration_required" || it.accountState == "provisional"
+        it.accountState == "registration_required" ||
+            it.accountState == "provisional" ||
+            it.licenseAccountState == "not_found" ||
+            it.licenseAccountState == "not_linked"
     } == true
 
     LaunchedEffect(Unit) {
