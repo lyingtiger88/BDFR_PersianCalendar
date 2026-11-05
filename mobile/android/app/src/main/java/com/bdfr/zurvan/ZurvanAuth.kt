@@ -72,6 +72,32 @@ class ZurvanAuth(private val context: Context) {
         if (reply.optString("access_token").isNotBlank()) saveResponse(reply)
         reply.optString("access_token").isNotBlank()
     }
+    suspend fun resendSignupConfirmation(email: String) = withContext(Dispatchers.IO) {
+        require(configured) { "Supabase is not configured for this build" }
+        require(email.isNotBlank()) { "Enter your email address" }
+        request("/auth/v1/resend", JSONObject().put("type", "signup").put("email", email.trim())
+            .put("options", JSONObject().put("emailRedirectTo", "com.bdfr.zurvan://auth/callback")))
+        Unit
+    }
+    suspend fun completeEmailCallback(uri: android.net.Uri) = withContext(Dispatchers.IO) {
+        require(configured) { "Supabase is not configured for this build" }
+        val fragment = uri.fragment?.let { android.net.Uri.parse("https://callback.invalid/?$it") }
+        val access = uri.getQueryParameter("access_token") ?: fragment?.getQueryParameter("access_token")
+        val refresh = uri.getQueryParameter("refresh_token") ?: fragment?.getQueryParameter("refresh_token")
+        if (!access.isNullOrBlank() && !refresh.isNullOrBlank()) {
+            val expiresIn = (uri.getQueryParameter("expires_in") ?: fragment?.getQueryParameter("expires_in"))?.toLongOrNull() ?: 3600L
+            val email = uri.getQueryParameter("email") ?: fragment?.getQueryParameter("email")
+            persist(ZurvanAuthSession(access, refresh, System.currentTimeMillis() / 1000 + expiresIn, email))
+            return@withContext
+        }
+        val tokenHash = uri.getQueryParameter("token_hash") ?: fragment?.getQueryParameter("token_hash")
+        val type = uri.getQueryParameter("type") ?: fragment?.getQueryParameter("type") ?: "signup"
+        if (!tokenHash.isNullOrBlank()) {
+            saveResponse(request("/auth/v1/verify", JSONObject().put("token_hash", tokenHash).put("type", type)))
+            return@withContext
+        }
+        throw IllegalStateException("لینک تأیید ناقص یا منقضی شده است. ایمیل تأیید جدید درخواست کنید.")
+    }
     suspend fun sendPasswordRecovery(email: String) = withContext(Dispatchers.IO) {
         require(configured) { "Supabase is not configured for this build" }
         require(email.isNotBlank()) { "Enter your email address" }
