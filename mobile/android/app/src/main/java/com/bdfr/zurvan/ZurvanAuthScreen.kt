@@ -35,6 +35,8 @@ fun ZurvanAuthScreen(modifier: Modifier = Modifier) {
     var current by remember { mutableStateOf(auth.session()) }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var confirmPassword by remember { mutableStateOf("") }
+    var isSignUpMode by remember { mutableStateOf(false) }
     var enrollmentUsername by remember { mutableStateOf("") }
     var showEnrollmentDialog by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
@@ -209,6 +211,18 @@ fun ZurvanAuthScreen(modifier: Modifier = Modifier) {
                 shape = RoundedCornerShape(16.dp)
             ) { Text("خروج از حساب") }
         } else {
+            val passwordStrength = remember(password) {
+                var score = 0
+                if (password.length >= 8) score++
+                if (password.length >= 12) score++
+                if (password.any { it.isLowerCase() } && password.any { it.isUpperCase() }) score++
+                if (password.any { it.isDigit() }) score++
+                if (password.any { !it.isLetterOrDigit() }) score++
+                score.coerceAtMost(5)
+            }
+            val passwordsMatch = confirmPassword == password && confirmPassword.isNotEmpty()
+            val emailLooksValid = android.util.Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches()
+            val passwordAcceptable = password.length >= 8 && passwordStrength >= 3
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(20.dp),
@@ -216,41 +230,104 @@ fun ZurvanAuthScreen(modifier: Modifier = Modifier) {
                 border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFCADFFF))
             ) {
                 Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(if (isSignUpMode) "ساخت حساب رایگان زروان" else "ورود به حساب زروان",
+                        color = ZurvanInk, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text(
+                        if (isSignUpMode) "با ساخت حساب، امکانات پایه تقویم فعال می‌شود. برای امکانات کامل می‌توانید بعداً اشتراک تهیه کنید."
+                        else "برای همگام‌سازی و دسترسی به حساب خود وارد شوید.",
+                        color = ZurvanMuted, style = MaterialTheme.typography.bodySmall
+                    )
                     OutlinedTextField(email, { email = it.take(254) }, label = { Text("ایمیل") },
-                        singleLine = true, modifier = Modifier.fillMaxWidth())
+                        singleLine = true, modifier = Modifier.fillMaxWidth(),
+                        isError = email.isNotBlank() && !emailLooksValid)
                     OutlinedTextField(password, { password = it.take(128) }, label = { Text("رمز عبور") },
                         singleLine = true, visualTransformation = PasswordVisualTransformation(),
                         modifier = Modifier.fillMaxWidth())
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Button(enabled = !busy, onClick = {
-                            busy = true
-                            scope.launch {
-                                try { current = auth.signIn(email, password); password = ""; message = "ورود موفق" }
-                                catch (e: Exception) { message = e.message ?: "ورود ناموفق" }
-                                finally { busy = false }
+                    if (isSignUpMode) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
+                            repeat(5) { index ->
+                                Box(Modifier.weight(1f).height(6.dp).background(
+                                    color = if (index < passwordStrength) {
+                                        when {
+                                            passwordStrength <= 2 -> Color(0xFFE05B55)
+                                            passwordStrength <= 3 -> Color(0xFFE5A33D)
+                                            else -> Color(0xFF20A36A)
+                                        }
+                                    } else Color(0xFFE5EAF1),
+                                    shape = RoundedCornerShape(50)
+                                ))
                             }
-                        }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = ZurvanBlue)) { Text("ورود") }
-                        OutlinedButton(enabled = !busy, onClick = {
+                        }
+                        Text(
+                            when {
+                                password.isEmpty() -> "رمز عبور حداقل ۸ کاراکتر داشته باشد."
+                                !passwordAcceptable -> "ضعیف؛ از حروف بزرگ و کوچک، عدد یا نماد استفاده کنید."
+                                passwordStrength <= 3 -> "قابل قبول"
+                                passwordStrength == 4 -> "قوی"
+                                else -> "بسیار قوی"
+                            },
+                            color = when {
+                                password.isEmpty() || !passwordAcceptable -> Color(0xFFE05B55)
+                                passwordStrength <= 3 -> Color(0xFFE09A2D)
+                                else -> Color(0xFF168653)
+                            }, style = MaterialTheme.typography.bodySmall
+                        )
+                        OutlinedTextField(confirmPassword, { confirmPassword = it.take(128) },
+                            label = { Text("تکرار رمز عبور") }, singleLine = true,
+                            visualTransformation = PasswordVisualTransformation(),
+                            modifier = Modifier.fillMaxWidth(),
+                            isError = confirmPassword.isNotEmpty() && !passwordsMatch,
+                            supportingText = {
+                                if (confirmPassword.isNotEmpty() && !passwordsMatch)
+                                    Text("دو رمز عبور یکسان نیستند.")
+                            })
+                    }
+                    Button(
+                        enabled = !busy && emailLooksValid && password.isNotBlank() &&
+                            (!isSignUpMode || (passwordAcceptable && passwordsMatch)),
+                        onClick = {
                             busy = true
                             scope.launch {
                                 try {
-                                    val signedIn = auth.signUp(email, password)
+                                    if (isSignUpMode) {
+                                        val signedIn = auth.signUp(email, password)
+                                        current = if (signedIn) auth.session() else null
+                                        message = if (signedIn) "حساب ساخته شد؛ امکانات پایه تقویم فعال است."
+                                            else "حساب ساخته شد. ایمیل تأیید را باز کنید و سپس وارد شوید."
+                                    } else {
+                                        current = auth.signIn(email, password)
+                                        message = "ورود موفق"
+                                    }
                                     password = ""
-                                    current = if (signedIn) auth.session() else null
-                                    message = if (signedIn) "ثبت‌نام و ورود موفق" else "ایمیل تأیید را بررسی کنید."
-                                } catch (e: Exception) { message = e.message ?: "ثبت‌نام ناموفق" }
+                                    confirmPassword = ""
+                                } catch (e: Exception) {
+                                    message = e.message ?: if (isSignUpMode) "ساخت حساب ناموفق بود." else "ورود ناموفق بود."
+                                } finally { busy = false }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = ZurvanBlue)
+                    ) { Text(if (isSignUpMode) "ساخت حساب کاربری" else "ورود") }
+                    TextButton(enabled = !busy, onClick = {
+                        isSignUpMode = !isSignUpMode
+                        password = ""
+                        confirmPassword = ""
+                        message = ""
+                    }, modifier = Modifier.fillMaxWidth()) {
+                        Text(if (isSignUpMode) "قبلاً حساب ساخته‌اید؟ ورود" else "حساب ندارید؟ ساخت حساب رایگان")
+                    }
+                    if (isSignUpMode) {
+                        Text("پس از ثبت‌نام، در صورت درخواست سیستم، ایمیل خود را تأیید کنید. نیازی به شناسه دستگاه یا کد فعال‌سازی نیست.",
+                            color = ZurvanMuted, style = MaterialTheme.typography.bodySmall)
+                        TextButton(enabled = !busy, onClick = {
+                            busy = true
+                            scope.launch {
+                                try { auth.resendSignupConfirmation(email); message = "لینک تأیید جدید ارسال شد. صندوق ورودی و هرزنامه را بررسی کنید." }
+                                catch (e: Exception) { message = e.message ?: "ارسال مجدد ناموفق" }
                                 finally { busy = false }
                             }
-                        }, modifier = Modifier.weight(1f)) { Text("ثبت‌نام") }
+                        }) { Text("ارسال مجدد ایمیل تأیید") }
                     }
-                    TextButton(enabled = !busy, onClick = {
-                        busy = true
-                        scope.launch {
-                            try { auth.resendSignupConfirmation(email); message = "لینک تأیید جدید ارسال شد. صندوق ورودی و هرزنامه را بررسی کنید." }
-                            catch (e: Exception) { message = e.message ?: "ارسال مجدد ناموفق" }
-                            finally { busy = false }
-                        }
-                    }) { Text("ارسال مجدد ایمیل تأیید") }
                     TextButton(enabled = !busy, onClick = {
                         busy = true
                         scope.launch {
@@ -258,7 +335,7 @@ fun ZurvanAuthScreen(modifier: Modifier = Modifier) {
                             catch (e: Exception) { message = e.message ?: "ارسال بازیابی ناموفق" }
                             finally { busy = false }
                         }
-                    }) { Text("بازیابی رمز عبور") }
+                    }) { Text("فراموشی رمز عبور؟ بازیابی رمز") }
                 }
             }
         }
