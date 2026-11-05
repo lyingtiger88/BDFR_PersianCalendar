@@ -23,6 +23,7 @@ fun ZurvanAuthScreen(modifier: Modifier = Modifier) {
     var message by remember { mutableStateOf("") }
     var licenseStatus by remember { mutableStateOf<ZurvanLicenseStatus?>(null) }
     var licenseBusy by remember { mutableStateOf(false) }
+    val needsEnrollment = licenseStatus?.let { it.accountState == "registration_required" || it.accountState == "provisional" } == true
     LaunchedEffect(Unit) {
         if (current != null) current = auth.validSession()
     }
@@ -40,7 +41,9 @@ fun ZurvanAuthScreen(modifier: Modifier = Modifier) {
             Text("اتصال Supabase برای این نسخه تنظیم نشده است.", color = MaterialTheme.colorScheme.error)
         } else if (current != null) {
             Text("وارد شده: " + (current?.email ?: "حساب کاربری"))
+            Text("نسخه حساب و دستگاه: 0.6.0-beta.10 (69)", style = MaterialTheme.typography.bodySmall)
             Text("وضعیت لایسنس", style = MaterialTheme.typography.titleMedium)
+            licenseStatus?.let { Text("وضعیت سرور: حساب=${it.accountState} | لایسنس=${it.licenseAccountState}", style = MaterialTheme.typography.bodySmall) }
             if (licenseBusy) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             licenseStatus?.let { status ->
                 when {
@@ -52,7 +55,7 @@ fun ZurvanAuthScreen(modifier: Modifier = Modifier) {
                         Text("حساب متصل است؛ هنوز لایسنسی برای آن صادر نشده است.")
                     else -> Text("تعداد لایسنس‌ها: ${status.licenses.size}")
                 }
-                if (status.accountState == "registration_required" || status.accountState == "provisional") {
+                if (needsEnrollment) {
                     OutlinedTextField(
                         value = enrollmentUsername,
                         onValueChange = { enrollmentUsername = it.lowercase().take(24) },
