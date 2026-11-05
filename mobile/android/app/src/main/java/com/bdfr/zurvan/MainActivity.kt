@@ -2742,6 +2742,7 @@ private fun SettingsScreen(
         }
         if (settingsCategory == "about") item {
             SettingsCard(title = "درباره زروان") {
+                Text("نسخه ${BuildConfig.VERSION_NAME} | بیلد ${BuildConfig.VERSION_CODE} | اکشن #${BuildConfig.CI_RUN_NUMBER}", style = MaterialTheme.typography.bodyMedium)
                 Text("زروان | زمان، به سبک زندگی تو",
                     style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Text("زروان فقط یک تقویم نیست؛ تلاشی است برای اینکه روزهای پرمشغله، قرارهای کوچک و آرزوهای بزرگ، همگی جای روشنی در زندگی داشته باشند. این برنامه با عشق به زبان فارسی، احترام به فرهنگ‌ها و اشتیاق به ساختن ابزاری ساده، زیبا و کاربردی شکل گرفته است.")
