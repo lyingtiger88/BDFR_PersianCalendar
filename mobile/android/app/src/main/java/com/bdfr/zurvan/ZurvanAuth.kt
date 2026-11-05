@@ -67,7 +67,10 @@ class ZurvanAuth(private val context: Context) {
     suspend fun signUp(email: String, password: String): Boolean = withContext(Dispatchers.IO) {
         require(configured) { "Supabase is not configured for this build" }
         require(email.isNotBlank() && password.length >= 8) { "Password must be at least 8 characters" }
-        val reply = request("/auth/v1/signup", JSONObject().put("email", email.trim()).put("password", password))
+        val reply = request("/auth/v1/signup", JSONObject()
+            .put("email", email.trim())
+            .put("password", password)
+            .put("options", JSONObject().put("emailRedirectTo", "com.bdfr.zurvan://auth/callback")))
         // Email confirmation may be required. Do not treat an unconfirmed signup as signed in.
         if (reply.optString("access_token").isNotBlank()) saveResponse(reply)
         reply.optString("access_token").isNotBlank()
