@@ -41,7 +41,7 @@ fun ZurvanAuthScreen(modifier: Modifier = Modifier) {
             Text("اتصال Supabase برای این نسخه تنظیم نشده است.", color = MaterialTheme.colorScheme.error)
         } else if (current != null) {
             Text("وارد شده: " + (current?.email ?: "حساب کاربری"))
-            Text("نسخه حساب و دستگاه: 0.6.0-beta.10 (69)", style = MaterialTheme.typography.bodySmall)
+            Text("نسخه ${BuildConfig.VERSION_NAME} | بیلد ${BuildConfig.VERSION_CODE} | اکشن #${BuildConfig.CI_RUN_NUMBER}", style = MaterialTheme.typography.bodySmall)
             Text("وضعیت لایسنس", style = MaterialTheme.typography.titleMedium)
             licenseStatus?.let { Text("وضعیت سرور: حساب=${it.accountState} | لایسنس=${it.licenseAccountState}", style = MaterialTheme.typography.bodySmall) }
             if (licenseBusy) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
