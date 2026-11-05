@@ -97,6 +97,16 @@ fun ZurvanAuthScreen(modifier: Modifier = Modifier) {
                 busy = true
                 scope.launch {
                     try {
+                        auth.resendSignupConfirmation(email)
+                        message = "لینک تأیید جدید ارسال شد. صندوق ورودی و پوشه هرزنامه را بررسی کنید."
+                    } catch (e: Exception) { message = e.message ?: "ارسال مجدد ناموفق" }
+                    finally { busy = false }
+                }
+            }) { Text("ارسال مجدد ایمیل تأیید") }
+            TextButton(enabled = !busy, onClick = {
+                busy = true
+                scope.launch {
+                    try {
                         auth.sendPasswordRecovery(email)
                         message = "اگر این ایمیل حسابی داشته باشد، راهنمای بازیابی ارسال می‌شود."
                     } catch (e: Exception) { message = e.message ?: "ارسال بازیابی ناموفق" }
