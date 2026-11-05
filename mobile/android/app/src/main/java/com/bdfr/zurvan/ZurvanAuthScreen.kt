@@ -42,8 +42,15 @@ fun ZurvanAuthScreen(modifier: Modifier = Modifier) {
             Text("وضعیت لایسنس", style = MaterialTheme.typography.titleMedium)
             if (licenseBusy) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             licenseStatus?.let { status ->
-                Text(if (status.licenses.isEmpty()) "برای این حساب هنوز لایسنس صادر نشده است."
-                     else "تعداد لایسنس‌ها: ${status.licenses.size}")
+                when {
+                    status.accountState == "registration_required" || status.accountState == "provisional" ->
+                        Text("ایمیل تأیید شده است، اما ثبت دستگاه و تکمیل حساب زروان هنوز انجام نشده است.")
+                    status.licenseAccountState == "not_found" || status.licenseAccountState == "not_linked" ->
+                        Text("حساب لایسنس هنوز به حساب زروان متصل نشده است.")
+                    status.licenses.isEmpty() ->
+                        Text("حساب متصل است؛ هنوز لایسنسی برای آن صادر نشده است.")
+                    else -> Text("تعداد لایسنس‌ها: ${status.licenses.size}")
+                }
                 status.licenses.forEach { item ->
                     Text("${item.productId} • ${item.type} • ${item.status}")
                 }
