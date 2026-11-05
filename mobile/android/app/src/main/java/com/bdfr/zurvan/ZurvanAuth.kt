@@ -67,10 +67,9 @@ class ZurvanAuth(private val context: Context) {
     suspend fun signUp(email: String, password: String): Boolean = withContext(Dispatchers.IO) {
         require(configured) { "Supabase is not configured for this build" }
         require(email.isNotBlank() && password.length >= 8) { "Password must be at least 8 characters" }
-        val reply = request("/auth/v1/signup", JSONObject()
-            .put("email", email.trim())
-            .put("password", password)
-            .put("options", JSONObject().put("emailRedirectTo", "com.bdfr.zurvan://auth/callback")))
+        val reply = request("/auth/v1/signup?email_redirect_to=" +
+            java.net.URLEncoder.encode("com.bdfr.zurvan://auth/callback", "UTF-8"),
+            JSONObject().put("email", email.trim()).put("password", password))
         // Email confirmation may be required. Do not treat an unconfirmed signup as signed in.
         if (reply.optString("access_token").isNotBlank()) saveResponse(reply)
         reply.optString("access_token").isNotBlank()
@@ -78,8 +77,9 @@ class ZurvanAuth(private val context: Context) {
     suspend fun resendSignupConfirmation(email: String) = withContext(Dispatchers.IO) {
         require(configured) { "Supabase is not configured for this build" }
         require(email.isNotBlank()) { "Enter your email address" }
-        request("/auth/v1/resend", JSONObject().put("type", "signup").put("email", email.trim())
-            .put("options", JSONObject().put("emailRedirectTo", "com.bdfr.zurvan://auth/callback")))
+        request("/auth/v1/resend?email_redirect_to=" +
+            java.net.URLEncoder.encode("com.bdfr.zurvan://auth/callback", "UTF-8"),
+            JSONObject().put("type", "signup").put("email", email.trim()))
         Unit
     }
     suspend fun completeEmailCallback(uri: android.net.Uri) = withContext(Dispatchers.IO) {
@@ -88,8 +88,9 @@ class ZurvanAuth(private val context: Context) {
         val access = uri.getQueryParameter("access_token") ?: fragment?.getQueryParameter("access_token")
         val refresh = uri.getQueryParameter("refresh_token") ?: fragment?.getQueryParameter("refresh_token")
         if (!access.isNullOrBlank() && !refresh.isNullOrBlank()) {
+            val user = getVerifiedUser(access)
             val expiresIn = (uri.getQueryParameter("expires_in") ?: fragment?.getQueryParameter("expires_in"))?.toLongOrNull() ?: 3600L
-            val email = uri.getQueryParameter("email") ?: fragment?.getQueryParameter("email")
+            val email = user.optString("email").takeIf { it.isNotBlank() }
             persist(ZurvanAuthSession(access, refresh, System.currentTimeMillis() / 1000 + expiresIn, email))
             return@withContext
         }
@@ -100,6 +101,21 @@ class ZurvanAuth(private val context: Context) {
             return@withContext
         }
         throw IllegalStateException("لینک تأیید ناقص یا منقضی شده است. ایمیل تأیید جدید درخواست کنید.")
+    }
+    private fun getVerifiedUser(accessToken: String): JSONObject {
+        val connection = (URL(apiUrl + "/auth/v1/user").openConnection() as HttpURLConnection).apply {
+            requestMethod = "GET"
+            connectTimeout = 12000
+            readTimeout = 12000
+            setRequestProperty("apikey", apiKey)
+            setRequestProperty("Authorization", "Bearer $accessToken")
+        }
+        try {
+            if (connection.responseCode !in 200..299) throw IllegalStateException("توکن تأیید معتبر نیست.")
+            val user = JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
+            require(user.optString("id").isNotBlank()) { "شناسه کاربر تأیید نشده است." }
+            return user
+        } finally { connection.disconnect() }
     }
     suspend fun sendPasswordRecovery(email: String) = withContext(Dispatchers.IO) {
         require(configured) { "Supabase is not configured for this build" }
