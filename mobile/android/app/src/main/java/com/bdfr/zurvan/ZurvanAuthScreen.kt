@@ -20,8 +20,17 @@ fun ZurvanAuthScreen(modifier: Modifier = Modifier) {
     var password by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf("") }
+    var licenseStatus by remember { mutableStateOf<ZurvanLicenseStatus?>(null) }
+    var licenseBusy by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         if (current != null) current = auth.validSession()
+    }
+    LaunchedEffect(current?.accessToken) {
+        val token = current?.accessToken ?: return@LaunchedEffect
+        licenseBusy = true
+        try { licenseStatus = ZurvanLicenseApi().status(token) }
+        catch (e: Exception) { message = e.message ?: "دریافت وضعیت لایسنس ناموفق بود." }
+        finally { licenseBusy = false }
     }
     Column(modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("حساب زروان", style = MaterialTheme.typography.titleLarge)
@@ -30,6 +39,24 @@ fun ZurvanAuthScreen(modifier: Modifier = Modifier) {
             Text("اتصال Supabase برای این نسخه تنظیم نشده است.", color = MaterialTheme.colorScheme.error)
         } else if (current != null) {
             Text("وارد شده: " + (current?.email ?: "حساب کاربری"))
+            Text("وضعیت لایسنس", style = MaterialTheme.typography.titleMedium)
+            if (licenseBusy) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            licenseStatus?.let { status ->
+                Text(if (status.licenses.isEmpty()) "برای این حساب هنوز لایسنس صادر نشده است."
+                     else "تعداد لایسنس‌ها: ${status.licenses.size}")
+                status.licenses.forEach { item ->
+                    Text("${item.productId} • ${item.type} • ${item.status}")
+                }
+            }
+            OutlinedButton(enabled = !busy && !licenseBusy, onClick = {
+                val token = current?.accessToken ?: return@OutlinedButton
+                licenseBusy = true
+                scope.launch {
+                    try { licenseStatus = ZurvanLicenseApi().status(token); message = "وضعیت لایسنس به‌روز شد." }
+                    catch (e: Exception) { message = e.message ?: "خطا در بررسی لایسنس" }
+                    finally { licenseBusy = false }
+                }
+            }) { Text("بررسی مجدد لایسنس") }
             Button(enabled = !busy, onClick = {
                 busy = true
                 scope.launch {
