@@ -62,6 +62,7 @@ class MainActivity : ComponentActivity() {
     private fun consumeAuthCallback(source: android.content.Intent?) {
         val uri = source?.data ?: return
         if (uri.scheme != "com.bdfr.zurvan" || uri.host != "auth" || uri.path != "/callback") return
+        setIntent(android.content.Intent(source).setData(null))
         lifecycleScope.launch {
             runCatching { ZurvanAuth(applicationContext).completeEmailCallback(uri) }
                 .onSuccess { recreate() }
