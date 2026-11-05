@@ -30,6 +30,8 @@ android {
         targetSdk = 35
         versionCode = 69
         versionName = "0.6.0-beta.10"
+        val ciRunNumber = providers.gradleProperty("ZURVAN_CI_RUN_NUMBER").orElse("local").get()
+        buildConfigField("String", "CI_RUN_NUMBER", "\"$ciRunNumber\"")
         buildConfigField(
             "String",
             "DESK_API_BASE_URL",
