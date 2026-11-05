@@ -53,6 +53,23 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        consumeAuthCallback(intent)
+    }
+
+    private fun consumeAuthCallback(source: android.content.Intent?) {
+        val uri = source?.data ?: return
+        if (uri.scheme != "com.bdfr.zurvan" || uri.host != "auth" || uri.path != "/callback") return
+        lifecycleScope.launch {
+            runCatching { ZurvanAuth(applicationContext).completeEmailCallback(uri) }
+                .onSuccess { recreate() }
+                .onFailure { android.widget.Toast.makeText(this@MainActivity,
+                    it.message ?: "تأیید ایمیل ناموفق بود", android.widget.Toast.LENGTH_LONG).show() }
+        }
+    }
+
     private val notificationPermissionLauncher =
         registerForActivityResult(
             ActivityResultContracts.RequestPermission()
@@ -60,6 +77,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        consumeAuthCallback(intent)
         // Preserve the transparent pixels of the Activity so Android can composite
         // the previously visible app beneath Liquid Glass surfaces.
         window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
