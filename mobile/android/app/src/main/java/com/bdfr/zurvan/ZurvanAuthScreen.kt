@@ -56,14 +56,11 @@ fun ZurvanAuthScreen(modifier: Modifier = Modifier) {
                     else -> Text("تعداد لایسنس‌ها: ${status.licenses.size}")
                 }
                 if (needsEnrollment) {
-                    OutlinedTextField(
-                        value = enrollmentUsername,
-                        onValueChange = { enrollmentUsername = it.lowercase().take(24) },
-                        label = { Text("شناسه کاربری زروان") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Button(enabled = !busy && !licenseBusy, onClick = {
+                    Text("مرحله بعد: ثبت شناسه و اتصال دستگاه", style = MaterialTheme.typography.titleMedium)
+                    Button(
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !busy && !licenseBusy,
+                        onClick = {
                         busy = true
                         scope.launch {
                             try {
@@ -79,6 +76,14 @@ fun ZurvanAuthScreen(modifier: Modifier = Modifier) {
                             } finally { busy = false }
                         }
                     }) { Text("تکمیل ثبت‌نام و اتصال دستگاه") }
+                    OutlinedTextField(
+                        value = enrollmentUsername,
+                        onValueChange = { enrollmentUsername = it.lowercase().take(24) },
+                        label = { Text("شناسه کاربری زروان") },
+                        supportingText = { Text("ابتدا شناسه را وارد کن، سپس دکمه بالای آن را بزن.") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
                 status.licenses.forEach { item ->
                     Text("${item.productId} • ${item.type} • ${item.status}")
