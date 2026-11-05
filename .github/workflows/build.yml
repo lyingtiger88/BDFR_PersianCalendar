@@ -116,7 +116,8 @@ jobs:
           gradle -p mobile/android :app:assembleDebug --stacktrace \
             "-PZURVAN_LICENSE_PUBLIC_KEY_B64=${ZURVAN_PUBLIC_KEY_B64}" \
             "-PZURVAN_SUPABASE_URL=${ZURVAN_SUPABASE_URL:-}" \
-            "-PZURVAN_SUPABASE_PUBLISHABLE_KEY=${ZURVAN_SUPABASE_PUBLISHABLE_KEY:-}"
+            "-PZURVAN_SUPABASE_PUBLISHABLE_KEY=${ZURVAN_SUPABASE_PUBLISHABLE_KEY:-}" \
+            "-PZURVAN_CI_RUN_NUMBER=${GITHUB_RUN_NUMBER}"
           test -s mobile/android/app/build/outputs/apk/debug/app-debug.apk
           unzip -l mobile/android/app/build/outputs/apk/debug/app-debug.apk | grep -E 'resources.arsc|AndroidManifest.xml'
 
