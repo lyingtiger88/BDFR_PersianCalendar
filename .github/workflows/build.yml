@@ -96,6 +96,8 @@ jobs:
       - name: Build Android debug app
         env:
           ZURVAN_PUBLIC_KEY_B64: ${{ vars.ZURVAN_LICENSE_PUBLIC_KEY_B64 }}
+          ZURVAN_SUPABASE_URL: ${{ vars.ZURVAN_SUPABASE_URL }}
+          ZURVAN_SUPABASE_PUBLISHABLE_KEY: ${{ vars.ZURVAN_SUPABASE_PUBLISHABLE_KEY }}
         shell: bash
         run: |
           set -euo pipefail
@@ -103,11 +105,23 @@ jobs:
             echo "::error::ZURVAN_LICENSE_PUBLIC_KEY_B64 repository variable is required for activation-enabled builds."
             exit 1
           fi
-          gradle -p mobile/android :app:assembleDebug --stacktrace "-PZURVAN_LICENSE_PUBLIC_KEY_B64=${ZURVAN_PUBLIC_KEY_B64}"
+          if [[ -z "${ZURVAN_SUPABASE_URL:-}" || -z "${ZURVAN_SUPABASE_PUBLISHABLE_KEY:-}" ]]; then
+            echo "::error::Set repository Actions variables ZURVAN_SUPABASE_URL and ZURVAN_SUPABASE_PUBLISHABLE_KEY before building Android."
+            exit 1
+          fi
+          if [[ ! "${ZURVAN_SUPABASE_URL}" =~ ^https://[a-zA-Z0-9.-]+$ ]]; then
+            echo "::error::ZURVAN_SUPABASE_URL must be the HTTPS Supabase project URL."
+            exit 1
+          fi
+          gradle -p mobile/android :app:assembleDebug --stacktrace \
+            "-PZURVAN_LICENSE_PUBLIC_KEY_B64=${ZURVAN_PUBLIC_KEY_B64}" \
+            "-PZURVAN_SUPABASE_URL=${ZURVAN_SUPABASE_URL:-}" \
+            "-PZURVAN_SUPABASE_PUBLISHABLE_KEY=${ZURVAN_SUPABASE_PUBLISHABLE_KEY:-}" \
+            "-PZURVAN_CI_RUN_NUMBER=${GITHUB_RUN_NUMBER}"
+          test -s mobile/android/app/build/outputs/apk/debug/app-debug.apk
           unzip -l mobile/android/app/build/outputs/apk/debug/app-debug.apk | grep -E 'resources.arsc|AndroidManifest.xml'
 
       - name: Upload Android debug APK
-        if: github.event_name == 'push'
         uses: actions/upload-artifact@v4
         with:
           name: Zurvan-Android-debug

@@ -1394,6 +1394,8 @@ public sealed partial class MainWindow : Window
         _settingsPanel.Padding = new Thickness(10);
         _settingsPanel.Visibility = Visibility.Collapsed;
 
+        _settingsPanel.Children.Add(BuildAccountAuthPanel());
+
         // Reuse the existing tested time.ir year sync workflow from Settings.
         _settingsPanel.Children.Add(new TextBlock
         {

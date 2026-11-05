@@ -53,6 +53,24 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        consumeAuthCallback(intent)
+    }
+
+    private fun consumeAuthCallback(source: android.content.Intent?) {
+        val uri = source?.data ?: return
+        if (uri.scheme != "com.bdfr.zurvan" || uri.host != "auth" || uri.path != "/callback") return
+        setIntent(android.content.Intent(source).setData(null))
+        lifecycleScope.launch {
+            runCatching { ZurvanAuth(applicationContext).completeEmailCallback(uri) }
+                .onSuccess { recreate() }
+                .onFailure { android.widget.Toast.makeText(this@MainActivity,
+                    it.message ?: "تأیید ایمیل ناموفق بود", android.widget.Toast.LENGTH_LONG).show() }
+        }
+    }
+
     private val notificationPermissionLauncher =
         registerForActivityResult(
             ActivityResultContracts.RequestPermission()
@@ -60,6 +78,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        consumeAuthCallback(intent)
         // Preserve the transparent pixels of the Activity so Android can composite
         // the previously visible app beneath Liquid Glass surfaces.
         window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
@@ -354,6 +373,8 @@ private fun ZurvanActivationScreen(modifier: Modifier, onActivated: () -> Unit) 
             } else message = ZurvanActivation.explanation(ZurvanActivation.diagnose(context, code))
         }) { Text("فعال‌سازی") }
         Text(message)
+        HorizontalDivider()
+        ZurvanAuthScreen()
     }
 }
 
@@ -427,7 +448,9 @@ private fun ZurvanDestination(
     }
     when (tab) {
         ZurvanTab.Calendar ->
-            if (!licensed) Box(modifier.fillMaxSize()) { CalendarScreen(viewModel = appViewModel, modifier = Modifier.fillMaxSize()); Box(Modifier.fillMaxSize().clickable(enabled = true, onClick = {}).semantics { }) } else CalendarScreen(
+            // The free account tier must keep the basic calendar usable.
+            // Premium tabs remain gated separately until a server entitlement is valid.
+            CalendarScreen(
                 viewModel = appViewModel,
                 modifier = modifier
             )
@@ -2716,8 +2739,12 @@ private fun SettingsScreen(
                 }
             }
         }
+        if (settingsCategory == "cloud") item {
+            SettingsCard(title = "ورود و مدیریت حساب") { ZurvanAuthScreen() }
+        }
         if (settingsCategory == "about") item {
             SettingsCard(title = "درباره زروان") {
+                Text("نسخه ${BuildConfig.VERSION_NAME} | بیلد ${BuildConfig.VERSION_CODE} | اکشن #${BuildConfig.CI_RUN_NUMBER}", style = MaterialTheme.typography.bodyMedium)
                 Text("زروان | زمان، به سبک زندگی تو",
                     style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Text("زروان فقط یک تقویم نیست؛ تلاشی است برای اینکه روزهای پرمشغله، قرارهای کوچک و آرزوهای بزرگ، همگی جای روشنی در زندگی داشته باشند. این برنامه با عشق به زبان فارسی، احترام به فرهنگ‌ها و اشتیاق به ساختن ابزاری ساده، زیبا و کاربردی شکل گرفته است.")

@@ -22,10 +22,16 @@ android {
         val issuerPublicKey = providers.gradleProperty("ZURVAN_LICENSE_PUBLIC_KEY_B64")
             .orElse("").get()
         buildConfigField("String", "LICENSE_PUBLIC_KEY_B64", "\"" + issuerPublicKey + "\"")
+        val supabaseUrl = providers.gradleProperty("ZURVAN_SUPABASE_URL").orElse("").get()
+        val supabaseKey = providers.gradleProperty("ZURVAN_SUPABASE_PUBLISHABLE_KEY").orElse("").get()
+        buildConfigField("String", "SUPABASE_URL", "\"" + supabaseUrl + "\"")
+        buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"" + supabaseKey + "\"")
         minSdk = 26
         targetSdk = 35
-        versionCode = 68
+        versionCode = 73
         versionName = "0.6.0-beta.9"
+        val ciRunNumber = providers.gradleProperty("ZURVAN_CI_RUN_NUMBER").orElse("local").get()
+        buildConfigField("String", "CI_RUN_NUMBER", "\"$ciRunNumber\"")
         buildConfigField(
             "String",
             "DESK_API_BASE_URL",
@@ -61,5 +67,6 @@ dependencies {
     implementation("androidx.compose.material3:material3-window-size-class")
     implementation("com.google.android.gms:play-services-code-scanner:16.1.0")
     implementation("com.google.zxing:core:3.5.4")
+    implementation("org.bouncycastle:bcprov-jdk15to18:1.78.1")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
