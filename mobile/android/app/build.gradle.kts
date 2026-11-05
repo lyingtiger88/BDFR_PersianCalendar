@@ -28,8 +28,8 @@ android {
         buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"" + supabaseKey + "\"")
         minSdk = 26
         targetSdk = 35
-        versionCode = 68
-        versionName = "0.6.0-beta.9"
+        versionCode = 69
+        versionName = "0.6.0-beta.10"
         buildConfigField(
             "String",
             "DESK_API_BASE_URL",
