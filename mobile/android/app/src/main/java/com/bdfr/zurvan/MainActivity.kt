@@ -448,7 +448,9 @@ private fun ZurvanDestination(
     }
     when (tab) {
         ZurvanTab.Calendar ->
-            if (!licensed) Box(modifier.fillMaxSize()) { CalendarScreen(viewModel = appViewModel, modifier = Modifier.fillMaxSize()); Box(Modifier.fillMaxSize().clickable(enabled = true, onClick = {}).semantics { }) } else CalendarScreen(
+            // The free account tier must keep the basic calendar usable.
+            // Premium tabs remain gated separately until a server entitlement is valid.
+            CalendarScreen(
                 viewModel = appViewModel,
                 modifier = modifier
             )
