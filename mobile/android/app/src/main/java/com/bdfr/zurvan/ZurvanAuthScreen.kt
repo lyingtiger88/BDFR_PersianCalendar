@@ -18,6 +18,7 @@ fun ZurvanAuthScreen(modifier: Modifier = Modifier) {
     var current by remember { mutableStateOf(auth.session()) }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var enrollmentUsername by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf("") }
     var licenseStatus by remember { mutableStateOf<ZurvanLicenseStatus?>(null) }
@@ -50,6 +51,31 @@ fun ZurvanAuthScreen(modifier: Modifier = Modifier) {
                     status.licenses.isEmpty() ->
                         Text("حساب متصل است؛ هنوز لایسنسی برای آن صادر نشده است.")
                     else -> Text("تعداد لایسنس‌ها: ${status.licenses.size}")
+                }
+                if (status.accountState == "registration_required" || status.accountState == "provisional") {
+                    OutlinedTextField(
+                        value = enrollmentUsername,
+                        onValueChange = { enrollmentUsername = it.lowercase().take(24) },
+                        label = { Text("شناسه کاربری زروان") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Button(enabled = !busy && !licenseBusy, onClick = {
+                        busy = true
+                        scope.launch {
+                            try {
+                                val valid = auth.validSession()
+                                    ?: error("نشست منقضی شده است؛ دوباره وارد شوید.")
+                                current = valid
+                                val result = ZurvanDeviceEnrollment(context.applicationContext)
+                                    .enroll(valid, enrollmentUsername.trim())
+                                licenseStatus = ZurvanLicenseApi().status(valid.accessToken)
+                                message = "حساب و دستگاه با موفقیت ثبت شدند: " + result.optString("username")
+                            } catch (e: Exception) {
+                                message = e.message ?: "ثبت دستگاه ناموفق بود."
+                            } finally { busy = false }
+                        }
+                    }) { Text("تکمیل ثبت‌نام و اتصال دستگاه") }
                 }
                 status.licenses.forEach { item ->
                     Text("${item.productId} • ${item.type} • ${item.status}")
