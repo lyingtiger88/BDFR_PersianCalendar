@@ -17,6 +17,7 @@ private val occasionLabels = linkedMapOf(
 )
 
 /** All privileges verified by the Supabase Edge Function, not client flags. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ZurvanCreatorCelebrationPanel() {
     val context = LocalContext.current
