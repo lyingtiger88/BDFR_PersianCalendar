@@ -237,7 +237,7 @@ public sealed partial class MainWindow
         _settings.NavigationRailSide = IsNavigationRailOnLeft() ? "left" : "right";
 
         if (_physicalLeftSidebarColumn is not null) _physicalLeftSidebarColumn.Width = new GridLength(leftWidth);
-        if (_physicalRightSidebarColumn is not null) _physicalRightSidebarColumn.Width = new GridLength(rightWidth);
+        if (_physicalRightSidebarColumn is not null) _physicalRightSidebarColumn.Width = new GridLength(0);
         if (_navigationRailLeftColumn is not null)
             _navigationRailLeftColumn.Width = new GridLength(IsNavigationRailOnLeft() ? collapsedRailWidth : 0);
         if (_navigationRailRightColumn is not null)
