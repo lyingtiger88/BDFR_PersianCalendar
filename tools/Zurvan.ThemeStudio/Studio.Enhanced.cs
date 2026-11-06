@@ -21,7 +21,7 @@ internal sealed partial class Studio
     private string activePlatform = "pc";
     private int selectedWallpaper = -1;
     private bool initialized;
-    private readonly Dictionary<string, Color[]> presets = new Dictionary<string, Color[]>()
+    private readonly Dictionary<string, Color[]> presets = new Dictionary<string, string[]>()
     {
         ["windows-light"] = ["#F5F6F8", "#FFFFFF", "#FFFFFF", "#202631", "#3685E6", "#D34E5E"],
         ["azure-glass"] = ["#E8F4FF", "#DDEEFF", "#FFFFFF", "#1D365A", "#338EDC", "#D34E5E"],
@@ -30,7 +30,7 @@ internal sealed partial class Studio
         ["zara-pastel"] = ["#F7F6FC", "#E8E0FA", "#FFFFFF", "#293049", "#789DE8", "#D56B8E"],
         ["season-vibe"] = ["#F0F9EE", "#D9F2DA", "#FFFFFF", "#234132", "#51A88A", "#D34E5E"],
         ["elena-mode"] = ["#F2F5FC", "#E7EEFB", "#FFFFFF", "#263047", "#758DCE", "#CC637B"]
-    }.ToDictionary(x => x.Key, x => x.Value.Select(ColorTranslator.FromHtml).ToArray());
+    }.ToDictionary(x => x.Key, x => x.Value.Select(value => ColorTranslator.FromHtml(value)).ToArray());
     private static readonly (string Id, string Title)[] RotationOptions =
     [
         ("sequential", "ترتیبی"), ("daily", "روزانه"), ("random", "تصادفی روزانه"),
