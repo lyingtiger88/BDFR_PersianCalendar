@@ -14,6 +14,7 @@ concurrency:
 
 jobs:
   core:
+    if: github.event_name != 'push' || !contains(github.event.head_commit.message, '[theme-studio-only]')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -90,6 +91,7 @@ jobs:
           if-no-files-found: error
 
   android:
+    if: github.event_name != 'push' || !contains(github.event.head_commit.message, '[theme-studio-only]')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -132,6 +134,7 @@ jobs:
           retention-days: 14
 
   ios:
+    if: github.event_name != 'push' || !contains(github.event.head_commit.message, '[theme-studio-only]')
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -167,7 +170,7 @@ jobs:
 
   mobile-release:
     name: Publish mobile test downloads
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' && !contains(github.event.head_commit.message, '[theme-studio-only]')
     needs: [android, ios, windows]
     runs-on: ubuntu-latest
     steps:
@@ -204,6 +207,7 @@ jobs:
           All downloads are test builds, not production releases."
 
   windows:
+    if: github.event_name != 'push' || !contains(github.event.head_commit.message, '[theme-studio-only]')
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
