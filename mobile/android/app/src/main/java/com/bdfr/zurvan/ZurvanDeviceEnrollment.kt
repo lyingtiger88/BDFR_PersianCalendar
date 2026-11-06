@@ -29,7 +29,7 @@ import javax.crypto.spec.GCMParameterSpec
 private class ZurvanEnrollmentDeviceKey(private val context: Context, accountScope: String) {
     private val scopeHash = MessageDigest.getInstance("SHA-256")
         .digest(accountScope.trim().lowercase().toByteArray(Charsets.UTF_8))
-        .take(8).joinToString("") { "%02x".format(it) }
+        .take(8).joinToString("") { "%02x".format(it.toInt() and 0xff) }
     private val prefs = context.getSharedPreferences("zurvan_device_enroll_key_$scopeHash", Context.MODE_PRIVATE)
     private fun aesKey(): SecretKey {
         val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
