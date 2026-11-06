@@ -21,7 +21,7 @@ internal sealed partial class Studio
     private string activePlatform = "pc";
     private int selectedWallpaper = -1;
     private bool initialized;
-    private readonly Dictionary<string, Color[]> presets = new()
+    private readonly Dictionary<string, Color[]> presets = new Dictionary<string, string[]>()
     {
         ["windows-light"] = ["#F5F6F8", "#FFFFFF", "#FFFFFF", "#202631", "#3685E6", "#D34E5E"],
         ["azure-glass"] = ["#E8F4FF", "#DDEEFF", "#FFFFFF", "#1D365A", "#338EDC", "#D34E5E"],
@@ -433,7 +433,7 @@ internal sealed partial class Studio
                 if (data.Colors == null || Fields.Any(f => !data.Colors.TryGetValue(f.Key, out var value) || !Regex.IsMatch(value, "^#[0-9a-fA-F]{6}$")))
                     throw new InvalidDataException("اطلاعات رنگ‌ها ناقص است.");
                 if (!baseTheme.Items.Contains(data.ThemeId)) throw new InvalidDataException("تم پایه نامعتبر است.");
-                var assets = data.Wallpapers.Count != 0 ? data.Wallpapers : data.Wallpaper is null ? new List<ThemeWallpaper>() : [data.Wallpaper];
+                var assets = (data.Wallpapers?.Count ?? 0) != 0 ? data.Wallpapers! : data.Wallpaper is null ? new List<ThemeWallpaper>() : [data.Wallpaper];
                 if (assets.Count > 100) throw new InvalidDataException("حداکثر ۱۰۰ تصویر مجاز است.");
                 if (assets.Count > 0 && !zip) throw new InvalidDataException("تم تصویردار باید به صورت ZIP وارد شود.");
                 foreach (var asset in assets)
