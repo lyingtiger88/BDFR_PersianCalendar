@@ -138,12 +138,20 @@ public sealed partial class MainWindow
     {
         var button = new Button
         {
-            Content = icon,
+            Content = new TextBlock
+            {
+                Text = icon,
+                FontSize = 25,
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                TextAlignment = TextAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            },
             Tag = label,
             HorizontalAlignment = HorizontalAlignment.Stretch,
             HorizontalContentAlignment = HorizontalAlignment.Center,
+            VerticalContentAlignment = VerticalAlignment.Center,
             MinWidth = 0,
-            MinHeight = 46,
+            MinHeight = 52,
             Padding = new Thickness(5, 8, 5, 8),
             Background = BrushWithAlpha(_theme.Accent, 0x35),
             Foreground = ThemeService.Brush(_theme.PrimaryText),
@@ -176,13 +184,49 @@ public sealed partial class MainWindow
     {
         foreach (var entry in _navigationEntries)
         {
-            entry.Button.Content = expanded ? $"{entry.Icon}   {entry.Label}" : entry.Icon;
+            if (expanded)
+            {
+                var content = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    Spacing = 12,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    FlowDirection = FlowDirection.RightToLeft
+                };
+                content.Children.Add(new TextBlock
+                {
+                    Text = entry.Icon,
+                    FontSize = 22,
+                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                    VerticalAlignment = VerticalAlignment.Center
+                });
+                content.Children.Add(new TextBlock
+                {
+                    Text = entry.Label,
+                    FontSize = 13,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    TextTrimming = TextTrimming.CharacterEllipsis
+                });
+                entry.Button.Content = content;
+            }
+            else
+            {
+                entry.Button.Content = new TextBlock
+                {
+                    Text = entry.Icon,
+                    FontSize = 25,
+                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                    TextAlignment = TextAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+            }
             entry.Button.HorizontalContentAlignment = expanded
                 ? HorizontalAlignment.Stretch
                 : HorizontalAlignment.Center;
             entry.Button.Padding = expanded
-                ? new Thickness(14, 8, 10, 8)
+                ? new Thickness(12, 8, 10, 8)
                 : new Thickness(5, 8, 5, 8);
+            entry.Button.MinHeight = expanded ? 50 : 54;
         }
     }
 
