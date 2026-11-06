@@ -42,8 +42,8 @@ internal sealed class WheelColorPicker : UserControl
 
     public WheelColorPicker()
     {
-        Height = 570;
-        MinimumSize = new Size(320, 490);
+        Height = 610;
+        MinimumSize = new Size(320, 610);
         BackColor = Color.White;
         Padding = new Padding(10);
         RightToLeft = RightToLeft.Yes;
@@ -196,8 +196,12 @@ internal sealed class WheelColorPicker : UserControl
         harmonySwatches.SuspendLayout();
         try
         {
-            foreach (Control control in harmonySwatches.Controls) control.Dispose();
-            harmonySwatches.Controls.Clear();
+            while (harmonySwatches.Controls.Count > 0)
+            {
+                var control = harmonySwatches.Controls[0];
+                harmonySwatches.Controls.RemoveAt(0);
+                control.Dispose();
+            }
             foreach (var color in HarmonyColors())
             {
                 var hex = ToHex(color);
