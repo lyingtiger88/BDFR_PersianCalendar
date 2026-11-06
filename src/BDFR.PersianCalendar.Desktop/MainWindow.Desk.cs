@@ -1,3 +1,4 @@
+using System.IO;
 using System.Globalization;
 using System.Security.Cryptography;
 using Microsoft.UI.Xaml;
@@ -83,7 +84,7 @@ public sealed partial class MainWindow
         if (_deskWorkspaceStatus is null) return;
         _deskWorkspaceStatus.Text = message;
         _deskWorkspaceStatus.Foreground = ThemeService.Brush(
-            isError ? _theme.Danger : _theme.SecondaryText);
+            isError ? _theme.HolidayText : _theme.SecondaryText);
     }
 
     private void BuildDeskAuthenticationPanel()
@@ -122,7 +123,6 @@ public sealed partial class MainWindow
         {
             Content = "حساب ندارم؛ ساخت حساب",
             HorizontalAlignment = HorizontalAlignment.Stretch,
-            Style = (Style)Application.Current.Resources["DefaultButtonStyle"]
         };
         var registerMode = false;
 
@@ -357,7 +357,7 @@ public sealed partial class MainWindow
 
     private FrameworkElement BuildDeskFileRow(ZurvanDeskFile file)
     {
-        var row = new Grid { ColumnSpacing = 10, Padding = new Thickness(8, 6, 8, 6) };
+        var row = new Grid { ColumnSpacing = 10 };
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         var info = new StackPanel { Spacing = 3 };
