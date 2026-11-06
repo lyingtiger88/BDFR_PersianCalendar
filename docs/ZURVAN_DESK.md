@@ -111,7 +111,7 @@ The Supabase publishable key is intentionally shipped in clients. The Supabase s
 The initial Supabase Free deployment is for development and demonstrations, not a production uptime guarantee:
 
 - 1 GB Storage quota
-- 50 MiB maximum file size per object
+- 50 MiB maximum encrypted object size per object (approximately 37 MiB maximum original file size because the encrypted JSON envelope uses Base64 encoding)
 - 5 GB egress quota
 - projects can be paused after a week of inactivity
 
