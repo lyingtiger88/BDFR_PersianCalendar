@@ -92,13 +92,14 @@ public sealed partial class MainWindow
         Grid.SetRow(scroller, 1);
         shell.Children.Add(scroller);
 
-        var settings = CreateNavigationRailButton("⚙", "تنظیمات", () =>
+        var settingsHost = new StackPanel { Spacing = 0 };
+        AddNavigationEntry(settingsHost, "⚙", "تنظیمات", () =>
         {
             OpenSettingsForNavigation(_settingsSurface);
             StatusText.Text = "تنظیمات باز شد.";
         });
-        Grid.SetRow(settings, 2);
-        shell.Children.Add(settings);
+        Grid.SetRow(settingsHost, 2);
+        shell.Children.Add(settingsHost);
 
         var border = new Border
         {
