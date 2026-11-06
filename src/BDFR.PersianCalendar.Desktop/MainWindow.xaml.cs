@@ -1394,6 +1394,46 @@ public sealed partial class MainWindow : Window
         _settingsPanel.Padding = new Thickness(10);
         _settingsPanel.Visibility = Visibility.Collapsed;
 
+        _settingsPanel.Children.Add(new TextBlock
+        {
+            Text = "زبان برنامه",
+            FontSize = 15,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Foreground = ThemeService.Brush(_theme.PrimaryText)
+        });
+        var languagePicker = new ComboBox
+        {
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            PlaceholderText = "انتخاب زبان"
+        };
+        foreach (var (code, title) in new (string Code, string Title)[]
+        {
+            ("fa", "فارسی"), ("en", "English"),
+            ("ckb", "کوردی (سۆرانی)"), ("bal", "بلوچی")
+        })
+        {
+            languagePicker.Items.Add(new ComboBoxItem { Content = title, Tag = code });
+        }
+        languagePicker.SelectedItem = languagePicker.Items
+            .OfType<ComboBoxItem>()
+            .FirstOrDefault(item => string.Equals(item.Tag as string, _settings.LanguageCode, StringComparison.OrdinalIgnoreCase))
+            ?? languagePicker.Items[0];
+        languagePicker.SelectionChanged += (_, _) =>
+        {
+            if (languagePicker.SelectedItem is ComboBoxItem item && item.Tag is string code)
+            {
+                _settings.LanguageCode = code;
+                _settingsService.Save(_settings);
+            }
+        };
+        _settingsPanel.Children.Add(languagePicker);
+        _settingsPanel.Children.Add(new TextBlock
+        {
+            Text = "انتخاب زبان ذخیره می‌شود؛ ترجمه صفحات قدیمی هنوز در حال تکمیل است.",
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = ThemeService.Brush(_theme.SecondaryText)
+        });
+
         // Reuse the existing tested time.ir year sync workflow from Settings.
         _settingsPanel.Children.Add(new TextBlock
         {
