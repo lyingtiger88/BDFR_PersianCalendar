@@ -415,3 +415,5 @@ public sealed partial class MainWindow
 }
 
 // [pc-android-only] Android-parity module navigation implementation.
+
+// [pc-android-only] Build scope: Windows desktop and Android only.
