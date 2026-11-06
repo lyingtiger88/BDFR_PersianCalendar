@@ -138,7 +138,7 @@ internal sealed partial class Studio
         editor.Controls.Add(Information("عنصر را از پالت بالا انتخاب کن، سپس رنگ را از چرخه بردار. ترکیب‌های مکمل، مشابه و سه‌گانه به‌صورت زنده پیشنهاد می‌شوند."));
         wheelPicker = new WheelColorPicker
         {
-            Height = 575,
+            Height = 610,
             Margin = new Padding(2, 4, 2, 12)
         };
         wheelPicker.ColorChanged += color =>
