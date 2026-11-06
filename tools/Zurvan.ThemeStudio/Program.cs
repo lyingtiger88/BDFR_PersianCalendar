@@ -14,8 +14,18 @@ internal static class Program
         ApplicationConfiguration.Initialize();
         if (Environment.GetEnvironmentVariable("ZURVAN_STUDIO_PRESET_SELFTEST") == "1")
         {
-            using var testStudio = new Studio();
-            testStudio.RunPresetSmokeTest();
+            try
+            {
+                using var testStudio = new Studio();
+                testStudio.RunPresetSmokeTest();
+                Environment.Exit(0);
+            }
+            catch (Exception ex)
+            {
+                var logPath = Path.Combine(Path.GetTempPath(), "zurvan-theme-studio-preset-selftest.log");
+                File.WriteAllText(logPath, ex.ToString());
+                Environment.Exit(1);
+            }
             return;
         }
         Application.Run(new Studio());
