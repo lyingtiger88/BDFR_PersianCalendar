@@ -21,7 +21,6 @@ public sealed partial class MainWindow
         _deskWorkspace = new StackPanel
         {
             Spacing = 14,
-            Padding = new Thickness(4),
             FlowDirection = FlowDirection.RightToLeft
         };
         _deskWorkspaceStatus = new TextBlock
@@ -439,7 +438,7 @@ public sealed partial class MainWindow
             {
                 var picker = new FileSavePicker
                 {
-                    SuggestedFileName = file.Name
+                    SuggestedFileName = Path.GetFileName(file.Name)
                 };
                 var extension = Path.GetExtension(file.Name);
                 if (string.IsNullOrWhiteSpace(extension) || extension.Length > 12)
