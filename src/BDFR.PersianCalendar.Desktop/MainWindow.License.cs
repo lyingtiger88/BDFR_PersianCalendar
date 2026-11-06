@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Reflection;
 using BDFR.PersianCalendar.Core;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -46,7 +47,8 @@ public sealed partial class MainWindow
     {
         try
         {
-            var value = BuildLicenseConfiguration.PublicKeyBase64;
+            var value = Assembly.GetExecutingAssembly().GetCustomAttributes<AssemblyMetadataAttribute>()
+                .FirstOrDefault(x => x.Key == "LicensePublicKeyB64")?.Value ?? "";
             if (string.IsNullOrWhiteSpace(value)) return "";
             return Encoding.UTF8.GetString(Convert.FromBase64String(value.Trim()));
         }
@@ -166,8 +168,3 @@ public sealed partial class MainWindow
     }
 }
 
-internal static class BuildLicenseConfiguration
-{
-    // Build workflow injects the Base64-encoded PEM public key from a repository variable.
-    public const string PublicKeyBase64 = "$(ZurvanLicensePublicKeyB64)";
-}
