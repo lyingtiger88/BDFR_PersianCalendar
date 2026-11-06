@@ -21,7 +21,7 @@ internal sealed partial class Studio
     private string activePlatform = "pc";
     private int selectedWallpaper = -1;
     private bool initialized;
-    private readonly Dictionary<string, Color[]> presets = new Dictionary<string, string[]>()
+    private readonly Dictionary<string, Color[]> presets = new Dictionary<string, Color[]>()
     {
         ["windows-light"] = ["#F5F6F8", "#FFFFFF", "#FFFFFF", "#202631", "#3685E6", "#D34E5E"],
         ["azure-glass"] = ["#E8F4FF", "#DDEEFF", "#FFFFFF", "#1D365A", "#338EDC", "#D34E5E"],
