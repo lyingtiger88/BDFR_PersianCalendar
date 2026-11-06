@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Reflection;
+using Microsoft.Win32;
 using BDFR.PersianCalendar.Core;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -16,12 +17,23 @@ public sealed partial class MainWindow
 
     private string GetWindowsDeviceCode()
     {
-        if (string.IsNullOrWhiteSpace(_settings.LicenseInstallationId))
+        // Prefer the Windows installation MachineGuid, matching Android's use of
+        // a platform installation identifier. Keep a per-install fallback for
+        // restricted registry environments.
+        var machineId = Registry.GetValue(
+            @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Cryptography",
+            "MachineGuid",
+            null) as string;
+        var installationId = !string.IsNullOrWhiteSpace(machineId)
+            ? machineId.Trim()
+            : _settings.LicenseInstallationId;
+        if (string.IsNullOrWhiteSpace(installationId))
         {
-            _settings.LicenseInstallationId = Guid.NewGuid().ToString("N");
+            installationId = Guid.NewGuid().ToString("N");
+            _settings.LicenseInstallationId = installationId;
             _settingsService.Save(_settings);
         }
-        return ZurvanLicense.DeviceCode("windows", _settings.LicenseInstallationId);
+        return ZurvanLicense.DeviceCode("windows", installationId);
     }
 
     private bool IsWindowsLicensed()
