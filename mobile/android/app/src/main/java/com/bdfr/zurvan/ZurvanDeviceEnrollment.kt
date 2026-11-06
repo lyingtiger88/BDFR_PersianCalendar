@@ -24,8 +24,11 @@ import javax.crypto.spec.GCMParameterSpec
  * Note: it is a SOFTWARE signing key, not a hardware non-exportable Ed25519 key.
  * If Keystore is unavailable, enrollment fails closed.
  */
-private class ZurvanEnrollmentDeviceKey(private val context: Context) {
-    private val prefs = context.getSharedPreferences("zurvan_device_enroll_key_v1", Context.MODE_PRIVATE)
+private class ZurvanEnrollmentDeviceKey(private val context: Context, accountScope: String) {
+    private val scopeHash = MessageDigest.getInstance("SHA-256")
+        .digest(accountScope.trim().lowercase().toByteArray(Charsets.UTF_8))
+        .take(8).joinToString("") { "%02x".format(it) }
+    private val prefs = context.getSharedPreferences("zurvan_device_enroll_key_$scopeHash", Context.MODE_PRIVATE)
     private fun aesKey(): SecretKey {
         val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
         val existing = store.getKey("zurvan_device_enroll_wrap_v1", null) as? SecretKey
@@ -90,7 +93,7 @@ class ZurvanDeviceEnrollment(private val context: Context) {
                     BuildConfig.SUPABASE_PUBLISHABLE_KEY.isNotBlank()) {
                 "تنظیمات Supabase نامعتبر است."
             }
-            val key = ZurvanEnrollmentDeviceKey(context)
+            val key = ZurvanEnrollmentDeviceKey(context, session.email ?: error("ایمیل حساب در دسترس نیست."))
             val started = request(session.accessToken, JSONObject()
                 .put("action", "start").put("username", username)
                 .put("platform", "android").put("public_key", key.publicKey())\n                .put("hardware_fingerprint", hardwareFingerprint))
