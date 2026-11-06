@@ -12,6 +12,12 @@ internal static class Program
     private static void Main()
     {
         ApplicationConfiguration.Initialize();
+        if (Environment.GetEnvironmentVariable("ZURVAN_STUDIO_PRESET_SELFTEST") == "1")
+        {
+            using var testStudio = new Studio();
+            testStudio.RunPresetSmokeTest();
+            return;
+        }
         Application.Run(new Studio());
     }
 }
