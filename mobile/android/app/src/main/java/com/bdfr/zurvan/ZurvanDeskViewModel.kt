@@ -354,6 +354,16 @@ class ZurvanDeskViewModel(
         mimeType: String?,
         bytes: ByteArray
     ) {
+        // The API/storage cap applies to the Base64-encoded encrypted envelope.
+        // A 37 MiB plaintext file stays below the 50 MiB Supabase object limit.
+        if (bytes.size > 37 * 1024 * 1024) {
+            bytes.fill(0)
+            _state.value = _state.value.copy(
+                error = "حداکثر حجم فایل اصلی برای رمزگذاری و ذخیره‌سازی در پلن فعلی ۳۷ مگابایت است."
+            )
+            return
+        }
+
         viewModelScope.launch {
             val token = requireToken()
             val vaultId = requireVaultId()
