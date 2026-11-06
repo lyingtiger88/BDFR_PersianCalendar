@@ -2346,6 +2346,9 @@ public sealed partial class MainWindow : Window
         openPictures.Click += (_, _) => OpenFolderInExplorer(_themeService.PictureRoot);
         _settingsPanel.Children.Add(openPictures);
 
+        _licensePanelElement = BuildLicensePanel();
+        _settingsPanel.Children.Add(_licensePanelElement);
+
         var aboutToggle = MakeButton("ℹ About Us");
         aboutToggle.Click += (_, _) =>
             _aboutUsPanel.Visibility =
