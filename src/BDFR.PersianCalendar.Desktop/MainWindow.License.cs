@@ -20,10 +20,18 @@ public sealed partial class MainWindow
         // Prefer the Windows installation MachineGuid, matching Android's use of
         // a platform installation identifier. Keep a per-install fallback for
         // restricted registry environments.
-        var machineId = Registry.GetValue(
-            @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Cryptography",
-            "MachineGuid",
-            null) as string;
+        var machineId = "";
+        try
+        {
+            machineId = Registry.GetValue(
+                @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Cryptography",
+                "MachineGuid",
+                null) as string ?? "";
+        }
+        catch (Exception ex)
+        {
+            StartupDiagnostics.Log($"Windows MachineGuid lookup unavailable; using installation identity: {ex.Message}");
+        }
         var installationId = !string.IsNullOrWhiteSpace(machineId)
             ? machineId.Trim()
             : _settings.LicenseInstallationId;
