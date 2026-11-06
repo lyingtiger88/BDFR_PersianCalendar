@@ -124,7 +124,7 @@ public sealed partial class MainWindow
                 page.Children.Add(BuildLicensePanel());
                 break;
             case "تنظیمات":
-                var settingsPage = BuildSettingsPanelSafe();
+                FrameworkElement settingsPage = _settingsSurface ?? BuildSettingsPanelSafe();
                 DetachDesktopElement(settingsPage);
                 page.Children.Add(settingsPage);
                 break;
