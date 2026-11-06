@@ -9,6 +9,7 @@ namespace Zurvan.ThemeStudio;
 
 internal sealed partial class Studio
 {
+    private WheelColorPicker? wheelPicker;
     private readonly List<string> enhancedWallpapers = new();
     private readonly FlowLayoutPanel wallpaperThumbnails = new() { Dock = DockStyle.Fill, AutoScroll = true, WrapContents = false, FlowDirection = FlowDirection.RightToLeft, BackColor = Color.White };
     private readonly ComboBox rotationMode = new() { DropDownStyle = ComboBoxStyle.DropDownList, Dock = DockStyle.Fill };
@@ -132,6 +133,26 @@ internal sealed partial class Studio
             palette.Controls.Add(cell, i % 2, i / 2);
         }
         editor.Controls.Add(palette);
+
+        editor.Controls.Add(Heading("🌈 چرخه رنگ و هارمونی"));
+        editor.Controls.Add(Information("عنصر را از پالت بالا انتخاب کن، سپس رنگ را از چرخه بردار. ترکیب‌های مکمل، مشابه و سه‌گانه به‌صورت زنده پیشنهاد می‌شوند."));
+        wheelPicker = new WheelColorPicker
+        {
+            Height = 575,
+            Margin = new Padding(2, 4, 2, 12)
+        };
+        wheelPicker.ColorChanged += color =>
+        {
+            if (!colors.ContainsKey(selected)) return;
+            colors[selected] = color;
+            if (swatches.TryGetValue(selected, out var target))
+                target.BackColor = color;
+            hex.Text = WheelColorPicker.ToHex(color);
+            liveCanvas.Invalidate();
+            preview.Invalidate();
+        };
+        wheelPicker.SetColor(colors[selected], Fields.First(field => field.Key == selected).Label);
+        editor.Controls.Add(wheelPicker);
 
         editor.Controls.Add(Heading("🖼 تصاویر زمینه"));
         editor.Controls.Add(Information("برای هر دو نسخه می‌توانید تصویر مناسب انتخاب کنید. تصاویر هنگام خروجی گرفتن در بسته تم قرار می‌گیرند."));
