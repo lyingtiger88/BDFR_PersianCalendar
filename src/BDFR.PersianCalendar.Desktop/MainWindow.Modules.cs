@@ -409,3 +409,5 @@ public sealed partial class MainWindow
         return host;
     }
 }
+
+// [pc-android-only] Android-parity module navigation implementation.
