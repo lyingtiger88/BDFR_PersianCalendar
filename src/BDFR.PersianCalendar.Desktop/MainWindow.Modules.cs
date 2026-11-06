@@ -8,7 +8,6 @@ namespace BDFR.PersianCalendar.Desktop;
 
 public sealed partial class MainWindow
 {
-    private readonly ZurvanDeskDesktopClient _deskClient = new();
     private TextBlock? _deskStatus;
     private StackPanel? _deskFiles;
     private bool _deskRegisterMode;
