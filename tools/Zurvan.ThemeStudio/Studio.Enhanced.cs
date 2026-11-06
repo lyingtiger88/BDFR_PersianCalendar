@@ -57,9 +57,6 @@ internal sealed partial class Studio
             BackColor = Color.FromArgb(230, 233, 244)
         };
         Controls.Add(split);
-        split.SplitterDistance = 565;
-        split.Panel1MinSize = 440;
-        split.Panel2MinSize = 480;
 
         var editor = new FlowLayoutPanel
         {
@@ -184,6 +181,19 @@ internal sealed partial class Studio
             TextAlign = ContentAlignment.MiddleCenter, Dock = DockStyle.Fill, ForeColor = Color.Gray
         }, 0, 2);
         split.Panel2.Controls.Add(right);
+        // The SplitContainer has not been laid out yet. Setting its panel minimums
+        // and distance before the first layout can throw during Form construction.
+        Shown += (_, _) =>
+        {
+            var available = split.ClientSize.Width - split.SplitterWidth;
+            if (available < 700) return;
+            var leftWidth = Math.Clamp((int)(available * 0.43), 350, available - 350);
+            split.Panel1MinSize = 0;
+            split.Panel2MinSize = 0;
+            split.SplitterDistance = leftWidth;
+            split.Panel1MinSize = Math.Min(400, leftWidth);
+            split.Panel2MinSize = Math.Min(400, available - leftWidth);
+        };
 
         targetPlatform.SelectedIndexChanged += (_, _) =>
         {
