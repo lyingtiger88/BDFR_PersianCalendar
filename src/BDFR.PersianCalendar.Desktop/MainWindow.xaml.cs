@@ -54,6 +54,11 @@ public sealed partial class MainWindow : Window
     private Border? _rightPanelSurface;
     private Border? _navigationRailSurface;
     private Grid? _workspaceLayoutGrid;
+    private Grid? _desktopModuleHost;
+    private Border? _desktopCalendarPage;
+    private Border? _desktopModulePage;
+    private Border? _desktopSelectedDayPanel;
+    private string _activeDesktopModule = "تقویم";
     private ColumnDefinition? _navigationRailLeftColumn;
     private ColumnDefinition? _physicalLeftSidebarColumn;
     private ColumnDefinition? _centerWorkspaceColumn;
@@ -745,14 +750,11 @@ public sealed partial class MainWindow : Window
         };
         _workspaceLayoutGrid = root;
 
-        _navigationRailLeftColumn = new ColumnDefinition();
-        _physicalLeftSidebarColumn = new ColumnDefinition();
-        _centerWorkspaceColumn = new ColumnDefinition
-        {
-            Width = new GridLength(1, GridUnitType.Star)
-        };
-        _physicalRightSidebarColumn = new ColumnDefinition();
-        _navigationRailRightColumn = new ColumnDefinition();
+        _navigationRailLeftColumn = new ColumnDefinition { Width = GridLength.Auto };
+        _physicalLeftSidebarColumn = new ColumnDefinition { Width = new GridLength(300) };
+        _centerWorkspaceColumn = new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) };
+        _physicalRightSidebarColumn = new ColumnDefinition { Width = new GridLength(0) };
+        _navigationRailRightColumn = new ColumnDefinition { Width = GridLength.Auto };
 
         root.ColumnDefinitions.Add(_navigationRailLeftColumn);
         root.ColumnDefinitions.Add(_physicalLeftSidebarColumn);
@@ -760,35 +762,43 @@ public sealed partial class MainWindow : Window
         root.ColumnDefinitions.Add(_physicalRightSidebarColumn);
         root.ColumnDefinitions.Add(_navigationRailRightColumn);
 
-        // The existing right detail panel was physically on the left under
-        // the old RTL grid. Keep that visual arrangement while making the
-        // physical column semantics explicit.
+        // Calendar workspace: selected-day details + calendar only.
         var physicalLeftPanel = BuildRightPanel();
         physicalLeftPanel.FlowDirection = FlowDirection.RightToLeft;
+        _desktopSelectedDayPanel = physicalLeftPanel as Border;
         Grid.SetColumn(physicalLeftPanel, 1);
         root.Children.Add(physicalLeftPanel);
 
+        _desktopModuleHost = new Grid { FlowDirection = FlowDirection.RightToLeft };
         var center = new Border
         {
             Background = CreateCenterSurfaceBrush(),
-            CornerRadius = new CornerRadius(
-                IsLiquidGlassActive() ? 24 : 18),
-            BorderBrush = BrushWithAlpha(
-                "#FFFFFFFF",
-                IsLiquidGlassActive() ? (byte)0xD0 : (byte)0xA8),
+            CornerRadius = new CornerRadius(IsLiquidGlassActive() ? 24 : 18),
+            BorderBrush = BrushWithAlpha("#FFFFFFFF", IsLiquidGlassActive() ? (byte)0xD0 : (byte)0xA8),
             BorderThickness = new Thickness(1),
             Child = BuildCalendarPanel(),
             FlowDirection = FlowDirection.RightToLeft
         };
         _centerPanelSurface = center;
-        Grid.SetColumn(center, 2);
-        root.Children.Add(center);
+        _desktopCalendarPage = center;
+        _desktopModulePage = new Border
+        {
+            Background = CreateCenterSurfaceBrush(),
+            CornerRadius = new CornerRadius(IsLiquidGlassActive() ? 24 : 18),
+            BorderBrush = BrushWithAlpha("#FFFFFFFF", IsLiquidGlassActive() ? (byte)0xD0 : (byte)0xA8),
+            BorderThickness = new Thickness(1),
+            Padding = new Thickness(22),
+            Visibility = Visibility.Collapsed
+        };
+        _desktopModuleHost.Children.Add(_desktopCalendarPage);
+        _desktopModuleHost.Children.Add(_desktopModulePage);
+        Grid.SetColumn(_desktopModuleHost, 2);
+        root.Children.Add(_desktopModuleHost);
 
-        var physicalRightPanel = BuildLeftPanel();
-        physicalRightPanel.FlowDirection = FlowDirection.RightToLeft;
-        Grid.SetColumn(physicalRightPanel, 3);
-        root.Children.Add(physicalRightPanel);
-
+        // The old right-hand column is intentionally no longer mounted on
+        // the calendar. Its settings and utility modules are now opened from
+        // dedicated navigation pages.
+        _ = BuildLeftPanel();
         _navigationRailSurface = BuildNavigationRail();
         root.Children.Add(_navigationRailSurface);
 
