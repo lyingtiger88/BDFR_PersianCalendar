@@ -193,11 +193,13 @@ public sealed partial class MainWindow : Window
             Content = BuildStartupSafeShell();
         }
 
-        Activated += (_, _) => StartupDiagnostics.Log("MainWindow Activated event fired.");
+        StartCelebrationMonitor();
+        Activated += (_, _) => _ = CheckCelebrationThemeAsync();
         Closed += (_, _) =>
         {
             _inAppReminderTimer?.Stop();
             _seasonCarouselTimer?.Stop();
+            _celebrationTimer?.Stop();
             StartupDiagnostics.Log("MainWindow Closed event fired.");
         };
         AppWindow.Changed += (_, e) =>
