@@ -214,11 +214,12 @@ internal sealed class ZurvanDeskDesktopClient
     {
         var vaultId = VaultId ?? throw new InvalidOperationException("شناسه Vault حساب در دسترس نیست.");
         var key = GetVaultKey();
+        byte[]? payload = null;
         try
         {
             var objectId = "desk_" + Guid.NewGuid().ToString("N");
             var encryptedName = ZurvanDeskCrypto.EncryptName(name, key, vaultId, objectId);
-            var payload = ZurvanDeskCrypto.EncryptFile(plaintext, key, vaultId, objectId, mimeType);
+            payload = ZurvanDeskCrypto.EncryptFile(plaintext, key, vaultId, objectId, mimeType);
             using var content = new ByteArrayContent(payload);
             content.Headers.ContentType = new MediaTypeHeaderValue(EncryptedMime);
             using var request = new HttpRequestMessage(HttpMethod.Post, _baseUrl + "/api/v1/files") { Content = content };
@@ -229,10 +230,10 @@ internal sealed class ZurvanDeskDesktopClient
             using var response = await Http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
             if (!response.IsSuccessStatusCode)
                 throw new InvalidOperationException(ParseError(await response.Content.ReadAsStringAsync(), (int)response.StatusCode));
-            CryptographicOperations.ZeroMemory(payload);
         }
         finally
         {
+            if (payload is not null) CryptographicOperations.ZeroMemory(payload);
             CryptographicOperations.ZeroMemory(key);
             CryptographicOperations.ZeroMemory(plaintext);
         }
