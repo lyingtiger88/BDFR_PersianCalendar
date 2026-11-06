@@ -190,7 +190,9 @@ public sealed partial class MainWindow
                 add.Children.Add(save);
                 page.Children.Add(Card("مناسبت‌های رسمی", $"تقویم رسمی سال {_selected.Year}", official));
                 page.Children.Add(refresh);
-                page.Children.Add(Card("مناسبت‌های روز انتخاب‌شده", "مناسبت‌هایی که در روز جاری انتخاب شده‌اند.", OccasionsPanel));
+                var selectedDayOccasions = OccasionsPanel;
+                DetachDesktopElement(selectedDayOccasions);
+                page.Children.Add(Card("مناسبت‌های روز انتخاب‌شده", "مناسبت‌هایی که در روز جاری انتخاب شده‌اند.", selectedDayOccasions));
                 page.Children.Add(Card("ثبت مناسبت شخصی", "تولد، سالگرد و مناسبت‌های تکرارشونده با زمان و یادآورهای مستقل.", add));
                 page.Children.Add(Card("مناسبت‌های شخصی ثبت‌شده", "فهرست مناسبت‌های سالانه کاربر.", personal));
                 async Task LoadPersonal()
@@ -265,13 +267,13 @@ public sealed partial class MainWindow
                 var clear = MakeButton("پاکسازی تاریخچه فعالیت");
                 clear.Click += ClearActivities_Click;
                 actions.Children.Add(refresh); actions.Children.Add(clear);
+                DetachDesktopElement(ActivityPanel);
                 page.Children.Add(Card("مرکز فعالیت", "گزارش رویدادهای ثبت‌شده در زروان.", ActivityPanel));
                 page.Children.Add(actions);
                 break;
             }
             case "لایسنس و فعال‌سازی":
                 page.Children.Add(BuildLicensePanel());
-                page.Children.Add(BuildAccountAuthPanel());
                 break;
             case "تنظیمات":
             {
