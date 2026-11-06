@@ -6,6 +6,14 @@ namespace BDFR.PersianCalendar.Desktop;
 
 public sealed partial class MainWindow
 {
+    private static void DetachDesktopElement(FrameworkElement element)
+    {
+        var parent = VisualTreeHelper.GetParent(element);
+        if (parent is Panel panel) panel.Children.Remove(element);
+        else if (parent is Border border) border.Child = null;
+        else if (parent is ContentControl content) content.Content = null;
+    }
+
     private void ShowDesktopModule(string module)
     {
         _activeDesktopModule = module;
@@ -116,7 +124,9 @@ public sealed partial class MainWindow
                 page.Children.Add(BuildLicensePanel());
                 break;
             case "تنظیمات":
-                page.Children.Add(BuildSettingsPanelSafe());
+                var settingsPage = BuildSettingsPanelSafe();
+                DetachDesktopElement(settingsPage);
+                page.Children.Add(settingsPage);
                 break;
             case "زروان دسک":
                 page.Children.Add(Card("فضای ذخیره‌سازی ابری", "این بخش برای فایل‌ها و همگام‌سازی ابری است و مستقل از فعال‌سازی لایسنس عمل می‌کند.", "باز کردن بخش زروان دسک", () => StatusText.Text = "مدیریت فایل‌های زروان دسک از بخش حساب ابری انجام می‌شود." ));
