@@ -14,7 +14,10 @@ android {
     }
 
     val deskApiBaseUrl = providers.gradleProperty("ZURVAN_DESK_API_BASE_URL")
-        .orElse("http://10.0.2.2:5088")
+        .orElse("https://yztithydgdvydaktuxlw.supabase.co/functions/v1/zurvan-desk-api")
+        .get()
+    val deskPublishableKey = providers.gradleProperty("ZURVAN_DESK_SUPABASE_PUBLISHABLE_KEY")
+        .orElse("sb_publishable_UAKFYbxgWOCVRDDdv_0JLg_oIIiubmT")
         .get()
 
     defaultConfig {
@@ -30,6 +33,11 @@ android {
             "String",
             "DESK_API_BASE_URL",
             "\"$deskApiBaseUrl\""
+        )
+        buildConfigField(
+            "String",
+            "DESK_SUPABASE_PUBLISHABLE_KEY",
+            "\"$deskPublishableKey\""
         )
     }
 

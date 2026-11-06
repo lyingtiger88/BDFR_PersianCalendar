@@ -299,6 +299,11 @@ class ZurvanDeskApi(
                     "application/json"
                 )
 
+                setRequestProperty(
+                    "apikey",
+                    BuildConfig.DESK_SUPABASE_PUBLISHABLE_KEY
+                )
+
                 if (!token.isNullOrBlank()) {
                     setRequestProperty(
                         "Authorization",
