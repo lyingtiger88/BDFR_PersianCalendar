@@ -22,6 +22,9 @@ public sealed class AppearanceColorOverrides
 
 public sealed class AppSettings
 {
+    // UI language (BCP-47): fa, en, ckb (Sorani Kurdish), bal (Balochi).
+    public string LanguageCode { get; set; } = "fa";
+
     // Optional links to user-selected media, indexed by Persian date key (yyyy/MM/dd).
     // Disabled by default; file paths remain references to the original files.
     public bool DayMediaEnabled { get; set; }
