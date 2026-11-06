@@ -78,10 +78,6 @@ internal sealed partial class Studio : Form
         RightToLeftLayout = true;
         baseTheme.Items.AddRange(["windows-light", "azure-glass", "graphite-night", "warm-sand", "zara-pastel", "season-vibe", "elena-mode"]);
         baseTheme.SelectedIndex = 0;
-        baseTheme.SelectedIndexChanged += (_, _) => {
-            if (baseTheme.SelectedItem?.ToString() == "zara-pastel") ApplyZaraPastel();
-        };
-
         var split = new SplitContainer { Dock = DockStyle.Fill, SplitterDistance = 380, FixedPanel = FixedPanel.Panel1 };
         Controls.Add(split);
         var editor = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(16), ColumnCount = 1, AutoScroll = true };
@@ -148,18 +144,6 @@ internal sealed partial class Studio : Form
         colors[key] = dialog.Color;
         swatches[key].BackColor = dialog.Color;
         Select(key);
-    }
-
-    private void ApplyZaraPastel()
-    {
-        var pastels = new[] { "#F8DDD4", "#FFF0C5", "#DFF0DD", "#D5EFED", "#DCE9FB", "#F8DDE7" };
-        for (var i = 0; i < 7; i++)
-        {
-            var key = "weekday" + i;
-            colors[key] = ColorTranslator.FromHtml(pastels[i]);
-            if (swatches.TryGetValue(key, out var button)) button.BackColor = colors[key];
-        }
-        Select(selected);
     }
 
     private void Reset()
