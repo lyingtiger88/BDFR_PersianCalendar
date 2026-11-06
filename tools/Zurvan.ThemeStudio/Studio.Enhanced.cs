@@ -262,7 +262,22 @@ internal sealed partial class Studio
         if (presets.TryGetValue(id, out var values))
         {
             var keys = new[] { "background", "surface", "card", "ink", "accent", "holiday" };
-            for (var i = 0; i < keys.Length; i++) colors[keys[i]] = values[i];
+            for (var i = 0; i < Math.Min(keys.Length, values.Length); i++) colors[keys[i]] = values[i];
+            // Weekday shades belong to the active base template. Apply all seven
+            // without indexing beyond the palette, including Friday.
+            string[] zaraDays =
+            [
+                "#F8DDD4", "#FFF0C5", "#DFF0DD", "#D5EFED",
+                "#DCE9FB", "#E8E0FA", "#F8DDE7"
+            ];
+            for (var i = 0; i < 7; i++)
+            {
+                var weekday = "weekday" + i;
+                var value = id == "zara-pastel"
+                    ? zaraDays[i]
+                    : Fields.First(field => field.Key == weekday).Value;
+                colors[weekday] = ColorTranslator.FromHtml(value);
+            }
             for (var i = 0; i < Fields.Length; i++)
             {
                 var k = Fields[i].Key;
