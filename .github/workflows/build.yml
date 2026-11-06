@@ -53,26 +53,6 @@ jobs:
           retention-days: 30
           if-no-files-found: error
 
-  license-calculator:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '10.0.x'
-      - name: Publish Windows activation calculator
-        shell: pwsh
-        run: |
-          dotnet publish tools/Zurvan.LicenseCalculator/Zurvan.LicenseCalculator.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o artifacts/Zurvan-LicenseCalculator
-          Compress-Archive -Path artifacts/Zurvan-LicenseCalculator/* -DestinationPath artifacts/Zurvan-LicenseCalculator-win-x64.zip -Force
-      - name: Upload calculator test artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: Zurvan-LicenseCalculator-win-x64
-          path: artifacts/Zurvan-LicenseCalculator-win-x64.zip
-          retention-days: 30
-          if-no-files-found: error
-
   android:
     runs-on: ubuntu-latest
     steps:
@@ -273,81 +253,6 @@ jobs:
           (Get-FileHash artifacts/Zurvan-win-x64.zip -Algorithm SHA256).Hash |
             Out-File artifacts/Zurvan-win-x64.zip.sha256 -Encoding ascii
 
-      - name: Package lightweight debug patch
-        if: github.event_name == 'push'
-        shell: pwsh
-        run: |
-          $publish = Join-Path $env:GITHUB_WORKSPACE "artifacts\Zurvan-win-x64"
-          $patch = Join-Path $env:GITHUB_WORKSPACE "artifacts\Zurvan-DebugPatch-x64"
-          New-Item -ItemType Directory -Force -Path $patch | Out-Null
-
-          # First-party binaries carry the code we are changing during the
-          # stability/debug cycle. Keep the self-contained .NET/WinUI runtime
-          # in the user's existing full portable folder instead of shipping it
-          # again for every tiny code change.
-          $patterns = @(
-            "BDFR.PersianCalendar.Desktop.exe",
-            "BDFR.PersianCalendar.Desktop.dll",
-            "BDFR.PersianCalendar.Desktop.pdb",
-            "BDFR.PersianCalendar.Desktop.deps.json",
-            "BDFR.PersianCalendar.Desktop.runtimeconfig.json",
-            "BDFR.PersianCalendar.Core.dll",
-            "BDFR.PersianCalendar.Core.pdb",
-            "BDFR.PersianCalendar.Infrastructure.dll",
-            "BDFR.PersianCalendar.Infrastructure.pdb",
-            "QRCoder.dll",
-            "*.pri"
-          )
-
-          foreach ($pattern in $patterns) {
-            Get-ChildItem -Path $publish -Filter $pattern -File -ErrorAction SilentlyContinue |
-              Copy-Item -Destination $patch -Force
-          }
-
-          # Include Season Carousel assets in the lightweight patch too.
-          $seasonSource = Join-Path $publish "picture\theme\season backgrounds"
-          $seasonPatch = Join-Path $patch "picture\theme\season backgrounds"
-          if (Test-Path $seasonSource) {
-            New-Item -ItemType Directory -Force -Path $seasonPatch | Out-Null
-            Copy-Item -Path "$seasonSource\*" -Destination $seasonPatch -Force
-          }
-
-          # Include editable occasion-picture mappings and their assets.
-          $occasionSource = Join-Path $publish "picture\occasion"
-          $occasionPatch = Join-Path $patch "picture\occasion"
-          if (Test-Path $occasionSource) {
-            New-Item -ItemType Directory -Force -Path $occasionPatch | Out-Null
-            Copy-Item -Path "$occasionSource\*" -Destination $occasionPatch -Recurse -Force
-          }
-
-          @"
-          Zurvan lightweight debug patch
-          ===============================
-          Base requirement:
-          - Keep one recent full Zurvan portable build already extracted.
-          - Close Zurvan completely.
-          - Extract this ZIP directly over that existing folder and replace files.
-          - Do NOT delete the existing .NET / Windows App SDK runtime files.
-
-          This patch includes the QRCoder dependency required by Companion QR pairing.
-          Other runtime dependencies still come from the existing full portable build. If a future release changes NuGet/runtime
-          dependencies, use that release's full portable ZIP once, then continue
-          with lightweight patches again.
-          "@ | Out-File (Join-Path $patch "PATCH-README.txt") -Encoding utf8
-
-          Compress-Archive `
-            -Path "$patch\*" `
-            -DestinationPath artifacts/Zurvan-DebugPatch-x64.zip `
-            -Force
-
-          (Get-FileHash artifacts/Zurvan-DebugPatch-x64.zip -Algorithm SHA256).Hash |
-            Out-File artifacts/Zurvan-DebugPatch-x64.zip.sha256 -Encoding ascii
-
-          $fullSize = (Get-Item artifacts/Zurvan-win-x64.zip).Length
-          $patchSize = (Get-Item artifacts/Zurvan-DebugPatch-x64.zip).Length
-          Write-Host ("Full portable: {0:N2} MB" -f ($fullSize / 1MB))
-          Write-Host ("Debug patch:   {0:N2} MB" -f ($patchSize / 1MB))
-
       - name: Install Inno Setup
         if: github.event_name == 'push'
         shell: pwsh
@@ -372,17 +277,6 @@ jobs:
           path: |
             artifacts/Zurvan-win-x64.zip
             artifacts/Zurvan-win-x64.zip.sha256
-          if-no-files-found: error
-          retention-days: 14
-
-      - name: Upload lightweight debug patch artifact
-        if: github.event_name == 'push'
-        uses: actions/upload-artifact@v4
-        with:
-          name: Zurvan-DebugPatch-x64
-          path: |
-            artifacts/Zurvan-DebugPatch-x64.zip
-            artifacts/Zurvan-DebugPatch-x64.zip.sha256
           if-no-files-found: error
           retention-days: 14
 
