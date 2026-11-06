@@ -159,7 +159,11 @@ internal sealed partial class Studio : Form
         // switching an element changes the wheel's active color.
         Select(key);
         if (wheelPicker is not null)
+        {
+            if (wheelPicker.Parent is ScrollableControl editor)
+                editor.ScrollControlIntoView(wheelPicker);
             wheelPicker.Focus();
+        }
     }
 
     private void Reset()
