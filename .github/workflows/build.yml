@@ -135,8 +135,7 @@ jobs:
           retention-days: 14
 
   ios:
-    if: github.event_name != 'push' || !contains(github.event.head_commit.message, '[pc-android-only]')
-    if: github.event_name != 'push' || !contains(github.event.head_commit.message, '[theme-studio-only]')
+    if: github.event_name != 'push' || (!contains(github.event.head_commit.message, '[pc-android-only]') && !contains(github.event.head_commit.message, '[theme-studio-only]'))
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
