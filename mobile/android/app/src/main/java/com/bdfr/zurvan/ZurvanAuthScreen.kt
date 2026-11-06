@@ -93,7 +93,11 @@ fun ZurvanAuthScreen(modifier: Modifier = Modifier) {
                                 licenseStatus = ZurvanLicenseApi().status(valid.accessToken)
                                 message = "حساب و دستگاه با موفقیت ثبت شدند: " + result.optString("username")
                             } catch (e: Exception) {
-                                message = e.message ?: "ثبت دستگاه ناموفق بود."
+                                message = when {
+                                    e.message?.contains("free_account_device_locked") == true ->
+                                        "این دستگاه قفل سهمیه رایگان است و مجوز ساخت حساب رایگان دیگری ندارد. برای فعال‌کردن سهمیه حساب بعدی، اشتراک حساب زروان خود را خریداری کنید."
+                                    else -> e.message ?: "ثبت دستگاه ناموفق بود."
+                                }
                             } finally { busy = false }
                         }
                     }
