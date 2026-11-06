@@ -64,6 +64,21 @@ jobs:
               Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
             }
           }
+      - name: Regression test Zara Pastel selection
+        shell: pwsh
+        run: |
+          $exe = Join-Path $env:GITHUB_WORKSPACE "artifacts/Zurvan-ThemeStudio/Zurvan.ThemeStudio.exe"
+          $env:ZURVAN_STUDIO_PRESET_SELFTEST = "1"
+          try {
+            & $exe
+            if ($LASTEXITCODE -ne 0) {
+              throw "Zara Pastel preset regression failed, exit code $LASTEXITCODE."
+            }
+            Write-Host "Zara Pastel and all seven weekday swatches validated successfully."
+          }
+          finally {
+            Remove-Item Env:ZURVAN_STUDIO_PRESET_SELFTEST -ErrorAction SilentlyContinue
+          }
       - name: Upload Theme Studio
         uses: actions/upload-artifact@v4
         with:
