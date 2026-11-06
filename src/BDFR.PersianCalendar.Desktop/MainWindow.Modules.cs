@@ -335,11 +335,15 @@ public sealed partial class MainWindow
                     _deskFiles.Children.Add(new TextBlock { Text = "فایلی در Zurvan Desk وجود ندارد.", Opacity = 0.7 });
                 else
                     foreach (var file in result.RootElement.EnumerateArray())
+                    {
+                        var sizeText = file.TryGetProperty("size", out var size) ? size.ToString() : "—";
+                        var dateText = file.TryGetProperty("modifiedAtUtc", out var date) ? date.ToString() : "";
                         _deskFiles.Children.Add(new TextBlock
                         {
-                            Text = $"فایل رمزگذاری‌شده · {file.TryGetProperty("size", out var size) ? size.ToString() : "—"} بایت · {file.TryGetProperty("modifiedAtUtc", out var date) ? date.ToString() : ""}",
+                            Text = $"فایل رمزگذاری‌شده · {sizeText} بایت · {dateText}",
                             TextWrapping = TextWrapping.Wrap
                         });
+                    }
             }
             catch (Exception ex) { status.Text = "دریافت فهرست فایل‌ها ناموفق بود: " + ex.Message; }
         }
