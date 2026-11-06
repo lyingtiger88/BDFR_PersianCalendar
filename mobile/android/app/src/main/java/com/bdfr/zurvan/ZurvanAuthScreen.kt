@@ -93,7 +93,11 @@ fun ZurvanAuthScreen(modifier: Modifier = Modifier) {
                                 licenseStatus = ZurvanLicenseApi().status(valid.accessToken)
                                 message = "حساب و دستگاه با موفقیت ثبت شدند: " + result.optString("username")
                             } catch (e: Exception) {
-                                message = e.message ?: "ثبت دستگاه ناموفق بود."
+                                message = when {
+                                    e.message?.contains("free_account_device_locked") == true ->
+                                        "این دستگاه قفل سهمیه رایگان است و مجوز ساخت حساب رایگان دیگری ندارد. برای فعال‌کردن سهمیه حساب بعدی، اشتراک حساب زروان خود را خریداری کنید."
+                                    else -> e.message ?: "ثبت دستگاه ناموفق بود."
+                                }
                             } finally { busy = false }
                         }
                     }
@@ -154,6 +158,22 @@ fun ZurvanAuthScreen(modifier: Modifier = Modifier) {
                     )
                     licenseStatus?.let { status ->
                         Text("وضعیت سرور: حساب ${status.accountState}  |  لایسنس ${status.licenseAccountState}", color = ZurvanMuted, style = MaterialTheme.typography.bodySmall)
+                        if (status.freeAccountLimit != null && status.freeAccountsCreated != null) {
+                            Text(
+                                "سهمیه حساب‌های رایگان این دستگاه: ${status.freeAccountsCreated} از ${status.freeAccountLimit} حساب استفاده شده",
+                                color = ZurvanInk,
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                if ((status.freeAccountsRemaining ?: 0) > 0)
+                                    "امکان ساخت ${status.freeAccountsRemaining} حساب رایگان دیگر وجود دارد."
+                                else
+                                    "سهمیه رایگان این دستگاه تکمیل شده است؛ با خرید اشتراک برای این حساب، یک سهمیه جدید آزاد می‌شود.",
+                                color = ZurvanMuted,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
                         when {
                             status.accountState == "registration_required" || status.accountState == "provisional" ->
                                 Text("برای تکمیل حساب، شناسه کاربری و اتصال دستگاه را ثبت کنید.", color = ZurvanInk)

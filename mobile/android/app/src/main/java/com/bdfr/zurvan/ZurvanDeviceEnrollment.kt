@@ -13,6 +13,8 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.security.KeyStore
 import java.security.SecureRandom
+import java.security.MessageDigest
+import android.provider.Settings
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
@@ -24,8 +26,11 @@ import javax.crypto.spec.GCMParameterSpec
  * Note: it is a SOFTWARE signing key, not a hardware non-exportable Ed25519 key.
  * If Keystore is unavailable, enrollment fails closed.
  */
-private class ZurvanEnrollmentDeviceKey(private val context: Context) {
-    private val prefs = context.getSharedPreferences("zurvan_device_enroll_key_v1", Context.MODE_PRIVATE)
+private class ZurvanEnrollmentDeviceKey(private val context: Context, accountScope: String) {
+    private val scopeHash = MessageDigest.getInstance("SHA-256")
+        .digest(accountScope.trim().lowercase().toByteArray(Charsets.UTF_8))
+        .take(8).joinToString("") { "%02x".format(it.toInt() and 0xff) }
+    private val prefs = context.getSharedPreferences("zurvan_device_enroll_key_$scopeHash", Context.MODE_PRIVATE)
     private fun aesKey(): SecretKey {
         val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
         val existing = store.getKey("zurvan_device_enroll_wrap_v1", null) as? SecretKey
@@ -90,10 +95,17 @@ class ZurvanDeviceEnrollment(private val context: Context) {
                     BuildConfig.SUPABASE_PUBLISHABLE_KEY.isNotBlank()) {
                 "تنظیمات Supabase نامعتبر است."
             }
-            val key = ZurvanEnrollmentDeviceKey(context)
+            val key = ZurvanEnrollmentDeviceKey(context, session.email ?: error("ایمیل حساب در دسترس نیست."))
+            // Hash the app-scoped Android ID; never transmit the raw identifier.
+            val androidId = Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID)
+                ?.takeIf { it.isNotBlank() } ?: error("شناسه پایدار دستگاه در دسترس نیست.")
+            val hardwareFingerprint = MessageDigest.getInstance("SHA-256")
+                .digest(("zurvan-android-hardware-v1:" + androidId).toByteArray(Charsets.UTF_8))
+                .joinToString("") { "%02x".format(it.toInt() and 0xff) }
             val started = request(session.accessToken, JSONObject()
                 .put("action", "start").put("username", username)
-                .put("platform", "android").put("public_key", key.publicKey()))
+                .put("platform", "android").put("public_key", key.publicKey())
+                .put("hardware_fingerprint", hardwareFingerprint))
             val id = started.getString("challenge_id")
             val nonce = started.getString("nonce")
             val userId = started.getString("user_id")

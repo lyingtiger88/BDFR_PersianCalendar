@@ -7,7 +7,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 data class ZurvanLicenseSummary(val id:String,val productId:String,val type:String,val status:String,val generation:Long,val expiresAt:String?)
-data class ZurvanLicenseStatus(val accountState:String,val licenseAccountState:String,val licenses:List<ZurvanLicenseSummary>,val checkedAt:String?)
+data class ZurvanLicenseStatus(val accountState:String,val licenseAccountState:String,val licenses:List<ZurvanLicenseSummary>,val checkedAt:String?,val hardwareAccountNumber:Int?,val freeAccountLimit:Int?,val freeAccountsCreated:Int?,val freeAccountsRemaining:Int?)
 
 class ZurvanLicenseApi {
  suspend fun status(accessToken:String):ZurvanLicenseStatus=withContext(Dispatchers.IO) {
@@ -24,7 +24,7 @@ class ZurvanLicenseApi {
    if(code !in 200..299) error(j.optString("error").ifBlank{"License status HTTP $code"})
    val items=mutableListOf<ZurvanLicenseSummary>();val a=j.optJSONArray("licenses")
    if(a!=null)for(i in 0 until a.length()){val x=a.getJSONObject(i);items+=ZurvanLicenseSummary(x.optString("id"),x.optString("product_id"),x.optString("type"),x.optString("status"),x.optLong("generation"),x.optString("expires_at").takeIf{it.isNotBlank() && it!="null"})}
-   ZurvanLicenseStatus(j.optString("account_state"),j.optString("license_account_state"),items,j.optString("checked_at").takeIf{it.isNotBlank()})
+   ZurvanLicenseStatus(j.optString("account_state"),j.optString("license_account_state"),items,j.optString("checked_at").takeIf{it.isNotBlank()},j.optInt("hardware_account_number").takeIf{j.has("hardware_account_number")&&!j.isNull("hardware_account_number")},j.optInt("free_account_limit").takeIf{j.has("free_account_limit")&&!j.isNull("free_account_limit")},j.optInt("free_accounts_created").takeIf{j.has("free_accounts_created")&&!j.isNull("free_accounts_created")},j.optInt("free_accounts_remaining").takeIf{j.has("free_accounts_remaining")&&!j.isNull("free_accounts_remaining")})
   } finally {c.disconnect()}
  }
 }
