@@ -413,8 +413,8 @@ public sealed partial class MainWindow
         try
         {
             var properties = await file.GetBasicPropertiesAsync();
-            if (properties.Size <= 0 || properties.Size > 50L * 1024 * 1024)
-                throw new InvalidOperationException("حجم فایل باید بین ۱ بایت و ۵۰ مگابایت باشد.");
+            if (properties.Size <= 0 || properties.Size > 37L * 1024 * 1024)
+                throw new InvalidOperationException("حداکثر حجم فایل اصلی برای رمزگذاری و ذخیره‌سازی در پلن فعلی ۳۷ مگابایت است.");
 
             await using var stream = await file.OpenStreamForReadAsync();
             using var memory = new MemoryStream();
