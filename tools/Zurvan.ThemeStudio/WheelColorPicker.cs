@@ -237,8 +237,8 @@ internal sealed class WheelColorPicker : UserControl
         var sector = (int)(hue / 60);
         (double r, double g, double b) = sector switch
         {
-            0 => (c, x, 0), 1 => (x, c, 0), 2 => (0, c, x),
-            3 => (0, x, c), 4 => (x, 0, c), _ => (c, 0, x)
+            0 => (c, x, 0d), 1 => (x, c, 0d), 2 => (0d, c, x),
+            3 => (0d, x, c), 4 => (x, 0d, c), _ => (c, 0d, x)
         };
         return Color.FromArgb(
             (int)Math.Round((r + m) * 255),
