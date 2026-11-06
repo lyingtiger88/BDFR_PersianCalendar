@@ -140,6 +140,18 @@ public sealed partial class MainWindow
                         enabled.IsChecked = row.Enabled;
                     };
                     records.Children.Add(button);
+                    var deleteButton = new Button { Content = "حذف این مناسبت" };
+                    deleteButton.Click += async (_, _) =>
+                    {
+                        try
+                        {
+                            await _celebrationClient.DeleteAsync(row.Id);
+                            await RefreshAsync();
+                            await CheckCelebrationThemeAsync();
+                        }
+                        catch (Exception ex) { info.Text = ex.Message; }
+                    };
+                    records.Children.Add(deleteButton);
                 }
             }
             catch (Exception ex) { info.Text = ex.Message; }
