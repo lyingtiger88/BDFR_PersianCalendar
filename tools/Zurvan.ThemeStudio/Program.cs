@@ -149,17 +149,17 @@ internal sealed partial class Studio : Form
         selected = key;
         selectedLabel.Text = "بخش در حال تغییر: " + Fields.First(x => x.Key == key).Label;
         hex.Text = ColorTranslator.ToHtml(colors[key]).ToUpperInvariant();
+        wheelPicker?.SetColor(colors[key], Fields.First(x => x.Key == key).Label);
         preview.Invalidate();
     }
 
     private void Pick(string key)
     {
+        // All element colors are edited with the embedded HSV wheel;
+        // switching an element changes the wheel's active color.
         Select(key);
-        using var dialog = new ColorDialog { FullOpen = true, AnyColor = true, Color = colors[key] };
-        if (dialog.ShowDialog(this) != DialogResult.OK) return;
-        colors[key] = dialog.Color;
-        swatches[key].BackColor = dialog.Color;
-        Select(key);
+        if (wheelPicker is not null)
+            wheelPicker.Focus();
     }
 
     private void Reset()
