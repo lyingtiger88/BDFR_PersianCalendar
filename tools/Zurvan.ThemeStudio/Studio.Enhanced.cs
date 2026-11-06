@@ -343,10 +343,10 @@ internal sealed partial class Studio
         var count = enhancedWallpapers.Count;
         return rotationMode.SelectedIndex switch
         {
-            1 => Math.Abs((year * 372 + month * 31 + day) % count),
+            1 => (day - 1) % count,
             2 => (int)((uint)HashCode.Combine(year, month, day, themeName.Text) % (uint)count),
-            3 => (year * 12 + month - 1) % count,
-            4 => ((year * 4) + (month - 1) / 3) % count,
+            3 => (month - 1) % count,
+            4 => ((month - 1) / 3) % count,
             _ => selectedWallpaper >= 0 ? selectedWallpaper : 0
         };
     }
