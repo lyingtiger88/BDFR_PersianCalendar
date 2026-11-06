@@ -119,7 +119,16 @@ public sealed partial class MainWindow
 
     private void AddNavigationEntry(Panel host, string icon, string label, Action action)
     {
-        var button = CreateNavigationRailButton(icon, label, action);
+        var button = CreateNavigationRailButton(icon, label, () =>
+        {
+            if (label != "تقویم" && label != "لایسنس و فعال‌سازی" && !IsWindowsLicensed())
+            {
+                OpenSettingsForNavigation(_licensePanelElement);
+                StatusText.Text = "برای استفاده از این ماژول ابتدا زروان را فعال کنید.";
+                return;
+            }
+            action();
+        });
         _navigationEntries.Add((button, icon, label));
         host.Children.Add(button);
     }
@@ -150,7 +159,7 @@ public sealed partial class MainWindow
         if (_navigationExpanded == expanded) return;
         _navigationExpanded = expanded;
         UpdateNavigationEntryLabels(expanded);
-        var width = expanded ? 196.0 : 64.0;
+        var width = expanded ? Math.Clamp(_settings.NavigationRailWidth, 150, 240) : 64.0;
         if (_navigationRailSurface is not null)
         {
             _navigationRailSurface.Width = width;
@@ -184,7 +193,7 @@ public sealed partial class MainWindow
         var leftWidth = Math.Clamp(_settings.LeftSidebarWidth, 220, 560);
         var rightWidth = Math.Clamp(_settings.RightSidebarWidth, 220, 560);
         const double collapsedRailWidth = 64;
-        _settings.NavigationRailWidth = collapsedRailWidth;
+        _settings.NavigationRailWidth = Math.Clamp(_settings.NavigationRailWidth, 150, 240);
         _settings.NavigationRailSide = IsNavigationRailOnLeft() ? "left" : "right";
 
         if (_physicalLeftSidebarColumn is not null) _physicalLeftSidebarColumn.Width = new GridLength(leftWidth);
