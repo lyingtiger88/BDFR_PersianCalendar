@@ -11,6 +11,7 @@
     <WindowsPackageType>None</WindowsPackageType>
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
     <PublishTrimmed>false</PublishTrimmed>
+    <ApplicationIcon>Assets\zurvan.ico</ApplicationIcon>
     <AssemblyTitle>Zurvan</AssemblyTitle>
     <Product>Zurvan</Product>
     <Company>BDFR</Company>
@@ -31,6 +32,12 @@
     <ProjectReference Include="../BDFR.PersianCalendar.Infrastructure/BDFR.PersianCalendar.Infrastructure.csproj" />
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.4.0" />
     <PackageReference Include="QRCoder" Version="1.8.1" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Assets\zurvan.ico;Assets\zurvan.png" Condition="Exists('Assets\zurvan.ico')">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
   </ItemGroup>
   <ItemGroup>
     <Content Include="..\..\..\picture\**\*">
