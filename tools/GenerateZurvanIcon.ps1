@@ -37,6 +37,7 @@ $png = Join-Path $assetDir "zurvan.png"
 $ico = Join-Path $assetDir "zurvan.ico"
 $bmp.Save($png,[System.Drawing.Imaging.ImageFormat]::Png)
 $hIcon = $bmp.GetHicon()
-try { [System.Drawing.Icon]::FromHandle($hIcon).Save([IO.File]::Create($ico)) } finally { [System.Runtime.InteropServices.Marshal]::DestroyIcon($hIcon) }
+$stream = [IO.File]::Create($ico)
+try { [System.Drawing.Icon]::FromHandle($hIcon).Save($stream) } finally { $stream.Dispose(); [System.Runtime.InteropServices.Marshal]::DestroyIcon($hIcon) }
 $bmp.Dispose()
 Write-Host "Generated $ico and $png"
