@@ -245,9 +245,16 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Build WinUI desktop app
-        run: dotnet build src/BDFR.PersianCalendar.Desktop/BDFR.PersianCalendar.Desktop.csproj -c Release -p:Platform=x64 -p:AnahitaGitCommit="${{ github.sha }}" -p:AnahitaBuildNumber="${{ github.run_number }}"
+        env:
+          ZURVAN_PUBLIC_KEY_B64: ${{ vars.ZURVAN_LICENSE_PUBLIC_KEY_B64 }}
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:ZURVAN_PUBLIC_KEY_B64)) { throw "ZURVAN_LICENSE_PUBLIC_KEY_B64 repository variable is required for Windows license activation." }
+          dotnet build src/BDFR.PersianCalendar.Desktop/BDFR.PersianCalendar.Desktop.csproj -c Release -p:Platform=x64 -p:AnahitaGitCommit="${{ github.sha }}" -p:AnahitaBuildNumber="${{ github.run_number }}" -p:ZurvanLicensePublicKeyB64="$env:ZURVAN_PUBLIC_KEY_B64"
 
       - name: Publish Windows x64 test build
+        env:
+          ZURVAN_PUBLIC_KEY_B64: ${{ vars.ZURVAN_LICENSE_PUBLIC_KEY_B64 }}
         shell: pwsh
         run: |
           dotnet publish src/BDFR.PersianCalendar.Desktop/BDFR.PersianCalendar.Desktop.csproj `
@@ -259,6 +266,7 @@ jobs:
             -p:PublishSingleFile=false `
             -p:AnahitaGitCommit="${{ github.sha }}" `
             -p:AnahitaBuildNumber="${{ github.run_number }}" `
+            -p:ZurvanLicensePublicKeyB64="$env:ZURVAN_PUBLIC_KEY_B64" `
             -o artifacts/Zurvan-win-x64
 
       - name: Package portable test ZIP
