@@ -129,6 +129,14 @@ internal sealed class ZurvanAuthClient
         catch { return false; }
     }
 
+    // Returns a refreshed Supabase Auth JWT for authenticated Edge Functions.
+    // Never use the Zurvan Desk token as a substitute.
+    internal async Task<string?> GetAccessTokenAsync()
+    {
+        if (!await RefreshAsync()) return null;
+        return Load()?.AccessToken;
+    }
+
     internal async Task SignOutAsync()
     {
         var session = Load();
