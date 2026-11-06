@@ -164,7 +164,7 @@ public sealed partial class MainWindow
         if (_navigationRailSurface is not null)
         {
             _navigationRailSurface.Width = width;
-            _navigationRailSurface.HorizontalAlignment = HorizontalAlignment.Left;
+            _navigationRailSurface.HorizontalAlignment = IsNavigationRailOnLeft() ? HorizontalAlignment.Left : HorizontalAlignment.Right;
         }
         var column = IsNavigationRailOnLeft()
             ? _navigationRailLeftColumn
