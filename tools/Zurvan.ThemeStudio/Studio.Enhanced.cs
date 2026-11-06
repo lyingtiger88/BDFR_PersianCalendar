@@ -287,6 +287,25 @@ internal sealed partial class Studio
         Select(selected);
         liveCanvas.Invalidate();
     }
+    internal void RunPresetSmokeTest()
+    {
+        // Regression: selecting the sixth base theme previously accessed a
+        // nonexistent seventh color and raised IndexOutOfRangeException.
+        foreach (var themeId in new[] { "zara-pastel", "windows-light", "zara-pastel" })
+        {
+            baseTheme.SelectedItem = themeId;
+            if (!string.Equals(baseTheme.SelectedItem?.ToString(), themeId, StringComparison.Ordinal))
+                throw new InvalidOperationException("Theme preset could not be selected: " + themeId);
+            for (var day = 0; day < 7; day++)
+            {
+                var key = "weekday" + day;
+                if (!colors.ContainsKey(key) || !swatches.ContainsKey(key) ||
+                    swatches[key].BackColor != colors[key])
+                    throw new InvalidOperationException("Invalid weekday palette: " + key);
+            }
+        }
+    }
+
     private void ResetEnhanced()
     {
         foreach (var field in Fields)
