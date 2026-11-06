@@ -176,6 +176,17 @@ public sealed partial class MainWindow : Window
 
         try
         {
+            var appIcon = Path.Combine(AppContext.BaseDirectory, "Assets", "zurvan.ico");
+            if (File.Exists(appIcon))
+                AppWindow.SetIcon(appIcon);
+        }
+        catch (Exception ex)
+        {
+            StartupDiagnostics.Log($"Zurvan app icon could not be applied to title bar: {ex.Message}");
+        }
+
+        try
+        {
             _safeShellMode = false;
             _settingsDiagnosticLevel = 4;
             StartupDiagnostics.MarkPhase("startup-full-ui-build-start");
