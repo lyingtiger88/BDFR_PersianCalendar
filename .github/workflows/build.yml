@@ -244,6 +244,10 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      - name: Generate Zurvan Windows application icon
+        shell: pwsh
+        run: ./tools/GenerateZurvanIcon.ps1
+
       - name: Build WinUI desktop app
         env:
           ZURVAN_PUBLIC_KEY_B64: ${{ vars.ZURVAN_LICENSE_PUBLIC_KEY_B64 }}
