@@ -22,13 +22,13 @@ android {
         val issuerPublicKey = providers.gradleProperty("ZURVAN_LICENSE_PUBLIC_KEY_B64")
             .orElse("").get()
         buildConfigField("String", "LICENSE_PUBLIC_KEY_B64", "\"" + issuerPublicKey + "\"")
-        val supabaseUrl = providers.gradleProperty("ZURVAN_SUPABASE_URL").orElse("").get()
-        val supabaseKey = providers.gradleProperty("ZURVAN_SUPABASE_PUBLISHABLE_KEY").orElse("").get()
+        val supabaseUrl = providers.gradleProperty("ZURVAN_SUPABASE_URL").orElse("https://yztithydgdvydaktuxlw.supabase.co").get()
+        val supabaseKey = providers.gradleProperty("ZURVAN_SUPABASE_PUBLISHABLE_KEY").orElse("sb_publishable_UAKFYbxgWOCVRDDdv_0JLg_oIIiubmT").get()
         buildConfigField("String", "SUPABASE_URL", "\"" + supabaseUrl + "\"")
         buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"" + supabaseKey + "\"")
         minSdk = 26
         targetSdk = 35
-        versionCode = 73
+        versionCode = 74
         versionName = "0.6.0-beta.9"
         val ciRunNumber = providers.gradleProperty("ZURVAN_CI_RUN_NUMBER").orElse("local").get()
         buildConfigField("String", "CI_RUN_NUMBER", "\"$ciRunNumber\"")

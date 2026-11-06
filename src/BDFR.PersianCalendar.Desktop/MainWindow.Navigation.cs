@@ -83,6 +83,10 @@ public sealed partial class MainWindow
             }));
 
         navItems.Children.Add(CreateNavigationRailButton(
+            "💝 Celebration",
+            () => _ = ShowCreatorCelebrationAsync()));
+
+        navItems.Children.Add(CreateNavigationRailButton(
             "🎉 مناسبت‌ها",
             () =>
             {

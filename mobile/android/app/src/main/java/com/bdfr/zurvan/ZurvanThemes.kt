@@ -57,6 +57,26 @@ object ZurvanThemes {
         var weekRtl by remember { mutableStateOf(calendarLayoutPrefs.getBoolean("week_rtl", true)) }
         var shownMonth by remember { mutableIntStateOf(AndroidCalendarEngine.currentPersianYearMonth().second) }
         var selected by remember { mutableStateOf(prefs.getString("theme", "windows-light") ?: "windows-light") }
+        var celebrationTheme by remember { mutableStateOf<String?>(null) }
+        // Never overwrite the person's base appearance. The overlay exists only
+        // for the exact local Persian calendar day, then naturally disappears.
+        LaunchedEffect(context) {
+            val api = ZurvanCelebrationApi(context.applicationContext)
+            while (true) {
+                celebrationTheme = try {
+                    val auth = ZurvanAuth(context.applicationContext)
+                    if (auth.configured && auth.session() != null)
+                        CelebrationCalendar.themeForToday(api.load())
+                    else null
+                } catch (_: Exception) {
+                    // The server remains authoritative. Do not grant private themes
+                    // or keep a stale celebration after an offline date boundary.
+                    null
+                }
+                kotlinx.coroutines.delay(60_000)
+            }
+        }
+        val effectiveTheme = celebrationTheme ?: selected
         var wallpaperPath by remember { mutableStateOf(prefs.getString("wallpaper", null)) }
         var appearanceRevision by remember { mutableIntStateOf(0) }
         var elenaImageIndex by remember { mutableIntStateOf(prefs.getInt("elena_picture", 0).coerceIn(0, 11)) }
@@ -84,14 +104,14 @@ object ZurvanThemes {
             ZurvanPalette("season-vibe","Season Vibe",Color(0xFFF9EBDD),Color(0xFFFFF7ED),Color(0xFFF7E3CF),Color(0xFF51362A),Color(0xFFC18751),Color(0xFFC65B52)),
             ZurvanPalette("season-vibe","Season Vibe",Color(0xFFE7F1FB),Color(0xFFF1F7FC),Color(0xFFE4F0FC),Color(0xFF19304A),Color(0xFF6AA4D8),Color(0xFFCE4452))
         )[season]
-        val palette = if (selected == "season-vibe") seasonalPalette else presets.firstOrNull { it.id == selected } ?: presets.first()
+        val palette = if (effectiveTheme == "season-vibe") seasonalPalette else presets.firstOrNull { it.id == effectiveTheme } ?: presets.first()
         val weekdayPalette = (0..6).map { index ->
             val custom = dayOverrides[index]
             if (custom != null) Color(android.graphics.Color.parseColor(custom))
-            else if (selected == "zara-pastel") Color(android.graphics.Color.parseColor(zaraWeekdays[index]))
+            else if (effectiveTheme == "zara-pastel") Color(android.graphics.Color.parseColor(zaraWeekdays[index]))
             else palette.card
         }
-        val isDark = selected == "graphite-night"
+        val isDark = effectiveTheme == "graphite-night"
         val base = if (isDark) darkColorScheme() else lightColorScheme()
         val colors = base.copy(
             background=color("background",palette.background), surface=color("surface",palette.surface),

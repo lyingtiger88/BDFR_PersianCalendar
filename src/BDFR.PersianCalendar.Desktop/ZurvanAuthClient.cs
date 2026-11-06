@@ -9,8 +9,8 @@ internal sealed class ZurvanAuthClient
 {
     private const string VaultResource = "Zurvan.Supabase.Auth.v1";
     private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(15) };
-    private readonly string _url = (Environment.GetEnvironmentVariable("ZURVAN_SUPABASE_URL") ?? "").TrimEnd('/');
-    private readonly string _key = Environment.GetEnvironmentVariable("ZURVAN_SUPABASE_PUBLISHABLE_KEY") ?? "";
+    private readonly string _url = (Environment.GetEnvironmentVariable("ZURVAN_SUPABASE_URL") ?? "https://yztithydgdvydaktuxlw.supabase.co").TrimEnd('/');
+    private readonly string _key = Environment.GetEnvironmentVariable("ZURVAN_SUPABASE_PUBLISHABLE_KEY") ?? "sb_publishable_UAKFYbxgWOCVRDDdv_0JLg_oIIiubmT";
     private readonly PasswordVault _vault = new();
 
     internal bool Configured => _url.StartsWith("https://", StringComparison.OrdinalIgnoreCase)
@@ -127,6 +127,14 @@ internal sealed class ZurvanAuthClient
             return true;
         }
         catch { return false; }
+    }
+
+    // Returns a refreshed Supabase Auth JWT for authenticated Edge Functions.
+    // Never use the Zurvan Desk token as a substitute.
+    internal async Task<string?> GetAccessTokenAsync()
+    {
+        if (!await RefreshAsync()) return null;
+        return Load()?.AccessToken;
     }
 
     internal async Task SignOutAsync()
