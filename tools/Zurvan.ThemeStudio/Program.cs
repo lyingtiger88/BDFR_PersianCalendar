@@ -24,6 +24,11 @@ internal sealed class ThemeFile
     public string ThemeId { get; set; } = "windows-light";
     public Dictionary<string, string> Colors { get; set; } = new();
     public ThemeWallpaper? Wallpaper { get; set; }
+    public List<ThemeWallpaper> Wallpapers { get; set; } = new();
+    public string Rotation { get; set; } = "sequential";
+    public string Platform { get; set; } = "both";
+    public string Template { get; set; } = "soft-wave";
+    public Dictionary<string, string> Layouts { get; set; } = new() { ["pc"] = "desktop-calendar", ["mobile"] = "mobile-calendar" };
 }
 
 internal sealed class ThemeWallpaper
@@ -32,7 +37,7 @@ internal sealed class ThemeWallpaper
     public string Fit { get; set; } = "cover";
 }
 
-internal sealed class Studio : Form
+internal sealed partial class Studio : Form
 {
     private static readonly (string Key, string Label, string Value)[] Fields =
     [
@@ -124,6 +129,7 @@ internal sealed class Studio : Form
         preview.Paint += PaintPreview;
         Resize += (_, _) => preview.Invalidate();
         Select("accent");
+        EnhanceStudio();
     }
 
     private void Select(string key)
