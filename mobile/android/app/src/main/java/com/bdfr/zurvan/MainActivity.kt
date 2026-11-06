@@ -249,7 +249,10 @@ private fun ZurvanMobileShell(
                         TopAppBar(
                             colors = TopAppBarDefaults.topAppBarColors(containerColor = if (liquidGlass) Color.White.copy(alpha = 0.18f) else MaterialTheme.colorScheme.surface),
                             title = {
+                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 ZurvanSecretTitle()
+                                ZurvanExpiryIndicator()
+                            }
                             }
                         )
                     }
@@ -278,7 +281,10 @@ private fun ZurvanMobileShell(
                     TopAppBar(
                         colors = TopAppBarDefaults.topAppBarColors(containerColor = if (liquidGlass) Color.White.copy(alpha = 0.18f) else MaterialTheme.colorScheme.surface),
                         title = {
-                            ZurvanSecretTitle()
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                ZurvanSecretTitle()
+                                ZurvanExpiryIndicator()
+                            }
                         }
                     )
                 },
