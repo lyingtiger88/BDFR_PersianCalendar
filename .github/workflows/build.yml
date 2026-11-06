@@ -45,6 +45,25 @@ jobs:
         run: |
           dotnet publish tools/Zurvan.ThemeStudio/Zurvan.ThemeStudio.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o artifacts/Zurvan-ThemeStudio
           Compress-Archive -Path artifacts/Zurvan-ThemeStudio/* -DestinationPath artifacts/Zurvan-ThemeStudio-win-x64.zip -Force
+      - name: Smoke test Theme Studio startup
+        shell: pwsh
+        run: |
+          $exe = Join-Path $env:GITHUB_WORKSPACE "artifacts/Zurvan-ThemeStudio/Zurvan.ThemeStudio.exe"
+          if (-not (Test-Path $exe)) { throw "Theme Studio EXE missing: $exe" }
+          $process = Start-Process -FilePath $exe -PassThru -ErrorAction Stop
+          try {
+            Start-Sleep -Seconds 5
+            $process.Refresh()
+            if ($process.HasExited) {
+              throw "Theme Studio exited during startup with code $($process.ExitCode)."
+            }
+            Write-Host "Theme Studio remained running after startup."
+          }
+          finally {
+            if (-not $process.HasExited) {
+              Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+            }
+          }
       - name: Upload Theme Studio
         uses: actions/upload-artifact@v4
         with:
