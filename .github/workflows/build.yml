@@ -70,9 +70,11 @@ jobs:
           $exe = Join-Path $env:GITHUB_WORKSPACE "artifacts/Zurvan-ThemeStudio/Zurvan.ThemeStudio.exe"
           $env:ZURVAN_STUDIO_PRESET_SELFTEST = "1"
           try {
-            & $exe
-            if ($LASTEXITCODE -ne 0) {
-              throw "Zara Pastel preset regression failed, exit code $LASTEXITCODE."
+            $testProcess = Start-Process -FilePath $exe -Wait -PassThru -ErrorAction Stop
+            if ($testProcess.ExitCode -ne 0) {
+              $log = Join-Path $env:TEMP "zurvan-theme-studio-preset-selftest.log"
+              if (Test-Path $log) { Get-Content $log | Write-Host }
+              throw "Zara Pastel preset regression failed, exit code $($testProcess.ExitCode)."
             }
             Write-Host "Zara Pastel and all seven weekday swatches validated successfully."
           }
