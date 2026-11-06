@@ -339,6 +339,11 @@ fun ZurvanAuthScreen(modifier: Modifier = Modifier) {
             }
         }
 
+        if (current != null && auth.configured) {
+            HorizontalDivider()
+            ZurvanCreatorCelebrationPanel()
+        }
+
         if (busy) LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = ZurvanBlue)
         if (message.isNotBlank()) {
             Text(message, color = ZurvanMuted, style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Start)
