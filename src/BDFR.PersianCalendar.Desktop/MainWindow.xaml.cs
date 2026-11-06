@@ -1434,6 +1434,8 @@ public sealed partial class MainWindow : Window
             Foreground = ThemeService.Brush(_theme.SecondaryText)
         });
 
+        _settingsPanel.Children.Add(BuildMobileInspiredSettingsCard());
+
         // Reuse the existing tested time.ir year sync workflow from Settings.
         _settingsPanel.Children.Add(new TextBlock
         {
@@ -5256,9 +5258,9 @@ public sealed partial class MainWindow : Window
                 VerticalAlignment = VerticalAlignment.Stretch,
                 HorizontalContentAlignment = HorizontalAlignment.Stretch,
                 VerticalContentAlignment = VerticalAlignment.Stretch,
-                Margin = new Thickness(4),
-                MinHeight = 88,
-                Padding = new Thickness(6),
+                Margin = new Thickness(5),
+                MinHeight = 94,
+                Padding = new Thickness(9),
                 Opacity = cell.IsCurrentMonth ? 1 : 0.48,
                 Background = CreateCalendarCellBrush(
                     cell.Date == _selected
@@ -5275,11 +5277,12 @@ public sealed partial class MainWindow : Window
                 BorderThickness = cell.Date == _selected
                     ? new Thickness(IsLiquidGlassActive() ? 2.0 : 1.6)
                     : new Thickness(1),
-                CornerRadius = new CornerRadius(IsLiquidGlassActive() ? 20 : 14),
+                CornerRadius = new CornerRadius(IsLiquidGlassActive() ? 22 : 18),
                 Content = cellLayer
             };
 
             var captured = cell.Date;
+            AttachDayCardContextMenu(button, captured);
             button.Click += async (_, _) =>
             {
                 _selected = captured;
