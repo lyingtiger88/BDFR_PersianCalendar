@@ -13,6 +13,7 @@ private enum ZurvanTab: Hashable {
 
 struct ContentView: View {
     @AppStorage("zurvan.appearance.theme") private var themeID = "windows-light"
+    @AppStorage("zurvan.language") private var language = "fa"
     @State private var selection: ZurvanTab = .calendar
     @State private var licensed = ZurvanIOSLicense.isLicensed
 
@@ -24,7 +25,7 @@ struct ContentView: View {
                     .navigationTitle("Zurvan | زروان")
             }
             .tabItem {
-                Label("تقویم", systemImage: "calendar")
+                Label(ZurvanIOSLanguage.text(language, "calendar"), systemImage: "calendar")
             }
             .tag(ZurvanTab.calendar)
 
@@ -37,7 +38,7 @@ struct ContentView: View {
             }
             .navigationTitle("Zurvan Desk")
             .tabItem {
-                Label("زروان دسک", systemImage: "externaldrive.connected.to.line.below")
+                Label(ZurvanIOSLanguage.text(language, "desk"), systemImage: "externaldrive.connected.to.line.below")
             }
             .tag(ZurvanTab.desk)
             .disabled(!licensed)
@@ -50,7 +51,7 @@ struct ContentView: View {
                 }
             }
             .tabItem {
-                Label("برنامه‌ها", systemImage: "checklist")
+                Label(ZurvanIOSLanguage.text(language, "plans"), systemImage: "checklist")
             }
             .tag(ZurvanTab.plans)
             .disabled(!licensed)
@@ -63,7 +64,7 @@ struct ContentView: View {
                 }
             }
             .tabItem {
-                Label("مناسبت‌ها", systemImage: "sparkles")
+                Label(ZurvanIOSLanguage.text(language, "occasions"), systemImage: "sparkles")
             }
             .tag(ZurvanTab.occasions)
             .disabled(!licensed)
@@ -76,7 +77,7 @@ struct ContentView: View {
                 }
             }
             .tabItem {
-                Label("یادآورها", systemImage: "bell")
+                Label(ZurvanIOSLanguage.text(language, "reminders"), systemImage: "bell")
             }
             .tag(ZurvanTab.reminders)
             .disabled(!licensed)
@@ -90,7 +91,7 @@ struct ContentView: View {
             }
             .navigationTitle("Companion")
             .tabItem {
-                Label("همراه", systemImage: "laptopcomputer.and.iphone")
+                Label(ZurvanIOSLanguage.text(language, "companion"), systemImage: "laptopcomputer.and.iphone")
             }
             .tag(ZurvanTab.companion)
             .disabled(!licensed)
@@ -103,7 +104,7 @@ struct ContentView: View {
                 }
             }
             .tabItem {
-                Label("تنظیمات", systemImage: "gearshape")
+                Label(ZurvanIOSLanguage.text(language, "settings"), systemImage: "gearshape")
             }
             .tag(ZurvanTab.settings)
         }
@@ -475,14 +476,28 @@ private struct ZurvanCloudShellView: View {
 
 private struct MobileSettingsView: View {
     @AppStorage("zurvan.appearance.theme") private var themeID = "windows-light"
+    @AppStorage("zurvan.language") private var language = "fa"
     @State private var selectedBackground: PhotosPickerItem?
     @State private var backgroundError: String?
     @State private var backgroundAvailable = ZurvanBackgroundStore.exists
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                Text("تنظیمات")
+                Text(ZurvanIOSLanguage.text(language, "settings"))
                     .font(.title2.bold())
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(ZurvanIOSLanguage.text(language, "language")).font(.headline)
+                    Picker(ZurvanIOSLanguage.text(language, "language"), selection: $language) {
+                        ForEach(ZurvanIOSLanguage.options, id: \.0) { code, title in
+                            Text(title).tag(code)
+                        }
+                    }.pickerStyle(.menu)
+                    Text("ترجمه بخش‌های قدیمی به‌تدریج کامل می‌شود.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
+                .padding()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
 
                 VStack(alignment: .leading, spacing: 8) {
                     Text("تم ظاهری").font(.headline)
@@ -608,5 +623,19 @@ private struct PlaceholderView: View {
             description: Text("در حال توسعه")
         )
         .navigationTitle(title)
+    }
+}
+
+
+private enum ZurvanIOSLanguage {
+    static let options: [(String, String)] = [("fa", "فارسی"), ("en", "English"), ("ckb", "کوردی (سۆرانی)"), ("bal", "بلوچی")]
+    static let dictionary: [String: [String: String]] = [
+        "fa": ["calendar": "تقویم", "desk": "زروان دسک", "plans": "برنامه‌ها", "occasions": "مناسبت‌ها", "reminders": "یادآورها", "companion": "همراه", "settings": "تنظیمات", "language": "زبان برنامه"],
+        "en": ["calendar": "Calendar", "desk": "Zurvan Desk", "plans": "Plans", "occasions": "Occasions", "reminders": "Reminders", "companion": "Companion", "settings": "Settings", "language": "App language"],
+        "ckb": ["calendar": "ڕۆژژمێر", "desk": "زروان دەسک", "plans": "پلانەکان", "occasions": "بۆنەکان", "reminders": "بیرخستنەوەکان", "companion": "هاوڕێ", "settings": "ڕێکخستنەکان", "language": "زمانی بەرنامە"],
+        "bal": ["calendar": "جنتری", "desk": "زروان دسک", "plans": "پلانان", "occasions": "مناسبتان", "reminders": "یادآوریان", "companion": "همراه", "settings": "تنظیمات", "language": "زبان برنامه"]
+    ]
+    static func text(_ locale: String, _ key: String) -> String {
+        dictionary[locale]?[key] ?? dictionary["fa"]?[key] ?? key
     }
 }
