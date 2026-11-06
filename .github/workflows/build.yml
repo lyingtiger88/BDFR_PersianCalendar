@@ -305,8 +305,6 @@ jobs:
           gh release create $tag `
             artifacts/Zurvan-win-x64.zip `
             artifacts/Zurvan-win-x64.zip.sha256 `
-            artifacts/Zurvan-DebugPatch-x64.zip `
-            artifacts/Zurvan-DebugPatch-x64.zip.sha256 `
             artifacts/Zurvan-Setup-x64.exe `
             artifacts/Zurvan-Setup-x64.exe.sha256 `
             --repo "${{ github.repository }}" `
