@@ -11,7 +11,8 @@ object ZurvanLanguages {
     val options = linkedMapOf(
         "fa" to "فارسی", "en" to "English", "ar" to "العربية",
         "de" to "Deutsch", "tr" to "Türkçe", "fr" to "Français",
-        "es" to "Español", "ru" to "Русский"
+        "es" to "Español", "ru" to "Русский",
+        "ckb" to "کوردی (سۆرانی)", "bal" to "بلوچی"
     )
     val current = compositionLocalOf { "fa" }
     val translations: Map<String, Map<String, String>> = mapOf(
@@ -22,6 +23,8 @@ object ZurvanLanguages {
         "tr" to mapOf("calendar" to "Takvim", "desk" to "Zurvan Desk", "plans" to "Planlar", "occasions" to "Özel günler", "reminders" to "Hatırlatmalar", "companion" to "Yardımcı", "settings" to "Ayarlar", "language" to "Uygulama dili", "languageNote" to "Dilinizi seçin. Bazı ekranlar henüz çevrilmedi."),
         "fr" to mapOf("calendar" to "Calendrier", "desk" to "Zurvan Desk", "plans" to "Projets", "occasions" to "Événements", "reminders" to "Rappels", "companion" to "Compagnon", "settings" to "Paramètres", "language" to "Langue", "languageNote" to "Choisissez la langue. Certaines pages restent à traduire."),
         "es" to mapOf("calendar" to "Calendario", "desk" to "Zurvan Desk", "plans" to "Planes", "occasions" to "Efemérides", "reminders" to "Recordatorios", "companion" to "Compañero", "settings" to "Ajustes", "language" to "Idioma", "languageNote" to "Elige el idioma. Algunas pantallas aún no están traducidas."),
+        "ckb" to mapOf("calendar" to "ڕۆژژمێر", "desk" to "زروان دەسک", "plans" to "پلانەکان", "occasions" to "بۆنەکان", "reminders" to "بیرخستنەوەکان", "companion" to "هاوڕێ", "settings" to "ڕێکخستنەکان", "language" to "زمانی بەرنامە", "languageNote" to "زمانی بەرنامە هەڵبژێرە. وەرگێڕانی هەندێک بەشی کۆن هێشتا تەواو نەبووە."),
+        "bal" to mapOf("calendar" to "جنتری", "desk" to "زروان دسک", "plans" to "پلانان", "occasions" to "مناسبتان", "reminders" to "یادآوریان", "companion" to "همراه", "settings" to "تنظیمات", "language" to "زبان برنامه", "languageNote" to "بلوچی زبان انتخاب بوت. بعضی بخشانی ترجمه هنوز کامل نه انت."),
         "ru" to mapOf("calendar" to "Календарь", "desk" to "Zurvan Desk", "plans" to "Планы", "occasions" to "События", "reminders" to "Напоминания", "companion" to "Помощник", "settings" to "Настройки", "language" to "Язык", "languageNote" to "Выберите язык. Некоторые экраны пока не переведены.")
     )
     fun text(lang: String, key: String): String =
