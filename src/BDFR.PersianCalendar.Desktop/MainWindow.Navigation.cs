@@ -43,43 +43,38 @@ public sealed partial class MainWindow
         var navItems = new StackPanel { Spacing = 6, HorizontalAlignment = HorizontalAlignment.Stretch };
         AddNavigationEntry(navItems, "▦", "تقویم", () =>
         {
-            HideSettingsForNavigation();
-            QueueBringIntoView(_centerPanelSurface);
+            ShowDesktopModule("تقویم");
             StatusText.Text = "نمای تقویم فعال است.";
         });
         AddNavigationEntry(navItems, "▣", "زروان دسک", () =>
         {
-            OpenSettingsForNavigation(_zurvanDeskSettingsElement);
+            ShowDesktopModule("زروان دسک");
             StatusText.Text = "بخش زروان دسک باز شد.";
         });
         AddNavigationEntry(navItems, "✓", "برنامه‌ها", () =>
         {
-            HideSettingsForNavigation();
-            QueueBringIntoView(_eventsSectionAnchor);
+            ShowDesktopModule("برنامه‌ها");
             StatusText.Text = "بخش برنامه‌ها باز شد.";
         });
         AddNavigationEntry(navItems, "✿", "مناسبت‌ها", () =>
         {
-            HideSettingsForNavigation();
-            QueueBringIntoView(_occasionsSectionAnchor);
+            ShowDesktopModule("مناسبت‌ها");
             StatusText.Text = "بخش مناسبت‌ها باز شد.";
         });
         AddNavigationEntry(navItems, "♧", "یادآورها", () =>
         {
-            HideSettingsForNavigation();
-            QueueBringIntoView(_remindersSectionAnchor);
+            ShowDesktopModule("یادآورها");
             StatusText.Text = "مرکز یادآورها باز شد.";
         });
-        AddNavigationEntry(navItems, "▤", "همراه", () => _ = ShowCompanionOverviewAsync());
+        AddNavigationEntry(navItems, "▤", "همراه", () => ShowDesktopModule("همراه"));
         AddNavigationEntry(navItems, "◷", "فعالیت‌ها", () =>
         {
-            HideSettingsForNavigation();
-            QueueBringIntoView(_activitySectionAnchor);
+            ShowDesktopModule("فعالیت‌ها");
             StatusText.Text = "مرکز فعالیت باز شد.";
         });
         AddNavigationEntry(navItems, "♙", "لایسنس و فعال‌سازی", () =>
         {
-            OpenSettingsForNavigation(_licensePanelElement);
+            ShowDesktopModule("لایسنس و فعال‌سازی");
             StatusText.Text = "مدیریت لایسنس زروان باز شد.";
         });
 
@@ -95,7 +90,7 @@ public sealed partial class MainWindow
         var settingsHost = new StackPanel { Spacing = 0 };
         AddNavigationEntry(settingsHost, "⚙", "تنظیمات", () =>
         {
-            OpenSettingsForNavigation(_settingsSurface);
+            ShowDesktopModule("تنظیمات");
             StatusText.Text = "تنظیمات باز شد.";
         });
         Grid.SetRow(settingsHost, 2);
