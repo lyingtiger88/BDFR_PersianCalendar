@@ -679,6 +679,40 @@ public sealed partial class MainWindow
         zodiacGroup.Children.Add(zodiacChoices);
         contents.Children.Add(SettingsCard(zodiacGroup));
         AddSettingsSeparator(contents);
+
+        var navigationSide = new ComboBox
+        {
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            MinWidth = 195
+        };
+        navigationSide.Items.Add(new ComboBoxItem { Content = "سمت چپ صفحه", Tag = "left" });
+        navigationSide.Items.Add(new ComboBoxItem { Content = "سمت راست صفحه", Tag = "right" });
+        navigationSide.SelectedItem = navigationSide.Items.OfType<ComboBoxItem>()
+            .FirstOrDefault(x => string.Equals((string?)x.Tag, _settings.NavigationRailSide, StringComparison.OrdinalIgnoreCase))
+            ?? navigationSide.Items.OfType<ComboBoxItem>().First();
+        navigationSide.SelectionChanged += (_, _) =>
+        {
+            if (navigationSide.SelectedItem is ComboBoxItem item && item.Tag is string side)
+            {
+                _settings.NavigationRailSide = side;
+                _settingsService.Save(_settings);
+                ApplyWorkspaceLayoutSettingsLive();
+                StatusText.Text = side == "left"
+                    ? "محل سربرگ‌ها به سمت چپ صفحه منتقل شد."
+                    : "محل سربرگ‌ها به سمت راست صفحه منتقل شد.";
+            }
+        };
+        var navigationPosition = SettingsGroup("محل قرارگیری سربرگ‌ها",
+            "نوار اصلی ناوبری را در سمت دلخواه صفحه قرار دهید.",
+            "\\uE700", "#FF4B91C8");
+        navigationPosition.Children.Add(SettingsOptionRow(
+            "جایگاه سربرگ‌ها",
+            "چپ یا راست صفحه",
+            navigationSide,
+            "\\uE700"));
+        contents.Children.Add(SettingsCard(navigationPosition));
+        AddSettingsSeparator(contents);
+
         AddSettingsAction(contents, "تنظیمات ظاهری پیشرفته",
             "رنگ‌ها، فونت‌ها، Glass Mode، پس‌زمینه و تصویرهای فصلی",
             "بازکردن تنظیمات کامل", OpenLegacySettings, "\uE771");
