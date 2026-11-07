@@ -477,6 +477,16 @@ private struct ZurvanCloudShellView: View {
 private struct MobileSettingsView: View {
     @AppStorage("zurvan.appearance.theme") private var themeID = "windows-light"
     @AppStorage("zurvan.language") private var language = "fa"
+    @AppStorage("zurvan.zodiac.theme") private var zodiacTheme = "cosmic"
+    private let zodiacStyles: [(String, String, String)] = [
+        ("cosmic", "کیهانی کلاسیک", "Classic Cosmic"),
+        ("neon", "فانتزی نورانی", "Luminous Fantasy"),
+        ("minimal", "مینیمال مدرن", "Modern Minimal"),
+        ("watercolor", "آبرنگی هنری", "Artistic Watercolor"),
+        ("mythic", "اسطوره‌ای", "Mythological"),
+        ("cute", "کارتونی کیوت", "Cute Cartoon"),
+        ("luxury", "سه‌بعدی لوکس", "Luxury 3D")
+    ]
     @State private var selectedBackground: PhotosPickerItem?
     @State private var backgroundError: String?
     @State private var backgroundAvailable = ZurvanBackgroundStore.exists
@@ -509,6 +519,34 @@ private struct MobileSettingsView: View {
                     .pickerStyle(.menu)
                     Text("تم‌های متناظر با ویندوز و اندروید؛ انتخاب در دستگاه ذخیره می‌شود.")
                         .font(.footnote).foregroundStyle(.secondary)
+                }
+                .padding()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
+
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Zodiac Theme").font(.headline)
+                    Text(language == "fa" ? "سبک مستقل نمایش نمادهای دوازده برج فلکی؛ جدا از تم کلی زروان." : "Choose a zodiac artwork style independently from the main Zurvan theme.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 9) {
+                        ForEach(0..<zodiacStyles.count, id: \.self) { index in
+                            let style = zodiacStyles[index]
+                            Button { zodiacTheme = style.0 } label: {
+                                VStack(spacing: 7) {
+                                    Text(["✦", "☄", "☾", "✿", "♜", "☺", "✧"][index])
+                                        .font(.title2).foregroundStyle(.tint)
+                                    Text(language == "fa" ? style.1 : style.2)
+                                        .font(.caption).multilineTextAlignment(.center)
+                                        .foregroundStyle(.primary)
+                                }
+                                .frame(maxWidth: .infinity, minHeight: 76)
+                                .padding(8)
+                                .background(zodiacTheme == style.0 ? Color.accentColor.opacity(0.14) : Color.secondary.opacity(0.07), in: RoundedRectangle(cornerRadius: 13))
+                                .overlay(RoundedRectangle(cornerRadius: 13).stroke(zodiacTheme == style.0 ? Color.accentColor : Color.clear, lineWidth: 2))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
                 }
                 .padding()
                 .frame(maxWidth: .infinity, alignment: .leading)
