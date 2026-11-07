@@ -329,9 +329,6 @@ public sealed partial class MainWindow
                 page.Children.Add(actions);
                 break;
             }
-            case "لایسنس و فعال‌سازی":
-                page.Children.Add(BuildLicensePanel());
-                break;
             case "تنظیمات":
             {
                 var settings = _settingsSurface ?? (Border)BuildSettingsPanelSafe();
