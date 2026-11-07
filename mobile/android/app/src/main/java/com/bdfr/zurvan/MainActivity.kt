@@ -1722,18 +1722,6 @@ private fun OccasionsScreen(
     val personalOccasions = remember(occasions) {
         occasions.sortedWith(compareBy<LocalOccasion> { it.calendar.ordinal }.thenBy { it.month }.thenBy { it.day })
     }
-    val zodiacStyles = listOf(
-        Triple("cosmic", "کیهانی کلاسیک", "✦"),
-        Triple("neon", "فانتزی نورانی", "☄"),
-        Triple("minimal", "مینیمال مدرن", "☾"),
-        Triple("watercolor", "آبرنگی هنری", "✿"),
-        Triple("mythic", "اسطوره‌ای", "♜"),
-        Triple("cute", "کارتونی کیوت", "☺"),
-        Triple("luxury", "سه‌بعدی لوکس", "✧")
-    )
-    val zodiacPrefs = remember(context) { context.getSharedPreferences("zurvan_zodiac", Context.MODE_PRIVATE) }
-    var selectedZodiacStyle by remember { mutableStateOf(zodiacPrefs.getString("style", "cosmic") ?: "cosmic") }
-
     LaunchedEffect(currentYear) {
         if (officialItems.isEmpty()) updating = true
     }
@@ -1848,33 +1836,6 @@ private fun OccasionsScreen(
                                     color = holidayColor
                                 )
                                 if (item.isHoliday) Text("تعطیل رسمی", style = MaterialTheme.typography.labelSmall, color = holidayColor, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        item(key = "zodiac_theme_selector") {
-            Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Zodiac Theme", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Text("سبک نمایش نمادهای برج فلکی را انتخاب کنید", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        zodiacStyles.forEach { style ->
-                            val selected = selectedZodiacStyle == style.first
-                            Surface(
-                                modifier = Modifier.width(104.dp).clickable {
-                                    selectedZodiacStyle = style.first
-                                    zodiacPrefs.edit().putString("style", style.first).apply()
-                                },
-                                shape = RoundedCornerShape(13.dp),
-                                color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
-                                border = BorderStroke(if (selected) 2.dp else 1.dp, if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant)
-                            ) {
-                                Column(Modifier.padding(9.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                                    Text(style.third, fontSize = 25.sp, color = MaterialTheme.colorScheme.primary)
-                                    Text(style.second, style = MaterialTheme.typography.labelSmall, textAlign = TextAlign.Center, maxLines = 2)
-                                }
                             }
                         }
                     }
@@ -2705,6 +2666,17 @@ private fun SettingsScreen(
     val weekdayColors = ZurvanThemes.weekdayColors.current
     val setWeekdayColor = ZurvanThemes.setWeekdayColor.current
     val context = LocalContext.current
+    val zodiacStyles = listOf(
+        Triple("cosmic", "کیهانی کلاسیک", "✦"),
+        Triple("neon", "فانتزی نورانی", "☄"),
+        Triple("minimal", "مینیمال مدرن", "☾"),
+        Triple("watercolor", "آبرنگی هنری", "✿"),
+        Triple("mythic", "اسطوره‌ای", "♜"),
+        Triple("cute", "کارتونی کیوت", "☺"),
+        Triple("luxury", "سه‌بعدی لوکس", "✧")
+    )
+    val zodiacPrefs = remember(context) { context.getSharedPreferences("zurvan_zodiac", Context.MODE_PRIVATE) }
+    var selectedZodiacStyle by remember { mutableStateOf(zodiacPrefs.getString("style", "cosmic") ?: "cosmic") }
     val tabsShown = ZurvanTabConfig.visible.current
     val updateTabs = ZurvanTabConfig.update.current
     val navigateTab = ZurvanTabConfig.open.current
@@ -3063,6 +3035,30 @@ private fun SettingsScreen(
                     }) { Text("فعال کردن قفل") }
                 }
                 Text(feedback)
+            }
+        }
+        if (settingsCategory == "appearance") item {
+            SettingsCard(title = "Zodiac Theme") {
+                Text("سبک مستقل نمایش نمادهای برج‌های فلکی؛ جدا از تم کلی زروان.", style = MaterialTheme.typography.bodySmall)
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    zodiacStyles.forEach { style ->
+                        val selected = selectedZodiacStyle == style.first
+                        Surface(
+                            modifier = Modifier.width(104.dp).clickable {
+                                selectedZodiacStyle = style.first
+                                zodiacPrefs.edit().putString("style", style.first).apply()
+                            },
+                            shape = RoundedCornerShape(13.dp),
+                            color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+                            border = BorderStroke(if (selected) 2.dp else 1.dp, if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant)
+                        ) {
+                            Column(Modifier.padding(9.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                                Text(style.third, fontSize = 25.sp, color = MaterialTheme.colorScheme.primary)
+                                Text(style.second, style = MaterialTheme.typography.labelSmall, textAlign = TextAlign.Center, maxLines = 2)
+                            }
+                        }
+                    }
+                }
             }
         }
         if (settingsCategory == "appearance") item {
