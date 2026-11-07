@@ -115,16 +115,11 @@ public sealed partial class MainWindow
 
     private void AddNavigationEntry(Panel host, string icon, string label, Action action)
     {
-        var button = CreateNavigationRailButton(icon, label, () =>
-        {
-            if (label != "تقویم" && label != "لایسنس و فعال‌سازی" && !IsWindowsLicensed())
-            {
-                OpenSettingsForNavigation(_licensePanelElement);
-                StatusText.Text = "برای استفاده از این ماژول ابتدا زروان را فعال کنید.";
-                return;
-            }
-            action();
-        });
+        // Navigation is always available, including Zurvan Desk.
+        // Desk credentials and the license service are independent. Never
+        // redirect navigation to an obsolete license panel: a missing local
+        // activation must not make tabs appear inert.
+        var button = CreateNavigationRailButton(icon, label, action);
         _navigationEntries.Add((button, icon, label));
         host.Children.Add(button);
     }
@@ -236,7 +231,8 @@ public sealed partial class MainWindow
         _settings.NavigationRailWidth = Math.Clamp(_settings.NavigationRailWidth, 150, 240);
         _settings.NavigationRailSide = IsNavigationRailOnLeft() ? "left" : "right";
 
-        if (_physicalLeftSidebarColumn is not null) _physicalLeftSidebarColumn.Width = new GridLength(leftWidth);
+        if (_physicalLeftSidebarColumn is not null)
+            _physicalLeftSidebarColumn.Width = new GridLength(_activeDesktopModule == "تقویم" ? leftWidth : 0);
         if (_physicalRightSidebarColumn is not null) _physicalRightSidebarColumn.Width = new GridLength(0);
         if (_navigationRailLeftColumn is not null)
             _navigationRailLeftColumn.Width = new GridLength(IsNavigationRailOnLeft() ? collapsedRailWidth : 0);
