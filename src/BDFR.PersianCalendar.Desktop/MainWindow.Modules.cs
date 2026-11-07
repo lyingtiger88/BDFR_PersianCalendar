@@ -28,16 +28,59 @@ public sealed partial class MainWindow
 
     private void ShowDesktopModule(string module)
     {
-        _activeDesktopModule = module;
         if (_desktopCalendarPage is null || _desktopModulePage is null || _desktopSelectedDayPanel is null)
+        {
+            StartupDiagnostics.Log($"Module navigation unavailable: '{module}', workspace not initialized.");
             return;
+        }
 
-        var isCalendar = module == "تقویم";
-        _desktopCalendarPage.Visibility = isCalendar ? Visibility.Visible : Visibility.Collapsed;
-        _desktopSelectedDayPanel.Visibility = isCalendar ? Visibility.Visible : Visibility.Collapsed;
-        _desktopModulePage.Visibility = isCalendar ? Visibility.Collapsed : Visibility.Visible;
-        _desktopModulePage.Child = BuildDesktopModulePage(module);
-        _desktopModulePage.FlowDirection = FlowDirection.RightToLeft;
+        try
+        {
+            var isCalendar = module == "تقویم";
+            // Build before changing the visible page: an optional module
+            // failure must not leave the central workspace blank.
+            var page = isCalendar ? null : BuildDesktopModulePage(module);
+            _activeDesktopModule = module;
+            _desktopModulePage.Child = page;
+            _desktopModulePage.FlowDirection = FlowDirection.RightToLeft;
+            _desktopCalendarPage.Visibility = isCalendar ? Visibility.Visible : Visibility.Collapsed;
+            _desktopSelectedDayPanel.Visibility = isCalendar ? Visibility.Visible : Visibility.Collapsed;
+            _desktopModulePage.Visibility = isCalendar ? Visibility.Collapsed : Visibility.Visible;
+
+            // The selected-date sidebar belongs to Calendar only. Non-calendar
+            // modules should occupy the full workspace, including the area
+            // formerly reserved for the selected day.
+            if (_physicalLeftSidebarColumn is not null)
+                _physicalLeftSidebarColumn.Width = new GridLength(
+                    isCalendar ? Math.Clamp(_settings.LeftSidebarWidth, 220, 560) : 0);
+            StartupDiagnostics.Log($"Desktop module opened: '{module}' (calendar={isCalendar}).");
+        }
+        catch (Exception ex)
+        {
+            StartupDiagnostics.Log($"Desktop module '{module}' failed: {ex}");
+            StatusText.Text = $"خطا در باز کردن بخش {module}: {ex.Message}";
+            // Ensure the failed page does not make subsequent navigation inert.
+            _desktopModulePage.Visibility = Visibility.Visible;
+            _desktopCalendarPage.Visibility = Visibility.Collapsed;
+            _desktopSelectedDayPanel.Visibility = Visibility.Collapsed;
+            if (_physicalLeftSidebarColumn is not null)
+                _physicalLeftSidebarColumn.Width = new GridLength(0);
+            _desktopModulePage.Child = new StackPanel
+            {
+                Padding = new Thickness(22),
+                Spacing = 12,
+                Children =
+                {
+                    new TextBlock
+                    {
+                        Text = $"باز کردن بخش «{module}» با خطا مواجه شد.",
+                        FontSize = 20,
+                        TextWrapping = TextWrapping.Wrap
+                    },
+                    new TextBlock { Text = ex.Message, TextWrapping = TextWrapping.Wrap }
+                }
+            };
+        }
     }
 
     private FrameworkElement BuildDesktopModulePage(string module)
