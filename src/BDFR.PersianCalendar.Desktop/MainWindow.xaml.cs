@@ -1726,7 +1726,7 @@ public sealed partial class MainWindow : Window
 
         _settingsPanel.Children.Add(new TextBlock
         {
-            Text = "ترتیب سربرگ ثابت و یکدست است: تقویم، زروان دسک، برنامه‌ها، مناسبت‌ها، یادآورها، همراه، فعالیت‌ها و در انتها تنظیمات.",
+            Text = "سربرگ‌ها را از بخش «تنظیمات ← نمایش و ظاهر» می‌توانید پنهان یا آشکار کنید. تقویم و تنظیمات همیشه قابل دسترسی هستند.",
             FontSize = 10.5,
             TextWrapping = TextWrapping.Wrap,
             Opacity = 0.62,
@@ -2026,11 +2026,6 @@ public sealed partial class MainWindow : Window
             Foreground = ThemeService.Brush(_theme.SecondaryText)
         });
 
-        _occasionPicturesCheck.Content = "نمایش عکس برای مناسبت‌ها";
-        _occasionPicturesCheck.IsChecked = _settings.ShowOccasionPictures;
-        _occasionPicturesCheck.Click -= OccasionPicturesCheck_Click;
-        _occasionPicturesCheck.Click += OccasionPicturesCheck_Click;
-        _settingsPanel.Children.Add(_occasionPicturesCheck);
 
         _settingsPanel.Children.Add(new Border
         {
@@ -2367,8 +2362,6 @@ public sealed partial class MainWindow : Window
         openPictures.Click += (_, _) => OpenFolderInExplorer(_themeService.PictureRoot);
         _settingsPanel.Children.Add(openPictures);
 
-        _licensePanelElement = BuildLicensePanel();
-        _settingsPanel.Children.Add(_licensePanelElement);
 
         var aboutToggle = MakeButton("ℹ About Us");
         aboutToggle.Click += (_, _) =>
@@ -3945,7 +3938,10 @@ public sealed partial class MainWindow : Window
         {
             var userFont = ResolveUserFont();
 
-            if (root is Control fontControl)
+            // FontIcon is a Control: overriding its font with the user's
+            // typography font replaces Fluent glyphs with empty squares after
+            // a theme switch. Icon glyphs must always keep their icon font.
+            if (root is Control fontControl && root is not FontIcon && root is not SymbolIcon)
                 fontControl.FontFamily = userFont;
             if (root is TextBlock fontText)
                 fontText.FontFamily = userFont;
