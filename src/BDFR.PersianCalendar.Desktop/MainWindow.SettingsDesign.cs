@@ -441,10 +441,10 @@ public sealed partial class MainWindow
 
     private void BuildSettingsGeneral()
     {
-        var contents = SettingsGroup("عمومی", "تنظیمات پایه و رفتار زروان", "\uE80F", "#FF7454E8");
+        var contents = SettingsGroup("عمومی", "تنظیمات پایه و رفتار زروان", "\\uE80F", "#FF7454E8");
         contents.Children.Add(SettingsOptionRow("شروع همراه ویندوز",
             "اجرای زروان هنگام ورود به حساب ویندوز",
-            SettingsToggle(IsZurvanAutoStart(), SetZurvanAutoStart), "\uE768"));
+            SettingsToggle(IsZurvanAutoStart(), SetZurvanAutoStart), "\\uE768"));
         AddSettingsSeparator(contents);
         contents.Children.Add(SettingsOptionRow("نمایش تصاویر مناسبت‌ها",
             "نمایش تصاویر مربوط به روزهای دارای مناسبت",
@@ -453,35 +453,62 @@ public sealed partial class MainWindow
                 _settings.ShowOccasionPictures = value;
                 _settingsService.Save(_settings);
                 BuildCalendar();
-            }), "\uEB9F"));
+            }), "\\uEB9F"));
         AddSettingsSeparator(contents);
         contents.Children.Add(SettingsOptionRow("رسانه‌های روز",
             "اجازه اتصال تصویر و فایل به روز انتخاب‌شده",
-            SettingsToggle(_settings.DayMediaEnabled, SetDayMediaEnabled), "\uE8B7"));
-        _settingsContent!.Children.Add(SettingsCard(contents));
-        BuildSettingsQuickActions();
-        BuildSettingsVersionBanner();
+            SettingsToggle(_settings.DayMediaEnabled, SetDayMediaEnabled), "\\uE8B7"));
+
+        // As in the approved Windows Settings mockup, use two independent card
+        // columns rather than a long stack with large unused horizontal space.
+        var columns = new Grid
+        {
+            ColumnSpacing = 18,
+            FlowDirection = FlowDirection.RightToLeft
+        };
+        columns.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        columns.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        var right = new StackPanel { Spacing = 17 };
+        right.Children.Add(SettingsCard(contents));
+        right.Children.Add(new Border
+        {
+            Background = ThemeService.Brush("#FFE8EDFF"),
+            CornerRadius = new CornerRadius(13),
+            Padding = new Thickness(14),
+            Child = SettingsHint("تنظیمات این صفحه ذخیره می‌شوند؛ تغییرات فنی که هنوز به رابط قبلی وابسته‌اند، از «تنظیمات کامل» قابل دسترسی‌اند.")
+        });
+        Grid.SetColumn(right, 0);
+        columns.Children.Add(right);
+
+        var left = new StackPanel { Spacing = 17 };
+        left.Children.Add(CreateSettingsVersionBanner());
+        left.Children.Add(CreateSettingsQuickActionsCard());
+        Grid.SetColumn(left, 1);
+        columns.Children.Add(left);
+        _settingsContent!.Children.Add(columns);
     }
 
-    private void BuildSettingsVersionBanner()
+    private FrameworkElement CreateSettingsVersionBanner()
     {
-        var layout = new StackPanel { Spacing = 8 };
-        layout.Children.Add(SettingsLabel("زروان", 22, true));
+        var layout = new StackPanel { Spacing = 9 };
+        layout.Children.Add(SettingsLabel("زروان", 24, true));
         layout.Children.Add(SettingsHint("تقویم فارسی، برنامه‌ریزی و مدیریت هوشمند زمان"));
-        layout.Children.Add(SettingsHint("نسخه نصب‌شده: " + Assembly.GetExecutingAssembly().GetName().Version));
+        layout.Children.Add(SettingsHint("نسخه نصب‌شده: " +
+            (Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "نامشخص")));
         layout.Children.Add(SettingsActionButton("درباره زروان", () => ShowSettingsSection("درباره زروان")));
-        _settingsContent!.Children.Add(new Border
+        return new Border
         {
             Background = ThemeService.Brush("#FFEDE4FB"),
             CornerRadius = new CornerRadius(20),
-            Padding = new Thickness(22),
+            Padding = new Thickness(24),
+            MinHeight = 170,
             Child = layout
-        });
+        };
     }
 
-    private void BuildSettingsQuickActions()
+    private FrameworkElement CreateSettingsQuickActionsCard()
     {
-        var contents = SettingsGroup("شروع سریع", "دسترسی به بخش‌های پرکاربرد", "\uE8A7", "#FF9360E0");
+        var contents = SettingsGroup("شروع سریع", "دسترسی به بخش‌های پرکاربرد", "\\uE8A7", "#FF9360E0");
         var grid = new Grid { ColumnSpacing = 10, RowSpacing = 10 };
         for (var i = 0; i < 3; i++) grid.ColumnDefinitions.Add(new ColumnDefinition());
         for (var i = 0; i < 2; i++) grid.RowDefinitions.Add(new RowDefinition());
@@ -503,12 +530,14 @@ public sealed partial class MainWindow
                     ShowSettingsSection(item.Destination);
                 else ShowDesktopModule(item.Destination);
             });
+            button.HorizontalAlignment = HorizontalAlignment.Stretch;
+            button.HorizontalContentAlignment = HorizontalAlignment.Center;
             Grid.SetColumn(button, i % 3);
             Grid.SetRow(button, i / 3);
             grid.Children.Add(button);
         }
         contents.Children.Add(grid);
-        _settingsContent!.Children.Add(SettingsCard(contents));
+        return SettingsCard(contents);
     }
 
     private void BuildSettingsAppearance()
