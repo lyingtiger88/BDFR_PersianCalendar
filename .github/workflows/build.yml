@@ -15,7 +15,7 @@ concurrency:
 jobs:
   # [pc-android-only] pushes intentionally build only Core, Windows desktop, and Android.
   core:
-    if: github.event_name != 'push' || !contains(github.event.head_commit.message, '[theme-studio-only]')
+    if: github.event_name != 'push' || (!contains(github.event.head_commit.message, '[theme-studio-only]') && !contains(github.event.head_commit.message, '[windows-only]'))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -35,7 +35,7 @@ jobs:
 
 
   theme-studio:
-    if: github.event_name != 'push' || !contains(github.event.head_commit.message, '[pc-android-only]')
+    if: github.event_name != 'push' || (!contains(github.event.head_commit.message, '[pc-android-only]') && !contains(github.event.head_commit.message, '[windows-only]'))
     name: Build Windows Theme Studio
     runs-on: windows-latest
     steps:
@@ -93,7 +93,7 @@ jobs:
           if-no-files-found: error
 
   android:
-    if: github.event_name != 'push' || !contains(github.event.head_commit.message, '[theme-studio-only]')
+    if: github.event_name != 'push' || (!contains(github.event.head_commit.message, '[theme-studio-only]') && !contains(github.event.head_commit.message, '[windows-only]'))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -136,7 +136,7 @@ jobs:
           retention-days: 14
 
   ios:
-    if: github.event_name != 'push' || (!contains(github.event.head_commit.message, '[pc-android-only]') && !contains(github.event.head_commit.message, '[theme-studio-only]'))
+    if: github.event_name != 'push' || (!contains(github.event.head_commit.message, '[pc-android-only]') && !contains(github.event.head_commit.message, '[theme-studio-only]') && !contains(github.event.head_commit.message, '[windows-only]'))
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -172,7 +172,7 @@ jobs:
 
   mobile-release:
     name: Publish mobile test downloads
-    if: github.event_name == 'push' && !contains(github.event.head_commit.message, '[theme-studio-only]') && !contains(github.event.head_commit.message, '[pc-android-only]')
+    if: github.event_name == 'push' && !contains(github.event.head_commit.message, '[theme-studio-only]') && !contains(github.event.head_commit.message, '[pc-android-only]') && !contains(github.event.head_commit.message, '[windows-only]')
     needs: [android, ios, windows]
     runs-on: ubuntu-latest
     steps:
