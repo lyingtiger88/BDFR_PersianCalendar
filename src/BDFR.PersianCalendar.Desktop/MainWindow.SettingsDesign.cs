@@ -607,8 +607,8 @@ public sealed partial class MainWindow
                 "لایسنس و فعال‌سازی" => "\uE8D7",
                 _ => "\uE787"
             };
-            var contents = new StackPanel { Spacing = 7, HorizontalAlignment = HorizontalAlignment.Center };
-            contents.Children.Add(new FontIcon
+            var tileContents = new StackPanel { Spacing = 7, HorizontalAlignment = HorizontalAlignment.Center };
+            tileContents.Children.Add(new FontIcon
             {
                 Glyph = glyph,
                 FontFamily = new FontFamily("Segoe Fluent Icons"),
@@ -616,8 +616,8 @@ public sealed partial class MainWindow
                 Foreground = ThemeService.Brush(color),
                 HorizontalAlignment = HorizontalAlignment.Center
             });
-            contents.Children.Add(SettingsLabel(item.Text, 12, true));
-            button.Content = contents;
+            tileContents.Children.Add(SettingsLabel(item.Text, 12, true));
+            button.Content = tileContents;
             button.Background = ThemeService.Brush("#FFFFFFFF");
             button.MinHeight = 92;
             button.HorizontalAlignment = HorizontalAlignment.Stretch;
