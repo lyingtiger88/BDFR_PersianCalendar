@@ -1,4 +1,5 @@
 name: build
+# Windows-only compilation of the approved settings UI.
 
 on:
   push:
