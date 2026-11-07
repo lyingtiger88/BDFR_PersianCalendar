@@ -87,6 +87,9 @@ public sealed class AppSettings
     public double NavigationRailWidth { get; set; } = 138.0;
     public string NavigationRailSide { get; set; } = "left";
 
+    // Independent visual style for zodiac artwork in the Occasions module.
+    public string ZodiacThemeId { get; set; } = "cosmic";
+
     // Optional modules hidden from the navigation rail; Calendar and Settings stay available.
     public List<string> HiddenNavigationTabs { get; set; } = new();
 
