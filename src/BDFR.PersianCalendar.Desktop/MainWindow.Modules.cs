@@ -344,130 +344,13 @@ public sealed partial class MainWindow
 
                 var zodiacOptions = new (string Id, string Title, string Glyph)[]
                 {
-                    ("cosmic", "کیهانی کلاسیک", "✦"),
-                    ("neon", "فانتزی نورانی", "☄"),
-                    ("minimal", "مینیمال مدرن", "☾"),
-                    ("watercolor", "آبرنگی هنری", "✿"),
-                    ("mythic", "اسطوره‌ای", "♜"),
-                    ("cute", "کارتونی کیوت", "☺"),
+                    ("cosmic", "کیهانی کلاسیک", "✦"), ("neon", "فانتزی نورانی", "☄"),
+                    ("minimal", "مینیمال مدرن", "☾"), ("watercolor", "آبرنگی هنری", "✿"),
+                    ("mythic", "اسطوره‌ای", "♜"), ("cute", "کارتونی کیوت", "☺"),
                     ("luxury", "سه‌بعدی لوکس", "✧")
                 };
                 var selectedZodiac = zodiacOptions.FirstOrDefault(x => x.Id == _settings.ZodiacThemeId);
                 if (string.IsNullOrWhiteSpace(selectedZodiac.Id)) selectedZodiac = zodiacOptions[0];
-                var zodiacBannerBody = new Grid { ColumnSpacing = 12, Padding = new Thickness(18), FlowDirection = FlowDirection.RightToLeft };
-                zodiacBannerBody.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                zodiacBannerBody.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                var zodiacGlyph = new TextBlock
-                {
-                    Text = selectedZodiac.Glyph,
-                    FontSize = 48,
-                    Foreground = ThemeService.Brush("#FFFFD68A"),
-                    VerticalAlignment = VerticalAlignment.Center
-                };
-                Grid.SetColumn(zodiacGlyph, 0);
-                zodiacBannerBody.Children.Add(zodiacGlyph);
-                var zodiacText = new StackPanel { Spacing = 5, VerticalAlignment = VerticalAlignment.Center };
-                zodiacText.Children.Add(new TextBlock
-                {
-                    Text = "مناسبت‌ها",
-                    FontSize = 23,
-                    FontWeight = Microsoft.UI.Text.FontWeights.Bold,
-                    Foreground = ThemeService.Brush("#FFFFFFFF")
-                });
-                zodiacText.Children.Add(new TextBlock
-                {
-                    Text = "تقویم رسمی و رویدادهای سال",
-                    Foreground = ThemeService.Brush("#FFF0E9FF")
-                });
-                zodiacText.Children.Add(new TextBlock
-                {
-                    Text = "نمادهای فلکی و حال‌وهوای کیهانی زروان",
-                    FontSize = 12,
-                    Foreground = ThemeService.Brush("#FFD8CCF5")
-                });
-                Grid.SetColumn(zodiacText, 1);
-                zodiacBannerBody.Children.Add(zodiacText);
-                var zodiacBanner = new Border
-                {
-                    CornerRadius = new CornerRadius(16),
-                    BorderThickness = new Thickness(1),
-                    BorderBrush = BrushWithAlpha(_theme.Accent, 0xB0),
-                    Background = new LinearGradientBrush
-                    {
-                        StartPoint = new Windows.Foundation.Point(0, 0),
-                        EndPoint = new Windows.Foundation.Point(1, 1),
-                        GradientStops =
-                        {
-                            new GradientStop { Color = Microsoft.UI.Colors.DarkSlateBlue, Offset = 0 },
-                            new GradientStop { Color = Microsoft.UI.Colors.MidnightBlue, Offset = 1 }
-                        }
-                    },
-                    Child = zodiacBannerBody
-                };
-                var zodiacSelector = new StackPanel { Spacing = 8 };
-                zodiacSelector.Children.Add(new TextBlock
-                {
-                    Text = "Zodiac Theme",
-                    FontSize = 17,
-                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-                    Foreground = ThemeService.Brush(_theme.PrimaryText)
-                });
-                zodiacSelector.Children.Add(new TextBlock
-                {
-                    Text = "سبک نمایش نمادهای برج فلکی را انتخاب کنید",
-                    FontSize = 12,
-                    Foreground = ThemeService.Brush(_theme.SecondaryText)
-                });
-                var zodiacChoices = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-                foreach (var option in zodiacOptions)
-                {
-                    var choiceContent = new StackPanel { Spacing = 5, Padding = new Thickness(10), HorizontalAlignment = HorizontalAlignment.Center };
-                    choiceContent.Children.Add(new TextBlock
-                    {
-                        Text = option.Glyph,
-                        FontSize = 25,
-                        HorizontalAlignment = HorizontalAlignment.Center,
-                        Foreground = ThemeService.Brush(_theme.Accent)
-                    });
-                    choiceContent.Children.Add(new TextBlock
-                    {
-                        Text = option.Title,
-                        FontSize = 11,
-                        TextWrapping = TextWrapping.Wrap,
-                        TextAlignment = TextAlignment.Center,
-                        HorizontalAlignment = HorizontalAlignment.Center,
-                        Foreground = ThemeService.Brush(_theme.PrimaryText)
-                    });
-                    var choice = new Button
-                    {
-                        Content = new Border
-                        {
-                            CornerRadius = new CornerRadius(12),
-                            BorderThickness = new Thickness(1),
-                            BorderBrush = BrushWithAlpha(_settings.ZodiacThemeId == option.Id ? _theme.Accent : _theme.SecondaryText, 0xA0),
-                            Background = BrushWithAlpha(_settings.ZodiacThemeId == option.Id ? _theme.Accent : _theme.CardBackground, _settings.ZodiacThemeId == option.Id ? (byte)0x38 : (byte)0x50),
-                            Child = choiceContent
-                        },
-                        MinWidth = 112,
-                        Padding = new Thickness(0),
-                        Background = BrushWithAlpha("#00FFFFFF", 0),
-                        BorderThickness = new Thickness(0)
-                    };
-                    choice.Click += (_, _) =>
-                    {
-                        _settings.ZodiacThemeId = option.Id;
-                        _settingsService.Save(_settings);
-                        StatusText.Text = "سبک نمادهای برج فلکی به «" + option.Title + "» تغییر کرد.";
-                        ShowDesktopModule("مناسبت‌ها");
-                    };
-                    zodiacChoices.Children.Add(choice);
-                }
-                zodiacSelector.Children.Add(new ScrollViewer
-                {
-                    HorizontalScrollMode = ScrollMode.Enabled,
-                    HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
-                    Content = zodiacChoices
-                });
 
                 var selectedDayOccasions = OccasionsPanel;
                 DetachDesktopElement(selectedDayOccasions);
@@ -475,7 +358,6 @@ public sealed partial class MainWindow
                 page.Children.Add(Card("مناسبت‌های رسمی سال " + ToPersianDigits(_selected.Year.ToString()),
                     "مناسبت‌ها به تفکیک ماه مرتب شده‌اند. تعطیلات رسمی با رنگ قرمز مشخص می‌شوند.", officialMonths));
                 page.Children.Add(refresh);
-                page.Children.Add(Card("Zodiac Theme · انتخاب سبک نمادهای فلکی", "این انتخاب مستقل از تم کلی زروان ذخیره می‌شود.", zodiacSelector));
                 page.Children.Add(Card("مناسبت‌های روز انتخاب‌شده", "مناسبت‌های مربوط به روز انتخاب‌شده در تقویم.", selectedDayOccasions));
                 page.Children.Add(Card("ثبت مناسبت شخصی", "تولد، سالگرد و مناسبت‌های تکرارشونده با زمان و یادآورهای مستقل.", add));
                 page.Children.Add(Card("مناسبت‌های شخصی ثبت‌شده", "فهرست مناسبت‌های سالانه کاربر.", personal));
