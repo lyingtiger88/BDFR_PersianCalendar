@@ -4194,7 +4194,7 @@ public sealed partial class MainWindow : Window
             var font = ResolveUserFont();
             var sizeScale = Math.Clamp(_settings.FontSize, 10.0, 24.0) / 14.0;
 
-            if (root is Control control)
+            if (root is Control control && root is not FontIcon && root is not SymbolIcon)
             {
                 var baseline = GetTypographyBaseline(
                     control,
