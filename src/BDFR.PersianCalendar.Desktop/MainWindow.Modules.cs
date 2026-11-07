@@ -85,6 +85,18 @@ public sealed partial class MainWindow
 
     private FrameworkElement BuildDesktopModulePage(string module)
     {
+        // Desk already owns the complete page header and two-column workspace.
+        // Avoid wrapping it in the legacy generic heading/card layout.
+        if (module == "زروان دسک")
+        {
+            return new ScrollViewer
+            {
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                FlowDirection = FlowDirection.RightToLeft,
+                Content = BuildDeskPage()
+            };
+        }
         var scroll = new ScrollViewer
         {
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
@@ -95,7 +107,6 @@ public sealed partial class MainWindow
         {
             Spacing = 14,
             Padding = new Thickness(12, 8, 12, 24),
-            MaxWidth = 1200,
             HorizontalAlignment = HorizontalAlignment.Stretch,
             FlowDirection = FlowDirection.RightToLeft
         };
