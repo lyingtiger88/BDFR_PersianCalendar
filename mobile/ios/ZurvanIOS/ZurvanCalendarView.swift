@@ -163,23 +163,83 @@ private struct SelectedZurvanDate: Identifiable {
 }
 
 struct ZurvanOccasionsView: View {
+    @AppStorage("zurvan.zodiac.theme") private var zodiacTheme = "cosmic"
+    private let zodiacStyles: [(String, String, String, [Color])] = [
+        ("cosmic", "کیهانی کلاسیک", "sparkles", [Color(red:0.08,green:0.06,blue:0.22), Color(red:0.22,green:0.12,blue:0.48)]),
+        ("neon", "فانتزی نورانی", "sun.max.fill", [Color(red:0.10,green:0.03,blue:0.30), Color(red:0.42,green:0.08,blue:0.72)]),
+        ("minimal", "مینیمال مدرن", "moon.stars", [Color(red:0.08,green:0.10,blue:0.14), Color(red:0.24,green:0.25,blue:0.30)]),
+        ("watercolor", "آبرنگی هنری", "paintpalette.fill", [Color(red:0.30,green:0.20,blue:0.42), Color(red:0.68,green:0.40,blue:0.58)]),
+        ("mythic", "اسطوره‌ای", "crown.fill", [Color(red:0.18,green:0.10,blue:0.04), Color(red:0.52,green:0.30,blue:0.10)]),
+        ("cute", "کارتونی کیوت", "face.smiling.fill", [Color(red:0.40,green:0.18,blue:0.32), Color(red:0.76,green:0.40,blue:0.60)]),
+        ("luxury", "سه‌بعدی لوکس", "gem.fill", [Color(red:0.04,green:0.12,blue:0.20), Color(red:0.28,green:0.34,blue:0.48)])
+    ]
+
     var body: some View {
-        List {
-            Section("مناسبت‌های رسمی ثابت") {
-                ForEach(ZurvanOccasions.records) { item in
-                    HStack {
-                        VStack(alignment:.leading) {
-                            Text(item.title)
-                            Text("\(item.day) / \(item.month) · \(item.calendar == .persian ? "شمسی" : "قمری")")
-                                .font(.caption).foregroundStyle(.secondary)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(alignment: .center, spacing: 12) {
+                        Image(systemName: zodiacStyles.first(where: { $0.0 == zodiacTheme })?.2 ?? "sparkles")
+                            .font(.system(size: 34, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(width: 54, height: 54)
+                            .background(.white.opacity(0.14), in: RoundedRectangle(cornerRadius: 15))
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("مناسبت‌ها").font(.title2.bold()).foregroundStyle(.white)
+                            Text("تقویم رسمی و رویدادهای سال").font(.caption).foregroundStyle(.white.opacity(0.78))
                         }
                         Spacer()
-                        if item.mourning { Image(systemName:"ribbon.fill").foregroundStyle(.black) }
-                        if item.holiday { Text("تعطیل").foregroundStyle(.red).font(.caption) }
+                        Text("✦").font(.largeTitle).foregroundStyle(.yellow)
+                    }
+                    Text("نمادهای فلکی و حال‌وهوای کیهانی زروان").font(.caption).foregroundStyle(.white.opacity(0.8))
+                }
+                .padding(16)
+                .background(LinearGradient(colors: zodiacStyles.first(where: { $0.0 == zodiacTheme })?.3 ?? zodiacStyles[0].3, startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 20))
+                .overlay(RoundedRectangle(cornerRadius: 20).stroke(.white.opacity(0.18), lineWidth: 1))
+
+                VStack(alignment: .leading, spacing: 9) {
+                    Text("Zodiac Theme").font(.headline)
+                    Text("سبک نمایش نمادهای برج فلکی را انتخاب کنید").font(.caption).foregroundStyle(.secondary)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 9) {
+                            ForEach(zodiacStyles, id: \.0) { style in
+                                Button { zodiacTheme = style.0 } label: {
+                                    VStack(spacing: 7) {
+                                        Image(systemName: style.2).font(.title2).foregroundStyle(.white)
+                                            .frame(width: 72, height: 54)
+                                            .background(LinearGradient(colors: style.3, startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 12))
+                                        Text(style.1).font(.caption2).foregroundStyle(.primary).lineLimit(1)
+                                    }
+                                    .padding(7)
+                                    .background(zodiacTheme == style.0 ? Color.accentColor.opacity(0.14) : Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 14))
+                                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(zodiacTheme == style.0 ? Color.accentColor : Color.clear, lineWidth: 2))
+                                }.buttonStyle(.plain)
+                            }
+                        }
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("مناسبت‌های رسمی ثابت").font(.headline)
+                    ForEach(ZurvanOccasions.records) { item in
+                        HStack {
+                            VStack(alignment:.leading) {
+                                Text(item.title).foregroundStyle(item.holiday ? Color.red : Color.primary)
+                                Text("\(item.day) / \(item.month) · \(item.calendar == .persian ? "شمسی" : "قمری")")
+                                    .font(.caption).foregroundStyle(item.holiday ? Color.red.opacity(0.85) : Color.secondary)
+                            }
+                            Spacer()
+                            if item.mourning { Image(systemName:"ribbon.fill").foregroundStyle(.secondary) }
+                            if item.holiday { Text("تعطیل رسمی").foregroundStyle(.red).font(.caption.bold()) }
+                        }
+                        .padding(.vertical, 7)
+                        Divider()
                     }
                 }
             }
+            .padding()
         }
+        .background { ZurvanBackgroundView() }
         .navigationTitle("مناسبت‌ها")
     }
 }
