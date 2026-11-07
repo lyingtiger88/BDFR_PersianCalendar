@@ -16,6 +16,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -1720,6 +1721,17 @@ private fun OccasionsScreen(
     val personalOccasions = remember(occasions) {
         occasions.sortedWith(compareBy<LocalOccasion> { it.calendar.ordinal }.thenBy { it.month }.thenBy { it.day })
     }
+    val zodiacStyles = listOf(
+        Triple("cosmic", "کیهانی کلاسیک", "✦"),
+        Triple("neon", "فانتزی نورانی", "☄"),
+        Triple("minimal", "مینیمال مدرن", "☾"),
+        Triple("watercolor", "آبرنگی هنری", "✿"),
+        Triple("mythic", "اسطوره‌ای", "♜"),
+        Triple("cute", "کارتونی کیوت", "☺"),
+        Triple("luxury", "سه‌بعدی لوکس", "✧")
+    )
+    val zodiacPrefs = remember(context) { context.getSharedPreferences("zurvan_zodiac", Context.MODE_PRIVATE) }
+    var selectedZodiacStyle by remember { mutableStateOf(zodiacPrefs.getString("style", "cosmic") ?: "cosmic") }
 
     LaunchedEffect(currentYear) {
         if (officialItems.isEmpty()) updating = true
@@ -1740,6 +1752,35 @@ private fun OccasionsScreen(
     ) {
         item(key = "occasions_header") {
             ScreenHeader(title = "مناسبت‌ها", actionText = "افزودن", onAction = { showDialog = true })
+        }
+        item(key = "zodiac_art_header") {
+            val styleIndex = zodiacStyles.indexOfFirst { it.first == selectedZodiacStyle }.coerceAtLeast(0)
+            val bannerColors = when (selectedZodiacStyle) {
+                "neon" -> listOf(Color(0xFF190B42), Color(0xFF6525A8))
+                "minimal" -> listOf(Color(0xFF171A24), Color(0xFF414655))
+                "watercolor" -> listOf(Color(0xFF60436E), Color(0xFFB879A0))
+                "mythic" -> listOf(Color(0xFF38200D), Color(0xFF93602C))
+                "cute" -> listOf(Color(0xFF6D3157), Color(0xFFC879A8))
+                "luxury" -> listOf(Color(0xFF102536), Color(0xFF53647E))
+                else -> listOf(Color(0xFF100D35), Color(0xFF39236F))
+            }
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = bannerColors.first()),
+                shape = RoundedCornerShape(18.dp)
+            ) {
+                Row(
+                    Modifier.fillMaxWidth().background(androidx.compose.ui.graphics.Brush.linearGradient(bannerColors)).padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text("مناسبت‌ها", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color.White)
+                        Text("تقویم رسمی و رویدادهای سال", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = .82f))
+                        Text("نمادهای فلکی و حال‌وهوای کیهانی زروان", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = .78f))
+                    }
+                    Text(if (selectedZodiacStyle == "cute") "☾" else "♈", fontSize = 42.sp, color = Color(0xFFFFD68A))
+                }
+            }
         }
         item(key = "official_timeline_header") {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -1806,6 +1847,33 @@ private fun OccasionsScreen(
                                     color = holidayColor
                                 )
                                 if (item.isHoliday) Text("تعطیل رسمی", style = MaterialTheme.typography.labelSmall, color = holidayColor, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        item(key = "zodiac_theme_selector") {
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Zodiac Theme", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text("سبک نمایش نمادهای برج فلکی را انتخاب کنید", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        zodiacStyles.forEach { style ->
+                            val selected = selectedZodiacStyle == style.first
+                            Surface(
+                                modifier = Modifier.width(104.dp).clickable {
+                                    selectedZodiacStyle = style.first
+                                    zodiacPrefs.edit().putString("style", style.first).apply()
+                                },
+                                shape = RoundedCornerShape(13.dp),
+                                color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+                                border = BorderStroke(if (selected) 2.dp else 1.dp, if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant)
+                            ) {
+                                Column(Modifier.padding(9.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                                    Text(style.third, fontSize = 25.sp, color = MaterialTheme.colorScheme.primary)
+                                    Text(style.second, style = MaterialTheme.typography.labelSmall, textAlign = TextAlign.Center, maxLines = 2)
+                                }
                             }
                         }
                     }
