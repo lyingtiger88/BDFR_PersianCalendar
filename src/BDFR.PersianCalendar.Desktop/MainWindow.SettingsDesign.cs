@@ -26,7 +26,7 @@ public sealed partial class MainWindow
         ("زروان دسک", "\uE753", "#FF238AF1", "ورود، Vault و فایل‌های ابری"),
         ("همگام‌سازی و پشتیبان‌گیری", "\uE895", "#FF168EA8", "فضای ابری و پوشهٔ داده‌ها"),
         ("امنیت و حریم خصوصی", "\uE72E", "#FFE4A728", "حریم خصوصی، احراز هویت و دستگاه"),
-        ("لایسنس و فعال‌سازی", "\uE8D7", "#FFE8A51F", "اعتبار مجوز و فعال‌سازی"),
+        ("حساب کاربری", "\uE77B", "#FFE8A51F", "ورود و وضعیت اشتراک سروری"),
         ("زبان و منطقه", "\uE774", "#FF1DB1AD", "زبان برنامه و تنظیمات محلی"),
         ("درباره زروان", "\uE946", "#FF288DF4", "نسخه و مشخصات نرم‌افزار")
     ];
@@ -132,8 +132,8 @@ public sealed partial class MainWindow
         text.Children.Add(new TextBlock
         {
             Text = _authClient.SignedInEmail is null
-                ? LicenseProfileStatus()
-                : "وضعیت مجوز سرور: در حال بررسی...",
+                ? "برای مشاهده حساب وارد شوید"
+                : "وضعیت اشتراک سرور: در حال بررسی...",
             FontSize = 12,
             TextWrapping = TextWrapping.Wrap,
             Foreground = ThemeService.Brush(SettingsSecondaryColor)
@@ -159,7 +159,7 @@ public sealed partial class MainWindow
         }
         var profile = new Button
         {
-            Content = "مشاهده وضعیت لایسنس و حساب",
+            Content = "مشاهده حساب و وضعیت اشتراک",
             Background = ThemeService.Brush("#00FFFFFF"),
             BorderThickness = new Thickness(0),
             Foreground = ThemeService.Brush("#FF6654A8"),
@@ -167,7 +167,7 @@ public sealed partial class MainWindow
             HorizontalContentAlignment = HorizontalAlignment.Right,
             Padding = new Thickness(4, 7, 4, 7)
         };
-        profile.Click += (_, _) => ShowSettingsSection("لایسنس و فعال‌سازی");
+        profile.Click += (_, _) => ShowSettingsSection("حساب کاربری");
         account.Children.Add(profile);
         return account;
     }
@@ -198,25 +198,6 @@ public sealed partial class MainWindow
             status.Text = "استعلام مجوز سرور ناموفق بود";
             StartupDiagnostics.Log("Account license verification unavailable: " + ex.Message);
         }
-    }
-
-    private string LicenseProfileStatus()
-    {
-        var code = _settings.LicenseActivationCode;
-        var pem = ReadLicensePublicKey();
-        if (string.IsNullOrWhiteSpace(code) || string.IsNullOrWhiteSpace(pem))
-            return "مجوز معتبر محلی ثبت نشده است";
-        try
-        {
-            using var rsa = RSA.Create();
-            rsa.ImportFromPem(pem);
-            if (ZurvanLicense.TryVerify(code, GetWindowsDeviceCode(), rsa, out var payload) && payload is not null)
-                return string.IsNullOrWhiteSpace(payload.ExpiresUtc)
-                    ? $"لایسنس معتبر · {payload.Edition} · بدون انقضا"
-                    : $"لایسنس معتبر · {payload.Edition} · تا {payload.ExpiresUtc}";
-        }
-        catch (Exception ex) { StartupDiagnostics.Log("Settings license profile lookup failed: " + ex.Message); }
-        return "مجوز محلی معتبر نیست یا منقضی شده است";
     }
 
     private void RefreshSettingsCategories()
@@ -417,7 +398,7 @@ public sealed partial class MainWindow
             case "زروان دسک": BuildSettingsDesk(); break;
             case "همگام‌سازی و پشتیبان‌گیری": BuildSettingsBackup(); break;
             case "امنیت و حریم خصوصی": BuildSettingsPrivacy(); break;
-            case "لایسنس و فعال‌سازی": BuildSettingsLicense(); break;
+            case "حساب کاربری": BuildSettingsAccount(); break;
             case "زبان و منطقه": BuildSettingsLanguage(); break;
             case "درباره زروان": BuildSettingsAbout(); break;
         }
@@ -577,7 +558,7 @@ public sealed partial class MainWindow
             ("زروان دسک", "زروان دسک"),
             ("تنظیم یادآور", "یادآورها"),
             ("تغییر تم", "نمایش و ظاهر"),
-            ("تنظیمات لایسنس", "لایسنس و فعال‌سازی"),
+            ("حساب کاربری", "حساب کاربری"),
             ("تقویم", "تقویم")
         };
         for (var i = 0; i < actions.Length; i++)
@@ -595,7 +576,7 @@ public sealed partial class MainWindow
                 "زروان دسک" => "#FF278FF3",
                 "یادآورها" => "#FFE89C22",
                 "نمایش و ظاهر" => "#FF9B70DE",
-                "لایسنس و فعال‌سازی" => "#FFE4AC20",
+                "حساب کاربری" => "#FFE4AC20",
                 _ => "#FF3CB3A8"
             };
             var glyph = item.Destination switch
@@ -604,7 +585,7 @@ public sealed partial class MainWindow
                 "زروان دسک" => "\uE753",
                 "یادآورها" => "\uE823",
                 "نمایش و ظاهر" => "\uE790",
-                "لایسنس و فعال‌سازی" => "\uE8D7",
+                "حساب کاربری" => "\uE77B",
                 _ => "\uE787"
             };
             var tileContents = new StackPanel { Spacing = 7, HorizontalAlignment = HorizontalAlignment.Center };
@@ -729,9 +710,9 @@ public sealed partial class MainWindow
     private void BuildSettingsPrivacy()
     {
         var contents = SettingsGroup("امنیت و حریم خصوصی",
-            "وضعیت امنیت، لایسنس و حساب‌های مستقل", "\uE72E", "#FFDAAB28");
+            "وضعیت امنیت و حساب‌های مستقل", "\uE72E", "#FFDAAB28");
         contents.Children.Add(SettingsHint(
-            "مجوز ویندوز به دستگاه وابسته است. حساب Zurvan Desk مستقل است و کلید رمزگذاری فایل‌ها در صندوق امن دستگاه نگه‌داری می‌شود."));
+            "حساب Zurvan Desk مستقل از حساب اصلی است و کلید رمزگذاری فایل‌ها در صندوق امن دستگاه نگه‌داری می‌شود."));
         AddSettingsAction(contents, "وضعیت مجوز", LicenseProfileStatus(),
             "مشاهده لایسنس", () => ShowSettingsSection("لایسنس و فعال‌سازی"), "\uE8D7");
         AddSettingsAction(contents, "حساب ابری", "مدیریت ورود و بازیابی Vault",
@@ -739,28 +720,20 @@ public sealed partial class MainWindow
         _settingsContent!.Children.Add(SettingsCard(contents));
     }
 
-    private void BuildSettingsLicense()
+    private void BuildSettingsAccount()
     {
-        var contents = SettingsGroup("لایسنس و فعال‌سازی",
-            "حساب زروان و وضعیت مجوز معتبر", "\uE8D7", "#FFE8AD1D");
-        contents.Children.Add(SettingsLabel("حساب زروان (Supabase Auth)", 17, true));
+        var contents = SettingsGroup("حساب کاربری",
+            "ورود، ثبت‌نام و وضعیت اشتراک زروان", "\uE77B", "#FFE8AD1D");
         contents.Children.Add(SettingsHint(
-            "ورود به حساب با فعال‌سازی دستگاه متفاوت است. تنها پس از استعلام موفق، وضعیت لایسنس سرور تأییدشده نمایش داده می‌شود."));
+            "وضعیت اشتراک صرفاً از سرور Supabase دریافت می‌شود؛ این صفحه مستقل از کدهای فعال‌سازی محلی قدیمی است."));
         contents.Children.Add(BuildAccountAuthPanel());
         _settingsServerLicenseStatus = SettingsHint(
             _authClient.SignedInEmail is null
-                ? "برای مشاهده وضعیت لایسنس سرور وارد حساب زروان شوید."
-                : "در حال بررسی مجوز سرور...");
+                ? "برای مشاهده وضعیت اشتراک وارد حساب زروان شوید."
+                : "در حال بررسی اشتراک سرور...");
         contents.Children.Add(_settingsServerLicenseStatus);
         if (_authClient.SignedInEmail is not null)
             _ = LoadSupabaseLicenseStatusAsync(_settingsServerLicenseStatus);
-
-        AddSettingsSeparator(contents);
-        contents.Children.Add(SettingsLabel("فعال‌سازی محلی دستگاه", 17, true));
-        contents.Children.Add(SettingsHint(LicenseProfileStatus()));
-        AddSettingsAction(contents, "مدیریت مجوز دستگاه",
-            "شناسه دستگاه و اعتبارسنجی کد امضاشدهٔ نسخه‌های پیشین",
-            "صفحه فعال‌سازی", () => ShowDesktopModule("لایسنس و فعال‌سازی"), "\uE8D7");
         _settingsContent!.Children.Add(SettingsCard(contents));
     }
 
