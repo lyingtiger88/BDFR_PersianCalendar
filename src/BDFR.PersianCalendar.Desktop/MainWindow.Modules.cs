@@ -214,26 +214,9 @@ public sealed partial class MainWindow
             }
             case "مناسبت‌ها":
             {
-                var official = new StackPanel { Spacing = 6 };
+                var officialMonths = new StackPanel { Spacing = 12 };
                 var personal = new StackPanel { Spacing = 6 };
                 var refresh = MakeButton("به‌روزرسانی مناسبت‌های سال");
-                refresh.Click += async (_, _) =>
-                {
-                    refresh.IsEnabled = false;
-                    try
-                    {
-                        var entries = await _occasionSource.GetYearAsync(_selected.Year);
-                        await _repository.ReplaceOccasionsForYearAsync(_occasionSource.Name, _selected.Year, entries);
-                        await LoadSelectedDayAsync();
-                        await LoadCalendarCellOccasionsAsync(_year, _month);
-                        official.Children.Clear();
-                        foreach (var item in entries.OrderBy(x => x.Date))
-                            official.Children.Add(new TextBlock { Text = $"{item.Date.MonthName} {item.Date.Day} · {item.Title}{(item.IsHoliday ? " · تعطیل رسمی" : "")}", TextWrapping = TextWrapping.Wrap });
-                        StatusText.Text = $"{entries.Count} مناسبت برای سال {_selected.Year} به‌روزرسانی شد.";
-                    }
-                    catch (Exception ex) { StatusText.Text = "به‌روزرسانی مناسبت‌ها انجام نشد: " + ex.Message; }
-                    finally { refresh.IsEnabled = true; }
-                };
                 var add = new StackPanel { Spacing = 8 };
                 AddModuleControl(add, SpecialTitleBox);
                 AddModuleControl(add, SpecialCalendarBox);
@@ -245,13 +228,129 @@ public sealed partial class MainWindow
                 var save = MakeButton("ثبت مناسبت شخصی سالانه");
                 save.Click += AddSpecialOccasion_Click;
                 add.Children.Add(save);
-                page.Children.Add(Card("مناسبت‌های رسمی", $"تقویم رسمی سال {_selected.Year}", official));
-                page.Children.Add(refresh);
+
+                async Task RenderOfficialMonths()
+                {
+                    officialMonths.Children.Clear();
+                    var entries = await _occasionSource.GetYearAsync(_selected.Year);
+                    var months = PersianDate.MonthNames;
+                    for (var month = 1; month <= 12; month++)
+                    {
+                        var monthEntries = entries
+                            .Where(x => x.Date.Month == month)
+                            .OrderBy(x => x.Date.Day)
+                            .ThenBy(x => x.Title)
+                            .ToList();
+                        var monthBody = new StackPanel { Spacing = 7, Padding = new Thickness(12) };
+                        if (monthEntries.Count == 0)
+                        {
+                            monthBody.Children.Add(new TextBlock
+                            {
+                                Text = "برای این ماه مناسبتی ثبت نشده است.",
+                                Opacity = 0.55,
+                                Foreground = ThemeService.Brush(_theme.SecondaryText)
+                            });
+                        }
+                        foreach (var item in monthEntries)
+                        {
+                            var holiday = item.IsHoliday;
+                            var row = new Grid { ColumnSpacing = 10, FlowDirection = FlowDirection.RightToLeft };
+                            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                            var day = new Border
+                            {
+                                MinWidth = 42,
+                                Padding = new Thickness(8, 5, 8, 5),
+                                CornerRadius = new CornerRadius(8),
+                                Background = holiday ? BrushWithAlpha("#FFE53935", 0x20) : BrushWithAlpha(_theme.Accent, 0x18),
+                                Child = new TextBlock
+                                {
+                                    Text = ToPersianDigits(item.Date.Day.ToString()),
+                                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                                    Foreground = holiday ? ThemeService.Brush("#FFD32F2F") : ThemeService.Brush(_theme.PrimaryText),
+                                    HorizontalAlignment = HorizontalAlignment.Center
+                                }
+                            };
+                            Grid.SetColumn(day, 0);
+                            row.Children.Add(day);
+                            var title = new TextBlock
+                            {
+                                Text = item.Title,
+                                TextWrapping = TextWrapping.Wrap,
+                                VerticalAlignment = VerticalAlignment.Center,
+                                Foreground = holiday ? ThemeService.Brush("#FFD32F2F") : ThemeService.Brush(_theme.PrimaryText),
+                                FontWeight = holiday ? Microsoft.UI.Text.FontWeights.SemiBold : Microsoft.UI.Text.FontWeights.Normal
+                            };
+                            Grid.SetColumn(title, 1);
+                            row.Children.Add(title);
+                            if (holiday)
+                            {
+                                var badge = new Border
+                                {
+                                    Padding = new Thickness(7, 4, 7, 4),
+                                    CornerRadius = new CornerRadius(8),
+                                    Background = BrushWithAlpha("#FFE53935", 0x20),
+                                    VerticalAlignment = VerticalAlignment.Center,
+                                    Child = new TextBlock
+                                    {
+                                        Text = "تعطیل رسمی",
+                                        FontSize = 11,
+                                        Foreground = ThemeService.Brush("#FFD32F2F")
+                                    }
+                                };
+                                Grid.SetColumn(badge, 2);
+                                row.Children.Add(badge);
+                            }
+                            monthBody.Children.Add(row);
+                        }
+
+                        var monthCard = new Border
+                        {
+                            Background = CreateSideSurfaceBrush(),
+                            BorderBrush = BrushWithAlpha(_theme.Accent, 0x60),
+                            BorderThickness = new Thickness(1),
+                            CornerRadius = new CornerRadius(13),
+                            Child = monthBody
+                        };
+                        var monthSection = new StackPanel { Spacing = 6 };
+                        monthSection.Children.Add(new TextBlock
+                        {
+                            Text = months[month - 1],
+                            FontSize = 17,
+                            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                            Foreground = ThemeService.Brush(_theme.PrimaryText)
+                        });
+                        monthSection.Children.Add(monthCard);
+                        officialMonths.Children.Add(monthSection);
+                    }
+                }
+
+                refresh.Click += async (_, _) =>
+                {
+                    refresh.IsEnabled = false;
+                    try
+                    {
+                        var entries = await _occasionSource.GetYearAsync(_selected.Year);
+                        await _repository.ReplaceOccasionsForYearAsync(_occasionSource.Name, _selected.Year, entries);
+                        await LoadSelectedDayAsync();
+                        await LoadCalendarCellOccasionsAsync(_year, _month);
+                        await RenderOfficialMonths();
+                        StatusText.Text = $"مناسبت‌های سال {ToPersianDigits(_selected.Year.ToString())} به‌روزرسانی شد.";
+                    }
+                    catch (Exception ex) { StatusText.Text = "به‌روزرسانی مناسبت‌ها انجام نشد: " + ex.Message; }
+                    finally { refresh.IsEnabled = true; }
+                };
+
                 var selectedDayOccasions = OccasionsPanel;
                 DetachDesktopElement(selectedDayOccasions);
-                page.Children.Add(Card("مناسبت‌های روز انتخاب‌شده", "مناسبت‌هایی که در روز جاری انتخاب شده‌اند.", selectedDayOccasions));
+                page.Children.Add(Card("مناسبت‌های رسمی سال " + ToPersianDigits(_selected.Year.ToString()),
+                    "مناسبت‌ها به تفکیک ماه مرتب شده‌اند. تعطیلات رسمی با رنگ قرمز مشخص می‌شوند.", officialMonths));
+                page.Children.Add(refresh);
+                page.Children.Add(Card("مناسبت‌های روز انتخاب‌شده", "مناسبت‌های مربوط به روز انتخاب‌شده در تقویم.", selectedDayOccasions));
                 page.Children.Add(Card("ثبت مناسبت شخصی", "تولد، سالگرد و مناسبت‌های تکرارشونده با زمان و یادآورهای مستقل.", add));
                 page.Children.Add(Card("مناسبت‌های شخصی ثبت‌شده", "فهرست مناسبت‌های سالانه کاربر.", personal));
+
                 async Task LoadPersonal()
                 {
                     personal.Children.Clear();
@@ -260,17 +359,17 @@ public sealed partial class MainWindow
                     foreach (var item in items)
                         personal.Children.Add(new TextBlock { Text = $"{item.Title} · {item.CalendarSystem} · {item.Month}/{item.Day} · یادآوری: {string.Join("، ", item.ReminderDaysBefore)} روز قبل", TextWrapping = TextWrapping.Wrap });
                 }
+
                 async Task LoadOfficial()
                 {
-                    try
+                    try { await RenderOfficialMonths(); }
+                    catch
                     {
-                        var entries = await _occasionSource.GetYearAsync(_selected.Year);
-                        official.Children.Clear();
-                        foreach (var item in entries.OrderBy(x => x.Date))
-                            official.Children.Add(new TextBlock { Text = $"{item.Date.MonthName} {item.Date.Day} · {item.Title}{(item.IsHoliday ? " · تعطیل رسمی" : "")}", TextWrapping = TextWrapping.Wrap });
+                        officialMonths.Children.Clear();
+                        officialMonths.Children.Add(new TextBlock { Text = "برای دریافت تقویم رسمی، دکمه به‌روزرسانی را بزنید.", Opacity = 0.65 });
                     }
-                    catch { official.Children.Add(new TextBlock { Text = "برای دریافت تقویم رسمی، دکمه به‌روزرسانی را بزنید.", Opacity = 0.65 }); }
                 }
+
                 _ = LoadOfficial();
                 _ = LoadPersonal();
                 break;
@@ -318,15 +417,163 @@ public sealed partial class MainWindow
                 break;
             case "فعالیت‌ها":
             {
-                var actions = new StackPanel { Spacing = 8 };
+                var actions = new StackPanel { Spacing = 8, Orientation = Orientation.Horizontal };
                 var refresh = MakeButton("تازه‌سازی فعالیت‌ها");
-                refresh.Click += RefreshActivities_Click;
                 var clear = MakeButton("پاکسازی تاریخچه فعالیت");
+                actions.Children.Add(refresh);
+                actions.Children.Add(clear);
+
+                var categoryGrid = new Grid { ColumnSpacing = 10, RowSpacing = 10 };
+                for (var i = 0; i < 3; i++)
+                    categoryGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                var history = new StackPanel { Spacing = 8 };
+                var summary = new TextBlock
+                {
+                    Text = "یک دسته را انتخاب کنید تا سوابق آن نمایش داده شود.",
+                    Foreground = ThemeService.Brush(_theme.SecondaryText),
+                    TextWrapping = TextWrapping.Wrap
+                };
+                var allItems = new List<ActivityLogEntry>();
+                var categories = new (string Key, string Title, string Glyph, Func<ActivityLogEntry, bool> Match)[]
+                {
+                    ("all", "همه فعالیت‌ها", "▦", _ => true),
+                    ("planning", "برنامه و کارها", "✓", x => x.Action is "event-created" or "task-created" or "task-completed" or "task-reopened"),
+                    ("notes", "یادداشت‌ها", "▤", x => x.Action == "note-saved"),
+                    ("reminders", "یادآورها و اعلان‌ها", "◷", x => x.Action.StartsWith("reminder", StringComparison.Ordinal) || x.Action == "notification-fired"),
+                    ("occasions", "مناسبت‌ها", "✦", x => x.Action == "special-occasion-created"),
+                    ("sync", "همگام‌سازی", "⟳", x => x.Action.StartsWith("occasion-sync", StringComparison.Ordinal))
+                };
+
+                void ShowCategory(string key)
+                {
+                    var selected = categories.First(x => x.Key == key);
+                    var filtered = allItems.Where(selected.Match).ToList();
+                    summary.Text = $"{selected.Title} · {ToPersianDigits(filtered.Count.ToString())} مورد";
+                    history.Children.Clear();
+                    if (filtered.Count == 0)
+                    {
+                        history.Children.Add(new TextBlock
+                        {
+                            Text = "برای این دسته فعالیتی ثبت نشده است.",
+                            Opacity = 0.6,
+                            Padding = new Thickness(8)
+                        });
+                        return;
+                    }
+                    foreach (var item in filtered)
+                    {
+                        var local = item.CreatedAt.ToLocalTime();
+                        var date = PersianDate.FromDateOnly(DateOnly.FromDateTime(local.DateTime));
+                        var title = item.Action switch
+                        {
+                            "event-created" => "رویداد جدید",
+                            "task-created" => "کار جدید",
+                            "task-completed" => "کار انجام شد",
+                            "task-reopened" => "کار دوباره باز شد",
+                            "note-saved" => "یادداشت ذخیره شد",
+                            "special-occasion-created" => "مناسبت شخصی",
+                            "notification-fired" => "اعلان نمایش داده شد",
+                            "reminder-acknowledged" => "یادآور تأیید شد",
+                            "reminder-completed" => "یادآور انجام شد",
+                            "reminder-snoozed" => "یادآور به تعویق افتاد",
+                            "reminder-dismissed" => "یادآور رد شد",
+                            "occasion-sync" => "همگام‌سازی مناسبت‌ها",
+                            "occasion-sync-failed" => "خطای همگام‌سازی",
+                            _ => item.Action
+                        };
+                        var detail = new StackPanel { Spacing = 4, Padding = new Thickness(12) };
+                        detail.Children.Add(new TextBlock
+                        {
+                            Text = title,
+                            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                            Foreground = ThemeService.Brush(_theme.PrimaryText)
+                        });
+                        detail.Children.Add(new TextBlock
+                        {
+                            Text = $"{FormatPersianActivityTimestamp(date, local.TimeOfDay)} · {item.Message}",
+                            TextWrapping = TextWrapping.Wrap,
+                            Foreground = ThemeService.Brush(_theme.SecondaryText)
+                        });
+                        history.Children.Add(new Border
+                        {
+                            Background = CreateSideSurfaceBrush(),
+                            BorderBrush = BrushWithAlpha(_theme.Accent, 0x50),
+                            BorderThickness = new Thickness(1),
+                            CornerRadius = new CornerRadius(12),
+                            Child = detail
+                        });
+                    }
+                }
+
+                async Task LoadActivityTiles()
+                {
+                    allItems = (await _repository.GetRecentActivitiesAsync(500))
+                        .OrderByDescending(x => x.CreatedAt)
+                        .ToList();
+                    categoryGrid.Children.Clear();
+                    for (var i = 0; i < categories.Length; i++)
+                    {
+                        var category = categories[i];
+                        var count = allItems.Count(category.Match);
+                        var tileContent = new StackPanel
+                        {
+                            Spacing = 6,
+                            Padding = new Thickness(12),
+                            HorizontalAlignment = HorizontalAlignment.Center
+                        };
+                        tileContent.Children.Add(new TextBlock
+                        {
+                            Text = category.Glyph,
+                            FontSize = 23,
+                            HorizontalAlignment = HorizontalAlignment.Center,
+                            Foreground = ThemeService.Brush(_theme.Accent)
+                        });
+                        tileContent.Children.Add(new TextBlock
+                        {
+                            Text = category.Title,
+                            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                            TextWrapping = TextWrapping.Wrap,
+                            TextAlignment = TextAlignment.Center,
+                            HorizontalAlignment = HorizontalAlignment.Center,
+                            Foreground = ThemeService.Brush(_theme.PrimaryText)
+                        });
+                        tileContent.Children.Add(new TextBlock
+                        {
+                            Text = ToPersianDigits(count.ToString()) + " مورد",
+                            FontSize = 11,
+                            Foreground = ThemeService.Brush(_theme.SecondaryText),
+                            HorizontalAlignment = HorizontalAlignment.Center
+                        });
+                        var tile = new Button
+                        {
+                            Content = new Border
+                            {
+                                Background = CreateSideSurfaceBrush(),
+                                BorderBrush = BrushWithAlpha(_theme.Accent, 0x65),
+                                BorderThickness = new Thickness(1),
+                                CornerRadius = new CornerRadius(13),
+                                Child = tileContent
+                            },
+                            HorizontalAlignment = HorizontalAlignment.Stretch,
+                            HorizontalContentAlignment = HorizontalAlignment.Stretch,
+                            Padding = new Thickness(0),
+                            Background = BrushWithAlpha("#00FFFFFF", 0),
+                            BorderThickness = new Thickness(0)
+                        };
+                        tile.Click += (_, _) => ShowCategory(category.Key);
+                        Grid.SetColumn(tile, i % 3);
+                        Grid.SetRow(tile, i / 3);
+                        categoryGrid.Children.Add(tile);
+                    }
+                    ShowCategory("all");
+                }
+
+                refresh.Click += async (_, _) => await LoadActivityTiles();
                 clear.Click += ClearActivities_Click;
-                actions.Children.Add(refresh); actions.Children.Add(clear);
-                DetachDesktopElement(ActivityPanel);
-                page.Children.Add(Card("مرکز فعالیت", "گزارش رویدادهای ثبت‌شده در زروان.", ActivityPanel));
+                page.Children.Add(Card("دسته‌بندی فعالیت‌ها", "برای مشاهده تاریخچه، یکی از کاشی‌های زیر را انتخاب کنید.", categoryGrid));
+                page.Children.Add(Card("سوابق فعالیت", "", new StackPanel { Spacing = 8, Children = { summary, history } }));
                 page.Children.Add(actions);
+                _ = LoadActivityTiles();
                 break;
             }
             case "تنظیمات":
