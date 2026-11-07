@@ -197,29 +197,6 @@ struct ZurvanOccasionsView: View {
                 .background(LinearGradient(colors: zodiacStyles.first(where: { $0.0 == zodiacTheme })?.3 ?? zodiacStyles[0].3, startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 20))
                 .overlay(RoundedRectangle(cornerRadius: 20).stroke(.white.opacity(0.18), lineWidth: 1))
 
-                VStack(alignment: .leading, spacing: 9) {
-                    Text("Zodiac Theme").font(.headline)
-                    Text("سبک نمایش نمادهای برج فلکی را انتخاب کنید").font(.caption).foregroundStyle(.secondary)
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 9) {
-                            ForEach(0..<zodiacStyles.count, id: \.self) { index in
-                                let style = zodiacStyles[index]
-                                Button { zodiacTheme = style.0 } label: {
-                                    VStack(spacing: 7) {
-                                        Image(systemName: style.2).font(.title2).foregroundStyle(.white)
-                                            .frame(width: 72, height: 54)
-                                            .background(LinearGradient(colors: style.3, startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 12))
-                                        Text(style.1).font(.caption2).foregroundStyle(.primary).lineLimit(1)
-                                    }
-                                    .padding(7)
-                                    .background(zodiacTheme == style.0 ? Color.accentColor.opacity(0.14) : Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 14))
-                                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(zodiacTheme == style.0 ? Color.accentColor : Color.clear, lineWidth: 2))
-                                }.buttonStyle(.plain)
-                            }
-                        }
-                    }
-                }
-
                 VStack(alignment: .leading, spacing: 8) {
                     Text("مناسبت‌های رسمی ثابت").font(.headline)
                     ForEach(ZurvanOccasions.records) { item in
