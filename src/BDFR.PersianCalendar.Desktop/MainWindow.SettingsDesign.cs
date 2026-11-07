@@ -1,0 +1,709 @@
+using System.Reflection;
+using System.Security.Cryptography;
+using BDFR.PersianCalendar.Core;
+using Microsoft.Win32;
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
+
+namespace BDFR.PersianCalendar.Desktop;
+
+/// <summary>
+/// Windows Settings-inspired, navigable settings experience.
+/// Existing advanced settings are retained and opened on demand, never discarded.
+/// Account identity is never invented: local signed license codes contain only
+/// edition/device/expiry, not a name, email or avatar.
+/// </summary>
+public sealed partial class MainWindow
+{
+    private readonly (string Key, string Icon, string Color, string Description)[] _settingsSections =
+    [
+        ("عمومی", "\uE80F", "#FF7754E8", "تنظیمات پایه و رفتار کلی برنامه"),
+        ("نمایش و ظاهر", "\uE790", "#FFF18727", "قالب، رنگ‌ها، فونت و تصاویر"),
+        ("تقویم و زمان", "\uE787", "#FF278EF5", "تقویم، مناسبت‌ها و اوقات"),
+        ("برنامه و یادآور", "\uE823", "#FF14AB9C", "برنامه‌ها، هشدارها و رسانهٔ روز"),
+        ("زروان دسک", "\uE753", "#FF238AF1", "ورود، Vault و فایل‌های ابری"),
+        ("همگام‌سازی و پشتیبان‌گیری", "\uE895", "#FF168EA8", "فضای ابری و پوشهٔ داده‌ها"),
+        ("امنیت و حریم خصوصی", "\uE72E", "#FFE4A728", "حریم خصوصی، احراز هویت و دستگاه"),
+        ("لایسنس و فعال‌سازی", "\uE8D7", "#FFE8A51F", "اعتبار مجوز و فعال‌سازی"),
+        ("زبان و منطقه", "\uE774", "#FF1DB1AD", "زبان برنامه و تنظیمات محلی"),
+        ("درباره زروان", "\uE946", "#FF288DF4", "نسخه و مشخصات نرم‌افزار")
+    ];
+
+    private const string SettingsTextColor = "#FF282532";
+    private const string SettingsSecondaryColor = "#FF797586";
+    private const string SettingsCardColor = "#FFFFFDFD";
+    private StackPanel? _settingsNavigationList;
+    private StackPanel? _settingsContent;
+    private TextBox? _settingsSearchBox;
+    private string _selectedSettingsSection = "عمومی";
+
+    private FrameworkElement BuildWindowsSettingsPage()
+    {
+        var outer = new Grid
+        {
+            ColumnSpacing = 22,
+            FlowDirection = FlowDirection.RightToLeft,
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+        outer.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(280) });
+        outer.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+        var right = new StackPanel { Spacing = 15, Margin = new Thickness(0, 14, 0, 0) };
+        right.Children.Add(BuildSettingsAccountProfile());
+
+        _settingsSearchBox = new TextBox
+        {
+            PlaceholderText = "جست‌وجوی تنظیمات...",
+            Height = 42,
+            CornerRadius = new CornerRadius(13),
+            Background = ThemeService.Brush("#FFFFFFFF"),
+            BorderBrush = ThemeService.Brush("#FFE0DCE6"),
+            BorderThickness = new Thickness(1),
+            FlowDirection = FlowDirection.RightToLeft
+        };
+        _settingsSearchBox.TextChanged += (_, _) => RefreshSettingsCategories();
+        right.Children.Add(_settingsSearchBox);
+
+        _settingsNavigationList = new StackPanel { Spacing = 3 };
+        right.Children.Add(_settingsNavigationList);
+        Grid.SetColumn(right, 0);
+        outer.Children.Add(right);
+
+        var leftScroll = new ScrollViewer
+        {
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto
+        };
+        _settingsContent = new StackPanel
+        {
+            Spacing = 18,
+            Padding = new Thickness(6, 12, 5, 25),
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+        leftScroll.Content = _settingsContent;
+        Grid.SetColumn(leftScroll, 1);
+        outer.Children.Add(leftScroll);
+
+        RefreshSettingsCategories();
+        ShowSettingsSection(_selectedSettingsSection);
+        return outer;
+    }
+
+    private FrameworkElement BuildSettingsAccountProfile()
+    {
+        // Do not display the mockup's sample name/email. Zurvan's legacy signed
+        // license has no identity fields, so show only verifiable facts.
+        var account = new StackPanel { Spacing = 8 };
+        var row = new StackPanel
+        {
+            Spacing = 10,
+            Orientation = Orientation.Horizontal,
+            FlowDirection = FlowDirection.RightToLeft
+        };
+        var avatar = new Border
+        {
+            Width = 65,
+            Height = 65,
+            Background = ThemeService.Brush("#FFE1D6FF"),
+            CornerRadius = new CornerRadius(33),
+            Child = new FontIcon
+            {
+                Glyph = "\uE77B",
+                FontFamily = new FontFamily("Segoe Fluent Icons"),
+                FontSize = 33,
+                Foreground = ThemeService.Brush("#FF7755E8"),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            }
+        };
+        var text = new StackPanel { Spacing = 4, VerticalAlignment = VerticalAlignment.Center };
+        text.Children.Add(new TextBlock
+        {
+            Text = "کاربر زروان",
+            FontSize = 17,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Foreground = ThemeService.Brush(SettingsTextColor)
+        });
+        text.Children.Add(new TextBlock
+        {
+            Text = LicenseProfileStatus(),
+            FontSize = 12,
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = ThemeService.Brush(SettingsSecondaryColor)
+        });
+        row.Children.Add(avatar);
+        row.Children.Add(text);
+        account.Children.Add(row);
+
+        if (_deskClient.IsAuthenticated && !string.IsNullOrWhiteSpace(_deskClient.Identifier))
+        {
+            account.Children.Add(new TextBlock
+            {
+                Text = "زروان دسک: " + _deskClient.Identifier,
+                TextWrapping = TextWrapping.Wrap,
+                FontSize = 11,
+                Foreground = ThemeService.Brush(SettingsSecondaryColor)
+            });
+        }
+        var profile = new Button
+        {
+            Content = "مشاهده وضعیت لایسنس و حساب",
+            Background = ThemeService.Brush("#00FFFFFF"),
+            BorderThickness = new Thickness(0),
+            Foreground = ThemeService.Brush("#FF6654A8"),
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            HorizontalContentAlignment = HorizontalAlignment.Right,
+            Padding = new Thickness(4, 7, 4, 7)
+        };
+        profile.Click += (_, _) => ShowSettingsSection("لایسنس و فعال‌سازی");
+        account.Children.Add(profile);
+        return account;
+    }
+
+    private string LicenseProfileStatus()
+    {
+        var code = _settings.LicenseActivationCode;
+        var pem = ReadLicensePublicKey();
+        if (string.IsNullOrWhiteSpace(code) || string.IsNullOrWhiteSpace(pem))
+            return "مجوز معتبر محلی ثبت نشده است";
+        try
+        {
+            using var rsa = RSA.Create();
+            rsa.ImportFromPem(pem);
+            if (ZurvanLicense.TryVerify(code, GetWindowsDeviceCode(), rsa, out var payload) && payload is not null)
+                return string.IsNullOrWhiteSpace(payload.ExpiresUtc)
+                    ? $"لایسنس معتبر · {payload.Edition} · بدون انقضا"
+                    : $"لایسنس معتبر · {payload.Edition} · تا {payload.ExpiresUtc}";
+        }
+        catch (Exception ex) { StartupDiagnostics.Log("Settings license profile lookup failed: " + ex.Message); }
+        return "مجوز محلی معتبر نیست یا منقضی شده است";
+    }
+
+    private void RefreshSettingsCategories()
+    {
+        if (_settingsNavigationList is null) return;
+        _settingsNavigationList.Children.Clear();
+        var term = _settingsSearchBox?.Text?.Trim() ?? "";
+        foreach (var (key, icon, color, description) in _settingsSections)
+        {
+            if (term.Length > 0 &&
+                !key.Contains(term, StringComparison.OrdinalIgnoreCase) &&
+                !description.Contains(term, StringComparison.OrdinalIgnoreCase))
+                continue;
+            var row = new Grid { FlowDirection = FlowDirection.RightToLeft, ColumnSpacing = 12 };
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(35) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            var symbol = new FontIcon
+            {
+                Glyph = icon,
+                FontFamily = new FontFamily("Segoe Fluent Icons"),
+                FontSize = 25,
+                Foreground = ThemeService.Brush(color),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            Grid.SetColumn(symbol, 0);
+            var label = new TextBlock
+            {
+                Text = key,
+                FontSize = 15,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                VerticalAlignment = VerticalAlignment.Center,
+                Foreground = ThemeService.Brush(SettingsTextColor)
+            };
+            Grid.SetColumn(label, 1);
+            row.Children.Add(symbol);
+            row.Children.Add(label);
+            var button = new Button
+            {
+                Content = row,
+                Background = ThemeService.Brush(key == _selectedSettingsSection ? "#FFE8E2EB" : "#00FFFFFF"),
+                BorderThickness = new Thickness(0),
+                CornerRadius = new CornerRadius(11),
+                MinHeight = 48,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                HorizontalContentAlignment = HorizontalAlignment.Stretch,
+                Padding = new Thickness(11, 7, 11, 7)
+            };
+            var selected = key;
+            button.Click += (_, _) => ShowSettingsSection(selected);
+            _settingsNavigationList.Children.Add(button);
+        }
+    }
+
+    private static TextBlock SettingsLabel(string title, int size = 15, bool bold = false)
+        => new()
+        {
+            Text = title,
+            FontSize = size,
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = ThemeService.Brush(SettingsTextColor),
+            FontWeight = bold ? Microsoft.UI.Text.FontWeights.SemiBold : Microsoft.UI.Text.FontWeights.Normal
+        };
+
+    private static TextBlock SettingsHint(string text)
+        => new()
+        {
+            Text = text,
+            FontSize = 12,
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = ThemeService.Brush(SettingsSecondaryColor)
+        };
+
+    private static Border SettingsCard(UIElement element, Thickness? padding = null)
+        => new()
+        {
+            Background = ThemeService.Brush(SettingsCardColor),
+            BorderBrush = ThemeService.Brush("#FFE8E2E6"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(17),
+            Padding = padding ?? new Thickness(18),
+            Child = element
+        };
+
+    private static FrameworkElement SettingsOptionRow(string title, string hint, UIElement control, string icon = "\uE713")
+    {
+        var grid = new Grid
+        {
+            ColumnSpacing = 12,
+            MinHeight = 63,
+            FlowDirection = FlowDirection.RightToLeft
+        };
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(31) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var glyph = new FontIcon
+        {
+            Glyph = icon,
+            FontFamily = new FontFamily("Segoe Fluent Icons"),
+            FontSize = 20,
+            Foreground = ThemeService.Brush("#FF665D77"),
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        Grid.SetColumn(glyph, 0);
+        var text = new StackPanel { Spacing = 3, VerticalAlignment = VerticalAlignment.Center };
+        text.Children.Add(SettingsLabel(title, 15, true));
+        text.Children.Add(SettingsHint(hint));
+        Grid.SetColumn(text, 1);
+        var controlHost = new Border
+        {
+            Child = control,
+            VerticalAlignment = VerticalAlignment.Center,
+            MinWidth = 90
+        };
+        Grid.SetColumn(controlHost, 2);
+        grid.Children.Add(glyph);
+        grid.Children.Add(text);
+        grid.Children.Add(controlHost);
+        return grid;
+    }
+
+    private static void AddSettingsSeparator(StackPanel panel)
+        => panel.Children.Add(new Border
+        {
+            Height = 1,
+            Background = ThemeService.Brush("#FFEEE9EC"),
+            Margin = new Thickness(0, 3, 0, 3)
+        });
+
+    private StackPanel SettingsGroup(string title, string description, string glyph, string color)
+    {
+        var panel = new StackPanel { Spacing = 12 };
+        var header = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 10,
+            FlowDirection = FlowDirection.RightToLeft
+        };
+        header.Children.Add(new FontIcon
+        {
+            Glyph = glyph,
+            FontFamily = new FontFamily("Segoe Fluent Icons"),
+            Foreground = ThemeService.Brush(color),
+            FontSize = 27
+        });
+        var texts = new StackPanel { Spacing = 3 };
+        texts.Children.Add(SettingsLabel(title, 19, true));
+        texts.Children.Add(SettingsHint(description));
+        header.Children.Add(texts);
+        panel.Children.Add(header);
+        AddSettingsSeparator(panel);
+        return panel;
+    }
+
+    private Button SettingsActionButton(string text, Action action)
+    {
+        var button = new Button
+        {
+            Content = text,
+            Background = ThemeService.Brush("#FFF6F0F5"),
+            Foreground = ThemeService.Brush(SettingsTextColor),
+            BorderBrush = ThemeService.Brush("#FFE5DFE6"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(10),
+            Padding = new Thickness(16, 10, 16, 10),
+            MinHeight = 43
+        };
+        button.Click += (_, _) => action();
+        return button;
+    }
+
+    private void AddSettingsAction(StackPanel parent, string title, string description, string buttonText, Action action, string glyph = "\uE713")
+    {
+        parent.Children.Add(SettingsOptionRow(
+            title, description,
+            SettingsActionButton(buttonText, action),
+            glyph));
+        AddSettingsSeparator(parent);
+    }
+
+    private void ShowSettingsSection(string section)
+    {
+        if (_settingsContent is null) return;
+        _selectedSettingsSection = section;
+        RefreshSettingsCategories();
+        _settingsContent.Children.Clear();
+        var meta = _settingsSections.FirstOrDefault(x => x.Key == section);
+        var description = !string.IsNullOrWhiteSpace(meta.Description) ? meta.Description : "شخصی‌سازی زروان";
+        _settingsContent.Children.Add(SettingsLabel("تنظیمات زروان", 32, true));
+        _settingsContent.Children.Add(SettingsHint("سفارشی‌سازی عملکرد، ظاهر و قابلیت‌های برنامه"));
+        _settingsContent.Children.Add(SettingsLabel(section, 22, true));
+
+        switch (section)
+        {
+            case "عمومی": BuildSettingsGeneral(); break;
+            case "نمایش و ظاهر": BuildSettingsAppearance(); break;
+            case "تقویم و زمان": BuildSettingsCalendar(); break;
+            case "برنامه و یادآور": BuildSettingsPlanner(); break;
+            case "زروان دسک": BuildSettingsDesk(); break;
+            case "همگام‌سازی و پشتیبان‌گیری": BuildSettingsBackup(); break;
+            case "امنیت و حریم خصوصی": BuildSettingsPrivacy(); break;
+            case "لایسنس و فعال‌سازی": BuildSettingsLicense(); break;
+            case "زبان و منطقه": BuildSettingsLanguage(); break;
+            case "درباره زروان": BuildSettingsAbout(); break;
+        }
+        _settingsContent.Children.Add(new Border
+        {
+            Background = ThemeService.Brush("#FFE7EBFF"),
+            CornerRadius = new CornerRadius(12),
+            Padding = new Thickness(16),
+            Child = SettingsHint("تغییرات ذخیره‌شدنی این صفحه مستقیماً در تنظیمات زروان ثبت می‌شوند. برخی تغییرات ظاهری ممکن است بازسازی رابط را نیاز داشته باشند.")
+        });
+    }
+
+    private bool IsZurvanAutoStart()
+    {
+        try
+        {
+            var value = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run")
+                ?.GetValue("Zurvan") as string;
+            return !string.IsNullOrWhiteSpace(value);
+        }
+        catch { return false; }
+    }
+
+    private void SetZurvanAutoStart(bool enabled)
+    {
+        var executable = Environment.ProcessPath;
+        if (enabled && (string.IsNullOrWhiteSpace(executable) ||
+            !executable.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)))
+            throw new InvalidOperationException("مسیر فایل اجرایی زروان در این نصب در دسترس نیست.");
+        using var run = Registry.CurrentUser.CreateSubKey(
+            @"Software\Microsoft\Windows\CurrentVersion\Run",
+            writable: true);
+        if (run is null) throw new InvalidOperationException("دسترسی به تنظیمات شروع ویندوز ممکن نیست.");
+        if (enabled) run.SetValue("Zurvan", $"\"{executable}\"", RegistryValueKind.String);
+        else run.DeleteValue("Zurvan", throwOnMissingValue: false);
+    }
+
+    private ToggleSwitch SettingsToggle(bool enabled, Action<bool> apply)
+    {
+        var control = new ToggleSwitch
+        {
+            IsOn = enabled,
+            OnContent = "فعال",
+            OffContent = "خاموش",
+            HorizontalAlignment = HorizontalAlignment.Right,
+            MinWidth = 85
+        };
+        control.Toggled += (_, _) =>
+        {
+            try { apply(control.IsOn); }
+            catch (Exception ex)
+            {
+                StartupDiagnostics.Log("Settings toggle failed: " + ex);
+                StatusText.Text = "تغییر تنظیمات ناموفق بود: " + ex.Message;
+                control.IsOn = enabled;
+            }
+        };
+        return control;
+    }
+
+    private void BuildSettingsGeneral()
+    {
+        var contents = SettingsGroup("عمومی", "تنظیمات پایه و رفتار زروان", "\uE80F", "#FF7454E8");
+        contents.Children.Add(SettingsOptionRow("شروع همراه ویندوز",
+            "اجرای زروان هنگام ورود به حساب ویندوز",
+            SettingsToggle(IsZurvanAutoStart(), SetZurvanAutoStart), "\uE768"));
+        AddSettingsSeparator(contents);
+        contents.Children.Add(SettingsOptionRow("نمایش تصاویر مناسبت‌ها",
+            "نمایش تصاویر مربوط به روزهای دارای مناسبت",
+            SettingsToggle(_settings.ShowOccasionPictures, value =>
+            {
+                _settings.ShowOccasionPictures = value;
+                _settingsService.Save(_settings);
+                BuildCalendar();
+            }), "\uEB9F"));
+        AddSettingsSeparator(contents);
+        contents.Children.Add(SettingsOptionRow("رسانه‌های روز",
+            "اجازه اتصال تصویر و فایل به روز انتخاب‌شده",
+            SettingsToggle(_settings.DayMediaEnabled, SetDayMediaEnabled), "\uE8B7"));
+        _settingsContent!.Children.Add(SettingsCard(contents));
+        BuildSettingsQuickActions();
+        BuildSettingsVersionBanner();
+    }
+
+    private void BuildSettingsVersionBanner()
+    {
+        var layout = new StackPanel { Spacing = 8 };
+        layout.Children.Add(SettingsLabel("زروان", 22, true));
+        layout.Children.Add(SettingsHint("تقویم فارسی، برنامه‌ریزی و مدیریت هوشمند زمان"));
+        layout.Children.Add(SettingsHint("نسخه نصب‌شده: " + Assembly.GetExecutingAssembly().GetName().Version));
+        layout.Children.Add(SettingsActionButton("درباره زروان", () => ShowSettingsSection("درباره زروان")));
+        _settingsContent!.Children.Add(new Border
+        {
+            Background = ThemeService.Brush("#FFEDE4FB"),
+            CornerRadius = new CornerRadius(20),
+            Padding = new Thickness(22),
+            Child = layout
+        });
+    }
+
+    private void BuildSettingsQuickActions()
+    {
+        var contents = SettingsGroup("شروع سریع", "دسترسی به بخش‌های پرکاربرد", "\uE8A7", "#FF9360E0");
+        var grid = new Grid { ColumnSpacing = 10, RowSpacing = 10 };
+        for (var i = 0; i < 3; i++) grid.ColumnDefinitions.Add(new ColumnDefinition());
+        for (var i = 0; i < 2; i++) grid.RowDefinitions.Add(new RowDefinition());
+        var actions = new (string Text, string Destination)[]
+        {
+            ("ایجاد برنامه", "برنامه‌ها"),
+            ("زروان دسک", "زروان دسک"),
+            ("تنظیم یادآور", "یادآورها"),
+            ("تغییر تم", "نمایش و ظاهر"),
+            ("تنظیمات لایسنس", "لایسنس و فعال‌سازی"),
+            ("تقویم", "تقویم")
+        };
+        for (var i = 0; i < actions.Length; i++)
+        {
+            var item = actions[i];
+            var button = SettingsActionButton(item.Text, () =>
+            {
+                if (_settingsSections.Any(x => x.Key == item.Destination))
+                    ShowSettingsSection(item.Destination);
+                else ShowDesktopModule(item.Destination);
+            });
+            Grid.SetColumn(button, i % 3);
+            Grid.SetRow(button, i / 3);
+            grid.Children.Add(button);
+        }
+        contents.Children.Add(grid);
+        _settingsContent!.Children.Add(SettingsCard(contents));
+    }
+
+    private void BuildSettingsAppearance()
+    {
+        var contents = SettingsGroup("نمایش و ظاهر", "انتخاب تم و تغییرات نمایشی", "\uE790", "#FFF39C42");
+        var combo = new ComboBox
+        {
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            MinWidth = 195
+        };
+        foreach (var item in AppearanceCatalog.Themes)
+            combo.Items.Add(new ComboBoxItem { Content = item.DisplayName, Tag = item.Id });
+        combo.SelectedItem = combo.Items.OfType<ComboBoxItem>()
+            .FirstOrDefault(x => string.Equals((string?)x.Tag, _settings.ThemeId, StringComparison.OrdinalIgnoreCase));
+        combo.SelectionChanged += async (_, _) =>
+        {
+            if (combo.SelectedItem is ComboBoxItem item && item.Tag is string id)
+                await SelectThemeAsync(id);
+        };
+        contents.Children.Add(SettingsOptionRow("تم زروان", "قالب فعلی برنامه", combo, "\uE790"));
+        AddSettingsSeparator(contents);
+        AddSettingsAction(contents, "تنظیمات ظاهری پیشرفته",
+            "رنگ‌ها، فونت‌ها، Glass Mode، پس‌زمینه و تصویرهای فصلی",
+            "بازکردن تنظیمات کامل", OpenLegacySettings, "\uE771");
+        _settingsContent!.Children.Add(SettingsCard(contents));
+    }
+
+    private void BuildSettingsCalendar()
+    {
+        var contents = SettingsGroup("تقویم و زمان", "روزها، مناسبت‌ها و ترتیب تقویم‌ها", "\uE787", "#FF288AF0");
+        AddSettingsAction(contents, "به‌روزرسانی مناسبت‌ها",
+            "همگام‌سازی داده‌های سال انتخاب‌شده با time.ir", "به‌روزرسانی",
+            () => _ = SyncOccasionsFromSettingsAsync(), "\uE895");
+        AddSettingsAction(contents, "ترتیب تقویم‌ها و اوقات شرعی",
+            "تنظیم تقویم شمسی، میلادی و هجری و محاسبه اوقات",
+            "تنظیمات کامل", OpenLegacySettings, "\uE787");
+        AddSettingsAction(contents, "مناسبت‌ها", "نمایش مناسبت‌های ثبت‌شده و رسمی",
+            "بازکردن مناسبت‌ها", () => ShowDesktopModule("مناسبت‌ها"), "\uE787");
+        _settingsContent!.Children.Add(SettingsCard(contents));
+    }
+
+    private async Task SyncOccasionsFromSettingsAsync()
+    {
+        try
+        {
+            await _repository.ReplaceOccasionsForYearAsync(
+                _occasionSource.Name, _selected.Year,
+                await _occasionSource.GetYearAsync(_selected.Year));
+            await LoadSelectedDayAsync();
+            await LoadCalendarCellOccasionsAsync(_year, _month);
+            StatusText.Text = "مناسبت‌های سال به‌روز شدند.";
+        }
+        catch (Exception ex) { StatusText.Text = "خطا در دریافت مناسبت‌ها: " + ex.Message; }
+    }
+
+    private void BuildSettingsPlanner()
+    {
+        var contents = SettingsGroup("برنامه و یادآور",
+            "تنظیم برنامه‌ها، یادآورها و اطلاعات روزها", "\uE823", "#FF1DAF9F");
+        AddSettingsAction(contents, "برنامه‌های من", "نمای هفتگی و مدیریت کارهای ثبت‌شده",
+            "بازکردن برنامه‌ها", () => ShowDesktopModule("برنامه‌ها"), "\uE80A");
+        AddSettingsAction(contents, "یادآورهای فعال", "مرکز هشدارها و یادآورها",
+            "بازکردن یادآورها", () => ShowDesktopModule("یادآورها"), "\uE823");
+        contents.Children.Add(SettingsOptionRow("اتصال رسانه به روز",
+            "فعال یا غیرفعال‌کردن فایل‌ها و تصاویر روزانه",
+            SettingsToggle(_settings.DayMediaEnabled, SetDayMediaEnabled), "\uE8B7"));
+        _settingsContent!.Children.Add(SettingsCard(contents));
+    }
+
+    private void BuildSettingsDesk()
+    {
+        var contents = SettingsGroup("زروان دسک",
+            "حساب ابری و Vault رمزگذاری‌شدهٔ مستقل از لایسنس", "\uE753", "#FF258BF2");
+        contents.Children.Add(SettingsHint(_deskClient.IsAuthenticated
+            ? "حساب متصل: " + (_deskClient.Identifier ?? "زروان دسک")
+            : "هنوز به زروان دسک وارد نشده‌اید."));
+        AddSettingsAction(contents, "حساب و فایل‌منیجر",
+            "ورود، ثبت‌نام، بازیابی Vault و مدیریت فایل‌های رمزگذاری‌شده",
+            "ورود به زروان دسک", () => ShowDesktopModule("زروان دسک"), "\uE753");
+        _settingsContent!.Children.Add(SettingsCard(contents));
+    }
+
+    private void BuildSettingsBackup()
+    {
+        var contents = SettingsGroup("همگام‌سازی و پشتیبان‌گیری",
+            "دسترسی به اطلاعات و تنظیمات ذخیره‌شده", "\uE895", "#FF168FA9");
+        AddSettingsAction(contents, "فضای ذخیره‌سازی ابری",
+            "نمایش و مدیریت فایل‌های ذخیره‌شده روی سرور",
+            "بازکردن فایل‌منیجر", () => ShowDesktopModule("زروان دسک"), "\uE753");
+        AddSettingsAction(contents, "همگام‌سازی مناسبت‌ها",
+            "دریافت دوباره مناسبت‌های سال جاری", "همگام‌سازی",
+            () => _ = SyncOccasionsFromSettingsAsync(), "\uE895");
+        AddSettingsAction(contents, "تنظیمات فضای ابری پیشرفته",
+            "تنظیمات اتصال ابری پیشین زروان بدون حذف اطلاعات ذخیره‌شده",
+            "تنظیمات کامل", OpenLegacySettings, "\uE713");
+        _settingsContent!.Children.Add(SettingsCard(contents));
+    }
+
+    private void BuildSettingsPrivacy()
+    {
+        var contents = SettingsGroup("امنیت و حریم خصوصی",
+            "وضعیت امنیت، لایسنس و حساب‌های مستقل", "\uE72E", "#FFDAAB28");
+        contents.Children.Add(SettingsHint(
+            "مجوز ویندوز به دستگاه وابسته است. حساب Zurvan Desk مستقل است و کلید رمزگذاری فایل‌ها در صندوق امن دستگاه نگه‌داری می‌شود."));
+        AddSettingsAction(contents, "وضعیت مجوز", LicenseProfileStatus(),
+            "مشاهده لایسنس", () => ShowSettingsSection("لایسنس و فعال‌سازی"), "\uE8D7");
+        AddSettingsAction(contents, "حساب ابری", "مدیریت ورود و بازیابی Vault",
+            "بازکردن زروان دسک", () => ShowDesktopModule("زروان دسک"), "\uE753");
+        _settingsContent!.Children.Add(SettingsCard(contents));
+    }
+
+    private void BuildSettingsLicense()
+    {
+        var contents = SettingsGroup("لایسنس و فعال‌سازی",
+            "مشخصات مجوز تأییدشدهٔ همین دستگاه", "\uE8D7", "#FFE8AD1D");
+        contents.Children.Add(SettingsLabel(LicenseProfileStatus(), 16, true));
+        contents.Children.Add(SettingsHint(
+            "کد محلی قدیمی زروان نام، نشانی ایمیل یا تصویر کاربر را نگه‌داری نمی‌کند. تا زمان اتصال احراز هویت حساب به سرویس لایسنس، اطلاعات هویتی ساختگی نمایش داده نمی‌شوند."));
+        AddSettingsAction(contents, "مدیریت فعال‌سازی",
+            "نمایش شناسه دستگاه و اعتبارسنجی کد امضاشده",
+            "صفحه فعال‌سازی", () => ShowDesktopModule("لایسنس و فعال‌سازی"), "\uE8D7");
+        _settingsContent!.Children.Add(SettingsCard(contents));
+    }
+
+    private void BuildSettingsLanguage()
+    {
+        var contents = SettingsGroup("زبان و منطقه",
+            "زبان رابط زروان", "\uE774", "#FF16AFA7");
+        var combo = new ComboBox
+        {
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            MinWidth = 200
+        };
+        var languages = new (string Code, string Label)[]
+        {
+            ("fa", "فارسی"), ("en", "English"),
+            ("ckb", "کوردی (سۆرانی)"), ("bal", "بلوچی")
+        };
+        foreach (var item in languages)
+            combo.Items.Add(new ComboBoxItem { Content = item.Label, Tag = item.Code });
+        combo.SelectedItem = combo.Items.OfType<ComboBoxItem>()
+            .FirstOrDefault(x => string.Equals((string?)x.Tag, _settings.LanguageCode, StringComparison.OrdinalIgnoreCase))
+            ?? combo.Items[0];
+        combo.SelectionChanged += (_, _) =>
+        {
+            if (combo.SelectedItem is ComboBoxItem item && item.Tag is string code)
+            {
+                _settings.LanguageCode = code;
+                _settingsService.Save(_settings);
+                StatusText.Text = "زبان ترجیحی ذخیره شد. ترجمه کامل همه صفحات هنوز در حال تکمیل است.";
+            }
+        };
+        contents.Children.Add(SettingsOptionRow("زبان برنامه",
+            "انتخاب زبان ترجیحی؛ ترجمهٔ بعضی صفحات هنوز تکمیل نشده است",
+            combo, "\uE774"));
+        _settingsContent!.Children.Add(SettingsCard(contents));
+    }
+
+    private void BuildSettingsAbout()
+    {
+        var contents = SettingsGroup("درباره زروان",
+            "نسخه و مشخصات نرم‌افزار", "\uE946", "#FF298FF7");
+        var asm = Assembly.GetExecutingAssembly();
+        contents.Children.Add(SettingsLabel("Zurvan | زروان", 22, true));
+        contents.Children.Add(SettingsHint("نسخه: " + (asm.GetName().Version?.ToString() ?? "نامشخص")));
+        var revision = asm.GetCustomAttributes<AssemblyMetadataAttribute>()
+            .FirstOrDefault(x => x.Key == "GitCommit")?.Value;
+        if (!string.IsNullOrWhiteSpace(revision))
+            contents.Children.Add(SettingsHint("شناسه نسخه: " + revision));
+        contents.Children.Add(SettingsHint("تقویم، برنامه‌ریز، مناسبت‌ها، یادآورها و فضای ابری شخصی زروان"));
+        AddSettingsAction(contents, "امکانات پیشرفته",
+            "نمایش تنظیمات قدیمی برای دسترسی به تمام قابلیت‌های موجود",
+            "تنظیمات پیشرفته", OpenLegacySettings, "\uE713");
+        _settingsContent!.Children.Add(SettingsCard(contents));
+    }
+
+    private void OpenLegacySettings()
+    {
+        try
+        {
+            var old = _settingsSurface ?? (Border)BuildSettingsPanelSafe();
+            _settingsPanel.Visibility = Visibility.Visible;
+            DetachDesktopElement(old);
+            ShowSettingsSection("نمایش و ظاهر");
+            // Replace the category page content with the full existing editor;
+            // do not rebuild the editor or reset any saved values.
+            _settingsContent!.Children.Clear();
+            _settingsContent.Children.Add(SettingsActionButton("بازگشت به دسته‌بندی‌ها",
+                () => ShowSettingsSection("نمایش و ظاهر")));
+            _settingsContent.Children.Add(old);
+        }
+        catch (Exception ex)
+        {
+            StartupDiagnostics.Log("Unable to open legacy settings: " + ex);
+            StatusText.Text = "بازکردن تنظیمات پیشرفته ناموفق بود: " + ex.Message;
+        }
+    }
+}
