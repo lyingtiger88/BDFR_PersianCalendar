@@ -202,7 +202,8 @@ struct ZurvanOccasionsView: View {
                     Text("سبک نمایش نمادهای برج فلکی را انتخاب کنید").font(.caption).foregroundStyle(.secondary)
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 9) {
-                            ForEach(zodiacStyles, id: \.0) { style in
+                            ForEach(0..<zodiacStyles.count, id: \.self) { index in
+                                let style = zodiacStyles[index]
                                 Button { zodiacTheme = style.0 } label: {
                                     VStack(spacing: 7) {
                                         Image(systemName: style.2).font(.title2).foregroundStyle(.white)
