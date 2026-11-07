@@ -93,10 +93,6 @@ public sealed class AppSettings
     // Stable local identity used by Zurvan Companion pairing.
     public string CompanionDeviceId { get; set; } = "";
 
-    // Offline, device-bound Windows activation (signed code only; issuer private key never ships).
-    public string LicenseInstallationId { get; set; } = "";
-    public string LicenseActivationCode { get; set; } = "";
-
     // Prayer-time calculation settings (local astronomical estimates).
     public string PrayerSchool { get; set; } = "jafari";
     public string PrayerMethod { get; set; } = "tehran";
