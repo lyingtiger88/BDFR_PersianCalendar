@@ -12,6 +12,8 @@ public sealed partial class MainWindow
 
     private Border BuildNavigationRail()
     {
+        // A fresh rail must never retain entries from an older visual tree.
+        _navigationEntries.Clear();
         var shell = new Grid
         {
             FlowDirection = FlowDirection.RightToLeft,
