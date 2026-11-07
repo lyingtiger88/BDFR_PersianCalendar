@@ -630,6 +630,55 @@ public sealed partial class MainWindow
         };
         contents.Children.Add(SettingsOptionRow("تم زروان", "قالب فعلی برنامه", combo, "\uE790"));
         AddSettingsSeparator(contents);
+
+        var zodiacStyles = new (string Id, string Title, string Glyph)[]
+        {
+            ("cosmic", "کیهانی کلاسیک", "✦"), ("neon", "فانتزی نورانی", "☄"),
+            ("minimal", "مینیمال مدرن", "☾"), ("watercolor", "آبرنگی هنری", "✿"),
+            ("mythic", "اسطوره‌ای", "♜"), ("cute", "کارتونی کیوت", "☺"),
+            ("luxury", "سه‌بعدی لوکس", "✧")
+        };
+        var zodiacGroup = SettingsGroup("Zodiac Theme", "سبک مستقل نمایش نمادهای دوازده برج فلکی؛ جدا از تم کلی زروان.", "✦", "#FF8B67DD");
+        var zodiacChoices = new Grid { ColumnSpacing = 8, RowSpacing = 8 };
+        for (var column = 0; column < 3; column++)
+            zodiacChoices.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        for (var row = 0; row < 3; row++)
+            zodiacChoices.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        for (var index = 0; index < zodiacStyles.Length; index++)
+        {
+            var style = zodiacStyles[index];
+            var selected = string.Equals(_settings.ZodiacThemeId, style.Id, StringComparison.OrdinalIgnoreCase);
+            var tileContent = new StackPanel { Spacing = 5, Padding = new Thickness(10), HorizontalAlignment = HorizontalAlignment.Center };
+            tileContent.Children.Add(new TextBlock { Text = style.Glyph, FontSize = 25, HorizontalAlignment = HorizontalAlignment.Center, Foreground = ThemeService.Brush(_theme.Accent) });
+            tileContent.Children.Add(new TextBlock { Text = style.Title, FontSize = 11, TextAlignment = TextAlignment.Center, TextWrapping = TextWrapping.Wrap, Foreground = ThemeService.Brush(_theme.PrimaryText) });
+            var tile = new Button
+            {
+                Content = new Border
+                {
+                    CornerRadius = new CornerRadius(11),
+                    BorderThickness = new Thickness(selected ? 2 : 1),
+                    BorderBrush = BrushWithAlpha(selected ? _theme.Accent : _theme.SecondaryText, 0x90),
+                    Background = BrushWithAlpha(selected ? _theme.Accent : _theme.CardBackground, selected ? (byte)0x35 : (byte)0x45),
+                    Child = tileContent
+                },
+                Padding = new Thickness(0),
+                Background = BrushWithAlpha("#00FFFFFF", 0),
+                BorderThickness = new Thickness(0)
+            };
+            tile.Click += (_, _) =>
+            {
+                _settings.ZodiacThemeId = style.Id;
+                _settingsService.Save(_settings);
+                StatusText.Text = "سبک نمادهای برج فلکی به «" + style.Title + "» تغییر کرد.";
+                ShowSettingsSection("نمایش و ظاهر");
+            };
+            Grid.SetColumn(tile, index % 3);
+            Grid.SetRow(tile, index / 3);
+            zodiacChoices.Children.Add(tile);
+        }
+        zodiacGroup.Children.Add(zodiacChoices);
+        contents.Children.Add(SettingsCard(zodiacGroup));
+        AddSettingsSeparator(contents);
         AddSettingsAction(contents, "تنظیمات ظاهری پیشرفته",
             "رنگ‌ها، فونت‌ها، Glass Mode، پس‌زمینه و تصویرهای فصلی",
             "بازکردن تنظیمات کامل", OpenLegacySettings, "\uE771");
