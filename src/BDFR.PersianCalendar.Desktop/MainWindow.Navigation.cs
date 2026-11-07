@@ -219,8 +219,8 @@ public sealed partial class MainWindow
         SelectNavigationEntry(_activeDesktopModule);
     }
 
-    private bool IsNavigationRailOnLeft()
-        => !string.Equals(_settings.NavigationRailSide, "right", StringComparison.OrdinalIgnoreCase);
+    // The approved Windows Settings-style mockup keeps the navigation on the left.
+    private bool IsNavigationRailOnLeft() => true;
 
     private void ApplyWorkspaceLayoutSettingsLive()
     {
