@@ -352,6 +352,73 @@ public sealed partial class MainWindow
                 var selectedZodiac = zodiacOptions.FirstOrDefault(x => x.Id == _settings.ZodiacThemeId);
                 if (string.IsNullOrWhiteSpace(selectedZodiac.Id)) selectedZodiac = zodiacOptions[0];
 
+                var zodiacBannerBody = new Grid { ColumnSpacing = 12, Padding = new Thickness(18), FlowDirection = FlowDirection.RightToLeft };
+                zodiacBannerBody.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                zodiacBannerBody.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                var zodiacGlyph = new TextBlock
+                {
+                    Text = selectedZodiac.Glyph,
+                    FontSize = 48,
+                    Foreground = ThemeService.Brush("#FFFFD68A"),
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                Grid.SetColumn(zodiacGlyph, 0);
+                zodiacBannerBody.Children.Add(zodiacGlyph);
+                var zodiacText = new StackPanel { Spacing = 5, VerticalAlignment = VerticalAlignment.Center };
+                zodiacText.Children.Add(new TextBlock
+                {
+                    Text = "مناسبت‌ها",
+                    FontSize = 23,
+                    FontWeight = Microsoft.UI.Text.FontWeights.Bold,
+                    Foreground = ThemeService.Brush("#FFFFFFFF")
+                });
+                zodiacText.Children.Add(new TextBlock
+                {
+                    Text = "تقویم رسمی و رویدادهای سال",
+                    Foreground = ThemeService.Brush("#FFF0E9FF")
+                });
+                zodiacText.Children.Add(new TextBlock
+                {
+                    Text = "نمادهای فلکی و حال‌وهوای کیهانی زروان",
+                    FontSize = 12,
+                    Foreground = ThemeService.Brush("#FFD8CCF5")
+                });
+                Grid.SetColumn(zodiacText, 1);
+                zodiacBannerBody.Children.Add(zodiacText);
+                var zodiacPalette = selectedZodiac.Id switch
+                {
+                    "neon" => ("#FF190B42", "#FF6525A8"),
+                    "minimal" => ("#FF171A24", "#FF414655"),
+                    "watercolor" => ("#FF60436E", "#FFB879A0"),
+                    "mythic" => ("#FF38200D", "#FF93602C"),
+                    "cute" => ("#FF6D3157", "#FFC879A8"),
+                    "luxury" => ("#FF102536", "#FF53647E"),
+                    _ => ("#FF100D35", "#FF39236F")
+                };
+                var zodiacBanner = new Border
+                {
+                    CornerRadius = new CornerRadius(16),
+                    BorderThickness = new Thickness(1),
+                    BorderBrush = BrushWithAlpha(_theme.Accent, 0xB0),
+                    Background = new LinearGradientBrush
+                    {
+                        StartPoint = new Windows.Foundation.Point(0, 0),
+                        EndPoint = new Windows.Foundation.Point(1, 1),
+                        GradientStops =
+                        {
+                            new GradientStop { Color = Windows.UI.ColorHelper.FromArgb(255,
+                                Convert.ToByte(zodiacPalette.Item1.Substring(3, 2), 16),
+                                Convert.ToByte(zodiacPalette.Item1.Substring(5, 2), 16),
+                                Convert.ToByte(zodiacPalette.Item1.Substring(7, 2), 16)), Offset = 0 },
+                            new GradientStop { Color = Windows.UI.ColorHelper.FromArgb(255,
+                                Convert.ToByte(zodiacPalette.Item2.Substring(3, 2), 16),
+                                Convert.ToByte(zodiacPalette.Item2.Substring(5, 2), 16),
+                                Convert.ToByte(zodiacPalette.Item2.Substring(7, 2), 16)), Offset = 1 }
+                        }
+                    },
+                    Child = zodiacBannerBody
+                };
+
                 var selectedDayOccasions = OccasionsPanel;
                 DetachDesktopElement(selectedDayOccasions);
                 page.Children.Add(zodiacBanner);
