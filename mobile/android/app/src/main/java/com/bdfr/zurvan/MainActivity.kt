@@ -1772,20 +1772,40 @@ private fun OccasionsScreen(
                     }
                 }
                 items(entries, key = { it.id }) { item ->
+                    val holidayColor = if (item.isHoliday) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
                     Row(
                         Modifier.fillMaxWidth().padding(start = 4.dp, top = 2.dp, bottom = 2.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(toPersianDigits(item.day.toString()), modifier = Modifier.width(42.dp), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
-                        Box(Modifier.width(2.dp).height(34.dp).background(MaterialTheme.colorScheme.outlineVariant))
+                        Text(
+                            toPersianDigits(item.day.toString()),
+                            modifier = Modifier.width(42.dp),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center,
+                            color = holidayColor
+                        )
+                        Box(
+                            Modifier.width(2.dp).height(34.dp)
+                                .background(if (item.isHoliday) holidayColor else MaterialTheme.colorScheme.outlineVariant)
+                        )
                         Column(Modifier.weight(1f).padding(start = 10.dp, top = 4.dp, bottom = 4.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                                 Text(ZurvanBuiltInOccasions.iconFor(item.title), style = MaterialTheme.typography.bodyMedium)
-                                Text(item.title, style = MaterialTheme.typography.bodyMedium, fontWeight = if (item.isHoliday) FontWeight.Bold else FontWeight.Normal)
+                                Text(
+                                    item.title,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = if (item.isHoliday) FontWeight.Bold else FontWeight.Normal,
+                                    color = holidayColor
+                                )
                             }
                             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text("${item.day} ${monthNames[month - 1]}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                if (item.isHoliday) Text("تعطیل رسمی", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                                Text(
+                                    "${toPersianDigits(item.day.toString())} ${monthNames[month - 1]}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = holidayColor
+                                )
+                                if (item.isHoliday) Text("تعطیل رسمی", style = MaterialTheme.typography.labelSmall, color = holidayColor, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
