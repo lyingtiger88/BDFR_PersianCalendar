@@ -571,7 +571,24 @@ public sealed partial class MainWindow
                 }
 
                 refresh.Click += async (_, _) => await LoadActivityTiles();
-                clear.Click += ClearActivities_Click;
+                clear.Click += async (_, _) =>
+                {
+                    var dialog = new ContentDialog
+                    {
+                        Title = "پاکسازی مرکز فعالیت",
+                        Content = "فقط تاریخچه فعالیت‌ها پاک می‌شود. یادداشت‌ها، رویدادها، کارها، مناسبت‌ها و یادآورها حذف نمی‌شوند.",
+                        PrimaryButtonText = "پاکسازی",
+                        CloseButtonText = "انصراف",
+                        DefaultButton = ContentDialogButton.Close,
+                        XamlRoot = (Content as FrameworkElement)?.XamlRoot
+                    };
+                    if (dialog.XamlRoot is null) return;
+                    var result = await dialog.ShowAsync();
+                    if (result != ContentDialogResult.Primary) return;
+                    await _repository.ClearActivitiesAsync();
+                    await LoadActivityTiles();
+                    StatusText.Text = "تاریخچه مرکز فعالیت پاک شد.";
+                };
                 page.Children.Add(Card("دسته‌بندی فعالیت‌ها", "برای مشاهده تاریخچه، یکی از کاشی‌های زیر را انتخاب کنید.", categoryGrid));
                 page.Children.Add(Card("سوابق فعالیت", "", new StackPanel { Spacing = 8, Children = { summary, history } }));
                 page.Children.Add(actions);
