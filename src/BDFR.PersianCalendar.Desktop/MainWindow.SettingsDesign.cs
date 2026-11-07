@@ -5,6 +5,7 @@ using Microsoft.Win32;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Media.Imaging;
 
 namespace BDFR.PersianCalendar.Desktop;
 
@@ -494,19 +495,35 @@ public sealed partial class MainWindow
 
     private FrameworkElement CreateSettingsVersionBanner()
     {
-        var layout = new StackPanel { Spacing = 9 };
-        layout.Children.Add(SettingsLabel("زروان", 24, true));
+        var container = new Grid { MinHeight = 196 };
+        container.Children.Add(new Image
+        {
+            Source = new SvgImageSource(new Uri("ms-appx:///picture/settings/landscape.svg")),
+            Stretch = Stretch.UniformToFill,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            VerticalAlignment = VerticalAlignment.Stretch
+        });
+        var layout = new StackPanel
+        {
+            Spacing = 8,
+            Padding = new Thickness(20),
+            HorizontalAlignment = HorizontalAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        layout.Children.Add(SettingsLabel("زروان", 26, true));
         layout.Children.Add(SettingsHint("تقویم فارسی، برنامه‌ریزی و مدیریت هوشمند زمان"));
         layout.Children.Add(SettingsHint("نسخه نصب‌شده: " +
             (Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "نامشخص")));
-        layout.Children.Add(SettingsActionButton("درباره زروان", () => ShowSettingsSection("درباره زروان")));
+        var about = SettingsActionButton("درباره زروان", () => ShowSettingsSection("درباره زروان"));
+        about.HorizontalAlignment = HorizontalAlignment.Right;
+        layout.Children.Add(about);
+        container.Children.Add(layout);
         return new Border
         {
             Background = ThemeService.Brush("#FFEDE4FB"),
             CornerRadius = new CornerRadius(20),
-            Padding = new Thickness(24),
-            MinHeight = 170,
-            Child = layout
+            MinHeight = 196,
+            Child = container
         };
     }
 
@@ -534,6 +551,37 @@ public sealed partial class MainWindow
                     ShowSettingsSection(item.Destination);
                 else ShowDesktopModule(item.Destination);
             });
+            var color = item.Destination switch
+            {
+                "برنامه‌ها" => "#FF1C94F0",
+                "زروان دسک" => "#FF278FF3",
+                "یادآورها" => "#FFE89C22",
+                "نمایش و ظاهر" => "#FF9B70DE",
+                "لایسنس و فعال‌سازی" => "#FFE4AC20",
+                _ => "#FF3CB3A8"
+            };
+            var glyph = item.Destination switch
+            {
+                "برنامه‌ها" => "\uE80A",
+                "زروان دسک" => "\uE753",
+                "یادآورها" => "\uE823",
+                "نمایش و ظاهر" => "\uE790",
+                "لایسنس و فعال‌سازی" => "\uE8D7",
+                _ => "\uE787"
+            };
+            var contents = new StackPanel { Spacing = 7, HorizontalAlignment = HorizontalAlignment.Center };
+            contents.Children.Add(new FontIcon
+            {
+                Glyph = glyph,
+                FontFamily = new FontFamily("Segoe Fluent Icons"),
+                FontSize = 28,
+                Foreground = ThemeService.Brush(color),
+                HorizontalAlignment = HorizontalAlignment.Center
+            });
+            contents.Children.Add(SettingsLabel(item.Text, 12, true));
+            button.Content = contents;
+            button.Background = ThemeService.Brush("#FFFFFFFF");
+            button.MinHeight = 92;
             button.HorizontalAlignment = HorizontalAlignment.Stretch;
             button.HorizontalContentAlignment = HorizontalAlignment.Center;
             Grid.SetColumn(button, i % 3);
