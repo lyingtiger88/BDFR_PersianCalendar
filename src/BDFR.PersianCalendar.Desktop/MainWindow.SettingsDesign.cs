@@ -634,6 +634,25 @@ public sealed partial class MainWindow
             "رنگ‌ها، فونت‌ها، Glass Mode، پس‌زمینه و تصویرهای فصلی",
             "بازکردن تنظیمات کامل", OpenLegacySettings, "\uE771");
         _settingsContent!.Children.Add(SettingsCard(contents));
+
+        var tabs = SettingsGroup("نمایش و پنهان‌سازی سربرگ‌ها",
+            "هر سربرگ را مستقل روشن یا خاموش کنید. تغییرات فوری و ماندگارند.",
+            "\uE80F", "#FF8B67DD");
+
+        foreach (var label in OptionalNavigationTabs)
+        {
+            var name = label;
+            var option = SettingsToggle(IsNavigationTabVisible(name),
+                enabled => SetNavigationTabVisibility(name, enabled));
+            tabs.Children.Add(SettingsOptionRow(name,
+                "نمایش این بخش در فهرست کناری برنامه",
+                option, NavigationIconGlyph(name)));
+            AddSettingsSeparator(tabs);
+        }
+
+        tabs.Children.Add(SettingsHint(
+            "تقویم و تنظیمات همیشه نمایش داده می‌شوند تا دسترسی به برنامه و بازیابی سربرگ‌های پنهان‌شده ممکن باشد."));
+        _settingsContent.Children.Add(SettingsCard(tabs));
     }
 
     private void BuildSettingsCalendar()
@@ -713,8 +732,8 @@ public sealed partial class MainWindow
             "وضعیت امنیت و حساب‌های مستقل", "\uE72E", "#FFDAAB28");
         contents.Children.Add(SettingsHint(
             "حساب Zurvan Desk مستقل از حساب اصلی است و کلید رمزگذاری فایل‌ها در صندوق امن دستگاه نگه‌داری می‌شود."));
-        AddSettingsAction(contents, "وضعیت مجوز", LicenseProfileStatus(),
-            "مشاهده لایسنس", () => ShowSettingsSection("لایسنس و فعال‌سازی"), "\uE8D7");
+        AddSettingsAction(contents, "حساب و اشتراک", "ورود به حساب اصلی و بررسی اشتراک معتبر در Supabase",
+            "مشاهده حساب", () => ShowSettingsSection("حساب کاربری"), "\uE77B");
         AddSettingsAction(contents, "حساب ابری", "مدیریت ورود و بازیابی Vault",
             "بازکردن زروان دسک", () => ShowDesktopModule("زروان دسک"), "\uE753");
         _settingsContent!.Children.Add(SettingsCard(contents));
