@@ -37,19 +37,7 @@ public sealed partial class MainWindow
         if (_deskWorkspace is null) return;
         _deskWorkspace.Children.Clear();
 
-        _deskWorkspace.Children.Add(new TextBlock
-        {
-            Text = "Zurvan Desk",
-            FontSize = 22,
-            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-            Foreground = ThemeService.Brush(_theme.PrimaryText)
-        });
-        _deskWorkspace.Children.Add(new TextBlock
-        {
-            Text = "فضای ابری شخصی زروان؛ حساب مستقل از لایسنس نرم‌افزار",
-            TextWrapping = TextWrapping.Wrap,
-            Foreground = ThemeService.Brush(_theme.SecondaryText)
-        });
+        _deskWorkspace.Children.Add(BuildDeskDesignHeader());
 
         if (_deskClient.IsAuthenticated)
         {
@@ -88,40 +76,56 @@ public sealed partial class MainWindow
 
     private void BuildDeskAuthenticationPanel()
     {
-        var panel = new StackPanel { Spacing = 12 };
+        var panel = new StackPanel { Spacing = 17, VerticalAlignment = VerticalAlignment.Center };
         var title = new TextBlock
         {
             Text = "ورود به حساب",
-            FontSize = 18,
+            FontSize = 25,
+            Margin = new Thickness(0, 0, 0, 14),
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
         };
         var identifier = new TextBox
         {
-            Header = "ایمیل یا شماره همراه",
-            PlaceholderText = "ایمیل یا شماره حساب",
-            FlowDirection = FlowDirection.LeftToRight
+            Header = "ایمیل یا شماره حساب",
+            PlaceholderText = "ایمیل یا شماره حساب را وارد کنید",
+            MinHeight = 46,
+            CornerRadius = new CornerRadius(9),
+            FlowDirection = FlowDirection.RightToLeft
         };
         var displayName = new TextBox
         {
             Header = "نام نمایشی",
-            PlaceholderText = "نامی که در زروان نمایش داده می‌شود"
+            PlaceholderText = "نامی که در زروان نمایش داده می‌شود",
+            MinHeight = 46,
+            CornerRadius = new CornerRadius(9)
         };
         var password = new PasswordBox
         {
             Header = "رمز عبور",
-            PlaceholderText = "حداقل ۸ نویسه",
-            FlowDirection = FlowDirection.LeftToRight
+            PlaceholderText = "رمز عبور را وارد کنید",
+            MinHeight = 46,
+            FlowDirection = FlowDirection.RightToLeft,
+            CornerRadius = new CornerRadius(9)
         };
         var submit = new Button
         {
             Content = "ورود",
             HorizontalAlignment = HorizontalAlignment.Stretch,
-            MinHeight = 42
+            MinHeight = 54,
+            CornerRadius = new CornerRadius(13),
+            Background = ThemeService.Brush("#FFBC7439"),
+            Foreground = ThemeService.Brush("#FFFFFFFF"),
+            BorderThickness = new Thickness(0)
         };
         var switchMode = new Button
         {
-            Content = "حساب ندارم؛ ساخت حساب",
+            Content = "ساخت حساب",
             HorizontalAlignment = HorizontalAlignment.Stretch,
+            MinHeight = 54,
+            CornerRadius = new CornerRadius(13),
+            Background = ThemeService.Brush("#FFF3E3D9"),
+            Foreground = ThemeService.Brush("#FF26212A"),
+            BorderThickness = new Thickness(0),
         };
         var registerMode = false;
 
@@ -130,7 +134,7 @@ public sealed partial class MainWindow
             title.Text = registerMode ? "ساخت حساب جدید" : "ورود به حساب";
             displayName.Visibility = registerMode ? Visibility.Visible : Visibility.Collapsed;
             submit.Content = registerMode ? "ساخت حساب" : "ورود";
-            switchMode.Content = registerMode ? "حساب دارم؛ ورود" : "حساب ندارم؛ ساخت حساب";
+            switchMode.Content = registerMode ? "حساب دارم؛ ورود" : "ساخت حساب";
         }
 
         submit.Click += async (_, _) =>
@@ -193,7 +197,7 @@ public sealed partial class MainWindow
             Foreground = ThemeService.Brush(_theme.SecondaryText)
         });
         UpdateMode();
-        _deskWorkspace!.Children.Add(DeskCard(panel));
+        _deskWorkspace!.Children.Add(BuildDeskSplitLayout(panel));
     }
 
     private void BuildDeskRecoveryPanel()
@@ -346,8 +350,8 @@ public sealed partial class MainWindow
     {
         if (_deskWorkspace is null) return null;
         // File list is the third child of the current file-manager card.
-        if (_deskWorkspace.Children.Count < 3) return null;
-        if (_deskWorkspace.Children[2] is not Border card ||
+        if (_deskWorkspace.Children.Count < 2) return null;
+        if (_deskWorkspace.Children[1] is not Border card ||
             card.Child is not StackPanel panel ||
             panel.Children.Count < 4)
             return null;
