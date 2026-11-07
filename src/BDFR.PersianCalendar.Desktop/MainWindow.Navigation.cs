@@ -259,8 +259,19 @@ public sealed partial class MainWindow
         SelectNavigationEntry(_activeDesktopModule);
     }
 
-    // The approved Windows Settings-style mockup keeps the navigation on the left.
-    private bool IsNavigationRailOnLeft() => true;
+    // Navigation side is a persistent user preference. Default to the left
+    // only when the saved value is missing or invalid.
+    private bool IsNavigationRailOnLeft()
+    {
+        var side = _settings.NavigationRailSide?.Trim();
+        if (string.Equals(side, "right", StringComparison.OrdinalIgnoreCase)) return false;
+        if (!string.Equals(side, "left", StringComparison.OrdinalIgnoreCase))
+        {
+            _settings.NavigationRailSide = "left";
+            _settingsService.Save(_settings);
+        }
+        return true;
+    }
 
     private void ApplyWorkspaceLayoutSettingsLive()
     {
