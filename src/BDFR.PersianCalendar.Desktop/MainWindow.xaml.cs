@@ -32,7 +32,6 @@ public sealed partial class MainWindow : Window
     private readonly Border _backgroundWash = new();
     private readonly StackPanel _settingsPanel = new();
     private readonly CheckBox _seasonalBackgroundCheck = new();
-    private readonly CheckBox _occasionPicturesCheck = new();
     private readonly CheckBox _glassModeCheck = new();
     private readonly Slider _backgroundOpacitySlider = new();
     private readonly TextBlock _backgroundOpacityValue = new();
@@ -4484,13 +4483,6 @@ public sealed partial class MainWindow : Window
                 $"{Math.Round(_backgroundOpacitySlider.Value):0}%";
             StatusText.Text = "اعمال شدت تصویر انجام نشد؛ مقدار قبلی حفظ شد.";
         }
-    }
-
-    private async void OccasionPicturesCheck_Click(object sender, RoutedEventArgs e)
-    {
-        _settings.ShowOccasionPictures = _occasionPicturesCheck.IsChecked == true;
-        _settingsService.Save(_settings);
-        await LoadSelectedDayAsync();
     }
 
     private FrameworkElement BuildPictureLibraryPanel()
