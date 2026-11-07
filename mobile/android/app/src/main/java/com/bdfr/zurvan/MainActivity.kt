@@ -1722,6 +1722,18 @@ private fun OccasionsScreen(
     val personalOccasions = remember(occasions) {
         occasions.sortedWith(compareBy<LocalOccasion> { it.calendar.ordinal }.thenBy { it.month }.thenBy { it.day })
     }
+    // Read the saved style for the banner; style selection is located in Settings > Appearance.
+    val zodiacStyles = listOf(
+        Triple("cosmic", "کیهانی کلاسیک", "✦"),
+        Triple("neon", "فانتزی نورانی", "☄"),
+        Triple("minimal", "مینیمال مدرن", "☾"),
+        Triple("watercolor", "آبرنگی هنری", "✿"),
+        Triple("mythic", "اسطوره‌ای", "♜"),
+        Triple("cute", "کارتونی کیوت", "☺"),
+        Triple("luxury", "سه‌بعدی لوکس", "✧")
+    )
+    val zodiacPrefs = remember(context) { context.getSharedPreferences("zurvan_zodiac", Context.MODE_PRIVATE) }
+    var selectedZodiacStyle by remember { mutableStateOf(zodiacPrefs.getString("style", "cosmic") ?: "cosmic") }
     LaunchedEffect(currentYear) {
         if (officialItems.isEmpty()) updating = true
     }
