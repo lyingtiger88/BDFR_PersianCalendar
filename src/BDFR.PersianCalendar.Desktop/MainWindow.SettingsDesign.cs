@@ -426,25 +426,29 @@ public sealed partial class MainWindow
             HorizontalAlignment = HorizontalAlignment.Right,
             MinWidth = 85
         };
+        var changing = false;
         control.Toggled += (_, _) =>
         {
-            try { apply(control.IsOn); }
+            if (changing) return;
+            changing = true;
+            try { apply(control.IsOn); enabled = control.IsOn; }
             catch (Exception ex)
             {
                 StartupDiagnostics.Log("Settings toggle failed: " + ex);
                 StatusText.Text = "تغییر تنظیمات ناموفق بود: " + ex.Message;
                 control.IsOn = enabled;
             }
+            finally { changing = false; }
         };
         return control;
     }
 
     private void BuildSettingsGeneral()
     {
-        var contents = SettingsGroup("عمومی", "تنظیمات پایه و رفتار زروان", "\\uE80F", "#FF7454E8");
+        var contents = SettingsGroup("عمومی", "تنظیمات پایه و رفتار زروان", "\uE80F", "#FF7454E8");
         contents.Children.Add(SettingsOptionRow("شروع همراه ویندوز",
             "اجرای زروان هنگام ورود به حساب ویندوز",
-            SettingsToggle(IsZurvanAutoStart(), SetZurvanAutoStart), "\\uE768"));
+            SettingsToggle(IsZurvanAutoStart(), SetZurvanAutoStart), "\uE768"));
         AddSettingsSeparator(contents);
         contents.Children.Add(SettingsOptionRow("نمایش تصاویر مناسبت‌ها",
             "نمایش تصاویر مربوط به روزهای دارای مناسبت",
@@ -453,11 +457,11 @@ public sealed partial class MainWindow
                 _settings.ShowOccasionPictures = value;
                 _settingsService.Save(_settings);
                 BuildCalendar();
-            }), "\\uEB9F"));
+            }), "\uEB9F"));
         AddSettingsSeparator(contents);
         contents.Children.Add(SettingsOptionRow("رسانه‌های روز",
             "اجازه اتصال تصویر و فایل به روز انتخاب‌شده",
-            SettingsToggle(_settings.DayMediaEnabled, SetDayMediaEnabled), "\\uE8B7"));
+            SettingsToggle(_settings.DayMediaEnabled, SetDayMediaEnabled), "\uE8B7"));
 
         // As in the approved Windows Settings mockup, use two independent card
         // columns rather than a long stack with large unused horizontal space.
@@ -508,7 +512,7 @@ public sealed partial class MainWindow
 
     private FrameworkElement CreateSettingsQuickActionsCard()
     {
-        var contents = SettingsGroup("شروع سریع", "دسترسی به بخش‌های پرکاربرد", "\\uE8A7", "#FF9360E0");
+        var contents = SettingsGroup("شروع سریع", "دسترسی به بخش‌های پرکاربرد", "\uE8A7", "#FF9360E0");
         var grid = new Grid { ColumnSpacing = 10, RowSpacing = 10 };
         for (var i = 0; i < 3; i++) grid.ColumnDefinitions.Add(new ColumnDefinition());
         for (var i = 0; i < 2; i++) grid.RowDefinitions.Add(new RowDefinition());
