@@ -97,6 +97,10 @@ public sealed partial class MainWindow
                 Content = BuildDeskPage()
             };
         }
+        if (module == "تنظیمات")
+        {
+            return BuildWindowsSettingsPage();
+        }
         var scroll = new ScrollViewer
         {
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
