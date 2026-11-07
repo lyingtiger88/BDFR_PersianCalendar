@@ -73,11 +73,6 @@ public sealed partial class MainWindow
             ShowDesktopModule("فعالیت‌ها");
             StatusText.Text = "مرکز فعالیت باز شد.";
         });
-        AddNavigationEntry(navItems, "⚿", "لایسنس و فعال‌سازی", () =>
-        {
-            ShowDesktopModule("لایسنس و فعال‌سازی");
-            StatusText.Text = "مدیریت لایسنس زروان باز شد.";
-        });
 
         var scroller = new ScrollViewer
         {
@@ -120,6 +115,7 @@ public sealed partial class MainWindow
         var button = CreateNavigationRailButton(icon, label, action);
         _navigationEntries.Add((button, icon, label));
         host.Children.Add(button);
+        button.Visibility = IsNavigationTabVisible(label) ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private string NavigationIconColor(string label) => label switch
@@ -131,7 +127,6 @@ public sealed partial class MainWindow
         "یادآورها" => "#FFF4AC20",
         "همراه" => "#FF1BAFB7",
         "فعالیت‌ها" => "#FFA069E4",
-        "لایسنس و فعال‌سازی" => "#FF309CF5",
         "تنظیمات" => "#FFB17BEB",
         _ => "#FF7A7484"
     };
@@ -145,10 +140,39 @@ public sealed partial class MainWindow
         "یادآورها" => "\uE823",
         "همراه" => "\uE8CC",
         "فعالیت‌ها" => "\uE81C",
-        "لایسنس و فعال‌سازی" => "\uE8D7",
         "تنظیمات" => "\uE713",
         _ => "\uE10F"
     };
+
+    private static readonly string[] OptionalNavigationTabs =
+    [
+        "زروان دسک", "برنامه‌ها", "مناسبت‌ها",
+        "یادآورها", "همراه", "فعالیت‌ها"
+    ];
+
+    private bool IsNavigationTabVisible(string label)
+        => label == "تقویم" || label == "تنظیمات" ||
+           !(_settings.HiddenNavigationTabs?.Contains(label) ?? false);
+
+    private void SetNavigationTabVisibility(string label, bool visible)
+    {
+        if (!OptionalNavigationTabs.Contains(label)) return;
+        _settings.HiddenNavigationTabs ??= new List<string>();
+        _settings.HiddenNavigationTabs.RemoveAll(x => x == label);
+        if (!visible) _settings.HiddenNavigationTabs.Add(label);
+        _settingsService.Save(_settings);
+        RefreshNavigationTabVisibility();
+        if (!visible && _activeDesktopModule == label)
+            ShowDesktopModule("تقویم");
+    }
+
+    private void RefreshNavigationTabVisibility()
+    {
+        foreach (var entry in _navigationEntries)
+            entry.Button.Visibility = IsNavigationTabVisible(entry.Label)
+                ? Visibility.Visible : Visibility.Collapsed;
+        SelectNavigationEntry(_activeDesktopModule);
+    }
 
     private void SelectNavigationEntry(string module)
     {
