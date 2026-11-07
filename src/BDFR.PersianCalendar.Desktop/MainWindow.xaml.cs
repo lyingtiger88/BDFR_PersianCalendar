@@ -745,8 +745,9 @@ public sealed partial class MainWindow : Window
         var root = new Grid
         {
             FlowDirection = FlowDirection.LeftToRight,
-            Margin = new Thickness(12),
-            ColumnSpacing = 10
+            Margin = new Thickness(0),
+            ColumnSpacing = 0,
+            Background = BrushWithAlpha("#FFF9F5F2", 0xF3)
         };
         _workspaceLayoutGrid = root;
 
@@ -783,11 +784,10 @@ public sealed partial class MainWindow : Window
         _desktopCalendarPage = center;
         _desktopModulePage = new Border
         {
-            Background = CreateCenterSurfaceBrush(),
-            CornerRadius = new CornerRadius(IsLiquidGlassActive() ? 24 : 18),
-            BorderBrush = BrushWithAlpha("#FFFFFFFF", IsLiquidGlassActive() ? (byte)0xD0 : (byte)0xA8),
-            BorderThickness = new Thickness(1),
-            Padding = new Thickness(22),
+            Background = BrushWithAlpha("#FFFAF7F5", 0xFC),
+            CornerRadius = new CornerRadius(0),
+            BorderThickness = new Thickness(0),
+            Padding = new Thickness(26, 14, 32, 24),
             Visibility = Visibility.Collapsed
         };
         _desktopModuleHost.Children.Add(_desktopCalendarPage);
