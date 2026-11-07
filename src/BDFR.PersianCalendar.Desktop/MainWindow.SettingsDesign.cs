@@ -38,6 +38,8 @@ public sealed partial class MainWindow
     private StackPanel? _settingsContent;
     private TextBox? _settingsSearchBox;
     private string _selectedSettingsSection = "عمومی";
+    private Border? _settingsProfileContainer;
+    private TextBlock? _settingsServerLicenseStatus;
 
     private FrameworkElement BuildWindowsSettingsPage()
     {
@@ -51,7 +53,8 @@ public sealed partial class MainWindow
         outer.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
         var right = new StackPanel { Spacing = 15, Margin = new Thickness(0, 14, 0, 0) };
-        right.Children.Add(BuildSettingsAccountProfile());
+        _settingsProfileContainer = new Border { Child = BuildSettingsAccountProfile() };
+        right.Children.Add(_settingsProfileContainer);
 
         _settingsSearchBox = new TextBox
         {
@@ -93,8 +96,8 @@ public sealed partial class MainWindow
 
     private FrameworkElement BuildSettingsAccountProfile()
     {
-        // Do not display the mockup's sample name/email. Zurvan's legacy signed
-        // license has no identity fields, so show only verifiable facts.
+        // Display the email from the user's secure Supabase Auth session only.
+        // A local activation code has no name/email/photo fields; do not invent them.
         var account = new StackPanel { Spacing = 8 };
         var row = new StackPanel
         {
@@ -121,14 +124,16 @@ public sealed partial class MainWindow
         var text = new StackPanel { Spacing = 4, VerticalAlignment = VerticalAlignment.Center };
         text.Children.Add(new TextBlock
         {
-            Text = "کاربر زروان",
+            Text = _authClient.SignedInEmail ?? "کاربر زروان",
             FontSize = 17,
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
             Foreground = ThemeService.Brush(SettingsTextColor)
         });
         text.Children.Add(new TextBlock
         {
-            Text = LicenseProfileStatus(),
+            Text = _authClient.SignedInEmail is null
+                ? LicenseProfileStatus()
+                : "وضعیت مجوز سرور: در حال بررسی...",
             FontSize = 12,
             TextWrapping = TextWrapping.Wrap,
             Foreground = ThemeService.Brush(SettingsSecondaryColor)
@@ -136,6 +141,11 @@ public sealed partial class MainWindow
         row.Children.Add(avatar);
         row.Children.Add(text);
         account.Children.Add(row);
+        if (_authClient.SignedInEmail is not null)
+        {
+            var status = (TextBlock)text.Children[1];
+            _ = LoadSupabaseLicenseStatusAsync(status);
+        }
 
         if (_deskClient.IsAuthenticated && !string.IsNullOrWhiteSpace(_deskClient.Identifier))
         {
@@ -160,6 +170,34 @@ public sealed partial class MainWindow
         profile.Click += (_, _) => ShowSettingsSection("لایسنس و فعال‌سازی");
         account.Children.Add(profile);
         return account;
+    }
+
+    private void RefreshWindowsSettingsProfile()
+    {
+        if (_settingsProfileContainer is not null)
+            _settingsProfileContainer.Child = BuildSettingsAccountProfile();
+    }
+
+    private async Task LoadSupabaseLicenseStatusAsync(TextBlock status)
+    {
+        try
+        {
+            var result = await _authClient.ReadLicenseStatusAsync();
+            if (result.AccountState != "active")
+                status.Text = "حساب زروان: " +
+                    (result.AccountState == "registration_required" || result.AccountState == "provisional"
+                        ? "ثبت‌نام دستگاه تکمیل نشده است"
+                        : "وضعیت حساب: " + result.AccountState);
+            else if (result.LicenseAccountState != "active" || result.ActiveLicenses == 0)
+                status.Text = "حساب تأییدشده؛ لایسنس فعال پیدا نشد";
+            else
+                status.Text = $"حساب تأییدشده · {result.ActiveLicenses} مجوز فعال";
+        }
+        catch (Exception ex)
+        {
+            status.Text = "استعلام مجوز سرور ناموفق بود";
+            StartupDiagnostics.Log("Account license verification unavailable: " + ex.Message);
+        }
     }
 
     private string LicenseProfileStatus()
@@ -704,12 +742,24 @@ public sealed partial class MainWindow
     private void BuildSettingsLicense()
     {
         var contents = SettingsGroup("لایسنس و فعال‌سازی",
-            "مشخصات مجوز تأییدشدهٔ همین دستگاه", "\uE8D7", "#FFE8AD1D");
-        contents.Children.Add(SettingsLabel(LicenseProfileStatus(), 16, true));
+            "حساب زروان و وضعیت مجوز معتبر", "\uE8D7", "#FFE8AD1D");
+        contents.Children.Add(SettingsLabel("حساب زروان (Supabase Auth)", 17, true));
         contents.Children.Add(SettingsHint(
-            "کد محلی قدیمی زروان نام، نشانی ایمیل یا تصویر کاربر را نگه‌داری نمی‌کند. تا زمان اتصال احراز هویت حساب به سرویس لایسنس، اطلاعات هویتی ساختگی نمایش داده نمی‌شوند."));
-        AddSettingsAction(contents, "مدیریت فعال‌سازی",
-            "نمایش شناسه دستگاه و اعتبارسنجی کد امضاشده",
+            "ورود به حساب با فعال‌سازی دستگاه متفاوت است. تنها پس از استعلام موفق، وضعیت لایسنس سرور تأییدشده نمایش داده می‌شود."));
+        contents.Children.Add(BuildAccountAuthPanel());
+        _settingsServerLicenseStatus = SettingsHint(
+            _authClient.SignedInEmail is null
+                ? "برای مشاهده وضعیت لایسنس سرور وارد حساب زروان شوید."
+                : "در حال بررسی مجوز سرور...");
+        contents.Children.Add(_settingsServerLicenseStatus);
+        if (_authClient.SignedInEmail is not null)
+            _ = LoadSupabaseLicenseStatusAsync(_settingsServerLicenseStatus);
+
+        AddSettingsSeparator(contents);
+        contents.Children.Add(SettingsLabel("فعال‌سازی محلی دستگاه", 17, true));
+        contents.Children.Add(SettingsHint(LicenseProfileStatus()));
+        AddSettingsAction(contents, "مدیریت مجوز دستگاه",
+            "شناسه دستگاه و اعتبارسنجی کد امضاشدهٔ نسخه‌های پیشین",
             "صفحه فعال‌سازی", () => ShowDesktopModule("لایسنس و فعال‌سازی"), "\uE8D7");
         _settingsContent!.Children.Add(SettingsCard(contents));
     }
