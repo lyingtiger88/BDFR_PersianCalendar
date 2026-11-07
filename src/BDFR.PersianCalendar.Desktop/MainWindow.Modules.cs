@@ -424,6 +424,8 @@ public sealed partial class MainWindow
                 actions.Children.Add(clear);
 
                 var categoryGrid = new Grid { ColumnSpacing = 10, RowSpacing = 10 };
+                categoryGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                categoryGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
                 for (var i = 0; i < 3; i++)
                     categoryGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
                 var history = new StackPanel { Spacing = 8 };
