@@ -136,6 +136,20 @@ public sealed partial class MainWindow
         _ => "#FF7A7484"
     };
 
+    private static string NavigationIconGlyph(string label) => label switch
+    {
+        "تقویم" => "\uE80F",
+        "زروان دسک" => "\uE753",
+        "برنامه‌ها" => "\uE80A",
+        "مناسبت‌ها" => "\uE787",
+        "یادآورها" => "\uE823",
+        "همراه" => "\uE8CC",
+        "فعالیت‌ها" => "\uE81C",
+        "لایسنس و فعال‌سازی" => "\uE8D7",
+        "تنظیمات" => "\uE713",
+        _ => "\uE10F"
+    };
+
     private void SelectNavigationEntry(string module)
     {
         foreach (var (button, _, label) in _navigationEntries)
@@ -192,12 +206,12 @@ public sealed partial class MainWindow
             var content = new Grid { ColumnSpacing = 16, FlowDirection = FlowDirection.RightToLeft };
             content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(32) });
             content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            var symbol = new TextBlock
+            var symbol = new FontIcon
             {
-                Text = entry.Icon,
-                FontSize = 29,
-                FontWeight = Microsoft.UI.Text.FontWeights.Bold,
-                TextAlignment = TextAlignment.Center,
+                Glyph = NavigationIconGlyph(entry.Label),
+                FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Segoe Fluent Icons"),
+                FontSize = 26,
+                HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
                 Foreground = ThemeService.Brush(NavigationIconColor(entry.Label))
             };
