@@ -7,25 +7,26 @@ namespace BDFR.PersianCalendar.Desktop;
 public sealed partial class MainWindow
 {
     private readonly List<(Button Button, string Icon, string Label)> _navigationEntries = new();
-    private bool _navigationExpanded;
+    private bool _navigationExpanded = true;
+    private const double ZurvanDesignNavigationWidth = 290;
 
     private Border BuildNavigationRail()
     {
         var shell = new Grid
         {
             FlowDirection = FlowDirection.RightToLeft,
-            Padding = new Thickness(6),
-            RowSpacing = 8
+            Padding = new Thickness(16, 20, 16, 22),
+            RowSpacing = 18
         };
         shell.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         shell.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         shell.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-        var brand = new StackPanel { Spacing = 2, Margin = new Thickness(2, 4, 2, 8) };
+        var brand = new StackPanel { Spacing = 3, Margin = new Thickness(9, 8, 9, 24), HorizontalAlignment = HorizontalAlignment.Right };
         brand.Children.Add(new TextBlock
         {
             Text = "◈",
-            FontSize = 25,
+            FontSize = 39,
             FontWeight = Microsoft.UI.Text.FontWeights.Bold,
             HorizontalAlignment = HorizontalAlignment.Center,
             Foreground = ThemeService.Brush(_theme.Accent)
@@ -33,15 +34,15 @@ public sealed partial class MainWindow
         brand.Children.Add(new TextBlock
         {
             Text = "زروان",
-            FontSize = 10,
-            HorizontalAlignment = HorizontalAlignment.Center,
+            FontSize = 21,
+            HorizontalAlignment = HorizontalAlignment.Right,
             Foreground = ThemeService.Brush(_theme.PrimaryText)
         });
         Grid.SetRow(brand, 0);
         shell.Children.Add(brand);
 
-        var navItems = new StackPanel { Spacing = 6, HorizontalAlignment = HorizontalAlignment.Stretch };
-        AddNavigationEntry(navItems, "▦", "تقویم", () =>
+        var navItems = new StackPanel { Spacing = 5, HorizontalAlignment = HorizontalAlignment.Stretch };
+        AddNavigationEntry(navItems, "⌂", "تقویم", () =>
         {
             ShowDesktopModule("تقویم");
             StatusText.Text = "نمای تقویم فعال است.";
@@ -51,28 +52,28 @@ public sealed partial class MainWindow
             ShowDesktopModule("زروان دسک");
             StatusText.Text = "بخش زروان دسک باز شد.";
         });
-        AddNavigationEntry(navItems, "✓", "برنامه‌ها", () =>
+        AddNavigationEntry(navItems, "▦", "برنامه‌ها", () =>
         {
             ShowDesktopModule("برنامه‌ها");
             StatusText.Text = "بخش برنامه‌ها باز شد.";
         });
-        AddNavigationEntry(navItems, "✿", "مناسبت‌ها", () =>
+        AddNavigationEntry(navItems, "▦", "مناسبت‌ها", () =>
         {
             ShowDesktopModule("مناسبت‌ها");
             StatusText.Text = "بخش مناسبت‌ها باز شد.";
         });
-        AddNavigationEntry(navItems, "♧", "یادآورها", () =>
+        AddNavigationEntry(navItems, "♟", "یادآورها", () =>
         {
             ShowDesktopModule("یادآورها");
             StatusText.Text = "مرکز یادآورها باز شد.";
         });
-        AddNavigationEntry(navItems, "▤", "همراه", () => ShowDesktopModule("همراه"));
+        AddNavigationEntry(navItems, "▯", "همراه", () => ShowDesktopModule("همراه"));
         AddNavigationEntry(navItems, "◷", "فعالیت‌ها", () =>
         {
             ShowDesktopModule("فعالیت‌ها");
             StatusText.Text = "مرکز فعالیت باز شد.";
         });
-        AddNavigationEntry(navItems, "♙", "لایسنس و فعال‌سازی", () =>
+        AddNavigationEntry(navItems, "⚿", "لایسنس و فعال‌سازی", () =>
         {
             ShowDesktopModule("لایسنس و فعال‌سازی");
             StatusText.Text = "مدیریت لایسنس زروان باز شد.";
@@ -98,18 +99,15 @@ public sealed partial class MainWindow
 
         var border = new Border
         {
-            Width = 64,
-            Background = CreateSideSurfaceBrush(),
-            BorderBrush = ThemeService.Brush(_theme.Accent),
-            BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(CurrentUiCornerRadius),
+            Width = ZurvanDesignNavigationWidth,
+            Background = BrushWithAlpha("#FFF7F0EB", 0xD8),
+            BorderThickness = new Thickness(0),
+            CornerRadius = new CornerRadius(0),
             Child = shell,
             FlowDirection = FlowDirection.RightToLeft,
             HorizontalAlignment = HorizontalAlignment.Stretch
         };
-        border.PointerEntered += (_, _) => SetNavigationExpanded(true);
-        border.PointerExited += (_, _) => SetNavigationExpanded(false);
-        UpdateNavigationEntryLabels(false);
+        UpdateNavigationEntryLabels(true);
         return border;
     }
 
@@ -124,100 +122,101 @@ public sealed partial class MainWindow
         host.Children.Add(button);
     }
 
+    private string NavigationIconColor(string label) => label switch
+    {
+        "تقویم" => "#FF9E56EB",
+        "زروان دسک" => "#FF2389F8",
+        "برنامه‌ها" => "#FF248AEE",
+        "مناسبت‌ها" => "#FFF06388",
+        "یادآورها" => "#FFF4AC20",
+        "همراه" => "#FF1BAFB7",
+        "فعالیت‌ها" => "#FFA069E4",
+        "لایسنس و فعال‌سازی" => "#FF309CF5",
+        "تنظیمات" => "#FFB17BEB",
+        _ => "#FF7A7484"
+    };
+
+    private void SelectNavigationEntry(string module)
+    {
+        foreach (var (button, _, label) in _navigationEntries)
+        {
+            var selected = label == module;
+            button.Background = selected
+                ? BrushWithAlpha("#FFECD7CC", 0xA8)
+                : BrushWithAlpha("#00FFFFFF", 0);
+            button.FontWeight = selected
+                ? Microsoft.UI.Text.FontWeights.SemiBold
+                : Microsoft.UI.Text.FontWeights.Normal;
+        }
+    }
+
     private Button CreateNavigationRailButton(string icon, string label, Action action)
     {
         var button = new Button
         {
-            Content = new TextBlock
-            {
-                Text = icon,
-                FontSize = 25,
-                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-                TextAlignment = TextAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center
-            },
             Tag = label,
             HorizontalAlignment = HorizontalAlignment.Stretch,
-            HorizontalContentAlignment = HorizontalAlignment.Center,
+            HorizontalContentAlignment = HorizontalAlignment.Stretch,
             VerticalContentAlignment = VerticalAlignment.Center,
-            MinWidth = 0,
-            MinHeight = 52,
-            Padding = new Thickness(5, 8, 5, 8),
-            Background = BrushWithAlpha(_theme.Accent, 0x35),
-            Foreground = ThemeService.Brush(_theme.PrimaryText),
+            MinHeight = 54,
+            Padding = new Thickness(16, 10, 16, 10),
+            Background = BrushWithAlpha("#00FFFFFF", 0),
+            Foreground = ThemeService.Brush("#FF211C26"),
             BorderThickness = new Thickness(0),
-            CornerRadius = new CornerRadius(12)
+            CornerRadius = new CornerRadius(15)
         };
         ToolTipService.SetToolTip(button, label);
-        button.Click += (_, _) => action();
+        button.Click += (_, _) => { action(); SelectNavigationEntry(label); };
         return button;
     }
 
     private void SetNavigationExpanded(bool expanded)
     {
-        if (_navigationExpanded == expanded) return;
-        _navigationExpanded = expanded;
-        UpdateNavigationEntryLabels(expanded);
-        var width = expanded ? Math.Clamp(_settings.NavigationRailWidth, 150, 240) : 64.0;
+        // The Windows-settings-like sidebar is intentionally always readable.
+        _navigationExpanded = true;
+        UpdateNavigationEntryLabels(true);
         if (_navigationRailSurface is not null)
-        {
-            _navigationRailSurface.Width = width;
-            _navigationRailSurface.HorizontalAlignment = IsNavigationRailOnLeft() ? HorizontalAlignment.Left : HorizontalAlignment.Right;
-        }
-        var column = IsNavigationRailOnLeft()
-            ? _navigationRailLeftColumn
-            : _navigationRailRightColumn;
-        if (column is not null) column.Width = new GridLength(width);
+            _navigationRailSurface.Width = ZurvanDesignNavigationWidth;
+        if (_navigationRailLeftColumn is not null)
+            _navigationRailLeftColumn.Width = new GridLength(
+                IsNavigationRailOnLeft() ? ZurvanDesignNavigationWidth : 0);
+        if (_navigationRailRightColumn is not null)
+            _navigationRailRightColumn.Width = new GridLength(
+                IsNavigationRailOnLeft() ? 0 : ZurvanDesignNavigationWidth);
     }
 
     private void UpdateNavigationEntryLabels(bool expanded)
     {
         foreach (var entry in _navigationEntries)
         {
-            if (expanded)
+            var content = new Grid { ColumnSpacing = 16, FlowDirection = FlowDirection.RightToLeft };
+            content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(32) });
+            content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            var symbol = new TextBlock
             {
-                var content = new StackPanel
-                {
-                    Orientation = Orientation.Horizontal,
-                    Spacing = 12,
-                    VerticalAlignment = VerticalAlignment.Center,
-                    FlowDirection = FlowDirection.RightToLeft
-                };
-                content.Children.Add(new TextBlock
-                {
-                    Text = entry.Icon,
-                    FontSize = 22,
-                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-                    VerticalAlignment = VerticalAlignment.Center
-                });
-                content.Children.Add(new TextBlock
-                {
-                    Text = entry.Label,
-                    FontSize = 13,
-                    VerticalAlignment = VerticalAlignment.Center,
-                    TextTrimming = TextTrimming.CharacterEllipsis
-                });
-                entry.Button.Content = content;
-            }
-            else
+                Text = entry.Icon,
+                FontSize = 29,
+                FontWeight = Microsoft.UI.Text.FontWeights.Bold,
+                TextAlignment = TextAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                Foreground = ThemeService.Brush(NavigationIconColor(entry.Label))
+            };
+            Grid.SetColumn(symbol, 0);
+            var label = new TextBlock
             {
-                entry.Button.Content = new TextBlock
-                {
-                    Text = entry.Icon,
-                    FontSize = 25,
-                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-                    TextAlignment = TextAlignment.Center,
-                    VerticalAlignment = VerticalAlignment.Center
-                };
-            }
-            entry.Button.HorizontalContentAlignment = expanded
-                ? HorizontalAlignment.Stretch
-                : HorizontalAlignment.Center;
-            entry.Button.Padding = expanded
-                ? new Thickness(12, 8, 10, 8)
-                : new Thickness(5, 8, 5, 8);
-            entry.Button.MinHeight = expanded ? 50 : 54;
+                Text = entry.Label,
+                FontSize = 16,
+                VerticalAlignment = VerticalAlignment.Center,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                Foreground = ThemeService.Brush("#FF25202B")
+            };
+            Grid.SetColumn(label, 1);
+            content.Children.Add(symbol);
+            content.Children.Add(label);
+            entry.Button.Content = content;
+            entry.Button.HorizontalContentAlignment = HorizontalAlignment.Stretch;
         }
+        SelectNavigationEntry(_activeDesktopModule);
     }
 
     private bool IsNavigationRailOnLeft()
@@ -227,7 +226,7 @@ public sealed partial class MainWindow
     {
         var leftWidth = Math.Clamp(_settings.LeftSidebarWidth, 220, 560);
         var rightWidth = Math.Clamp(_settings.RightSidebarWidth, 220, 560);
-        const double collapsedRailWidth = 64;
+        const double collapsedRailWidth = ZurvanDesignNavigationWidth;
         _settings.NavigationRailWidth = Math.Clamp(_settings.NavigationRailWidth, 150, 240);
         _settings.NavigationRailSide = IsNavigationRailOnLeft() ? "left" : "right";
 
