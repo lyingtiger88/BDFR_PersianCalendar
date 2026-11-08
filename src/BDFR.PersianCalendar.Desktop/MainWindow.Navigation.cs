@@ -27,14 +27,7 @@ public sealed partial class MainWindow
         var brand = new StackPanel { Spacing = 3, Margin = new Thickness(9, 8, 9, 24), HorizontalAlignment = HorizontalAlignment.Right };
         var brandMark = new Button
         {
-            Content = new TextBlock
-            {
-                Text = "◈",
-                FontSize = 43,
-                FontWeight = Microsoft.UI.Text.FontWeights.Bold,
-                HorizontalAlignment = HorizontalAlignment.Center,
-                Foreground = ThemeService.Brush(_theme.Accent)
-            },
+            Content = BuildZurvanBrandMark(),
             Background = BrushWithAlpha("#00FFFFFF", 0),
             BorderThickness = new Thickness(0),
             Padding = new Thickness(10, 2, 10, 2),
