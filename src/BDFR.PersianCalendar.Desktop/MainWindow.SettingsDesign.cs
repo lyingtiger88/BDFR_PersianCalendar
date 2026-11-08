@@ -464,6 +464,23 @@ public sealed partial class MainWindow
         return control;
     }
 
+    private void BuildSettingsAbout()
+    {
+        var story = new StackPanel { Spacing = 14, FlowDirection = FlowDirection.RightToLeft };
+        story.Children.Add(SettingsLabel("زروان | زمان، به سبک زندگی تو", 25, true));
+        story.Children.Add(SettingsLabel("زروان فقط یک تقویم نیست؛ تلاشی است برای اینکه روزهای پرمشغله، قرارهای کوچک و آرزوهای بزرگ، همگی جای روشنی در زندگی داشته باشند. این برنامه با عشق به زبان فارسی، احترام به فرهنگ‌ها و اشتیاق به ساختن ابزاری ساده، زیبا و کاربردی شکل گرفته است.", 15));
+        AddSettingsSeparator(story);
+        story.Children.Add(SettingsLabel("درباره توسعه‌دهنده", 19, true));
+        story.Children.Add(SettingsLabel("من، بهزاد، زروان را با یک باور ساده می‌سازم: فناوری وقتی ارزشمند است که در کنار دقت و کارایی، حس خوبی هم به آدم‌ها بدهد. هر جزئیات زروان حاصل یادگیری، آزمون‌وخطا و شوق بهتر کردن تجربه هر روز است؛ مسیری که با ایده‌های تازه و همراهی آدم‌های عزیز ادامه پیدا می‌کند.", 15));
+        AddSettingsSeparator(story);
+        story.Children.Add(SettingsLabel("با مهر و سپاس", 19, true));
+        story.Children.Add(SettingsLabel("از Elen عزیزم، برای همراهی صمیمانه، صبر و بردباری قشنگش در تمام فراز و نشیب‌های این مسیر، از ته دل سپاسگزارم. حضورت دلگرمی بزرگی است.", 15));
+        story.Children.Add(SettingsLabel("از خواهر عزیزم که با ایده‌ها و نگاه خلاقانه‌اش به بهتر شدن زروان کمک کرد، صمیمانه ممنونم.", 15));
+        story.Children.Add(SettingsLabel("و از همه دوستان مهربانی که با پیشنهادها، دلگرمی‌ها و همراهی‌شان کنار این پروژه بودند، به‌ویژه Zara عزیز، سپاسگزارم. سهم شما در این مسیر فراموش‌نشدنی است.", 15));
+        story.Children.Add(SettingsLabel("ساخته‌شده با عشق، برای لحظه‌هایی که ارزش به‌یادماندن دارند. 💛", 15, true));
+        _settingsContent!.Children.Add(SettingsCard(story, new Thickness(24)));
+    }
+
     private void BuildSettingsGeneral()
     {
         var contents = SettingsGroup("عمومی", "تنظیمات پایه و رفتار زروان", "\uE80F", "#FF7454E8");
