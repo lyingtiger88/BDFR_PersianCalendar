@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Globalization;
 using System.Security.Cryptography;
 using BDFR.PersianCalendar.Core;
 using Microsoft.Win32;
