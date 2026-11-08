@@ -672,10 +672,10 @@ public sealed partial class MainWindow
                 var categories = new (string Key, string Title, string Glyph, Func<ActivityLogEntry, bool> Match)[]
                 {
                     ("all", "همه فعالیت‌ها", "▦", _ => true),
-                    ("planning", "برنامه و کارها", "✓", x => x.Action is "event-created" or "task-created" or "task-completed" or "task-reopened"),
-                    ("notes", "یادداشت‌ها", "▤", x => x.Action == "note-saved"),
+                    ("planning", "برنامه و کارها", "✓", x => x.Action.StartsWith("event-", StringComparison.Ordinal) || x.Action.StartsWith("task-", StringComparison.Ordinal)),
+                    ("notes", "یادداشت‌ها", "▤", x => x.Action.StartsWith("note-", StringComparison.Ordinal)),
                     ("reminders", "یادآورها و اعلان‌ها", "◷", x => x.Action.StartsWith("reminder", StringComparison.Ordinal) || x.Action == "notification-fired"),
-                    ("occasions", "مناسبت‌ها", "✦", x => x.Action is "special-occasion-created" or "special-occasion-recovered"),
+                    ("occasions", "مناسبت‌ها", "✦", x => x.Action.StartsWith("special-occasion-", StringComparison.Ordinal)),
                     ("sync", "همگام‌سازی", "⟳", x => x.Action.StartsWith("occasion-sync", StringComparison.Ordinal))
                 };
 
@@ -702,12 +702,19 @@ public sealed partial class MainWindow
                         var title = item.Action switch
                         {
                             "event-created" => "رویداد جدید",
+                            "event-updated" => "رویداد ویرایش شد",
+                            "event-deleted" => "رویداد حذف شد",
                             "task-created" => "کار جدید",
+                            "task-updated" => "کار ویرایش شد",
+                            "task-deleted" => "کار حذف شد",
                             "task-completed" => "کار انجام شد",
                             "task-reopened" => "کار دوباره باز شد",
                             "note-saved" => "یادداشت ذخیره شد",
+                            "note-deleted" => "یادداشت حذف شد",
                             "special-occasion-created" => "مناسبت شخصی",
                             "special-occasion-recovered" => "بازیابی سابقه مناسبت شخصی",
+                            "special-occasion-updated" => "مناسبت شخصی ویرایش شد",
+                            "special-occasion-deleted" => "مناسبت شخصی حذف شد",
                             "notification-fired" => "اعلان نمایش داده شد",
                             "reminder-acknowledged" => "یادآور تأیید شد",
                             "reminder-completed" => "یادآور انجام شد",
