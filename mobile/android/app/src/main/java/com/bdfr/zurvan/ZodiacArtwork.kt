@@ -1,9 +1,11 @@
 package com.bdfr.zurvan
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -17,6 +19,7 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import org.json.JSONObject
+import android.graphics.BitmapFactory
 
 /** Shared zodiac illustration catalog used by Windows and Android.
  *  Each sign has its own outlined vector drawing, rendered at any density.
@@ -29,6 +32,30 @@ internal fun ZodiacArtworkImage(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    // Prefer the user's hand-cropped PNG for each Cute variant. Existing
+    // packages can still display the legacy Cute artwork until all 36
+    // distinct images have been supplied and included in the APK.
+    val png = remember(context, month, styleId) {
+        runCatching {
+            require(month in 1..12)
+            val signs = arrayOf("aries", "taurus", "gemini", "cancer", "leo", "virgo",
+                "libra", "scorpio", "sagittarius", "capricorn", "aquarius", "pisces")
+            val selected = if (styleId == "cute") "cute_1" else styleId
+            val candidates = listOf("png/${selected}_${signs[month - 1]}.png") +
+                if (selected.startsWith("cute_")) listOf("png/cute_${signs[month - 1]}.png") else emptyList()
+            candidates.firstNotNullOfOrNull { filename ->
+                runCatching {
+                    context.assets.open(filename).use { stream ->
+                        BitmapFactory.decodeStream(stream)?.asImageBitmap()
+                    }
+                }.getOrNull()
+            }
+        }.getOrNull()
+    }
+    if (png != null) {
+        Image(bitmap = png, contentDescription = null, modifier = modifier)
+        return
+    }
     val artwork = remember(month, styleId) {
         runCatching {
             require(month in 1..12)
