@@ -83,7 +83,7 @@ def main():
             target = OUTPUT / f'{style["id"]}_{sign["id"]}.png'
             # The user will provide independent artwork for Cute 2 and 3.
             # Do not synthesize lookalike files or overwrite manually cropped PNGs.
-            if target.exists() or style["id"] in {"cute_2", "cute_3"}:
+            if target.exists() or style["id"] in {"cute_1", "cute_2", "cute_3"}:
                 continue
             if cairosvg is not None:
                 try:
