@@ -55,6 +55,13 @@ public sealed class AppSettings
 
     public string? CustomBackgroundPath { get; set; }
     public double BackgroundOpacity { get; set; } = 0.22;
+
+    // Wallpaper Manager strategy: manual, random, seasonal, or monthly.
+    public string WallpaperMode { get; set; } = "manual";
+    public Dictionary<string, string> SeasonalWallpaperPaths { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, string> MonthlyWallpaperPaths { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+    public string? LastRandomWallpaperPath { get; set; }
+    public int WallpaperChangeIntervalHours { get; set; } = 24;
     public bool ShowOccasionPictures { get; set; } = true;
 
     // Zara Pastel optional Liquid Glass presentation.
