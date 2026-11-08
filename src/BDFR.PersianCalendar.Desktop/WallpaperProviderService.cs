@@ -102,7 +102,9 @@ public sealed class WallpaperProviderService
             var pageUrl = ReadString(entry, "url");
             var thumbnail = "";
             if (entry.TryGetProperty("thumbs", out var thumbs))
-                thumbnail = ReadString(thumbs, "large");
+                thumbnail = ReadString(thumbs, "small");
+            if (string.IsNullOrWhiteSpace(thumbnail) && entry.TryGetProperty("thumbs", out thumbs))
+                thumbnail = ReadString(thumbs, "medium");
             var tags = new List<string>();
             if (entry.TryGetProperty("tags", out var tagArray) && tagArray.ValueKind == JsonValueKind.Array)
                 foreach (var tag in tagArray.EnumerateArray())
@@ -116,7 +118,14 @@ public sealed class WallpaperProviderService
                 Uri.TryCreate(pageUrl, UriKind.Absolute, out var pageUri) ? pageUri.ToString() : $"https://wallhaven.cc/w/{id}",
                 thumbnail, tags));
         }
-        return items;
+        var currentPage = page;
+        var totalPages = page;
+        if (json.RootElement.TryGetProperty("meta", out var meta))
+        {
+            if (meta.TryGetProperty("current_page", out var current) && current.TryGetInt32(out var parsedCurrent)) currentPage = parsedCurrent;
+            if (meta.TryGetProperty("last_page", out var last) && last.TryGetInt32(out var parsedLast)) totalPages = parsedLast;
+        }
+        return new WallpaperSearchResult(items, currentPage, totalPages);
     }
 
     public async Task<string> DownloadAsync(
