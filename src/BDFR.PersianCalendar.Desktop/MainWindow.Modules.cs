@@ -232,6 +232,7 @@ public sealed partial class MainWindow
         async Task LoadGalleryAsync()
         {
             gallery.Children.Clear();
+            gallery.Children.Add(galleryRefresh);
             var files = _wallpaperService.GetGalleryFiles();
             gallerySummary.Text = $"{files.Count} تصویر در گالری محلی · مسیر: {_wallpaperService.GalleryRoot}";
             if (files.Count == 0)
@@ -268,7 +269,6 @@ public sealed partial class MainWindow
                     Child = row
                 });
             }
-            gallery.Children.Add(galleryRefresh);
         }
         root.Children.Add(Card("گالری محلی", "تصاویر دانلودشده در پوشه‌های دسته‌بندی‌شده نگهداری می‌شوند؛ برای هر تصویر اطلاعات منبع نیز ذخیره می‌شود.", new StackPanel
         {
