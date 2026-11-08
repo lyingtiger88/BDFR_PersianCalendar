@@ -75,6 +75,11 @@ public sealed partial class MainWindow
             ShowDesktopModule("فعالیت‌ها");
             StatusText.Text = "مرکز فعالیت باز شد.";
         });
+        AddNavigationEntry(navItems, "▧", "Wallpaper Manager", () =>
+        {
+            ShowDesktopModule("Wallpaper Manager");
+            StatusText.Text = "مدیریت کاغذدیواری باز شد.";
+        });
 
         var scroller = new ScrollViewer
         {
@@ -129,6 +134,7 @@ public sealed partial class MainWindow
         "یادآورها" => "#FFF4AC20",
         "همراه" => "#FF1BAFB7",
         "فعالیت‌ها" => "#FFA069E4",
+        "Wallpaper Manager" => "#FF16A6B5",
         "تنظیمات" => "#FFB17BEB",
         _ => "#FF7A7484"
     };
@@ -149,7 +155,7 @@ public sealed partial class MainWindow
     private static readonly string[] OptionalNavigationTabs =
     [
         "زروان دسک", "برنامه‌ها", "مناسبت‌ها",
-        "یادآورها", "همراه", "فعالیت‌ها"
+        "یادآورها", "همراه", "فعالیت‌ها", "Wallpaper Manager"
     ];
 
     private bool IsNavigationTabVisible(string label)
