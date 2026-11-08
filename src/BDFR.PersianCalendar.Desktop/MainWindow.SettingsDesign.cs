@@ -785,7 +785,7 @@ public sealed partial class MainWindow
         };
         foreach (var season in seasons)
             seasonPicker.Items.Add(new ComboBoxItem { Content = season.Label, Tag = season.Id });
-        seasonPicker.SelectedIndex = Array.FindIndex(seasons, x => x.Id == ThemeService.GetSeasonKey(_month));
+        seasonPicker.SelectedIndex = Array.FindIndex(seasons, x => x.Id == ThemeService.GetSeasonKey(PersianDate.Today().Month));
         if (seasonPicker.SelectedIndex < 0) seasonPicker.SelectedIndex = 0;
 
         var setSeason = MakeButton("انتخاب تصویر برای فصل");
@@ -798,11 +798,11 @@ public sealed partial class MainWindow
         var monthPicker = new ComboBox { Header = "ماه", HorizontalAlignment = HorizontalAlignment.Stretch };
         for (var i = 1; i <= 12; i++)
             monthPicker.Items.Add(new ComboBoxItem { Content = PersianDate.MonthNames[i - 1], Tag = i.ToString("00", CultureInfo.InvariantCulture) });
-        monthPicker.SelectedIndex = Math.Clamp(_month - 1, 0, 11);
+        monthPicker.SelectedIndex = Math.Clamp(PersianDate.Today().Month - 1, 0, 11);
         var setMonth = MakeButton("انتخاب تصویر برای ماه");
         setMonth.Click += async (_, _) =>
         {
-            var key = (monthPicker.SelectedItem as ComboBoxItem)?.Tag as string ?? _month.ToString("00", CultureInfo.InvariantCulture);
+            var key = (monthPicker.SelectedItem as ComboBoxItem)?.Tag as string ?? PersianDate.Today().Month.ToString("00", CultureInfo.InvariantCulture);
             await PickWallpaperMappingAsync(false, key);
         };
 
