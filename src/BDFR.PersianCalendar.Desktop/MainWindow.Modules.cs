@@ -90,7 +90,7 @@ public sealed partial class MainWindow
     {
         Border Card(string title, string description, FrameworkElement content)
         {
-            var body = new StackPanel { Spacing = 10, Padding = new Thickness(18) };
+            var body = new StackPanel { Spacing = 10, Padding = new Thickness(16) };
             if (!string.IsNullOrWhiteSpace(title))
                 body.Children.Add(new TextBlock
                 {
@@ -117,27 +117,232 @@ public sealed partial class MainWindow
         }
 
         var root = new StackPanel { Spacing = 14, Padding = new Thickness(18), FlowDirection = FlowDirection.RightToLeft };
-        var intro = new StackPanel { Spacing = 5 };
-        intro.Children.Add(new TextBlock { Text = "Wallpaper Manager", FontSize = 25, FontWeight = Microsoft.UI.Text.FontWeights.Bold, Foreground = ThemeService.Brush(_theme.PrimaryText) });
-        intro.Children.Add(new TextBlock
-        {
-            Text = "جست‌وجو، دریافت و دسته‌بندی کاغذدیواری‌های باکیفیت متناسب با وضوح نمایشگر",
-            TextWrapping = TextWrapping.Wrap, Foreground = ThemeService.Brush(_theme.SecondaryText)
-        });
-        root.Children.Add(Card("مدیریت کاغذدیواری", "", intro));
+        var (screenWidth, screenHeight) = GetPrimaryDisplayResolution();
 
-        var search = new StackPanel { Spacing = 8 };
-        var query = new TextBox { Header = "عبارت جست‌وجو", Text = "nature landscape", PlaceholderText = "مثلاً forest, space, architecture" };
-        var category = new ComboBox { Header = "دسته‌بندی منبع", HorizontalAlignment = HorizontalAlignment.Stretch };
-        category.Items.Add(new ComboBoxItem { Content = "عمومی", Tag = "general" });
-        category.Items.Add(new ComboBoxItem { Content = "انیمه", Tag = "anime" });
-        category.Items.Add(new ComboBoxItem { Content = "افراد", Tag = "people" });
-        category.Items.Add(new ComboBoxItem { Content = "همه دسته‌ها", Tag = "all" });
-        category.SelectedIndex = 0;
-        var resolution = new TextBlock { Text = "وضوح موردنیاز: در حال تشخیص نمایشگر...", Foreground = ThemeService.Brush(_theme.SecondaryText) };
+        // Genre selector is intentionally placed at the top of the page, before
+        // any results are requested. Search only downloads thumbnail previews.
+        var genre = new ComboBox { Header = "ژانر تصاویر", HorizontalAlignment = HorizontalAlignment.Stretch };
+        var genres = new (string Label, string Query)[]
+        {
+            ("همه ژانرها", ""),
+            ("طبیعت", "nature"),
+            ("منظره", "landscape"),
+            ("فضا و کیهان", "space OR galaxy OR nebula"),
+            ("معماری", "architecture"),
+            ("مینیمال", "minimalism"),
+            ("هنر انتزاعی", "abstract"),
+            ("خودرو", "cars OR automotive"),
+            ("انیمه", "anime"),
+            ("حیوانات", "animals OR wildlife"),
+            ("افراد", "people OR portrait"),
+            ("فانتزی", "fantasy"),
+            ("بازی", "video games"),
+            ("دریا و اقیانوس", "ocean OR sea"),
+            ("شهر و شب", "cityscape OR night")
+        };
+        foreach (var item in genres) genre.Items.Add(new ComboBoxItem { Content = item.Label, Tag = item.Query });
+        genre.SelectedIndex = 0;
+
+        var contentCategory = new ComboBox { Header = "نوع محتوای منبع", HorizontalAlignment = HorizontalAlignment.Stretch };
+        contentCategory.Items.Add(new ComboBoxItem { Content = "عمومی", Tag = "general" });
+        contentCategory.Items.Add(new ComboBoxItem { Content = "انیمه", Tag = "anime" });
+        contentCategory.Items.Add(new ComboBoxItem { Content = "افراد", Tag = "people" });
+        contentCategory.Items.Add(new ComboBoxItem { Content = "همه دسته‌ها", Tag = "all" });
+        contentCategory.SelectedIndex = 0;
+
+        var query = new TextBox { Header = "عبارت تکمیلی جست‌وجو (اختیاری)", PlaceholderText = "مثلاً forest, purple, cinematic" };
+        var resolution = new TextBlock
+        {
+            Text = $"وضوح نمایشگر: {screenWidth} × {screenHeight} پیکسل · دریافت اولیه فقط تصویر بندانگشتی",
+            Foreground = ThemeService.Brush(_theme.SecondaryText),
+            TextWrapping = TextWrapping.Wrap
+        };
         var searchButton = MakeButton("جست‌وجوی کاغذدیواری");
-        var resultSummary = new TextBlock { Text = "نتایج جست‌وجو اینجا نمایش داده می‌شوند.", Foreground = ThemeService.Brush(_theme.SecondaryText) };
-        var results = new StackPanel { Spacing = 10 };
+        var resultSummary = new TextBlock { Text = "ابتدا ژانر تصویر را انتخاب و جست‌وجو کنید.", Foreground = ThemeService.Brush(_theme.SecondaryText) };
+        var resultGrid = new Grid { ColumnSpacing = 12, RowSpacing = 12 };
+        for (var i = 0; i < 4; i++)
+            resultGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        var resultScroll = new ScrollViewer
+        {
+            Content = resultGrid,
+            Height = 590,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
+        };
+
+        var currentPage = 0;
+        var totalPages = 1;
+        var loadingPage = false;
+        var searchGeneration = 0;
+        var seenIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var currentQuery = "";
+        var currentCategory = "general";
+
+        async Task DownloadItemAsync(WallpaperItem item, bool apply, Button button)
+        {
+            button.IsEnabled = false;
+            try
+            {
+                // The original-resolution file is fetched only after an explicit
+                // Download or Download & Apply click.
+                var path = await _wallpaperService.DownloadAsync(item);
+                if (apply)
+                {
+                    _settings.CustomBackgroundPath = path;
+                    _settings.BackgroundMode = "custom";
+                    _settings.WallpaperMode = "manual";
+                    _settings.AppearanceMode = "theme";
+                    _settings.UseSeasonalBackground = false;
+                    _settingsService.Save(_settings);
+                    await ApplyBackgroundAsync();
+                    StatusText.Text = $"کاغذدیواری دانلود و اعمال شد · {item.Width}×{item.Height}";
+                }
+                else
+                {
+                    StatusText.Text = $"تصویر در گالری ذخیره شد · {item.Width}×{item.Height}";
+                }
+                await LoadGalleryAsync();
+            }
+            catch (Exception ex)
+            {
+                StatusText.Text = "دریافت تصویر انجام نشد: " + ex.Message;
+                StartupDiagnostics.Log("Wallpaper download failed: " + ex);
+            }
+            finally { button.IsEnabled = true; }
+        }
+
+        void AddWallpaperCard(WallpaperItem item, int index)
+        {
+            var cardBody = new StackPanel { Spacing = 6, Padding = new Thickness(8) };
+            var preview = new Image
+            {
+                Height = 112,
+                Stretch = Stretch.UniformToFill,
+                HorizontalAlignment = HorizontalAlignment.Stretch
+            };
+            if (Uri.TryCreate(item.ThumbnailUrl, UriKind.Absolute, out var thumbUri))
+            {
+                var bitmap = new BitmapImage { UriSource = thumbUri, DecodePixelWidth = 240 };
+                preview.Source = bitmap;
+            }
+            cardBody.Children.Add(preview);
+            cardBody.Children.Add(new TextBlock
+            {
+                Text = $"{item.Width}×{item.Height} · {item.Category}",
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                FontSize = 12,
+                TextWrapping = TextWrapping.Wrap,
+                Foreground = ThemeService.Brush(_theme.PrimaryText)
+            });
+            cardBody.Children.Add(new TextBlock
+            {
+                Text = string.Join("، ", item.Tags.Take(3)),
+                FontSize = 10, MaxLines = 2, TextWrapping = TextWrapping.Wrap,
+                Foreground = ThemeService.Brush(_theme.SecondaryText)
+            });
+            var download = MakeButton("دانلود");
+            download.Click += async (_, _) => await DownloadItemAsync(item, false, download);
+            var apply = MakeButton("دانلود و اعمال");
+            apply.Click += async (_, _) => await DownloadItemAsync(item, true, apply);
+            var actions = new StackPanel { Spacing = 5 };
+            actions.Children.Add(download);
+            actions.Children.Add(apply);
+            cardBody.Children.Add(actions);
+            var card = new Border
+            {
+                BorderBrush = BrushWithAlpha(_theme.Accent, 0x90),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(10),
+                Child = cardBody,
+                Background = CreateSideSurfaceBrush()
+            };
+            var row = index / 4;
+            var column = index % 4;
+            while (resultGrid.RowDefinitions.Count <= row)
+                resultGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            Grid.SetRow(card, row);
+            Grid.SetColumn(card, column);
+            resultGrid.Children.Add(card);
+        }
+
+        async Task LoadNextPageAsync(bool reset)
+        {
+            if (loadingPage) return;
+            if (!reset && currentPage >= totalPages) return;
+            loadingPage = true;
+            var generation = searchGeneration;
+            searchButton.IsEnabled = false;
+            try
+            {
+                var nextPage = reset ? 1 : currentPage + 1;
+                resultSummary.Text = reset
+                    ? "در حال دریافت پیش‌نمایش‌های بندانگشتی..."
+                    : $"در حال بارگذاری صفحه {nextPage}...";
+                var result = await _wallpaperService.SearchPageAsync(
+                    currentQuery, currentCategory, screenWidth, screenHeight, nextPage);
+                if (generation != searchGeneration) return;
+                if (reset)
+                {
+                    resultGrid.Children.Clear();
+                    resultGrid.RowDefinitions.Clear();
+                    seenIds.Clear();
+                }
+                foreach (var item in result.Items)
+                {
+                    if (!seenIds.Add(item.Id)) continue;
+                    AddWallpaperCard(item, seenIds.Count - 1);
+                }
+                currentPage = result.CurrentPage;
+                totalPages = Math.Max(result.TotalPages, currentPage);
+                resultSummary.Text = seenIds.Count == 0
+                    ? "نتیجه‌ای با وضوح کافی پیدا نشد. ژانر دیگری را انتخاب کنید."
+                    : $"{seenIds.Count} پیش‌نمایش بارگذاری شده · صفحه {currentPage} از {totalPages} · برای دیدن موارد بیشتر به پایین بروید.";
+                if (seenIds.Count == 0)
+                    resultSummary.Text += " می‌توانید حداقل وضوح را در تنظیمات نمایشگر تغییر دهید.";
+            }
+            catch (Exception ex)
+            {
+                resultSummary.Text = "ارتباط با منبع تصاویر برقرار نشد: " + ex.Message;
+                StartupDiagnostics.Log("Wallpaper search failed: " + ex);
+            }
+            finally
+            {
+                loadingPage = false;
+                searchButton.IsEnabled = true;
+            }
+        }
+
+        searchButton.Click += async (_, _) =>
+        {
+            searchGeneration++;
+            currentPage = 0;
+            totalPages = 1;
+            var genreQuery = (genre.SelectedItem as ComboBoxItem)?.Tag as string ?? "";
+            var extraQuery = query.Text?.Trim() ?? "";
+            currentQuery = string.Join(" ", new[] { genreQuery, extraQuery }.Where(x => !string.IsNullOrWhiteSpace(x)));
+            currentCategory = (contentCategory.SelectedItem as ComboBoxItem)?.Tag as string ?? "general";
+            await LoadNextPageAsync(true);
+        };
+
+        // Infinite scrolling within the results branch. Each page appends to the
+        // same 4-column grid; no giant originals are fetched during browsing.
+        resultScroll.ViewChanged += async (_, _) =>
+        {
+            if (!loadingPage && currentPage > 0 && currentPage < totalPages &&
+                resultScroll.VerticalOffset >= resultScroll.ScrollableHeight - 180)
+                await LoadNextPageAsync(false);
+        };
+
+        var searchPanel = new StackPanel { Spacing = 9 };
+        searchPanel.Children.Add(genre);
+        searchPanel.Children.Add(contentCategory);
+        searchPanel.Children.Add(query);
+        searchPanel.Children.Add(resolution);
+        searchPanel.Children.Add(searchButton);
+        searchPanel.Children.Add(resultSummary);
+        searchPanel.Children.Add(resultScroll);
+        root.Children.Add(Card("دانلود کاغذدیواری", "ابتدا ژانر را از فهرست بالا انتخاب کنید. در مرحله مرور فقط تصاویر بندانگشتی دریافت می‌شوند؛ فایل اصلی تنها پس از انتخاب «دانلود» یا «دانلود و اعمال» دریافت خواهد شد.", searchPanel));
+
         var gallery = new StackPanel { Spacing = 8 };
         var gallerySummary = new TextBlock { Foreground = ThemeService.Brush(_theme.SecondaryText) };
         var galleryCategoryPicker = new ComboBox { Header = "دسته‌بندی گالری", HorizontalAlignment = HorizontalAlignment.Stretch };
@@ -152,94 +357,6 @@ public sealed partial class MainWindow
         {
             if (!rebuildingGalleryCategories) await LoadGalleryAsync();
         };
-
-        var (screenWidth, screenHeight) = GetPrimaryDisplayResolution();
-        resolution.Text = $"حداقل وضوح جست‌وجو: {screenWidth} × {screenHeight} پیکسل";
-        searchButton.Click += async (_, _) =>
-        {
-            searchButton.IsEnabled = false;
-            resultSummary.Text = "در حال دریافت نتایج از Wallhaven (فقط محتوای SFW)...";
-            results.Children.Clear();
-            try
-            {
-                var categoryId = (category.SelectedItem as ComboBoxItem)?.Tag as string ?? "general";
-                var items = await _wallpaperService.SearchAsync(query.Text, categoryId, screenWidth, screenHeight);
-                resultSummary.Text = items.Count == 0
-                    ? "نتیجه‌ای با وضوح کافی پیدا نشد. عبارت یا دسته‌بندی را تغییر دهید."
-                    : $"{items.Count} تصویر سازگار با وضوح نمایشگر پیدا شد.";
-                foreach (var item in items)
-                {
-                    var cardBody = new StackPanel { Spacing = 6 };
-                    var preview = new Image { Height = 190, Stretch = Stretch.UniformToFill, HorizontalAlignment = HorizontalAlignment.Stretch };
-                    if (Uri.TryCreate(item.ThumbnailUrl, UriKind.Absolute, out var thumbUri))
-                    {
-                        var bitmap = new BitmapImage { UriSource = thumbUri, DecodePixelWidth = 720 };
-                        preview.Source = bitmap;
-                    }
-                    cardBody.Children.Add(preview);
-                    cardBody.Children.Add(new TextBlock
-                    {
-                        Text = $"{item.Title} · {item.Width}×{item.Height} · {item.Category}",
-                        FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-                        TextWrapping = TextWrapping.Wrap,
-                        Foreground = ThemeService.Brush(_theme.PrimaryText)
-                    });
-                    cardBody.Children.Add(new TextBlock
-                    {
-                        Text = string.Join("، ", item.Tags.Take(6)),
-                        FontSize = 11, TextWrapping = TextWrapping.Wrap,
-                        Foreground = ThemeService.Brush(_theme.SecondaryText)
-                    });
-                    var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-                    var download = MakeButton("دانلود و اعمال");
-                    download.Click += async (_, _) =>
-                    {
-                        download.IsEnabled = false;
-                        try
-                        {
-                            var path = await _wallpaperService.DownloadAsync(item);
-                            _settings.CustomBackgroundPath = path;
-                            _settings.BackgroundMode = "custom";
-                            _settings.WallpaperMode = "manual";
-                            _settings.AppearanceMode = "theme";
-                            _settings.UseSeasonalBackground = false;
-                            _settingsService.Save(_settings);
-                            await ApplyBackgroundAsync();
-                            StatusText.Text = $"کاغذدیواری دریافت و اعمال شد · {item.Width}×{item.Height}";
-                            await LoadGalleryAsync();
-                        }
-                        catch (Exception ex)
-                        {
-                            StatusText.Text = "دریافت تصویر انجام نشد: " + ex.Message;
-                            StartupDiagnostics.Log("Wallpaper download failed: " + ex);
-                        }
-                        finally { download.IsEnabled = true; }
-                    };
-                    var openSource = MakeButton("صفحه منبع");
-                    openSource.Click += (_, _) =>
-                    {
-                        try { Process.Start(new ProcessStartInfo(item.PageUrl) { UseShellExecute = true }); }
-                        catch (Exception ex) { StartupDiagnostics.Log("Wallpaper source open failed: " + ex.Message); }
-                    };
-                    actions.Children.Add(download); actions.Children.Add(openSource);
-                    cardBody.Children.Add(actions);
-                    results.Children.Add(Card(item.Id, "منبع: Wallhaven · فقط نسخه عمومی و مجاز برای جست‌وجوی مهمان", cardBody));
-                }
-            }
-            catch (Exception ex)
-            {
-                resultSummary.Text = "ارتباط با منبع تصاویر برقرار نشد: " + ex.Message;
-                StartupDiagnostics.Log("Wallpaper search failed: " + ex);
-            }
-            finally { searchButton.IsEnabled = true; }
-        };
-        search.Children.Add(query);
-        search.Children.Add(category);
-        search.Children.Add(resolution);
-        search.Children.Add(searchButton);
-        search.Children.Add(resultSummary);
-        search.Children.Add(results);
-        root.Children.Add(Card("جست‌وجوی آنلاین", "Wallhaven API · فقط محتوای SFW · وضوح نتیجه‌ها با نمایشگر تطبیق داده می‌شود. حقوق و شرایط استفاده هر تصویر را در صفحه منبع بررسی کنید.", search));
 
         async Task LoadGalleryAsync()
         {
@@ -297,6 +414,7 @@ public sealed partial class MainWindow
                 });
             }
         }
+
         root.Children.Add(Card("گالری محلی", "تصاویر دانلودشده در پوشه‌های دسته‌بندی‌شده نگهداری می‌شوند؛ برای هر تصویر اطلاعات منبع نیز ذخیره می‌شود.", new StackPanel
         {
             Spacing = 8,
@@ -308,14 +426,13 @@ public sealed partial class MainWindow
         openGallery.Click += (_, _) => OpenFolderInExplorer(_wallpaperService.GalleryRoot);
         root.Children.Add(openGallery);
 
-        var scroll = new ScrollViewer
+        return new ScrollViewer
         {
             Content = root,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
             FlowDirection = FlowDirection.RightToLeft
         };
-        return scroll;
     }
 
     private (int Width, int Height) GetPrimaryDisplayResolution()
