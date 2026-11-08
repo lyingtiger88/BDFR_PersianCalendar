@@ -112,6 +112,7 @@ public sealed partial class MainWindow : Window
 
     private Microsoft.UI.Dispatching.DispatcherQueueTimer? _seasonCarouselTimer;
     private Microsoft.UI.Dispatching.DispatcherQueueTimer? _wallpaperRotationTimer;
+    private bool _wallpaperRotationBusy;
     private int _seasonCarouselIndex;
     private string? _seasonCarouselSeasonKey;
     private bool _seasonCarouselBusy;
@@ -299,6 +300,7 @@ public sealed partial class MainWindow : Window
             // images are decoded to a bounded width. Apply the saved background
             // only after the visual tree and calendar data are fully initialized.
             var shouldApplyBackground =
+                _settings.WallpaperMode is "random" or "seasonal" or "monthly" ||
                 (string.Equals(
                      _settings.AppearanceMode,
                      "elena",
@@ -3833,6 +3835,13 @@ public sealed partial class MainWindow : Window
         await LoadSelectedDayAsync();
         await LoadActivitiesAsync();
 
+        UpdateNavigationEntryLabels(true);
+        if (_activeDesktopModule != "تقویم")
+            ShowDesktopModule(_activeDesktopModule);
+        ApplyUserFont(Content);
+        ApplyCornerRadiusLive(Content);
+        await ApplyBackgroundAsync();
+
         StatusText.Text = string.Equals(
             _settings.AppearanceMode,
             "elena",
@@ -4776,6 +4785,7 @@ public sealed partial class MainWindow : Window
                 _settings.AppearanceMode,
                 "elena",
                 StringComparison.OrdinalIgnoreCase);
+            _settings.WallpaperMode = "manual";
 
             StopSeasonCarousel();
             _settings.AppearanceMode = "theme";
@@ -5090,6 +5100,157 @@ public sealed partial class MainWindow : Window
             _backgroundWash.Opacity = 0;
             _backgroundPathText.Text = "بارگذاری تصویر زمینه انجام نشد.";
         }
+    }
+
+    private void StartWallpaperRotationTimer()
+    {
+        StopWallpaperRotationTimer();
+        var mode = (_settings.WallpaperMode ?? "manual").ToLowerInvariant();
+        if (mode == "manual") return;
+
+        _wallpaperRotationTimer = DispatcherQueue.CreateTimer();
+        _wallpaperRotationTimer.Interval = mode == "random"
+            ? TimeSpan.FromHours(Math.Clamp(_settings.WallpaperChangeIntervalHours, 1, 168))
+            : TimeSpan.FromHours(1);
+        _wallpaperRotationTimer.IsRepeating = true;
+        _wallpaperRotationTimer.Tick += async (_, _) =>
+        {
+            if (_wallpaperRotationBusy) return;
+            _wallpaperRotationBusy = true;
+            try
+            {
+                await ApplyBackgroundAsync(forceRandom: mode == "random");
+            }
+            finally { _wallpaperRotationBusy = false; }
+        };
+        _wallpaperRotationTimer.Start();
+    }
+
+    private void StopWallpaperRotationTimer()
+    {
+        _wallpaperRotationTimer?.Stop();
+        _wallpaperRotationTimer = null;
+    }
+
+    private async Task ShowWallpaperModeDialogAsync()
+    {
+        var modePicker = new ComboBox { HorizontalAlignment = HorizontalAlignment.Stretch };
+        var options = new (string Id, string Label, string Detail)[]
+        {
+            ("random", "تصادفی", "انتخاب تصادفی از گالری و تعویض دوره‌ای"),
+            ("seasonal", "فصلی", "تصویر اختصاصی برای بهار، تابستان، پاییز و زمستان"),
+            ("monthly", "ماهانه", "تصویر اختصاصی برای هر یک از ۱۲ ماه"),
+            ("manual", "دستی", "یک تصویر ثابت که خودتان انتخاب می‌کنید")
+        };
+        foreach (var option in options)
+            modePicker.Items.Add(new ComboBoxItem { Content = option.Label, Tag = option.Id });
+        var current = (_settings.WallpaperMode ?? "manual").ToLowerInvariant();
+        modePicker.SelectedItem = modePicker.Items.OfType<ComboBoxItem>()
+            .FirstOrDefault(x => string.Equals((string?)x.Tag, current, StringComparison.OrdinalIgnoreCase))
+            ?? modePicker.Items.OfType<ComboBoxItem>().Last();
+        var details = new TextBlock
+        {
+            Text = options.FirstOrDefault(x => x.Id == current).Detail,
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = ThemeService.Brush(_theme.SecondaryText)
+        };
+        modePicker.SelectionChanged += (_, _) =>
+        {
+            var id = (modePicker.SelectedItem as ComboBoxItem)?.Tag as string;
+            details.Text = options.FirstOrDefault(x => x.Id == id).Detail;
+        };
+        var interval = new ComboBox { Header = "فاصله تعویض در حالت تصادفی" };
+        foreach (var hours in new[] { 1, 6, 12, 24, 48, 72 })
+            interval.Items.Add(new ComboBoxItem { Content = hours == 1 ? "هر ساعت" : $"هر {hours} ساعت", Tag = hours });
+        interval.SelectedItem = interval.Items.OfType<ComboBoxItem>()
+            .FirstOrDefault(x => (int)x.Tag == Math.Clamp(_settings.WallpaperChangeIntervalHours, 1, 168))
+            ?? interval.Items.OfType<ComboBoxItem>().First(x => (int)x.Tag == 24);
+        var content = new StackPanel { Spacing = 10, Width = 420 };
+        content.Children.Add(new TextBlock { Text = "روش مدیریت و زمان‌بندی تصویر زمینه را انتخاب کنید.", TextWrapping = TextWrapping.Wrap });
+        content.Children.Add(modePicker);
+        content.Children.Add(details);
+        content.Children.Add(interval);
+        var dialog = new ContentDialog
+        {
+            Title = "Background Manager",
+            Content = content,
+            PrimaryButtonText = "تأیید و اعمال",
+            CloseButtonText = "انصراف",
+            DefaultButton = ContentDialogButton.Primary,
+            XamlRoot = (Content as FrameworkElement)?.XamlRoot
+        };
+        if (dialog.XamlRoot is null || await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+
+        var selectedMode = (modePicker.SelectedItem as ComboBoxItem)?.Tag as string ?? "manual";
+        _settings.WallpaperMode = selectedMode;
+        _settings.WallpaperChangeIntervalHours = (int?)((interval.SelectedItem as ComboBoxItem)?.Tag) ?? 24;
+        if (selectedMode == "manual")
+        {
+            if (!string.IsNullOrWhiteSpace(_settings.CustomBackgroundPath) && File.Exists(_settings.CustomBackgroundPath))
+                _settings.BackgroundMode = "custom";
+            else
+            {
+                _settings.BackgroundMode = "none";
+                _settingsService.Save(_settings);
+                await SelectCustomBackgroundAsync();
+                return;
+            }
+        }
+        else
+        {
+            _settings.BackgroundMode = "managed";
+            _settings.AppearanceMode = "theme";
+            _settings.UseSeasonalBackground = false;
+        }
+        _settingsService.Save(_settings);
+        await ApplyBackgroundAsync(forceRandom: selectedMode == "random");
+        StatusText.Text = $"روش مدیریت تصویر زمینه: {options.First(x => x.Id == selectedMode).Label}";
+    }
+
+    private async Task SelectCustomBackgroundAsync()
+    {
+        var picker = new FileOpenPicker { SuggestedStartLocation = PickerLocationId.PicturesLibrary };
+        foreach (var extension in new[] { ".jpg", ".jpeg", ".png", ".webp" })
+            picker.FileTypeFilter.Add(extension);
+        WinRT.Interop.InitializeWithWindow.Initialize(picker, WinRT.Interop.WindowNative.GetWindowHandle(this));
+        var file = await picker.PickSingleFileAsync();
+        if (file is null) return;
+        var copied = await _settingsService.CopyCustomBackgroundAsync(file);
+        if (copied is null) { StatusText.Text = "کپی تصویر زمینه انجام نشد."; return; }
+        _settings.CustomBackgroundPath = copied;
+        _settings.BackgroundMode = "custom";
+        _settings.WallpaperMode = "manual";
+        _settings.AppearanceMode = "theme";
+        _settingsService.Save(_settings);
+        await ApplyBackgroundAsync();
+        StatusText.Text = "تصویر زمینه انتخاب و اعمال شد.";
+    }
+
+    private async Task PickWallpaperMappingAsync(bool seasonal, string key)
+    {
+        var picker = new FileOpenPicker { SuggestedStartLocation = PickerLocationId.PicturesLibrary };
+        foreach (var extension in new[] { ".jpg", ".jpeg", ".png", ".webp" })
+            picker.FileTypeFilter.Add(extension);
+        WinRT.Interop.InitializeWithWindow.Initialize(picker, WinRT.Interop.WindowNative.GetWindowHandle(this));
+        var file = await picker.PickSingleFileAsync();
+        if (file is null) return;
+        var copied = await _settingsService.CopyCustomBackgroundAsync(file);
+        if (copied is null) { StatusText.Text = "ذخیره تصویر انجام نشد."; return; }
+        if (seasonal)
+        {
+            _settings.SeasonalWallpaperPaths ??= new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            _settings.SeasonalWallpaperPaths[key] = copied;
+        }
+        else
+        {
+            _settings.MonthlyWallpaperPaths ??= new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            _settings.MonthlyWallpaperPaths[key] = copied;
+        }
+        _settingsService.Save(_settings);
+        StatusText.Text = $"تصویر برای {(seasonal ? "فصل" : "ماه")} انتخاب‌شده ذخیره شد.";
+        if ((seasonal && _settings.WallpaperMode == "seasonal" && key == ThemeService.GetSeasonKey(_month)) ||
+            (!seasonal && _settings.WallpaperMode == "monthly" && key == _month.ToString("00", CultureInfo.InvariantCulture)))
+            await ApplyBackgroundAsync();
     }
 
     private void UpdateMonthDecorations()
