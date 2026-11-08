@@ -33,6 +33,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.asImageBitmap
@@ -1806,58 +1807,63 @@ private fun OccasionsScreen(
         } else {
             groupedItems.forEach { (month, entries) ->
                 item(key = "month_${month}") {
-                    Row(
-                        Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 2.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = RoundedCornerShape(10.dp)) {
-                            Text(monthNames[month - 1], modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp), color = MaterialTheme.colorScheme.onPrimaryContainer, fontWeight = FontWeight.SemiBold)
-                        }
-                        Spacer(Modifier.weight(1f))
-                        Text("${entries.size} رویداد", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Spacer(Modifier.width(8.dp))
+                    Box(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                        // The zodiac artwork is twice its former size and is
+                        // deliberately layered beneath the month/event text.
                         ZodiacArtworkImage(
                             month = month,
                             styleId = selectedZodiacStyle,
-                            modifier = Modifier.size(72.dp)
+                            modifier = Modifier.align(Alignment.TopEnd).size(144.dp).alpha(0.5f)
                         )
-                    }
-                }
-                items(entries, key = { it.id }) { item ->
-                    val holidayColor = if (item.isHoliday) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
-                    Row(
-                        Modifier.fillMaxWidth().padding(start = 4.dp, top = 2.dp, bottom = 2.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            toPersianDigits(item.day.toString()),
-                            modifier = Modifier.width(42.dp),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            textAlign = TextAlign.Center,
-                            color = holidayColor
-                        )
-                        Box(
-                            Modifier.width(2.dp).height(34.dp)
-                                .background(if (item.isHoliday) holidayColor else MaterialTheme.colorScheme.outlineVariant)
-                        )
-                        Column(Modifier.weight(1f).padding(start = 10.dp, top = 4.dp, bottom = 4.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                                Text(ZurvanBuiltInOccasions.iconFor(item.title), style = MaterialTheme.typography.bodyMedium)
-                                Text(
-                                    item.title,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = if (item.isHoliday) FontWeight.Bold else FontWeight.Normal,
-                                    color = holidayColor
-                                )
+                        Column(Modifier.fillMaxWidth()) {
+                            Row(
+                                Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = RoundedCornerShape(10.dp)) {
+                                    Text(monthNames[month - 1], modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp), color = MaterialTheme.colorScheme.onPrimaryContainer, fontWeight = FontWeight.SemiBold)
+                                }
+                                Spacer(Modifier.weight(1f))
+                                Text("${entries.size} رویداد", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
-                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    "${toPersianDigits(item.day.toString())} ${monthNames[month - 1]}",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = holidayColor
-                                )
-                                if (item.isHoliday) Text("تعطیل رسمی", style = MaterialTheme.typography.labelSmall, color = holidayColor, fontWeight = FontWeight.Bold)
+                            entries.forEach { item ->
+                                val holidayColor = if (item.isHoliday) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+                                Row(
+                                    Modifier.fillMaxWidth().padding(start = 4.dp, top = 2.dp, bottom = 2.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        toPersianDigits(item.day.toString()),
+                                        modifier = Modifier.width(42.dp),
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        textAlign = TextAlign.Center,
+                                        color = holidayColor
+                                    )
+                                    Box(
+                                        Modifier.width(2.dp).height(34.dp)
+                                            .background(if (item.isHoliday) holidayColor else MaterialTheme.colorScheme.outlineVariant)
+                                    )
+                                    Column(Modifier.weight(1f).padding(start = 10.dp, top = 4.dp, bottom = 4.dp)) {
+                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                                            Text(ZurvanBuiltInOccasions.iconFor(item.title), style = MaterialTheme.typography.bodyMedium)
+                                            Text(
+                                                item.title,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = if (item.isHoliday) FontWeight.Bold else FontWeight.Normal,
+                                                color = holidayColor
+                                            )
+                                        }
+                                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                            Text(
+                                                "${toPersianDigits(item.day.toString())} ${monthNames[month - 1]}",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = holidayColor
+                                            )
+                                            if (item.isHoliday) Text("تعطیل رسمی", style = MaterialTheme.typography.labelSmall, color = holidayColor, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
