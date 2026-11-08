@@ -636,19 +636,21 @@ public sealed partial class MainWindow
         {
             ("cosmic", "کیهانی کلاسیک", "✦"), ("neon", "فانتزی نورانی", "☄"),
             ("minimal", "مینیمال مدرن", "☾"), ("watercolor", "آبرنگی هنری", "✿"),
-            ("mythic", "اسطوره‌ای", "♜"), ("cute", "کارتونی کیوت", "☺"),
+            ("mythic", "اسطوره‌ای", "♜"), ("cute_1", "کیوت ۱", "☺"),
+            ("cute_2", "کیوت ۲", "♡"), ("cute_3", "کیوت ۳", "✿"),
             ("luxury", "سه‌بعدی لوکس", "✧")
         };
         var zodiacGroup = SettingsGroup("Zodiac Theme", "سبک مستقل نمایش نمادهای دوازده برج فلکی؛ جدا از تم کلی زروان.", "✦", "#FF8B67DD");
         var zodiacChoices = new Grid { ColumnSpacing = 8, RowSpacing = 8 };
         for (var column = 0; column < 3; column++)
             zodiacChoices.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        for (var row = 0; row < 3; row++)
+        for (var row = 0; row < (zodiacStyles.Length + 2) / 3; row++)
             zodiacChoices.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         for (var index = 0; index < zodiacStyles.Length; index++)
         {
             var style = zodiacStyles[index];
-            var selected = string.Equals(_settings.ZodiacThemeId, style.Id, StringComparison.OrdinalIgnoreCase);
+            var selected = string.Equals(_settings.ZodiacThemeId, style.Id, StringComparison.OrdinalIgnoreCase) ||
+                (style.Id == "cute_1" && _settings.ZodiacThemeId == "cute");
             var tileContent = new StackPanel { Spacing = 5, Padding = new Thickness(10), HorizontalAlignment = HorizontalAlignment.Center };
             var previewArt = new Image
             {
