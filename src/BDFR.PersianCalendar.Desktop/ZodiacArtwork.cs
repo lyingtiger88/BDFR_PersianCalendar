@@ -56,6 +56,10 @@ internal static class ZodiacArtwork
         var signId = SignIds[month - 1];
         var root = Path.Combine(AppContext.BaseDirectory, "picture", "zodiac", "png");
         var path = Path.Combine(root, $"{selectedTheme}_{signId}.png");
+        // Old installations retain the legacy cute files. New style slots are
+        // populated by the user’s separate artwork; never manufacture duplicates.
+        if (!File.Exists(path) && selectedTheme.StartsWith("cute_", StringComparison.Ordinal))
+            path = Path.Combine(root, $"cute_{signId}.png");
 
         try
         {
