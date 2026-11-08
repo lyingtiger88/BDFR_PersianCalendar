@@ -174,6 +174,15 @@ public sealed partial class MainWindow
         var totalPages = 1;
         var loadingPage = false;
         var searchGeneration = 0;
+        var gallery = new StackPanel { Spacing = 8 };
+        var gallerySummary = new TextBlock { Foreground = ThemeService.Brush(_theme.SecondaryText) };
+        var galleryCategoryPicker = new ComboBox { Header = "دسته‌بندی گالری", HorizontalAlignment = HorizontalAlignment.Stretch };
+        galleryCategoryPicker.Items.Add(new ComboBoxItem { Content = "همه دسته‌ها", Tag = "" });
+        foreach (var name in _wallpaperService.GetGalleryCategories())
+            galleryCategoryPicker.Items.Add(new ComboBoxItem { Content = name, Tag = name });
+        galleryCategoryPicker.SelectedIndex = 0;
+        var rebuildingGalleryCategories = false;
+        var galleryRefresh = MakeButton("تازه‌سازی گالری");
         var seenIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var currentQuery = "";
         var currentCategory = "general";
@@ -343,15 +352,6 @@ public sealed partial class MainWindow
         searchPanel.Children.Add(resultScroll);
         root.Children.Add(Card("دانلود کاغذدیواری", "ابتدا ژانر را از فهرست بالا انتخاب کنید. در مرحله مرور فقط تصاویر بندانگشتی دریافت می‌شوند؛ فایل اصلی تنها پس از انتخاب «دانلود» یا «دانلود و اعمال» دریافت خواهد شد.", searchPanel));
 
-        var gallery = new StackPanel { Spacing = 8 };
-        var gallerySummary = new TextBlock { Foreground = ThemeService.Brush(_theme.SecondaryText) };
-        var galleryCategoryPicker = new ComboBox { Header = "دسته‌بندی گالری", HorizontalAlignment = HorizontalAlignment.Stretch };
-        galleryCategoryPicker.Items.Add(new ComboBoxItem { Content = "همه دسته‌ها", Tag = "" });
-        foreach (var name in _wallpaperService.GetGalleryCategories())
-            galleryCategoryPicker.Items.Add(new ComboBoxItem { Content = name, Tag = name });
-        galleryCategoryPicker.SelectedIndex = 0;
-        var rebuildingGalleryCategories = false;
-        var galleryRefresh = MakeButton("تازه‌سازی گالری");
         galleryRefresh.Click += async (_, _) => await LoadGalleryAsync();
         galleryCategoryPicker.SelectionChanged += async (_, _) =>
         {
