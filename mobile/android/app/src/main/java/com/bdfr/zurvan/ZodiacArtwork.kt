@@ -37,7 +37,7 @@ internal fun ZodiacArtworkImage(
             val styles = json.getJSONArray("styles")
             val style = (0 until styles.length())
                 .map { styles.getJSONObject(it) }
-                .firstOrNull { it.optString("id") == styleId }
+                .firstOrNull { it.optString("id") == (if (styleId == "cute") "cute_1" else styleId) }
                 ?: styles.getJSONObject(0)
             val path = PathParser().parsePathString(sign.getString("path")).toPath()
             ZodiacArt(
