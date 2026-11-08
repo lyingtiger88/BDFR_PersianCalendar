@@ -140,6 +140,8 @@ public sealed partial class MainWindow
         var results = new StackPanel { Spacing = 10 };
         var gallery = new StackPanel { Spacing = 8 };
         var gallerySummary = new TextBlock { Foreground = ThemeService.Brush(_theme.SecondaryText) };
+        var galleryRefresh = MakeButton("تازه‌سازی گالری");
+        galleryRefresh.Click += async (_, _) => await LoadGalleryAsync();
 
         var (screenWidth, screenHeight) = GetPrimaryDisplayResolution();
         resolution.Text = $"حداقل وضوح جست‌وجو: {screenWidth} × {screenHeight} پیکسل";
@@ -266,11 +268,8 @@ public sealed partial class MainWindow
                     Child = row
                 });
             }
+            gallery.Children.Add(galleryRefresh);
         }
-
-        var galleryRefresh = MakeButton("تازه‌سازی گالری");
-        galleryRefresh.Click += async (_, _) => await LoadGalleryAsync();
-        gallery.Children.Add(galleryRefresh);
         root.Children.Add(Card("گالری محلی", "تصاویر دانلودشده در پوشه‌های دسته‌بندی‌شده نگهداری می‌شوند؛ برای هر تصویر اطلاعات منبع نیز ذخیره می‌شود.", new StackPanel
         {
             Spacing = 8,
