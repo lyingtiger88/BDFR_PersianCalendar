@@ -148,6 +148,7 @@ public sealed partial class MainWindow
         "یادآورها" => "\uE823",
         "همراه" => "\uE8CC",
         "فعالیت‌ها" => "\uE81C",
+        "Wallpaper Manager" => "\uE91B",
         "تنظیمات" => "\uE713",
         _ => "\uE10F"
     };
