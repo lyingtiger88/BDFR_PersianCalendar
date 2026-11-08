@@ -235,7 +235,7 @@ public sealed partial class MainWindow
             var symbol = new FontIcon
             {
                 Glyph = NavigationIconGlyph(entry.Label),
-                FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Segoe Fluent Icons"),
+                FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Segoe MDL2 Assets"),
                 FontSize = 26,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
