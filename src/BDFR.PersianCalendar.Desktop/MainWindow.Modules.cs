@@ -140,8 +140,14 @@ public sealed partial class MainWindow
         var results = new StackPanel { Spacing = 10 };
         var gallery = new StackPanel { Spacing = 8 };
         var gallerySummary = new TextBlock { Foreground = ThemeService.Brush(_theme.SecondaryText) };
+        var galleryCategoryPicker = new ComboBox { Header = "دسته‌بندی گالری", HorizontalAlignment = HorizontalAlignment.Stretch };
+        galleryCategoryPicker.Items.Add(new ComboBoxItem { Content = "همه دسته‌ها", Tag = "" });
+        foreach (var name in _wallpaperService.GetGalleryCategories())
+            galleryCategoryPicker.Items.Add(new ComboBoxItem { Content = name, Tag = name });
+        galleryCategoryPicker.SelectedIndex = 0;
         var galleryRefresh = MakeButton("تازه‌سازی گالری");
         galleryRefresh.Click += async (_, _) => await LoadGalleryAsync();
+        galleryCategoryPicker.SelectionChanged += async (_, _) => await LoadGalleryAsync();
 
         var (screenWidth, screenHeight) = GetPrimaryDisplayResolution();
         resolution.Text = $"حداقل وضوح جست‌وجو: {screenWidth} × {screenHeight} پیکسل";
@@ -235,8 +241,19 @@ public sealed partial class MainWindow
         {
             gallery.Children.Clear();
             gallery.Children.Add(galleryRefresh);
-            var files = _wallpaperService.GetGalleryFiles();
-            gallerySummary.Text = $"{files.Count} تصویر در گالری محلی · مسیر: {_wallpaperService.GalleryRoot}";
+            var selectedCategory = (galleryCategoryPicker.SelectedItem as ComboBoxItem)?.Tag as string ?? "";
+            var currentCategories = _wallpaperService.GetGalleryCategories();
+            var previousCategory = selectedCategory;
+            galleryCategoryPicker.Items.Clear();
+            galleryCategoryPicker.Items.Add(new ComboBoxItem { Content = "همه دسته‌ها", Tag = "" });
+            foreach (var name in currentCategories)
+                galleryCategoryPicker.Items.Add(new ComboBoxItem { Content = name, Tag = name });
+            galleryCategoryPicker.SelectedItem = galleryCategoryPicker.Items.OfType<ComboBoxItem>()
+                .FirstOrDefault(x => string.Equals((string?)x.Tag, previousCategory, StringComparison.OrdinalIgnoreCase))
+                ?? galleryCategoryPicker.Items.OfType<ComboBoxItem>().First();
+            selectedCategory = (galleryCategoryPicker.SelectedItem as ComboBoxItem)?.Tag as string ?? "";
+            var files = _wallpaperService.GetGalleryFiles(selectedCategory);
+            gallerySummary.Text = $"{files.Count} تصویر در این دسته · مسیر: {_wallpaperService.GalleryRoot}";
             if (files.Count == 0)
             {
                 gallery.Children.Add(new TextBlock { Text = "هنوز تصویری دانلود نشده است.", Opacity = 0.65 });
@@ -277,7 +294,7 @@ public sealed partial class MainWindow
         root.Children.Add(Card("گالری محلی", "تصاویر دانلودشده در پوشه‌های دسته‌بندی‌شده نگهداری می‌شوند؛ برای هر تصویر اطلاعات منبع نیز ذخیره می‌شود.", new StackPanel
         {
             Spacing = 8,
-            Children = { gallerySummary, gallery }
+            Children = { galleryCategoryPicker, gallerySummary, gallery }
         }));
         _ = LoadGalleryAsync();
 
