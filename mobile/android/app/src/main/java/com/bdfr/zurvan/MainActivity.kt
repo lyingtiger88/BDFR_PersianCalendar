@@ -3383,13 +3383,31 @@ private fun ZurvanDeskScreen(
         verticalArrangement =
             Arrangement.spacedBy(10.dp)
     ) {
-        Text(
-            "Zurvan Desk",
-            style =
-                MaterialTheme
-                    .typography
-                    .headlineSmall
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Surface(
+                color = MaterialTheme.colorScheme.primaryContainer,
+                shape = RoundedCornerShape(18.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Cloud,
+                    contentDescription = "نماد فضای ابری زروان دسک",
+                    modifier = Modifier.padding(12.dp).size(52.dp),
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
+            Column {
+                Text("Zurvan Desk", style = MaterialTheme.typography.headlineSmall)
+                Text(
+                    "فضای ابری شخصی زروان",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
 
         if (!state.authenticated) {
             Card(
