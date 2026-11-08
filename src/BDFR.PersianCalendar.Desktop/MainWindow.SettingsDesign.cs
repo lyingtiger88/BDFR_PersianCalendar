@@ -114,7 +114,7 @@ public sealed partial class MainWindow
             Child = new FontIcon
             {
                 Glyph = "\uE77B",
-                FontFamily = new FontFamily("Segoe Fluent Icons"),
+                FontFamily = new FontFamily("Segoe MDL2 Assets"),
                 FontSize = 33,
                 Foreground = ThemeService.Brush("#FF7755E8"),
                 HorizontalAlignment = HorizontalAlignment.Center,
@@ -217,7 +217,7 @@ public sealed partial class MainWindow
             var symbol = new FontIcon
             {
                 Glyph = icon,
-                FontFamily = new FontFamily("Segoe Fluent Icons"),
+                FontFamily = new FontFamily("Segoe MDL2 Assets"),
                 FontSize = 25,
                 Foreground = ThemeService.Brush(color),
                 VerticalAlignment = VerticalAlignment.Center
@@ -295,7 +295,7 @@ public sealed partial class MainWindow
         var glyph = new FontIcon
         {
             Glyph = icon,
-            FontFamily = new FontFamily("Segoe Fluent Icons"),
+            FontFamily = new FontFamily("Segoe MDL2 Assets"),
             FontSize = 20,
             Foreground = ThemeService.Brush("#FF665D77"),
             VerticalAlignment = VerticalAlignment.Center
@@ -338,7 +338,7 @@ public sealed partial class MainWindow
         header.Children.Add(new FontIcon
         {
             Glyph = glyph,
-            FontFamily = new FontFamily("Segoe Fluent Icons"),
+            FontFamily = new FontFamily("Segoe MDL2 Assets"),
             Foreground = ThemeService.Brush(color),
             FontSize = 27
         });
@@ -592,7 +592,7 @@ public sealed partial class MainWindow
             tileContents.Children.Add(new FontIcon
             {
                 Glyph = glyph,
-                FontFamily = new FontFamily("Segoe Fluent Icons"),
+                FontFamily = new FontFamily("Segoe MDL2 Assets"),
                 FontSize = 28,
                 Foreground = ThemeService.Brush(color),
                 HorizontalAlignment = HorizontalAlignment.Center
