@@ -150,8 +150,31 @@ public sealed partial class MainWindow
         {
             Stretch = Stretch.UniformToFill,
             HorizontalAlignment = HorizontalAlignment.Stretch,
-            VerticalAlignment = VerticalAlignment.Stretch,
-            Source = new SvgImageSource(new Uri("ms-appx:///picture/desk/welcome.svg"))
+            VerticalAlignment = VerticalAlignment.Stretch
+        };
+        var cloudFallback = new TextBlock
+        {
+            Text = "☁",
+            FontSize = 115,
+            FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Segoe UI Symbol"),
+            Foreground = ThemeService.Brush("#FFDC9D8D"),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        var imageLayer = new Grid();
+        imageLayer.Children.Add(cloudFallback);
+        imageLayer.Children.Add(image);
+        // Unpackaged WinUI windows do not reliably resolve ms-appx image URIs.
+        // Read the published SVG from its actual application directory instead.
+        image.Loaded += async (_, _) =>
+        {
+            if (image.Source is not null) return;
+            var path = Path.Combine(AppContext.BaseDirectory, "picture", "desk", "welcome.svg");
+            image.Source = await PictureService.LoadImageAsync(path, 720);
+            if (image.Source is not null)
+                cloudFallback.Visibility = Visibility.Collapsed;
+            else
+                StartupDiagnostics.Log($"Zurvan Desk hero image missing or could not be decoded: {path}");
         };
         var hero = new Border
         {
@@ -160,7 +183,7 @@ public sealed partial class MainWindow
             HorizontalAlignment = HorizontalAlignment.Stretch,
             VerticalAlignment = VerticalAlignment.Stretch,
             MinHeight = 505,
-            Child = image
+            Child = imageLayer
         };
         Grid.SetColumn(hero, 1);
         grid.Children.Add(hero);
