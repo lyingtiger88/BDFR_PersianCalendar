@@ -183,10 +183,10 @@ public sealed class WallpaperProviderService
     {
         if (!Directory.Exists(GalleryRoot)) return [];
         return Directory.EnumerateDirectories(GalleryRoot)
-            .Select(Path.GetFileName)
-            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Select(path => Path.GetFileName(path))
+            .OfType<string>()
             .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
-            .ToArray()!;
+            .ToArray();
     }
 
     public IReadOnlyList<string> GetGalleryFiles(string? category = null)
