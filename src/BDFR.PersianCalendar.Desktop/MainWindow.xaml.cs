@@ -3804,6 +3804,7 @@ public sealed partial class MainWindow : Window
             if (_activeDesktopModule != "تقویم")
                 ShowDesktopModule(_activeDesktopModule);
             ApplyUserFont(Content);
+            RefreshIconFonts(Content);
             ApplyCornerRadiusLive(Content);
 
             StatusText.Text =
@@ -3844,6 +3845,7 @@ public sealed partial class MainWindow : Window
         if (_activeDesktopModule != "تقویم")
             ShowDesktopModule(_activeDesktopModule);
         ApplyUserFont(Content);
+        RefreshIconFonts(Content);
         ApplyCornerRadiusLive(Content);
         await ApplyBackgroundAsync();
 
@@ -4205,6 +4207,16 @@ public sealed partial class MainWindow : Window
 
         _typographyBaselines.Add(element, baseline);
         return baseline;
+    }
+
+    private void RefreshIconFonts(DependencyObject? root)
+    {
+        if (root is null) return;
+        if (root is FontIcon icon)
+            icon.FontFamily = new FontFamily("Segoe MDL2 Assets");
+        var count = VisualTreeHelper.GetChildrenCount(root);
+        for (var i = 0; i < count; i++)
+            RefreshIconFonts(VisualTreeHelper.GetChild(root, i));
     }
 
     private void ApplyUserFont(DependencyObject? root)
@@ -4818,6 +4830,7 @@ public sealed partial class MainWindow : Window
                 if (_activeDesktopModule != "تقویم")
                     ShowDesktopModule(_activeDesktopModule);
                 ApplyUserFont(Content);
+                RefreshIconFonts(Content);
                 ApplyCornerRadiusLive(Content);
             }
 
