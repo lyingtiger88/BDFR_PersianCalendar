@@ -233,6 +233,33 @@ public sealed partial class MainWindow
                 {
                     officialMonths.Children.Clear();
                     var entries = await _occasionSource.GetYearAsync(_selected.Year);
+                    var personalEntries = await _repository.GetSpecialOccasionsAsync();
+                    var yearStart = new PersianDate(_selected.Year, 1, 1).ToDateOnly();
+                    var gregorianYear = yearStart.Year;
+                    var hijriYear = new System.Globalization.HijriCalendar().GetYear(yearStart.ToDateTime(TimeOnly.MinValue));
+                    var personalDates = personalEntries.Select(item =>
+                    {
+                        try
+                        {
+                            var date = item.CalendarSystem switch
+                            {
+                                CalendarSystemKind.Persian => new PersianDate(_selected.Year, item.Month,
+                                    Math.Min(item.Day, PersianDate.DaysInMonth(_selected.Year, item.Month))).ToDateOnly(),
+                                CalendarSystemKind.Gregorian => new DateOnly(gregorianYear, item.Month,
+                                    Math.Min(item.Day, DateTime.DaysInMonth(gregorianYear, item.Month))),
+                                CalendarSystemKind.Hijri => DateOnly.FromDateTime(new System.Globalization.HijriCalendar().ToDateTime(
+                                    hijriYear, item.Month, Math.Min(item.Day, new System.Globalization.HijriCalendar().GetDaysInMonth(hijriYear, item.Month)),
+                                    0, 0, 0, 0)),
+                                _ => yearStart
+                            };
+                            var converted = CalendarDateConverter.Convert(date).Persian;
+                            return (Item: item, Date: converted);
+                        }
+                        catch (ArgumentOutOfRangeException)
+                        {
+                            return (Item: item, Date: default(PersianDate));
+                        }
+                    }).Where(x => x.Date.Year == _selected.Year).ToList();
                     var months = PersianDate.MonthNames;
                     for (var month = 1; month <= 12; month++)
                     {
@@ -305,6 +332,69 @@ public sealed partial class MainWindow
                             monthBody.Children.Add(row);
                         }
 
+                        // Personal annual occasions are merged into the same month
+                        // timeline, while retaining a distinct gold identity.
+                        foreach (var personalItem in personalDates
+                            .Where(x => x.Date.Month == month)
+                            .OrderBy(x => x.Date.Day))
+                        {
+                            var personalRow = new Grid { ColumnSpacing = 10, FlowDirection = FlowDirection.RightToLeft };
+                            personalRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                            personalRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                            personalRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                            var dayBadge = new Border
+                            {
+                                MinWidth = 42, Padding = new Thickness(8, 5, 8, 5),
+                                CornerRadius = new CornerRadius(8),
+                                Background = BrushWithAlpha("#FFFFC857", 0x30),
+                                Child = new TextBlock
+                                {
+                                    Text = ToPersianDigits(personalItem.Date.Day.ToString()),
+                                    FontWeight = Microsoft.UI.Text.FontWeights.Bold,
+                                    Foreground = ThemeService.Brush("#FF9A6700"),
+                                    HorizontalAlignment = HorizontalAlignment.Center
+                                }
+                            };
+                            Grid.SetColumn(dayBadge, 0);
+                            personalRow.Children.Add(dayBadge);
+                            var personalTitle = new TextBlock
+                            {
+                                Text = personalItem.Item.Title,
+                                TextWrapping = TextWrapping.Wrap,
+                                VerticalAlignment = VerticalAlignment.Center,
+                                Foreground = ThemeService.Brush(_theme.PrimaryText),
+                                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
+                            };
+                            Grid.SetColumn(personalTitle, 1);
+                            personalRow.Children.Add(personalTitle);
+                            var personalMarker = new Border
+                            {
+                                Padding = new Thickness(8, 4, 8, 4),
+                                CornerRadius = new CornerRadius(10),
+                                Background = BrushWithAlpha("#FFFFC857", 0x35),
+                                VerticalAlignment = VerticalAlignment.Center,
+                                Child = new TextBlock
+                                {
+                                    Text = "✦ مناسبت شخصی",
+                                    FontSize = 11,
+                                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                                    Foreground = ThemeService.Brush("#FF9A6700")
+                                }
+                            };
+                            Grid.SetColumn(personalMarker, 2);
+                            personalRow.Children.Add(personalMarker);
+                            var personalCard = new Border
+                            {
+                                BorderThickness = new Thickness(1.5),
+                                BorderBrush = ThemeService.Brush("#FFD6A63B"),
+                                Background = BrushWithAlpha("#FFFFD76A", 0x0C),
+                                CornerRadius = new CornerRadius(10),
+                                Padding = new Thickness(5),
+                                Child = personalRow
+                            };
+                            monthBody.Children.Add(personalCard);
+                        }
+
                         var monthCard = new Border
                         {
                             Background = CreateSideSurfaceBrush(),
@@ -352,6 +442,7 @@ public sealed partial class MainWindow
                         await LoadSelectedDayAsync();
                         await LoadCalendarCellOccasionsAsync(_year, _month);
                         await RenderOfficialMonths();
+                        await LoadPersonal();
                         StatusText.Text = $"مناسبت‌های سال {ToPersianDigits(_selected.Year.ToString())} به‌روزرسانی شد.";
                     }
                     catch (Exception ex) { StatusText.Text = "به‌روزرسانی مناسبت‌ها انجام نشد: " + ex.Message; }
@@ -451,7 +542,30 @@ public sealed partial class MainWindow
                     var items = await _repository.GetSpecialOccasionsAsync();
                     if (items.Count == 0) personal.Children.Add(new TextBlock { Text = "هنوز مناسبتی ثبت نشده است.", Opacity = 0.65 });
                     foreach (var item in items)
-                        personal.Children.Add(new TextBlock { Text = $"{item.Title} · {item.CalendarSystem} · {item.Month}/{item.Day} · یادآوری: {string.Join("، ", item.ReminderDaysBefore)} روز قبل", TextWrapping = TextWrapping.Wrap });
+                    {
+                        var line = new StackPanel { Spacing = 4 };
+                        line.Children.Add(new TextBlock
+                        {
+                            Text = "✦  " + item.Title,
+                            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                            Foreground = ThemeService.Brush("#FF9A6700")
+                        });
+                        line.Children.Add(new TextBlock
+                        {
+                            Text = $"{item.CalendarSystem} · {item.Month}/{item.Day} · یادآوری: {string.Join("، ", item.ReminderDaysBefore)} روز قبل",
+                            Foreground = ThemeService.Brush(_theme.SecondaryText),
+                            FontSize = 12
+                        });
+                        personal.Children.Add(new Border
+                        {
+                            BorderThickness = new Thickness(1.5),
+                            BorderBrush = ThemeService.Brush("#FFD6A63B"),
+                            Background = BrushWithAlpha("#FFFFD76A", 0x0C),
+                            CornerRadius = new CornerRadius(10),
+                            Padding = new Thickness(10),
+                            Child = line
+                        });
+                    }
                 }
 
                 async Task LoadOfficial()
