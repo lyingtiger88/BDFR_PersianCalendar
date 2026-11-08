@@ -237,6 +237,15 @@ public sealed class SqliteCalendarRepository(string databasePath) : ICalendarRep
         await cmd.ExecuteNonQueryAsync(cancellationToken);
     }
 
+    public async Task DeleteNoteAsync(PersianDate date, CancellationToken cancellationToken = default)
+    {
+        await using var db = await OpenAsync(cancellationToken);
+        var cmd = db.CreateCommand();
+        cmd.CommandText = "DELETE FROM notes WHERE persian_date=$date";
+        cmd.Parameters.AddWithValue("$date", date.ToString());
+        await cmd.ExecuteNonQueryAsync(cancellationToken);
+    }
+
     public async Task AddTaskAsync(CalendarTask task, CancellationToken cancellationToken = default)
     {
         await using var db = await OpenAsync(cancellationToken);
@@ -254,6 +263,43 @@ public sealed class SqliteCalendarRepository(string databasePath) : ICalendarRep
         cmd.Parameters.AddWithValue("$cat", (object?)task.Category ?? DBNull.Value);
         cmd.Parameters.AddWithValue("$desc", (object?)task.Description ?? DBNull.Value);
         await cmd.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    public async Task UpdateTaskAsync(CalendarTask task, CancellationToken cancellationToken = default)
+    {
+        await using var db = await OpenAsync(cancellationToken);
+        var cmd = db.CreateCommand();
+        cmd.CommandText = """
+            UPDATE tasks SET title=$title,persian_date=$date,due_time=$due,priority=$priority,
+                completed=$completed,category=$category,description=$description WHERE id=$id;
+            """;
+        cmd.Parameters.AddWithValue("$id", task.Id);
+        cmd.Parameters.AddWithValue("$title", task.Title);
+        cmd.Parameters.AddWithValue("$date", task.Date.ToString());
+        cmd.Parameters.AddWithValue("$due", (object?)task.DueTime?.ToString("HH:mm") ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("$priority", task.Priority);
+        cmd.Parameters.AddWithValue("$completed", task.Completed ? 1 : 0);
+        cmd.Parameters.AddWithValue("$category", (object?)task.Category ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("$description", (object?)task.Description ?? DBNull.Value);
+        await cmd.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    public async Task DeleteTaskAsync(string taskId, CancellationToken cancellationToken = default)
+    {
+        await using var db = await OpenAsync(cancellationToken);
+        await using var tx = await db.BeginTransactionAsync(cancellationToken);
+        var reminders = db.CreateCommand();
+        reminders.Transaction = (SqliteTransaction)tx;
+        reminders.CommandText = "DELETE FROM reminders WHERE item_kind=$kind AND item_id=$id";
+        reminders.Parameters.AddWithValue("$kind", (int)CalendarItemKind.Task);
+        reminders.Parameters.AddWithValue("$id", taskId);
+        await reminders.ExecuteNonQueryAsync(cancellationToken);
+        var cmd = db.CreateCommand();
+        cmd.Transaction = (SqliteTransaction)tx;
+        cmd.CommandText = "DELETE FROM tasks WHERE id=$id";
+        cmd.Parameters.AddWithValue("$id", taskId);
+        await cmd.ExecuteNonQueryAsync(cancellationToken);
+        await tx.CommitAsync(cancellationToken);
     }
 
     public async Task SetTaskCompletedAsync(string taskId, bool completed, CancellationToken cancellationToken = default)
@@ -286,6 +332,47 @@ public sealed class SqliteCalendarRepository(string databasePath) : ICalendarRep
         cmd.Parameters.AddWithValue("$r", (int)calendarEvent.Recurrence);
         cmd.Parameters.AddWithValue("$privacy", (int)calendarEvent.Privacy);
         await cmd.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    public async Task UpdateEventAsync(CalendarEvent calendarEvent, CancellationToken cancellationToken = default)
+    {
+        await using var db = await OpenAsync(cancellationToken);
+        var cmd = db.CreateCommand();
+        cmd.CommandText = """
+            UPDATE events SET title=$title,persian_date=$date,start_time=$start,end_time=$end,
+                all_day=$allDay,description=$description,category=$category,location=$location,
+                recurrence=$recurrence,privacy=$privacy WHERE id=$id;
+            """;
+        cmd.Parameters.AddWithValue("$id", calendarEvent.Id);
+        cmd.Parameters.AddWithValue("$title", calendarEvent.Title);
+        cmd.Parameters.AddWithValue("$date", calendarEvent.Date.ToString());
+        cmd.Parameters.AddWithValue("$start", (object?)calendarEvent.StartTime?.ToString("HH:mm") ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("$end", (object?)calendarEvent.EndTime?.ToString("HH:mm") ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("$allDay", calendarEvent.AllDay ? 1 : 0);
+        cmd.Parameters.AddWithValue("$description", (object?)calendarEvent.Description ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("$category", (object?)calendarEvent.Category ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("$location", (object?)calendarEvent.Location ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("$recurrence", (int)calendarEvent.Recurrence);
+        cmd.Parameters.AddWithValue("$privacy", (int)calendarEvent.Privacy);
+        await cmd.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    public async Task DeleteEventAsync(string eventId, CancellationToken cancellationToken = default)
+    {
+        await using var db = await OpenAsync(cancellationToken);
+        await using var tx = await db.BeginTransactionAsync(cancellationToken);
+        var reminders = db.CreateCommand();
+        reminders.Transaction = (SqliteTransaction)tx;
+        reminders.CommandText = "DELETE FROM reminders WHERE item_kind=$kind AND item_id=$id";
+        reminders.Parameters.AddWithValue("$kind", (int)CalendarItemKind.Event);
+        reminders.Parameters.AddWithValue("$id", eventId);
+        await reminders.ExecuteNonQueryAsync(cancellationToken);
+        var cmd = db.CreateCommand();
+        cmd.Transaction = (SqliteTransaction)tx;
+        cmd.CommandText = "DELETE FROM events WHERE id=$id";
+        cmd.Parameters.AddWithValue("$id", eventId);
+        await cmd.ExecuteNonQueryAsync(cancellationToken);
+        await tx.CommitAsync(cancellationToken);
     }
 
     public async Task UpsertOccasionsAsync(IEnumerable<Occasion> occasions, CancellationToken cancellationToken = default)
@@ -376,6 +463,54 @@ public sealed class SqliteCalendarRepository(string databasePath) : ICalendarRep
         cmd.Parameters.AddWithValue("$days", string.Join(",", occasion.ReminderDaysBefore));
         cmd.Parameters.AddWithValue("$cat", (object?)occasion.Category ?? DBNull.Value);
         cmd.Parameters.AddWithValue("$note", (object?)occasion.Note ?? DBNull.Value);
+        await cmd.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    public async Task UpdateSpecialOccasionAsync(SpecialOccasion occasion, CancellationToken cancellationToken = default)
+    {
+        await using var db = await OpenAsync(cancellationToken);
+        var cmd = db.CreateCommand();
+        cmd.CommandText = """
+            UPDATE special_occasions SET title=$title,calendar_system=$calendar,month=$month,day=$day,
+                repeat_yearly=$repeat,reminder_days=$days,category=$category,note=$note WHERE id=$id;
+            """;
+        cmd.Parameters.AddWithValue("$id", occasion.Id);
+        cmd.Parameters.AddWithValue("$title", occasion.Title);
+        cmd.Parameters.AddWithValue("$calendar", (int)occasion.CalendarSystem);
+        cmd.Parameters.AddWithValue("$month", occasion.Month);
+        cmd.Parameters.AddWithValue("$day", occasion.Day);
+        cmd.Parameters.AddWithValue("$repeat", occasion.RepeatYearly ? 1 : 0);
+        cmd.Parameters.AddWithValue("$days", string.Join(",", occasion.ReminderDaysBefore));
+        cmd.Parameters.AddWithValue("$category", (object?)occasion.Category ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("$note", (object?)occasion.Note ?? DBNull.Value);
+        await cmd.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    public async Task DeleteSpecialOccasionAsync(string occasionId, CancellationToken cancellationToken = default)
+    {
+        await using var db = await OpenAsync(cancellationToken);
+        await using var tx = await db.BeginTransactionAsync(cancellationToken);
+        var reminders = db.CreateCommand();
+        reminders.Transaction = (SqliteTransaction)tx;
+        reminders.CommandText = "DELETE FROM reminders WHERE item_kind=$kind AND item_id=$id";
+        reminders.Parameters.AddWithValue("$kind", (int)CalendarItemKind.SpecialOccasion);
+        reminders.Parameters.AddWithValue("$id", occasionId);
+        await reminders.ExecuteNonQueryAsync(cancellationToken);
+        var cmd = db.CreateCommand();
+        cmd.Transaction = (SqliteTransaction)tx;
+        cmd.CommandText = "DELETE FROM special_occasions WHERE id=$id";
+        cmd.Parameters.AddWithValue("$id", occasionId);
+        await cmd.ExecuteNonQueryAsync(cancellationToken);
+        await tx.CommitAsync(cancellationToken);
+    }
+
+    public async Task DeleteRemindersForItemAsync(CalendarItemKind itemKind, string itemId, CancellationToken cancellationToken = default)
+    {
+        await using var db = await OpenAsync(cancellationToken);
+        var cmd = db.CreateCommand();
+        cmd.CommandText = "DELETE FROM reminders WHERE item_kind=$kind AND item_id=$id";
+        cmd.Parameters.AddWithValue("$kind", (int)itemKind);
+        cmd.Parameters.AddWithValue("$id", itemId);
         await cmd.ExecuteNonQueryAsync(cancellationToken);
     }
 
