@@ -16,6 +16,8 @@ public sealed record WallpaperItem(
     string ThumbnailUrl,
     IReadOnlyList<string> Tags);
 
+public sealed record WallpaperSearchResult(IReadOnlyList<WallpaperItem> Items, int CurrentPage, int TotalPages);
+
 public sealed class WallpaperProviderService
 {
     private const string ApiRoot = "https://wallhaven.cc/api/v1/";
@@ -34,13 +36,15 @@ public sealed class WallpaperProviderService
         return client;
     }
 
-    public async Task<IReadOnlyList<WallpaperItem>> SearchAsync(
+    public async Task<WallpaperSearchResult> SearchPageAsync(
         string query,
         string category,
         int minimumWidth,
         int minimumHeight,
+        int page = 1,
         CancellationToken cancellationToken = default)
     {
+        page = Math.Clamp(page, 1, 100);
         minimumWidth = Math.Clamp(minimumWidth, 800, 16384);
         minimumHeight = Math.Clamp(minimumHeight, 600, 16384);
         // Wallhaven's "atleast" filter expects one of its supported resolution
@@ -66,7 +70,7 @@ public sealed class WallpaperProviderService
             "sorting=relevance",
             "order=desc",
             $"atleast={apiMinimum.Width}x{apiMinimum.Height}",
-            "page=1"
+            $"page={page}"
         };
         if (!string.IsNullOrWhiteSpace(query))
             terms.Add("q=" + Uri.EscapeDataString(query.Trim()));
@@ -77,7 +81,7 @@ public sealed class WallpaperProviderService
         await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
         using var json = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
         if (!json.RootElement.TryGetProperty("data", out var data) || data.ValueKind != JsonValueKind.Array)
-            return [];
+            return new WallpaperSearchResult([], page, page);
 
         var items = new List<WallpaperItem>();
         foreach (var entry in data.EnumerateArray())
