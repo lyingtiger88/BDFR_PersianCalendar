@@ -3800,6 +3800,11 @@ public sealed partial class MainWindow : Window
             ApplyAppearanceBrushesOnly();
             BuildCalendar();
             await LoadSelectedDayAsync();
+            UpdateNavigationEntryLabels(true);
+            if (_activeDesktopModule != "تقویم")
+                ShowDesktopModule(_activeDesktopModule);
+            ApplyUserFont(Content);
+            ApplyCornerRadiusLive(Content);
 
             StatusText.Text =
                 $"اعمال {requestedAppearance} انجام نشد؛ ظاهر قبلی بازیابی شد.";
@@ -4809,6 +4814,11 @@ public sealed partial class MainWindow : Window
                 ApplyAppearanceBrushesOnly();
                 BuildCalendar();
                 await LoadSelectedDayAsync();
+                UpdateNavigationEntryLabels(true);
+                if (_activeDesktopModule != "تقویم")
+                    ShowDesktopModule(_activeDesktopModule);
+                ApplyUserFont(Content);
+                ApplyCornerRadiusLive(Content);
             }
 
             await ApplyBackgroundAsync();
