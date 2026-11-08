@@ -180,13 +180,31 @@ public sealed partial class MainWindow
                             Foreground = ThemeService.Brush(_theme.PrimaryText)
                         });
                         foreach (var ev in snapshot.Events)
-                            day.Children.Add(new TextBlock { Text = $"◷ {ev.Title} · {(ev.StartTime?.ToString("HH:mm") ?? "تمام‌روز")}", TextWrapping = TextWrapping.Wrap });
+                        {
+                            var row = new StackPanel { Spacing = 6 };
+                            row.Children.Add(new TextBlock { Text = $"◷ {ev.Title} · {(ev.StartTime?.ToString("HH:mm") ?? "تمام‌روز")}", TextWrapping = TextWrapping.Wrap });
+                            var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
+                            var edit = MakeButton("ویرایش");
+                            edit.Click += async (_, _) => { await EditEventAsync(ev); await LoadWeek(); };
+                            var delete = MakeButton("حذف");
+                            delete.Click += async (_, _) => { await DeleteEventAsync(ev); await LoadWeek(); };
+                            actions.Children.Add(edit); actions.Children.Add(delete); row.Children.Add(actions);
+                            day.Children.Add(row);
+                        }
                         foreach (var task in snapshot.Tasks)
                         {
+                            var row = new StackPanel { Spacing = 5 };
                             var check = new CheckBox { Content = task.Title, IsChecked = task.Completed };
                             check.Checked += async (_, _) => { await _repository.SetTaskCompletedAsync(task.Id, true); await LoadWeek(); };
                             check.Unchecked += async (_, _) => { await _repository.SetTaskCompletedAsync(task.Id, false); await LoadWeek(); };
-                            day.Children.Add(check);
+                            row.Children.Add(check);
+                            var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
+                            var edit = MakeButton("ویرایش");
+                            edit.Click += async (_, _) => { await EditTaskAsync(task); await LoadWeek(); };
+                            var delete = MakeButton("حذف");
+                            delete.Click += async (_, _) => { await DeleteTaskAsync(task); await LoadWeek(); };
+                            actions.Children.Add(edit); actions.Children.Add(delete); row.Children.Add(actions);
+                            day.Children.Add(row);
                         }
                         if (snapshot.Events.Count == 0 && snapshot.Tasks.Count == 0)
                             day.Children.Add(new TextBlock { Text = "برنامه‌ای ثبت نشده است.", Opacity = 0.6 });
@@ -556,6 +574,13 @@ public sealed partial class MainWindow
                             Foreground = ThemeService.Brush(_theme.SecondaryText),
                             FontSize = 12
                         });
+                        var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 7 };
+                        var edit = MakeButton("ویرایش");
+                        edit.Click += async (_, _) => await EditSpecialOccasionAsync(item);
+                        var delete = MakeButton("حذف");
+                        delete.Click += async (_, _) => await DeleteSpecialOccasionAsync(item);
+                        actions.Children.Add(edit); actions.Children.Add(delete);
+                        line.Children.Add(actions);
                         personal.Children.Add(new Border
                         {
                             BorderThickness = new Thickness(1.5),
