@@ -271,8 +271,12 @@ jobs:
       - name: Generate seven zodiac PNG themes
         shell: pwsh
         run: |
+          python -m pip install --disable-pip-version-check pillow
+          if ($LASTEXITCODE -ne 0) { throw "Pillow installation failed." }
           python -m pip install --disable-pip-version-check cairosvg
+          if ($LASTEXITCODE -ne 0) { Write-Warning "CairoSVG unavailable; portable PNG fallback will be used." }
           python tools/GenerateZodiacPngs.py
+          if ($LASTEXITCODE -ne 0) { throw "Zodiac PNG generation failed." }
 
       - uses: actions/setup-dotnet@v4
         with:
