@@ -5551,8 +5551,39 @@ public sealed partial class MainWindow : Window
             OccasionsPanel.Children.Clear();
             _selectedHolidayOccasionLabels.Clear();
             _selectedOccasionCards.Clear();
+            var personalOccasionLookup = (await _repository.GetSpecialOccasionsAsync())
+                .ToDictionary(x => x.Id, StringComparer.Ordinal);
             foreach (var item in snapshot.Occasions)
             {
+                if (item.Source == "personal" && personalOccasionLookup.TryGetValue(item.Id, out var personalItem))
+                {
+                    var personalRow = new StackPanel { Spacing = 5, Padding = new Thickness(8) };
+                    personalRow.Children.Add(new TextBlock
+                    {
+                        Text = "✦ " + personalItem.Title + " · مناسبت شخصی",
+                        FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                        Foreground = ThemeService.Brush("#FF9A6700"),
+                        TextWrapping = TextWrapping.Wrap
+                    });
+                    var personalActions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
+                    var editPersonal = MakeButton("ویرایش");
+                    editPersonal.Click += async (_, _) => await EditSpecialOccasionAsync(personalItem);
+                    var deletePersonal = MakeButton("حذف");
+                    deletePersonal.Click += async (_, _) => await DeleteSpecialOccasionAsync(personalItem);
+                    personalActions.Children.Add(editPersonal);
+                    personalActions.Children.Add(deletePersonal);
+                    personalRow.Children.Add(personalActions);
+                    OccasionsPanel.Children.Add(new Border
+                    {
+                        BorderThickness = new Thickness(1.5),
+                        BorderBrush = ThemeService.Brush("#FFD6A63B"),
+                        Background = BrushWithAlpha("#FFFFD76A", 0x0C),
+                        CornerRadius = new CornerRadius(10),
+                        Child = personalRow
+                    });
+                    continue;
+                }
+
                 var effectiveHoliday = IsOfficialHolidayOccasion(_selected, item);
                 var mourning = IsMourningHolidayTitle(item.Title);
                 var badge = GetOccasionBadge(item.Title, effectiveHoliday, mourning);
