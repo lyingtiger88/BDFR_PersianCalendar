@@ -43,6 +43,15 @@ public sealed class WallpaperProviderService
     {
         minimumWidth = Math.Clamp(minimumWidth, 800, 16384);
         minimumHeight = Math.Clamp(minimumHeight, 600, 16384);
+        // Wallhaven's "atleast" filter expects one of its supported resolution
+        // presets. Results are additionally filtered against the actual monitor.
+        var apiMinimum = minimumWidth >= 3840 && minimumHeight >= 2160
+            ? (Width: 3840, Height: 2160)
+            : minimumWidth >= 2560 && minimumHeight >= 1440
+                ? (Width: 2560, Height: 1440)
+                : minimumWidth >= 1920 && minimumHeight >= 1200
+                    ? (Width: 1920, Height: 1200)
+                    : (Width: 1920, Height: 1080);
         var categoryFlags = category switch
         {
             "anime" => "010",
@@ -56,7 +65,7 @@ public sealed class WallpaperProviderService
             "purity=100",
             "sorting=relevance",
             "order=desc",
-            $"atleast={minimumWidth}x{minimumHeight}",
+            $"atleast={apiMinimum.Width}x{apiMinimum.Height}",
             "page=1"
         };
         if (!string.IsNullOrWhiteSpace(query))
