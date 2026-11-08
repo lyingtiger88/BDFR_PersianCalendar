@@ -7125,10 +7125,15 @@ public sealed partial class MainWindow : Window
                 var action = item.Action switch
                 {
                     "event-created" => "رویداد",
+                    "event-updated" => "ویرایش رویداد",
+                    "event-deleted" => "حذف رویداد",
                     "task-created" => "کار جدید",
+                    "task-updated" => "ویرایش کار",
+                    "task-deleted" => "حذف کار",
                     "task-completed" => "کار انجام شد",
                     "task-reopened" => "کار باز شد",
                     "note-saved" => "یادداشت",
+                    "note-deleted" => "حذف یادداشت",
                     "occasion-sync" => "همگام‌سازی مناسبت‌ها",
                     "special-occasion-created" => "مناسبت شخصی",
                     "notification-fired" => "اعلان",
