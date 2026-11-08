@@ -191,6 +191,8 @@ public sealed partial class MainWindow
                             _settings.CustomBackgroundPath = path;
                             _settings.BackgroundMode = "custom";
                             _settings.WallpaperMode = "manual";
+                            _settings.AppearanceMode = "theme";
+                            _settings.UseSeasonalBackground = false;
                             _settingsService.Save(_settings);
                             await ApplyBackgroundAsync();
                             StatusText.Text = $"کاغذدیواری دریافت و اعمال شد · {item.Width}×{item.Height}";
@@ -255,6 +257,8 @@ public sealed partial class MainWindow
                     _settings.CustomBackgroundPath = path;
                     _settings.BackgroundMode = "custom";
                     _settings.WallpaperMode = "manual";
+                    _settings.AppearanceMode = "theme";
+                    _settings.UseSeasonalBackground = false;
                     _settingsService.Save(_settings);
                     await ApplyBackgroundAsync();
                     StatusText.Text = "تصویر انتخاب‌شده از گالری اعمال شد.";
