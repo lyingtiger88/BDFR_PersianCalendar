@@ -314,13 +314,29 @@ public sealed partial class MainWindow
                             Child = monthBody
                         };
                         var monthSection = new StackPanel { Spacing = 6 };
-                        monthSection.Children.Add(new TextBlock
+                        var monthHeader = new StackPanel { Spacing = 7 };
+                        monthHeader.Children.Add(new TextBlock
                         {
                             Text = months[month - 1],
                             FontSize = 17,
                             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
                             Foreground = ThemeService.Brush(_theme.PrimaryText)
                         });
+                        // Artwork sits in its own row between month title and event list.
+                        // It never overlays or obscures occasion descriptions.
+                        var monthArtworkSource = await ZodiacArtwork.LoadAsync(month, _settings.ZodiacThemeId);
+                        if (monthArtworkSource is not null)
+                        {
+                            monthHeader.Children.Add(new Image
+                            {
+                                Source = monthArtworkSource,
+                                Width = 104,
+                                Height = 104,
+                                Stretch = Stretch.Uniform,
+                                HorizontalAlignment = HorizontalAlignment.Right
+                            });
+                        }
+                        monthSection.Children.Add(monthHeader);
                         monthSection.Children.Add(monthCard);
                         officialMonths.Children.Add(monthSection);
                     }
@@ -355,15 +371,15 @@ public sealed partial class MainWindow
                 var zodiacBannerBody = new Grid { ColumnSpacing = 12, Padding = new Thickness(18), FlowDirection = FlowDirection.RightToLeft };
                 zodiacBannerBody.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
                 zodiacBannerBody.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                var zodiacGlyph = new TextBlock
+                var zodiacHeroImage = new Image
                 {
-                    Text = selectedZodiac.Glyph,
-                    FontSize = 48,
-                    Foreground = ThemeService.Brush("#FFFFD68A"),
+                    Width = 104, Height = 104,
+                    Stretch = Stretch.Uniform,
                     VerticalAlignment = VerticalAlignment.Center
                 };
-                Grid.SetColumn(zodiacGlyph, 0);
-                zodiacBannerBody.Children.Add(zodiacGlyph);
+                _ = ZodiacArtwork.PopulateAsync(zodiacHeroImage, _selected.Month, _settings.ZodiacThemeId);
+                Grid.SetColumn(zodiacHeroImage, 0);
+                zodiacBannerBody.Children.Add(zodiacHeroImage);
                 var zodiacText = new StackPanel { Spacing = 5, VerticalAlignment = VerticalAlignment.Center };
                 zodiacText.Children.Add(new TextBlock
                 {
