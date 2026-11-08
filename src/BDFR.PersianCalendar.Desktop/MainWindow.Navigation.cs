@@ -25,14 +25,23 @@ public sealed partial class MainWindow
         shell.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
         var brand = new StackPanel { Spacing = 3, Margin = new Thickness(9, 8, 9, 24), HorizontalAlignment = HorizontalAlignment.Right };
-        brand.Children.Add(new TextBlock
+        var brandMark = new Button
         {
-            Text = "◈",
-            FontSize = 39,
-            FontWeight = Microsoft.UI.Text.FontWeights.Bold,
-            HorizontalAlignment = HorizontalAlignment.Center,
-            Foreground = ThemeService.Brush(_theme.Accent)
-        });
+            Content = new TextBlock
+            {
+                Text = "◈",
+                FontSize = 43,
+                FontWeight = Microsoft.UI.Text.FontWeights.Bold,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Foreground = ThemeService.Brush(_theme.Accent)
+            },
+            Background = BrushWithAlpha("#00FFFFFF", 0),
+            BorderThickness = new Thickness(0),
+            Padding = new Thickness(10, 2, 10, 2),
+            HorizontalAlignment = HorizontalAlignment.Center
+        };
+        brandMark.Click += (_, _) => HandleZurvanLogoTap(brandMark);
+        brand.Children.Add(brandMark);
         brand.Children.Add(new TextBlock
         {
             Text = "زروان",
