@@ -14,9 +14,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # [pc-android-only] pushes intentionally build only Core, Windows desktop, and Android.
+  # [pc-android-only] builds Core, Windows desktop and Android.\n  # [windows-debug-only] builds a Windows Debug portable ZIP only.
   core:
-    if: github.event_name != 'push' || (!contains(github.event.head_commit.message, '[theme-studio-only]') && !contains(github.event.head_commit.message, '[windows-only]'))
+    if: github.event_name != 'push' || (!contains(github.event.head_commit.message, '[theme-studio-only]') && !contains(github.event.head_commit.message, '[windows-only]')) && !contains(github.event.head_commit.message, '[windows-debug-only]')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -36,7 +36,7 @@ jobs:
 
 
   theme-studio:
-    if: github.event_name != 'push' || (!contains(github.event.head_commit.message, '[pc-android-only]') && !contains(github.event.head_commit.message, '[windows-only]'))
+    if: github.event_name != 'push' || (!contains(github.event.head_commit.message, '[pc-android-only]') && !contains(github.event.head_commit.message, '[windows-only]')) && !contains(github.event.head_commit.message, '[windows-debug-only]')
     name: Build Windows Theme Studio
     runs-on: windows-latest
     steps:
@@ -94,7 +94,7 @@ jobs:
           if-no-files-found: error
 
   android:
-    if: github.event_name != 'push' || (!contains(github.event.head_commit.message, '[theme-studio-only]') && !contains(github.event.head_commit.message, '[windows-only]'))
+    if: github.event_name != 'push' || (!contains(github.event.head_commit.message, '[theme-studio-only]') && !contains(github.event.head_commit.message, '[windows-only]')) && !contains(github.event.head_commit.message, '[windows-debug-only]')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -137,7 +137,7 @@ jobs:
           retention-days: 14
 
   ios:
-    if: github.event_name != 'push' || (!contains(github.event.head_commit.message, '[pc-android-only]') && !contains(github.event.head_commit.message, '[theme-studio-only]') && !contains(github.event.head_commit.message, '[windows-only]'))
+    if: github.event_name != 'push' || (!contains(github.event.head_commit.message, '[pc-android-only]') && !contains(github.event.head_commit.message, '[theme-studio-only]') && !contains(github.event.head_commit.message, '[windows-only]')) && !contains(github.event.head_commit.message, '[windows-debug-only]')
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -173,7 +173,7 @@ jobs:
 
   mobile-release:
     name: Publish mobile test downloads
-    if: github.event_name == 'push' && !contains(github.event.head_commit.message, '[theme-studio-only]') && !contains(github.event.head_commit.message, '[pc-android-only]') && !contains(github.event.head_commit.message, '[windows-only]')
+    if: github.event_name == 'push' && !contains(github.event.head_commit.message, '[theme-studio-only]') && !contains(github.event.head_commit.message, '[pc-android-only]') && !contains(github.event.head_commit.message, '[windows-only]') && !contains(github.event.head_commit.message, '[windows-debug-only]')
     needs: [android, ios, windows]
     runs-on: ubuntu-latest
     steps:
@@ -210,7 +210,7 @@ jobs:
           All downloads are test builds, not production releases."
 
   windows:
-    if: github.event_name != 'push' || !contains(github.event.head_commit.message, '[theme-studio-only]')
+    if: github.event_name != 'push' || !contains(github.event.head_commit.message, '[theme-studio-only]') && !contains(github.event.head_commit.message, '[windows-debug-only]')
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -367,3 +367,64 @@ jobs:
             --title $title `
             --notes $notes `
             --prerelease
+
+  windows-debug:
+    name: Windows x64 Debug ZIP (Zodiac diagnostics)
+    if: github.event_name == 'push' && contains(github.event.head_commit.message, '[windows-debug-only]')
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Generate Zurvan application icon
+        shell: pwsh
+        run: ./tools/GenerateZurvanIcon.ps1
+      - name: Validate bundled zodiac and desk artwork
+        shell: pwsh
+        run: |
+          $catalog = "picture/zodiac/catalog.json"
+          $cloud = "picture/desk/welcome.svg"
+          if (-not (Test-Path $catalog)) { throw "Missing zodiac catalog" }
+          if (-not (Test-Path $cloud)) { throw "Missing Desk cloud illustration" }
+          $data = Get-Content $catalog -Raw | ConvertFrom-Json
+          if ($data.signs.Count -ne 12 -or $data.styles.Count -ne 7) { throw "Zodiac catalog must contain 12 signs and 7 themes" }
+      - name: Publish Windows x64 Debug build
+        shell: pwsh
+        env:
+          ZURVAN_PUBLIC_KEY_B64: ${{ vars.ZURVAN_LICENSE_PUBLIC_KEY_B64 }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:ZURVAN_PUBLIC_KEY_B64)) { throw "ZURVAN_LICENSE_PUBLIC_KEY_B64 repository variable required" }
+          dotnet publish src/BDFR.PersianCalendar.Desktop/BDFR.PersianCalendar.Desktop.csproj `
+            -c Debug `
+            -r win-x64 `
+            --self-contained true `
+            -p:Platform=x64 `
+            -p:WindowsAppSDKSelfContained=true `
+            -p:PublishSingleFile=false `
+            -p:AnahitaGitCommit="${{ github.sha }}" `
+            -p:AnahitaBuildNumber="${{ github.run_number }}" `
+            -p:ZurvanLicensePublicKeyB64="$env:ZURVAN_PUBLIC_KEY_B64" `
+            -o artifacts/Zurvan-win-x64-Debug
+          $output = "artifacts/Zurvan-win-x64-Debug"
+          $catalog = Join-Path $output "picture/zodiac/catalog.json"
+          $cloud = Join-Path $output "picture/desk/welcome.svg"
+          if (-not (Test-Path $catalog)) { throw "Zodiac artwork missing from Debug publish output: $catalog" }
+          if (-not (Test-Path $cloud)) { throw "Zurvan Desk cloud missing from Debug publish output: $cloud" }
+          $data = Get-Content $catalog -Raw | ConvertFrom-Json
+          if ($data.signs.Count -ne 12 -or $data.styles.Count -ne 7) { throw "Published zodiac catalog invalid" }
+          Write-Host "Verified 12 signs, 7 themes and Desk cloud illustration in Windows Debug output."
+      - name: Package Debug ZIP only
+        shell: pwsh
+        run: |
+          Compress-Archive -Path artifacts/Zurvan-win-x64-Debug/* -DestinationPath artifacts/Zurvan-win-x64-Debug.zip -Force
+          (Get-FileHash artifacts/Zurvan-win-x64-Debug.zip -Algorithm SHA256).Hash | Out-File artifacts/Zurvan-win-x64-Debug.zip.sha256 -Encoding ascii
+      - name: Upload Debug ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: Zurvan-Windows-x64-Debug
+          path: |
+            artifacts/Zurvan-win-x64-Debug.zip
+            artifacts/Zurvan-win-x64-Debug.zip.sha256
+          retention-days: 14
+          if-no-files-found: error
