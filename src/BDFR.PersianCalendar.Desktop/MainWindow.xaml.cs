@@ -6556,6 +6556,10 @@ public sealed partial class MainWindow : Window
             SpecialTitleBox.Text = "";
             StatusText.Text = "مناسبت شخصی و یادآورهای سالانه ثبت شد.";
             await LoadActivitiesAsync();
+            // Refresh the open occasions module immediately so the new personal
+            // occasion appears in both the monthly timeline and personal list.
+            if (_activeDesktopModule == "مناسبت‌ها")
+                ShowDesktopModule("مناسبت‌ها");
         }
         catch (Exception ex)
         {
