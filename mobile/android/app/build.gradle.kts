@@ -9,7 +9,7 @@ android {
     compileSdk = 35
 
     // Share zodiac vector catalog with the desktop build without duplicating assets.
-    sourceSets.getByName("main").assets.srcDir("../../../picture")
+    sourceSets.getByName("main").assets.srcDir("../../../picture/zodiac")
 
     buildFeatures {
         compose = true
