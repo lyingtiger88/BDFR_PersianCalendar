@@ -1118,6 +1118,10 @@ public sealed partial class MainWindow : Window
         saveNote.Click += SaveNote_Click;
         stack.Children.Add(saveNote);
 
+        var deleteNote = MakeButton("حذف یادداشت روز");
+        deleteNote.Click += DeleteNote_Click;
+        stack.Children.Add(deleteNote);
+
         _dayMediaPanel.Spacing = 6;
         stack.Children.Add(_dayMediaPanel);
         RefreshDayMediaPanel();
@@ -6250,6 +6254,215 @@ public sealed partial class MainWindow : Window
         StatusText.Text = "یادداشت ذخیره شد.";
         await LoadSelectedDayAsync();
         await LoadActivitiesAsync();
+    }
+
+    private async Task<bool> ConfirmDeleteAsync(string title, string message)
+    {
+        var dialog = new ContentDialog
+        {
+            Title = title,
+            Content = message,
+            PrimaryButtonText = "حذف",
+            CloseButtonText = "انصراف",
+            DefaultButton = ContentDialogButton.Close,
+            XamlRoot = (Content as FrameworkElement)?.XamlRoot
+        };
+        if (dialog.XamlRoot is null) return false;
+        return await dialog.ShowAsync() == ContentDialogResult.Primary;
+    }
+
+    private async void DeleteNote_Click(object sender, RoutedEventArgs e)
+    {
+        var snapshot = await _repository.GetDayAsync(_selected);
+        if (snapshot.Note is null)
+        {
+            StatusText.Text = "برای این روز یادداشتی ثبت نشده است.";
+            return;
+        }
+        if (!await ConfirmDeleteAsync("حذف یادداشت", $"یادداشت روز {_selected} حذف شود؟")) return;
+        await _repository.DeleteNoteAsync(_selected);
+        await _repository.AddActivityAsync(new ActivityLogEntry(
+            Guid.NewGuid().ToString("N"), DateTimeOffset.UtcNow, "note-deleted",
+            CalendarItemKind.Note, snapshot.Note.Id, $"یادداشت روز {_selected} حذف شد"));
+        NoteBox.Text = "";
+        StatusText.Text = "یادداشت حذف شد.";
+        await LoadSelectedDayAsync();
+        await LoadActivitiesAsync();
+    }
+
+    private async Task EditEventAsync(CalendarEvent item)
+    {
+        var title = new TextBox { Header = "عنوان رویداد", Text = item.Title };
+        var year = CreateDatePartBox("سال شمسی", "مثلاً 1405");
+        var month = CreateDatePartBox("ماه", "1 تا 12");
+        var day = CreateDatePartBox("روز", "1 تا 31");
+        year.Text = item.Date.Year.ToString(CultureInfo.InvariantCulture);
+        month.Text = item.Date.Month.ToString(CultureInfo.InvariantCulture);
+        day.Text = item.Date.Day.ToString(CultureInfo.InvariantCulture);
+        var hour = CreateTimePartBox("ساعت", "0 تا 23");
+        var minute = CreateTimePartBox("دقیقه", "0 تا 59");
+        hour.Text = (item.StartTime ?? new TimeOnly(9, 0)).Hour.ToString("00");
+        minute.Text = (item.StartTime ?? new TimeOnly(9, 0)).Minute.ToString("00");
+        var allDay = new CheckBox { Content = "تمام‌روز", IsChecked = item.AllDay };
+        var isPrivate = new CheckBox { Content = "رویداد خصوصی", IsChecked = item.Privacy == PrivacyLevel.Private };
+        var form = new StackPanel { Spacing = 8, Width = 400 };
+        foreach (var control in new FrameworkElement[] { title, year, month, day, allDay, hour, minute, isPrivate }) form.Children.Add(control);
+        var dialog = new ContentDialog
+        {
+            Title = "ویرایش رویداد",
+            Content = new ScrollViewer { Content = form, MaxHeight = 540, VerticalScrollBarVisibility = ScrollBarVisibility.Auto },
+            PrimaryButtonText = "ذخیره تغییرات", CloseButtonText = "انصراف",
+            DefaultButton = ContentDialogButton.Primary, XamlRoot = (Content as FrameworkElement)?.XamlRoot
+        };
+        if (dialog.XamlRoot is null || await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+        if (string.IsNullOrWhiteSpace(title.Text)) { StatusText.Text = "عنوان رویداد الزامی است."; return; }
+        if (!TryReadSeparatedDate(year, month, day, CalendarSystemKind.Persian, out var date, out var dateError))
+        { StatusText.Text = dateError; return; }
+        if (!TryReadSeparatedTime(hour, minute, out var start, out var timeError))
+        { StatusText.Text = timeError; return; }
+        var newStart = allDay.IsChecked == true ? null : start;
+        var duration = item.StartTime is not null && item.EndTime is not null
+            ? Math.Max(1, (int)(item.EndTime.Value - item.StartTime.Value).TotalMinutes) : 60;
+        var updated = item with
+        {
+            Title = title.Text.Trim(), Date = date.Persian, StartTime = newStart,
+            EndTime = newStart is null ? null : newStart.Value.AddMinutes(duration),
+            AllDay = allDay.IsChecked == true,
+            Privacy = isPrivate.IsChecked == true ? PrivacyLevel.Private : PrivacyLevel.Public
+        };
+        await _repository.UpdateEventAsync(updated);
+        await _repository.DeleteRemindersForItemAsync(CalendarItemKind.Event, item.Id);
+        await _repository.AddActivityAsync(new ActivityLogEntry(
+            Guid.NewGuid().ToString("N"), DateTimeOffset.UtcNow, "event-updated",
+            CalendarItemKind.Event, item.Id, updated.Title));
+        _selected = updated.Date; _year = _selected.Year; _month = _selected.Month;
+        BuildCalendar();
+        await LoadSelectedDayAsync(); await LoadActivitiesAsync();
+        StatusText.Text = "رویداد ویرایش شد. یادآور قبلی پاک شد؛ در صورت نیاز یادآور جدید ثبت کنید.";
+    }
+
+    private async Task DeleteEventAsync(CalendarEvent item)
+    {
+        if (!await ConfirmDeleteAsync("حذف رویداد", $"«{item.Title}» و یادآورهای وابسته حذف شوند؟")) return;
+        await _repository.DeleteEventAsync(item.Id);
+        await _repository.AddActivityAsync(new ActivityLogEntry(
+            Guid.NewGuid().ToString("N"), DateTimeOffset.UtcNow, "event-deleted",
+            CalendarItemKind.Event, item.Id, item.Title));
+        await LoadSelectedDayAsync(); await LoadActivitiesAsync();
+        StatusText.Text = "رویداد و یادآورهای وابسته حذف شدند.";
+    }
+
+    private async Task EditTaskAsync(CalendarTask item)
+    {
+        var title = new TextBox { Header = "عنوان کار", Text = item.Title };
+        var year = CreateDatePartBox("سال شمسی", "مثلاً 1405");
+        var month = CreateDatePartBox("ماه", "1 تا 12");
+        var day = CreateDatePartBox("روز", "1 تا 31");
+        year.Text = item.Date.Year.ToString(CultureInfo.InvariantCulture);
+        month.Text = item.Date.Month.ToString(CultureInfo.InvariantCulture);
+        day.Text = item.Date.Day.ToString(CultureInfo.InvariantCulture);
+        var time = new TextBox { Header = "زمان انجام (اختیاری)", Text = item.DueTime?.ToString("HH:mm") ?? "", PlaceholderText = "09:30" };
+        var priority = new TextBox { Header = "اولویت (۰ تا ۳)", Text = item.Priority.ToString(CultureInfo.InvariantCulture) };
+        var form = new StackPanel { Spacing = 8, Width = 400 };
+        foreach (var control in new FrameworkElement[] { title, year, month, day, time, priority }) form.Children.Add(control);
+        var dialog = new ContentDialog
+        {
+            Title = "ویرایش کار", Content = new ScrollViewer { Content = form, MaxHeight = 520 },
+            PrimaryButtonText = "ذخیره تغییرات", CloseButtonText = "انصراف",
+            DefaultButton = ContentDialogButton.Primary, XamlRoot = (Content as FrameworkElement)?.XamlRoot
+        };
+        if (dialog.XamlRoot is null || await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+        if (string.IsNullOrWhiteSpace(title.Text)) { StatusText.Text = "عنوان کار الزامی است."; return; }
+        if (!TryReadSeparatedDate(year, month, day, CalendarSystemKind.Persian, out var date, out var dateError))
+        { StatusText.Text = dateError; return; }
+        TimeOnly? due = null;
+        if (!string.IsNullOrWhiteSpace(time.Text))
+        {
+            if (!TimeOnly.TryParse(PersianQuickAddParser.NormalizeDigits(time.Text), out var parsed))
+            { StatusText.Text = "زمان واردشده معتبر نیست."; return; }
+            due = parsed;
+        }
+        var p = int.TryParse(PersianQuickAddParser.NormalizeDigits(priority.Text), out var parsedPriority)
+            ? Math.Clamp(parsedPriority, 0, 3) : item.Priority;
+        var updated = item with { Title = title.Text.Trim(), Date = date.Persian, DueTime = due, Priority = p };
+        await _repository.UpdateTaskAsync(updated);
+        await _repository.DeleteRemindersForItemAsync(CalendarItemKind.Task, item.Id);
+        await _repository.AddActivityAsync(new ActivityLogEntry(
+            Guid.NewGuid().ToString("N"), DateTimeOffset.UtcNow, "task-updated",
+            CalendarItemKind.Task, item.Id, updated.Title));
+        _selected = updated.Date; _year = _selected.Year; _month = _selected.Month;
+        BuildCalendar(); await LoadSelectedDayAsync(); await LoadActivitiesAsync();
+        StatusText.Text = "کار ویرایش شد.";
+    }
+
+    private async Task DeleteTaskAsync(CalendarTask item)
+    {
+        if (!await ConfirmDeleteAsync("حذف کار", $"کار «{item.Title}» و یادآورهای وابسته حذف شوند؟")) return;
+        await _repository.DeleteTaskAsync(item.Id);
+        await _repository.AddActivityAsync(new ActivityLogEntry(
+            Guid.NewGuid().ToString("N"), DateTimeOffset.UtcNow, "task-deleted",
+            CalendarItemKind.Task, item.Id, item.Title));
+        await LoadSelectedDayAsync(); await LoadActivitiesAsync();
+        StatusText.Text = "کار حذف شد.";
+    }
+
+    private async Task EditSpecialOccasionAsync(SpecialOccasion item)
+    {
+        var title = new TextBox { Header = "عنوان مناسبت", Text = item.Title };
+        var calendar = new ComboBox { Header = "نوع تقویم", HorizontalAlignment = HorizontalAlignment.Stretch };
+        calendar.Items.Add("شمسی"); calendar.Items.Add("میلادی"); calendar.Items.Add("قمری");
+        calendar.SelectedIndex = item.CalendarSystem switch { CalendarSystemKind.Gregorian => 1, CalendarSystemKind.Hijri => 2, _ => 0 };
+        var month = CreateDatePartBox("ماه", "1 تا 12"); month.Text = item.Month.ToString(CultureInfo.InvariantCulture);
+        var day = CreateDatePartBox("روز", "1 تا 31"); day.Text = item.Day.ToString(CultureInfo.InvariantCulture);
+        var reminders = new TextBox { Header = "روزهای یادآوری قبل از مناسبت", Text = string.Join(",", item.ReminderDaysBefore) };
+        var form = new StackPanel { Spacing = 8, Width = 400 };
+        foreach (var control in new FrameworkElement[] { title, calendar, month, day, reminders }) form.Children.Add(control);
+        var dialog = new ContentDialog
+        {
+            Title = "ویرایش مناسبت شخصی", Content = new ScrollViewer { Content = form, MaxHeight = 500 },
+            PrimaryButtonText = "ذخیره تغییرات", CloseButtonText = "انصراف",
+            DefaultButton = ContentDialogButton.Primary, XamlRoot = (Content as FrameworkElement)?.XamlRoot
+        };
+        if (dialog.XamlRoot is null || await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+        if (string.IsNullOrWhiteSpace(title.Text)) { StatusText.Text = "عنوان مناسبت الزامی است."; return; }
+        if (!int.TryParse(PersianQuickAddParser.NormalizeDigits(month.Text), out var m) ||
+            !int.TryParse(PersianQuickAddParser.NormalizeDigits(day.Text), out var d))
+        { StatusText.Text = "ماه یا روز معتبر نیست."; return; }
+        var system = calendar.SelectedIndex switch { 1 => CalendarSystemKind.Gregorian, 2 => CalendarSystemKind.Hijri, _ => CalendarSystemKind.Persian };
+        var maxDay = system switch
+        {
+            CalendarSystemKind.Persian => m is >= 1 and <= 6 ? 31 : 30,
+            CalendarSystemKind.Gregorian when m is >= 1 and <= 12 => DateTime.DaysInMonth(2024, m),
+            CalendarSystemKind.Hijri => 30,
+            _ => 0
+        };
+        if (m is < 1 or > 12 || d < 1 || d > maxDay) { StatusText.Text = "تاریخ مناسبت معتبر نیست."; return; }
+        var days = reminders.Text.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(x => int.TryParse(PersianQuickAddParser.NormalizeDigits(x), out var n) ? n : -1)
+            .Where(x => x >= 0).Distinct().OrderByDescending(x => x).ToArray();
+        var updated = item with { Title = title.Text.Trim(), CalendarSystem = system, Month = m, Day = d, ReminderDaysBefore = days.Length == 0 ? [0] : days };
+        await _repository.UpdateSpecialOccasionAsync(updated);
+        await _repository.DeleteRemindersForItemAsync(CalendarItemKind.SpecialOccasion, item.Id);
+        await _specialOccasions.EnsureUpcomingRemindersAsync(new TimeOnly(9, 0));
+        await _repository.AddActivityAsync(new ActivityLogEntry(
+            Guid.NewGuid().ToString("N"), DateTimeOffset.UtcNow, "special-occasion-updated",
+            CalendarItemKind.SpecialOccasion, item.Id, updated.Title));
+        await LoadActivitiesAsync();
+        if (_activeDesktopModule == "مناسبت‌ها") ShowDesktopModule("مناسبت‌ها");
+        StatusText.Text = "مناسبت شخصی و یادآورهای آن ویرایش شد.";
+    }
+
+    private async Task DeleteSpecialOccasionAsync(SpecialOccasion item)
+    {
+        if (!await ConfirmDeleteAsync("حذف مناسبت شخصی", $"مناسبت «{item.Title}» و یادآورهای وابسته حذف شوند؟")) return;
+        await _repository.DeleteSpecialOccasionAsync(item.Id);
+        await _repository.AddActivityAsync(new ActivityLogEntry(
+            Guid.NewGuid().ToString("N"), DateTimeOffset.UtcNow, "special-occasion-deleted",
+            CalendarItemKind.SpecialOccasion, item.Id, item.Title));
+        await LoadActivitiesAsync();
+        if (_activeDesktopModule == "مناسبت‌ها") ShowDesktopModule("مناسبت‌ها");
+        await LoadSelectedDayAsync();
+        StatusText.Text = "مناسبت شخصی حذف شد.";
     }
 
     private async void AddEvent_Click(object sender, RoutedEventArgs e)
