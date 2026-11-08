@@ -843,7 +843,8 @@ public sealed partial class MainWindow
                 {
                     ("cosmic", "کیهانی کلاسیک", "✦"), ("neon", "فانتزی نورانی", "☄"),
                     ("minimal", "مینیمال مدرن", "☾"), ("watercolor", "آبرنگی هنری", "✿"),
-                    ("mythic", "اسطوره‌ای", "♜"), ("cute", "کارتونی کیوت", "☺"),
+                    ("mythic", "اسطوره‌ای", "♜"), ("cute_1", "کیوت ۱", "☺"),
+                    ("cute_2", "کیوت ۲", "♡"), ("cute_3", "کیوت ۳", "✿"),
                     ("luxury", "سه‌بعدی لوکس", "✧")
                 };
                 var selectedZodiac = zodiacOptions.FirstOrDefault(x => x.Id == _settings.ZodiacThemeId);
@@ -888,7 +889,7 @@ public sealed partial class MainWindow
                     "minimal" => ("#FF171A24", "#FF414655"),
                     "watercolor" => ("#FF60436E", "#FFB879A0"),
                     "mythic" => ("#FF38200D", "#FF93602C"),
-                    "cute" => ("#FF6D3157", "#FFC879A8"),
+                    "cute_1" or "cute_2" or "cute_3" or "cute" => ("#FF6D3157", "#FFC879A8"),
                     "luxury" => ("#FF102536", "#FF53647E"),
                     _ => ("#FF100D35", "#FF39236F")
                 };
