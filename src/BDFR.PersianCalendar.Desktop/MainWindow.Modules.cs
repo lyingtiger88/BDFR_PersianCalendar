@@ -650,7 +650,7 @@ public sealed partial class MainWindow
                     ("planning", "برنامه و کارها", "✓", x => x.Action is "event-created" or "task-created" or "task-completed" or "task-reopened"),
                     ("notes", "یادداشت‌ها", "▤", x => x.Action == "note-saved"),
                     ("reminders", "یادآورها و اعلان‌ها", "◷", x => x.Action.StartsWith("reminder", StringComparison.Ordinal) || x.Action == "notification-fired"),
-                    ("occasions", "مناسبت‌ها", "✦", x => x.Action == "special-occasion-created"),
+                    ("occasions", "مناسبت‌ها", "✦", x => x.Action is "special-occasion-created" or "special-occasion-recovered"),
                     ("sync", "همگام‌سازی", "⟳", x => x.Action.StartsWith("occasion-sync", StringComparison.Ordinal))
                 };
 
@@ -717,9 +717,34 @@ public sealed partial class MainWindow
 
                 async Task LoadActivityTiles()
                 {
-                    allItems = (await _repository.GetRecentActivitiesAsync(500))
+                    allItems = (await _repository.GetRecentActivitiesAsync(5000))
                         .OrderByDescending(x => x.CreatedAt)
                         .ToList();
+
+                    // Backfill legacy personal occasions created before activity
+                    // logging was active. Use a stable item id check to avoid duplicates.
+                    var personalItems = await _repository.GetSpecialOccasionsAsync();
+                    var loggedIds = allItems
+                        .Where(x => x.Action is "special-occasion-created" or "special-occasion-recovered")
+                        .Select(x => x.ItemId)
+                        .Where(x => !string.IsNullOrWhiteSpace(x))
+                        .ToHashSet(StringComparer.Ordinal);
+                    foreach (var occasion in personalItems.Where(x => !loggedIds.Contains(x.Id)))
+                    {
+                        await _repository.AddActivityAsync(new ActivityLogEntry(
+                            "legacy-special-" + occasion.Id,
+                            DateTimeOffset.UtcNow,
+                            "special-occasion-recovered",
+                            CalendarItemKind.SpecialOccasion,
+                            occasion.Id,
+                            $"{occasion.Title} — سابقه مناسبت شخصی بازیابی شد"));
+                    }
+                    if (personalItems.Count > 0)
+                    {
+                        allItems = (await _repository.GetRecentActivitiesAsync(5000))
+                            .OrderByDescending(x => x.CreatedAt)
+                            .ToList();
+                    }
                     categoryGrid.Children.Clear();
                     for (var i = 0; i < categories.Length; i++)
                     {
