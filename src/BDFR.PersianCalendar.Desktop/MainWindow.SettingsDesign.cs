@@ -749,7 +749,7 @@ public sealed partial class MainWindow
 
     private StackPanel BuildBackgroundManagerCard()
     {
-        var group = SettingsGroup("Background Manager", "انتخاب تصویر زمینه و تعیین منطق تعویض خودکار؛ مستقل از تم رنگی زروان.", "\\uE91B", "#FF16A6B5");
+        var group = SettingsGroup("Background Manager", "انتخاب تصویر زمینه و تعیین منطق تعویض خودکار؛ مستقل از تم رنگی زروان.", "\uE91B", "#FF16A6B5");
         var currentMode = new TextBlock
         {
             Text = "روش فعلی: " + ((_settings.WallpaperMode ?? "manual") switch
