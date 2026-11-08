@@ -649,7 +649,14 @@ public sealed partial class MainWindow
             var style = zodiacStyles[index];
             var selected = string.Equals(_settings.ZodiacThemeId, style.Id, StringComparison.OrdinalIgnoreCase);
             var tileContent = new StackPanel { Spacing = 5, Padding = new Thickness(10), HorizontalAlignment = HorizontalAlignment.Center };
-            tileContent.Children.Add(new TextBlock { Text = style.Glyph, FontSize = 25, HorizontalAlignment = HorizontalAlignment.Center, Foreground = ThemeService.Brush(_theme.Accent) });
+            var previewArt = new Image
+            {
+                Width = 82, Height = 82,
+                Stretch = Stretch.Uniform,
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
+            _ = ZodiacArtwork.PopulateAsync(previewArt, _selected.Month, style.Id);
+            tileContent.Children.Add(previewArt);
             tileContent.Children.Add(new TextBlock { Text = style.Title, FontSize = 11, TextAlignment = TextAlignment.Center, TextWrapping = TextWrapping.Wrap, Foreground = ThemeService.Brush(_theme.PrimaryText) });
             var tile = new Button
             {
