@@ -541,8 +541,32 @@ internal sealed partial class Studio
         var bounds = liveCanvas.ClientRectangle;
         if (bounds.Width < 160 || bounds.Height < 200) return;
         g.Clear(Color.FromArgb(238, 243, 255));
-        bool mobile = activePlatform == "mobile";
-        var w = mobile ? Math.Min(360, bounds.Width - 38) : Math.Min(bounds.Width - 28, 950);
+
+        if (targetPlatform.SelectedIndex == 2)
+        {
+            // Side-by-side desktop and mobile previews share the exact same
+            // colors, wallpaper, template and live editing state.
+            const int gap = 18;
+            var paneWidth = (bounds.Width - gap - 32) / 2;
+            if (paneWidth < 170) return;
+            var left = new Rectangle(bounds.X + 8, bounds.Y + 8, paneWidth, bounds.Height - 16);
+            var right = new Rectangle(left.Right + gap, bounds.Y + 8, paneWidth, bounds.Height - 16);
+            DrawPlatformPreview(g, left, false);
+            DrawPlatformPreview(g, right, true);
+            using var labelFont = new Font("Segoe UI", 9, FontStyle.Bold);
+            using var labelBrush = new SolidBrush(Color.FromArgb(54, 70, 105));
+            g.DrawString("پیش‌نمایش دسکتاپ", labelFont, labelBrush, left.X + 8, left.Y + 2);
+            g.DrawString("پیش‌نمایش موبایل", labelFont, labelBrush, right.X + 8, right.Y + 2);
+            return;
+        }
+
+        DrawPlatformPreview(g, bounds, targetPlatform.SelectedIndex == 1);
+    }
+
+    private void DrawPlatformPreview(Graphics g, Rectangle bounds, bool mobile)
+    {
+        if (bounds.Width < 160 || bounds.Height < 200) return;
+var w = mobile ? Math.Min(360, bounds.Width - 38) : Math.Min(bounds.Width - 28, 950);
         var h = mobile ? Math.Min(bounds.Height - 34, 690) : Math.Min(bounds.Height - 32, 660);
         var rect = new Rectangle((bounds.Width - w) / 2, (bounds.Height - h) / 2, w, h);
         using (var shadow = new SolidBrush(Color.FromArgb(30, Color.Black)))
@@ -634,6 +658,7 @@ internal sealed partial class Studio
             using var outline = new Pen(Color.FromArgb(110, colors["accent"]), 2);
             g.DrawRounded(outline, new Rectangle(rect.X + 2, rect.Y + 2, rect.Width - 4, rect.Height - 4), 20);
         }
+    
     }
 }
 
