@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media.Imaging;
 using Windows.Storage.Streams;
 
@@ -25,6 +26,11 @@ internal static class ZodiacArtwork
             return null;
         }
     });
+
+    public static async Task PopulateAsync(Image target, int month, string? theme)
+    {
+        target.Source = await LoadAsync(month, theme);
+    }
 
     public static async Task<ImageSource?> LoadAsync(int month, string? theme)
     {
