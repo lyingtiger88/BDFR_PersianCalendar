@@ -25,6 +25,7 @@ public sealed partial class MainWindow : Window
     private readonly SettingsService _settingsService;
     private readonly ThemeService _themeService;
     private readonly PictureService _pictureService;
+    private readonly WallpaperProviderService _wallpaperService = new();
     private readonly AppSettings _settings;
     private ThemeDefinition _theme;
 
@@ -110,6 +111,7 @@ public sealed partial class MainWindow : Window
     private bool _inAppReminderPollRunning;
 
     private Microsoft.UI.Dispatching.DispatcherQueueTimer? _seasonCarouselTimer;
+    private Microsoft.UI.Dispatching.DispatcherQueueTimer? _wallpaperRotationTimer;
     private int _seasonCarouselIndex;
     private string? _seasonCarouselSeasonKey;
     private bool _seasonCarouselBusy;
@@ -214,6 +216,7 @@ public sealed partial class MainWindow : Window
         {
             _inAppReminderTimer?.Stop();
             _seasonCarouselTimer?.Stop();
+            _wallpaperRotationTimer?.Stop();
             StartupDiagnostics.Log("MainWindow Closed event fired.");
         };
         AppWindow.Changed += (_, e) =>
