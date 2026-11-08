@@ -47,7 +47,7 @@
   <Target Name="IncludeGeneratedZodiacPngAssets" BeforeTargets="AssignTargetPaths">
     <ItemGroup>
       <Content Include="$(MSBuildThisFileDirectory)..\..\picture\zodiac\png\*.png"
-               Condition="Exists('%(Identity)')">
+               >
         <Link>picture\zodiac\png\%(Filename)%(Extension)</Link>
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
