@@ -86,6 +86,7 @@ public sealed partial class MainWindow : Window
     private readonly StackPanel TasksPanel = new();
     private readonly StackPanel _dayMediaPanel = new();
     private readonly TextBox NoteBox = new();
+    private readonly CheckBox NotePinnedCheck = new() { Content = "سنجاق‌کردن یادداشت" };
     private readonly TextBox EventTitleBox = new();
     private readonly TextBox EventTimeBox = new();
     private readonly TextBox ReminderMinutesBox = new();
@@ -1113,6 +1114,7 @@ public sealed partial class MainWindow : Window
         NoteBox.TextWrapping = TextWrapping.Wrap;
         NoteBox.MinHeight = 100;
         stack.Children.Add(NoteBox);
+        stack.Children.Add(NotePinnedCheck);
 
         var saveNote = MakeButton("ذخیره یادداشت");
         saveNote.Click += SaveNote_Click;
@@ -5546,6 +5548,7 @@ public sealed partial class MainWindow : Window
             var snapshot = await _repository.GetDayAsync(_selected);
             ApplySelectedDateCalendarOrder();
             NoteBox.Text = snapshot.Note?.Text ?? string.Empty;
+            NotePinnedCheck.IsChecked = snapshot.Note?.Pinned == true;
             RefreshDayMediaPanel();
 
             OccasionsPanel.Children.Clear();
@@ -6291,7 +6294,7 @@ public sealed partial class MainWindow : Window
 
     private async void SaveNote_Click(object sender, RoutedEventArgs e)
     {
-        await _repository.UpsertNoteAsync(_selected, NoteBox.Text ?? string.Empty);
+        await _repository.UpsertNoteAsync(_selected, NoteBox.Text ?? string.Empty, NotePinnedCheck.IsChecked == true);
         await _repository.AddActivityAsync(new ActivityLogEntry(
             Guid.NewGuid().ToString("N"),
             DateTimeOffset.UtcNow,
@@ -6334,6 +6337,7 @@ public sealed partial class MainWindow : Window
             Guid.NewGuid().ToString("N"), DateTimeOffset.UtcNow, "note-deleted",
             CalendarItemKind.Note, snapshot.Note.Id, $"یادداشت روز {_selected} حذف شد"));
         NoteBox.Text = "";
+        NotePinnedCheck.IsChecked = false;
         StatusText.Text = "یادداشت حذف شد.";
         await LoadSelectedDayAsync();
         await LoadActivitiesAsync();
