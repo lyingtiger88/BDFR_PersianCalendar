@@ -227,7 +227,7 @@ public sealed partial class MainWindow
         search.Children.Add(searchButton);
         search.Children.Add(resultSummary);
         search.Children.Add(results);
-        root.Children.Add(Card("جست‌وجوی آنلاین", "Wallhaven API · فیلتر محتوای SFW · حداقل وضوح برابر با وضوح نمایشگر", search));
+        root.Children.Add(Card("جست‌وجوی آنلاین", "Wallhaven API · فقط محتوای SFW · وضوح نتیجه‌ها با نمایشگر تطبیق داده می‌شود. حقوق و شرایط استفاده هر تصویر را در صفحه منبع بررسی کنید.", search));
 
         async Task LoadGalleryAsync()
         {
