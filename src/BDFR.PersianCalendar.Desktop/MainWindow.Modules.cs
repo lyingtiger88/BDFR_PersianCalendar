@@ -145,9 +145,13 @@ public sealed partial class MainWindow
         foreach (var name in _wallpaperService.GetGalleryCategories())
             galleryCategoryPicker.Items.Add(new ComboBoxItem { Content = name, Tag = name });
         galleryCategoryPicker.SelectedIndex = 0;
+        var rebuildingGalleryCategories = false;
         var galleryRefresh = MakeButton("تازه‌سازی گالری");
         galleryRefresh.Click += async (_, _) => await LoadGalleryAsync();
-        galleryCategoryPicker.SelectionChanged += async (_, _) => await LoadGalleryAsync();
+        galleryCategoryPicker.SelectionChanged += async (_, _) =>
+        {
+            if (!rebuildingGalleryCategories) await LoadGalleryAsync();
+        };
 
         var (screenWidth, screenHeight) = GetPrimaryDisplayResolution();
         resolution.Text = $"حداقل وضوح جست‌وجو: {screenWidth} × {screenHeight} پیکسل";
@@ -244,6 +248,7 @@ public sealed partial class MainWindow
             var selectedCategory = (galleryCategoryPicker.SelectedItem as ComboBoxItem)?.Tag as string ?? "";
             var currentCategories = _wallpaperService.GetGalleryCategories();
             var previousCategory = selectedCategory;
+            rebuildingGalleryCategories = true;
             galleryCategoryPicker.Items.Clear();
             galleryCategoryPicker.Items.Add(new ComboBoxItem { Content = "همه دسته‌ها", Tag = "" });
             foreach (var name in currentCategories)
@@ -251,6 +256,7 @@ public sealed partial class MainWindow
             galleryCategoryPicker.SelectedItem = galleryCategoryPicker.Items.OfType<ComboBoxItem>()
                 .FirstOrDefault(x => string.Equals((string?)x.Tag, previousCategory, StringComparison.OrdinalIgnoreCase))
                 ?? galleryCategoryPicker.Items.OfType<ComboBoxItem>().First();
+            rebuildingGalleryCategories = false;
             selectedCategory = (galleryCategoryPicker.SelectedItem as ComboBoxItem)?.Tag as string ?? "";
             var files = _wallpaperService.GetGalleryFiles(selectedCategory);
             gallerySummary.Text = $"{files.Count} تصویر در این دسته · مسیر: {_wallpaperService.GalleryRoot}";
