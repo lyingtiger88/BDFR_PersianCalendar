@@ -112,10 +112,24 @@
       "stroke": 4
     },
     {
-      "id": "cute",
+      "id": "cute_1",
       "bg": "#733F7F",
       "accent": "#FEE7F7",
       "glow": "#FFA7D4",
+      "stroke": 4.8
+    },
+    {
+      "id": "cute_2",
+      "bg": "#472E67",
+      "accent": "#FBEAF9",
+      "glow": "#E6B7F8",
+      "stroke": 4.8
+    },
+    {
+      "id": "cute_3",
+      "bg": "#3D6378",
+      "accent": "#FFF5D6",
+      "glow": "#FFBFA8",
       "stroke": 4.8
     },
     {
