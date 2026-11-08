@@ -32,7 +32,7 @@ internal fun ZodiacArtworkImage(
     val artwork = remember(month, styleId) {
         runCatching {
             require(month in 1..12)
-            val json = context.assets.open("zodiac/catalog.json").bufferedReader().use { JSONObject(it.readText()) }
+            val json = context.assets.open("catalog.json").bufferedReader().use { JSONObject(it.readText()) }
             val sign = json.getJSONArray("signs").getJSONObject(month - 1)
             val styles = json.getJSONArray("styles")
             val style = (0 until styles.length())
