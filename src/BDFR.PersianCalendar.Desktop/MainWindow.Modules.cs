@@ -779,13 +779,33 @@ public sealed partial class MainWindow
                             monthBody.Children.Add(personalCard);
                         }
 
+                        // Render the zodiac art at 200% of its former size.
+                        // It is a translucent watermark behind the occasion text,
+                        // not a separate row, and Uniform preserves the full artwork.
+                        var monthContent = new Grid();
+                        var monthArtworkSource = await ZodiacArtwork.LoadAsync(month, _settings.ZodiacThemeId);
+                        if (monthArtworkSource is not null)
+                        {
+                            monthContent.Children.Add(new Image
+                            {
+                                Source = monthArtworkSource,
+                                Width = 208,
+                                Height = 208,
+                                Opacity = 0.5,
+                                Stretch = Stretch.Uniform,
+                                HorizontalAlignment = HorizontalAlignment.Right,
+                                VerticalAlignment = VerticalAlignment.Center,
+                                IsHitTestVisible = false
+                            });
+                        }
+                        monthContent.Children.Add(monthBody);
                         var monthCard = new Border
                         {
                             Background = CreateSideSurfaceBrush(),
                             BorderBrush = BrushWithAlpha(_theme.Accent, 0x60),
                             BorderThickness = new Thickness(1),
                             CornerRadius = new CornerRadius(13),
-                            Child = monthBody
+                            Child = monthContent
                         };
                         var monthSection = new StackPanel { Spacing = 6 };
                         var monthHeader = new StackPanel { Spacing = 7 };
@@ -796,20 +816,6 @@ public sealed partial class MainWindow
                             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
                             Foreground = ThemeService.Brush(_theme.PrimaryText)
                         });
-                        // Artwork sits in its own row between month title and event list.
-                        // It never overlays or obscures occasion descriptions.
-                        var monthArtworkSource = await ZodiacArtwork.LoadAsync(month, _settings.ZodiacThemeId);
-                        if (monthArtworkSource is not null)
-                        {
-                            monthHeader.Children.Add(new Image
-                            {
-                                Source = monthArtworkSource,
-                                Width = 104,
-                                Height = 104,
-                                Stretch = Stretch.Uniform,
-                                HorizontalAlignment = HorizontalAlignment.Right
-                            });
-                        }
                         monthSection.Children.Add(monthHeader);
                         monthSection.Children.Add(monthCard);
                         officialMonths.Children.Add(monthSection);
