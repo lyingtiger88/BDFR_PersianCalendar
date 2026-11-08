@@ -6379,15 +6379,11 @@ public sealed partial class MainWindow : Window
             AllDay = allDay.IsChecked == true,
             Privacy = isPrivate.IsChecked == true ? PrivacyLevel.Private : PrivacyLevel.Public
         };
-        await _repository.UpdateEventAsync(updated);
-        await _repository.DeleteRemindersForItemAsync(CalendarItemKind.Event, item.Id);
-        await _repository.AddActivityAsync(new ActivityLogEntry(
-            Guid.NewGuid().ToString("N"), DateTimeOffset.UtcNow, "event-updated",
-            CalendarItemKind.Event, item.Id, updated.Title));
+        await _planner.UpdateEventAsync(updated, reminderMinutes: [10], reminderRepeatCount: 3, reminderRepeatIntervalMinutes: 5);
         _selected = updated.Date; _year = _selected.Year; _month = _selected.Month;
         BuildCalendar();
         await LoadSelectedDayAsync(); await LoadActivitiesAsync();
-        StatusText.Text = "رویداد ویرایش شد. یادآور قبلی پاک شد؛ در صورت نیاز یادآور جدید ثبت کنید.";
+        StatusText.Text = "رویداد ویرایش شد و یادآورهای آن با زمان جدید بازتنظیم شدند.";
     }
 
     private async Task DeleteEventAsync(CalendarEvent item)
@@ -6434,11 +6430,7 @@ public sealed partial class MainWindow : Window
         var p = int.TryParse(PersianQuickAddParser.NormalizeDigits(priority.Text), out var parsedPriority)
             ? Math.Clamp(parsedPriority, 0, 3) : item.Priority;
         var updated = item with { Title = title.Text.Trim(), Date = date.Persian, DueTime = due, Priority = p };
-        await _repository.UpdateTaskAsync(updated);
-        await _repository.DeleteRemindersForItemAsync(CalendarItemKind.Task, item.Id);
-        await _repository.AddActivityAsync(new ActivityLogEntry(
-            Guid.NewGuid().ToString("N"), DateTimeOffset.UtcNow, "task-updated",
-            CalendarItemKind.Task, item.Id, updated.Title));
+        await _planner.UpdateTaskAsync(updated);
         _selected = updated.Date; _year = _selected.Year; _month = _selected.Month;
         BuildCalendar(); await LoadSelectedDayAsync(); await LoadActivitiesAsync();
         StatusText.Text = "کار ویرایش شد.";
