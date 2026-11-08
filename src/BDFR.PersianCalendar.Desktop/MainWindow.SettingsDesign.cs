@@ -687,6 +687,8 @@ public sealed partial class MainWindow
         contents.Children.Add(SettingsCard(zodiacGroup));
         AddSettingsSeparator(contents);
 
+        contents.Children.Add(SettingsCard(BuildBackgroundManagerCard()));
+
         var navigationSide = new ComboBox
         {
             HorizontalAlignment = HorizontalAlignment.Stretch,
@@ -743,6 +745,89 @@ public sealed partial class MainWindow
         tabs.Children.Add(SettingsHint(
             "تقویم و تنظیمات همیشه نمایش داده می‌شوند تا دسترسی به برنامه و بازیابی سربرگ‌های پنهان‌شده ممکن باشد."));
         _settingsContent.Children.Add(SettingsCard(tabs));
+    }
+
+    private StackPanel BuildBackgroundManagerCard()
+    {
+        var group = SettingsGroup("Background Manager", "انتخاب تصویر زمینه و تعیین منطق تعویض خودکار؛ مستقل از تم رنگی زروان.", "\\uE91B", "#FF16A6B5");
+        var currentMode = new TextBlock
+        {
+            Text = "روش فعلی: " + ((_settings.WallpaperMode ?? "manual") switch
+            {
+                "random" => "تصادفی",
+                "seasonal" => "فصلی",
+                "monthly" => "ماهانه",
+                _ => "دستی"
+            }),
+            Foreground = ThemeService.Brush(_theme.SecondaryText),
+            TextWrapping = TextWrapping.Wrap
+        };
+        group.Children.Add(currentMode);
+
+        var chooseMode = MakeButton("انتخاب روش مدیریت تصویر زمینه");
+        chooseMode.Click += async (_, _) =>
+        {
+            await ShowWallpaperModeDialogAsync();
+            currentMode.Text = "روش فعلی: " + ((_settings.WallpaperMode ?? "manual") switch
+            {
+                "random" => "تصادفی",
+                "seasonal" => "فصلی",
+                "monthly" => "ماهانه",
+                _ => "دستی"
+            });
+        };
+        group.Children.Add(chooseMode);
+
+        var seasonPicker = new ComboBox { Header = "فصل", HorizontalAlignment = HorizontalAlignment.Stretch };
+        var seasons = new (string Id, string Label)[]
+        {
+            ("spring", "بهار"), ("summer", "تابستان"), ("autumn", "پاییز"), ("winter", "زمستان")
+        };
+        foreach (var season in seasons)
+            seasonPicker.Items.Add(new ComboBoxItem { Content = season.Label, Tag = season.Id });
+        seasonPicker.SelectedIndex = Array.FindIndex(seasons, x => x.Id == ThemeService.GetSeasonKey(_month));
+        if (seasonPicker.SelectedIndex < 0) seasonPicker.SelectedIndex = 0;
+
+        var setSeason = MakeButton("انتخاب تصویر برای فصل");
+        setSeason.Click += async (_, _) =>
+        {
+            var key = (seasonPicker.SelectedItem as ComboBoxItem)?.Tag as string ?? "spring";
+            await PickWallpaperMappingAsync(true, key);
+        };
+
+        var monthPicker = new ComboBox { Header = "ماه", HorizontalAlignment = HorizontalAlignment.Stretch };
+        for (var i = 1; i <= 12; i++)
+            monthPicker.Items.Add(new ComboBoxItem { Content = PersianDate.MonthNames[i - 1], Tag = i.ToString("00", CultureInfo.InvariantCulture) });
+        monthPicker.SelectedIndex = Math.Clamp(_month - 1, 0, 11);
+        var setMonth = MakeButton("انتخاب تصویر برای ماه");
+        setMonth.Click += async (_, _) =>
+        {
+            var key = (monthPicker.SelectedItem as ComboBoxItem)?.Tag as string ?? _month.ToString("00", CultureInfo.InvariantCulture);
+            await PickWallpaperMappingAsync(false, key);
+        };
+
+        var mappingGrid = new Grid { ColumnSpacing = 12, RowSpacing = 8 };
+        mappingGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        mappingGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        var seasonStack = new StackPanel { Spacing = 7, Children = { seasonPicker, setSeason } };
+        var monthStack = new StackPanel { Spacing = 7, Children = { monthPicker, setMonth } };
+        Grid.SetColumn(seasonStack, 0); Grid.SetColumn(monthStack, 1);
+        mappingGrid.Children.Add(seasonStack); mappingGrid.Children.Add(monthStack);
+        group.Children.Add(mappingGrid);
+
+        var actions = new StackPanel { Spacing = 8 };
+        var manual = MakeButton("انتخاب تصویر زمینه دستی");
+        manual.Click += async (_, _) => await SelectCustomBackgroundAsync();
+        var apply = MakeButton("اعمال تصویر زمینه فعلی");
+        apply.Click += async (_, _) => await ApplyBackgroundAsync();
+        var gallery = MakeButton("بازکردن Wallpaper Manager و گالری آنلاین");
+        gallery.Click += (_, _) => ShowDesktopModule("Wallpaper Manager");
+        actions.Children.Add(manual); actions.Children.Add(apply); actions.Children.Add(gallery);
+        group.Children.Add(actions);
+
+        group.Children.Add(SettingsHint(
+            "تصاویر فصلی و ماهانه در تنظیمات کاربر نگهداری می‌شوند. حالت تصادفی از گالری محلی Wallpaper Manager انتخاب می‌کند. فایل‌های اصلی به پوشه امن داده‌های زروان کپی می‌شوند."));
+        return group;
     }
 
     private void BuildSettingsCalendar()
