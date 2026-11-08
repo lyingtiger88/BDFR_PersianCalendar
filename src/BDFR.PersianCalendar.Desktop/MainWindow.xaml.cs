@@ -6320,7 +6320,7 @@ public sealed partial class MainWindow : Window
         { StatusText.Text = dateError; return; }
         if (!TryReadSeparatedTime(hour, minute, out var start, out var timeError))
         { StatusText.Text = timeError; return; }
-        var newStart = allDay.IsChecked == true ? null : start;
+        TimeOnly? newStart = allDay.IsChecked == true ? null : start;
         var duration = item.StartTime is not null && item.EndTime is not null
             ? Math.Max(1, (int)(item.EndTime.Value - item.StartTime.Value).TotalMinutes) : 60;
         var updated = item with
