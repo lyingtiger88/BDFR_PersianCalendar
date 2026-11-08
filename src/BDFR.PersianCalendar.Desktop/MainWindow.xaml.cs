@@ -5186,6 +5186,8 @@ public sealed partial class MainWindow : Window
         _settings.WallpaperChangeIntervalHours = (int?)((interval.SelectedItem as ComboBoxItem)?.Tag) ?? 24;
         if (selectedMode == "manual")
         {
+            _settings.AppearanceMode = "theme";
+            _settings.UseSeasonalBackground = false;
             if (!string.IsNullOrWhiteSpace(_settings.CustomBackgroundPath) && File.Exists(_settings.CustomBackgroundPath))
                 _settings.BackgroundMode = "custom";
             else
