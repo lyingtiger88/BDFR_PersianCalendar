@@ -4849,7 +4849,10 @@ public sealed partial class MainWindow : Window
     }
 
     private string GetCurrentSeasonName()
-        => _month switch
+        => GetSeasonName(_month);
+
+    private static string GetSeasonName(int month)
+        => month switch
         {
             <= 3 => "بهار",
             <= 6 => "تابستان",
@@ -4986,19 +4989,20 @@ public sealed partial class MainWindow : Window
             }
             else if (wallpaperMode == "seasonal")
             {
-                var seasonKey = ThemeService.GetSeasonKey(_month);
+                var wallpaperMonth = PersianDate.Today().Month;
+                var seasonKey = ThemeService.GetSeasonKey(wallpaperMonth);
                 if (_settings.SeasonalWallpaperPaths is not null &&
                     _settings.SeasonalWallpaperPaths.TryGetValue(seasonKey, out var mapped) && File.Exists(mapped))
                 {
                     path = mapped;
                     isCustom = true;
-                    label = $"پس‌زمینه فصلی · {GetCurrentSeasonName()} · {Path.GetFileName(path)}";
+                    label = $"پس‌زمینه فصلی · {GetSeasonName(wallpaperMonth)} · {Path.GetFileName(path)}";
                 }
                 else if (isElena && _settings.UseSeasonalBackground)
                 {
-                    seasonalFiles = _themeService.GetSeasonalBackgroundPaths(_month);
-                    path = _themeService.GetSeasonalBackgroundPath(_month, _seasonCarouselIndex);
-                    label = path is null ? $"برای فصل {GetCurrentSeasonName()} تصویری تنظیم نشده است." : $"پس‌زمینه فصلی · {Path.GetFileName(path)}";
+                    seasonalFiles = _themeService.GetSeasonalBackgroundPaths(wallpaperMonth);
+                    path = _themeService.GetSeasonalBackgroundPath(wallpaperMonth, _seasonCarouselIndex);
+                    label = path is null ? $"برای فصل {GetSeasonName(wallpaperMonth)} تصویری تنظیم نشده است." : $"پس‌زمینه فصلی · {Path.GetFileName(path)}";
                 }
                 else
                 {
@@ -5010,24 +5014,25 @@ public sealed partial class MainWindow : Window
             }
             else if (wallpaperMode == "monthly")
             {
-                var monthKey = _month.ToString("00", CultureInfo.InvariantCulture);
+                var wallpaperMonth = PersianDate.Today().Month;
+                var monthKey = wallpaperMonth.ToString("00", CultureInfo.InvariantCulture);
                 if (_settings.MonthlyWallpaperPaths is not null &&
                     _settings.MonthlyWallpaperPaths.TryGetValue(monthKey, out var mapped) && File.Exists(mapped))
                 {
                     path = mapped;
                     isCustom = true;
-                    label = $"پس‌زمینه ماهانه · {PersianDate.MonthNames[_month - 1]} · {Path.GetFileName(path)}";
+                    label = $"پس‌زمینه ماهانه · {PersianDate.MonthNames[wallpaperMonth - 1]} · {Path.GetFileName(path)}";
                 }
                 else
                 {
-                    var seasonKey = ThemeService.GetSeasonKey(_month);
+                    var seasonKey = ThemeService.GetSeasonKey(wallpaperMonth);
                     if (_settings.SeasonalWallpaperPaths is not null &&
                         _settings.SeasonalWallpaperPaths.TryGetValue(seasonKey, out var seasonal) && File.Exists(seasonal))
                         path = seasonal;
                     else
-                        path = _themeService.GetSeasonalBackgroundPath(_month);
+                        path = _themeService.GetSeasonalBackgroundPath(wallpaperMonth);
                     isCustom = path is not null;
-                    label = path is null ? $"برای {PersianDate.MonthNames[_month - 1]} تصویری تنظیم نشده است." : $"پس‌زمینه جایگزین فصلی · {Path.GetFileName(path)}";
+                    label = path is null ? $"برای {PersianDate.MonthNames[wallpaperMonth - 1]} تصویری تنظیم نشده است." : $"پس‌زمینه جایگزین فصلی · {Path.GetFileName(path)}";
                 }
             }
             else if (isElena && _settings.UseSeasonalBackground)
@@ -5273,8 +5278,9 @@ public sealed partial class MainWindow : Window
         }
         _settingsService.Save(_settings);
         StatusText.Text = $"تصویر برای {(seasonal ? "فصل" : "ماه")} انتخاب‌شده ذخیره شد.";
-        if ((seasonal && _settings.WallpaperMode == "seasonal" && key == ThemeService.GetSeasonKey(_month)) ||
-            (!seasonal && _settings.WallpaperMode == "monthly" && key == _month.ToString("00", CultureInfo.InvariantCulture)))
+        var currentWallpaperMonth = PersianDate.Today().Month;
+        if ((seasonal && _settings.WallpaperMode == "seasonal" && key == ThemeService.GetSeasonKey(currentWallpaperMonth)) ||
+            (!seasonal && _settings.WallpaperMode == "monthly" && key == currentWallpaperMonth.ToString("00", CultureInfo.InvariantCulture)))
             await ApplyBackgroundAsync();
     }
 
