@@ -116,12 +116,12 @@ public sealed partial class MainWindow
             };
         }
 
-        var root = new StackPanel { Spacing = 14, Padding = new Thickness(18), FlowDirection = FlowDirection.RightToLeft };
+        var root = new StackPanel { Spacing = 12, Padding = new Thickness(14, 18, 14, 22), FlowDirection = FlowDirection.RightToLeft };
         var (screenWidth, screenHeight) = GetPrimaryDisplayResolution();
 
         // Genre selector is intentionally placed at the top of the page, before
         // any results are requested. Search only downloads thumbnail previews.
-        var genre = new ComboBox { Header = "ژانر تصاویر", HorizontalAlignment = HorizontalAlignment.Stretch };
+        var genre = new ComboBox { Header = "ژانر تصاویر", HorizontalAlignment = HorizontalAlignment.Stretch, MinWidth = 145 };
         var genres = new (string Label, string Query)[]
         {
             ("همه ژانرها", ""),
@@ -143,14 +143,14 @@ public sealed partial class MainWindow
         foreach (var item in genres) genre.Items.Add(new ComboBoxItem { Content = item.Label, Tag = item.Query });
         genre.SelectedIndex = 0;
 
-        var contentCategory = new ComboBox { Header = "نوع محتوای منبع", HorizontalAlignment = HorizontalAlignment.Stretch };
+        var contentCategory = new ComboBox { Header = "نوع محتوای منبع", HorizontalAlignment = HorizontalAlignment.Stretch, MinWidth = 145 };
         contentCategory.Items.Add(new ComboBoxItem { Content = "عمومی", Tag = "general" });
         contentCategory.Items.Add(new ComboBoxItem { Content = "انیمه", Tag = "anime" });
         contentCategory.Items.Add(new ComboBoxItem { Content = "افراد", Tag = "people" });
         contentCategory.Items.Add(new ComboBoxItem { Content = "همه دسته‌ها", Tag = "all" });
         contentCategory.SelectedIndex = 0;
 
-        var query = new TextBox { Header = "عبارت تکمیلی جست‌وجو (اختیاری)", PlaceholderText = "مثلاً forest, purple, cinematic" };
+        var query = new TextBox { Header = "عبارت تکمیلی جست‌وجو (اختیاری)", PlaceholderText = "مثلاً forest, purple, cinematic", HorizontalAlignment = HorizontalAlignment.Stretch, MinWidth = 180 };
         var resolution = new TextBlock
         {
             Text = $"وضوح نمایشگر: {screenWidth} × {screenHeight} پیکسل · دریافت اولیه فقط تصویر بندانگشتی",
@@ -158,8 +158,14 @@ public sealed partial class MainWindow
             TextWrapping = TextWrapping.Wrap
         };
         var searchButton = MakeButton("جست‌وجوی کاغذدیواری");
+        searchButton.HorizontalAlignment = HorizontalAlignment.Stretch;
+        searchButton.HorizontalContentAlignment = HorizontalAlignment.Center;
+        searchButton.Background = ThemeService.Brush("#FFC9C2FF");
+        searchButton.Foreground = ThemeService.Brush("#FF302B4B");
+        searchButton.BorderThickness = new Thickness(0);
+        searchButton.MinHeight = 38;
         var resultSummary = new TextBlock { Text = "ابتدا ژانر تصویر را انتخاب و جست‌وجو کنید.", Foreground = ThemeService.Brush(_theme.SecondaryText) };
-        var resultGrid = new Grid { ColumnSpacing = 12, RowSpacing = 12 };
+        var resultGrid = new Grid { ColumnSpacing = 12, RowSpacing = 12, Padding = new Thickness(1, 2, 1, 10) };
         for (var i = 0; i < 4; i++)
             resultGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         var resultScroll = new ScrollViewer
@@ -222,48 +228,59 @@ public sealed partial class MainWindow
 
         void AddWallpaperCard(WallpaperItem item, int index)
         {
-            var cardBody = new StackPanel { Spacing = 6, Padding = new Thickness(8) };
+            // Each result card owns its preview height. The image must not be
+            // squeezed by the grid's auto-sized rows when the page is scrolled.
+            var cardBody = new StackPanel { Spacing = 7, Padding = new Thickness(7, 7, 7, 8) };
             var preview = new Image
             {
-                Height = 112,
+                Height = 164,
                 Stretch = Stretch.UniformToFill,
-                HorizontalAlignment = HorizontalAlignment.Stretch
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                VerticalAlignment = VerticalAlignment.Center
             };
             if (Uri.TryCreate(item.ThumbnailUrl, UriKind.Absolute, out var thumbUri))
+                preview.Source = new BitmapImage { UriSource = thumbUri, DecodePixelWidth = 420 };
+
+            cardBody.Children.Add(new Border
             {
-                var bitmap = new BitmapImage { UriSource = thumbUri, DecodePixelWidth = 240 };
-                preview.Source = bitmap;
-            }
-            cardBody.Children.Add(preview);
+                Height = 164,
+                CornerRadius = new CornerRadius(8),
+                Background = ThemeService.Brush("#FFF2EFF8"),
+                Child = preview
+            });
             cardBody.Children.Add(new TextBlock
             {
                 Text = $"{item.Width}×{item.Height} · {item.Category}",
                 FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-                FontSize = 12,
-                TextWrapping = TextWrapping.Wrap,
-                Foreground = ThemeService.Brush(_theme.PrimaryText)
-            });
-            cardBody.Children.Add(new TextBlock
-            {
-                Text = string.Join("، ", item.Tags.Take(3)),
-                FontSize = 10, MaxLines = 2, TextWrapping = TextWrapping.Wrap,
-                Foreground = ThemeService.Brush(_theme.SecondaryText)
+                FontSize = 11,
+                TextAlignment = TextAlignment.Right,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                Foreground = ThemeService.Brush("#FF37435C")
             });
             var download = MakeButton("دانلود");
-            download.Click += async (_, _) => await DownloadItemAsync(item, false, download);
             var apply = MakeButton("دانلود و اعمال");
+            foreach (var action in new[] { download, apply })
+            {
+                action.HorizontalAlignment = HorizontalAlignment.Stretch;
+                action.HorizontalContentAlignment = HorizontalAlignment.Center;
+                action.Background = ThemeService.Brush("#FFC9C2FF");
+                action.Foreground = ThemeService.Brush("#FF302B4B");
+                action.BorderThickness = new Thickness(0);
+                action.MinHeight = 30;
+                action.Padding = new Thickness(6, 4, 6, 4);
+            }
+            download.Click += async (_, _) => await DownloadItemAsync(item, false, download);
             apply.Click += async (_, _) => await DownloadItemAsync(item, true, apply);
-            var actions = new StackPanel { Spacing = 5 };
-            actions.Children.Add(download);
-            actions.Children.Add(apply);
-            cardBody.Children.Add(actions);
+            cardBody.Children.Add(download);
+            cardBody.Children.Add(apply);
             var card = new Border
             {
-                BorderBrush = BrushWithAlpha(_theme.Accent, 0x90),
+                BorderBrush = ThemeService.Brush("#FFE2DDFF"),
                 BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(10),
+                CornerRadius = new CornerRadius(12),
                 Child = cardBody,
-                Background = CreateSideSurfaceBrush()
+                Background = ThemeService.Brush("#FFFFFFFF"),
+                HorizontalAlignment = HorizontalAlignment.Stretch
             };
             var row = index / 4;
             var column = index % 4;
@@ -342,12 +359,24 @@ public sealed partial class MainWindow
                 await LoadNextPageAsync(false);
         };
 
-        var searchPanel = new StackPanel { Spacing = 9 };
-        searchPanel.Children.Add(genre);
-        searchPanel.Children.Add(contentCategory);
-        searchPanel.Children.Add(query);
+        var searchPanel = new StackPanel { Spacing = 10 };
+        // Match the desktop reference: all three filters on one line, in RTL
+        // order: genre (right), source category (middle), extra search (left).
+        var filters = new Grid { ColumnSpacing = 12, FlowDirection = FlowDirection.RightToLeft };
+        filters.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        filters.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        filters.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.15, GridUnitType.Star) });
+        Grid.SetColumn(genre, 0);
+        Grid.SetColumn(contentCategory, 1);
+        Grid.SetColumn(query, 2);
+        filters.Children.Add(genre);
+        filters.Children.Add(contentCategory);
+        filters.Children.Add(query);
+        searchPanel.Children.Add(filters);
+        resolution.TextAlignment = TextAlignment.Right;
         searchPanel.Children.Add(resolution);
         searchPanel.Children.Add(searchButton);
+        resultSummary.TextAlignment = TextAlignment.Right;
         searchPanel.Children.Add(resultSummary);
         searchPanel.Children.Add(resultScroll);
         root.Children.Add(Card("دانلود کاغذدیواری", "ابتدا ژانر را از فهرست بالا انتخاب کنید. در مرحله مرور فقط تصاویر بندانگشتی دریافت می‌شوند؛ فایل اصلی تنها پس از انتخاب «دانلود» یا «دانلود و اعمال» دریافت خواهد شد.", searchPanel));
