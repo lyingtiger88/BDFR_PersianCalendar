@@ -5006,9 +5006,9 @@ public sealed partial class MainWindow : Window
                 }
                 else
                 {
-                    seasonalFiles = _themeService.GetSeasonalBackgroundPaths(_month);
-                    path = _themeService.GetSeasonalBackgroundPath(_month, _seasonCarouselIndex);
-                    label = path is null ? $"برای فصل {GetCurrentSeasonName()} تصویری تنظیم نشده است." : $"پس‌زمینه فصلی · {Path.GetFileName(path)}";
+                    seasonalFiles = _themeService.GetSeasonalBackgroundPaths(wallpaperMonth);
+                    path = _themeService.GetSeasonalBackgroundPath(wallpaperMonth, _seasonCarouselIndex);
+                    label = path is null ? $"برای فصل {GetSeasonName(wallpaperMonth)} تصویری تنظیم نشده است." : $"پس‌زمینه فصلی · {Path.GetFileName(path)}";
                 }
                 isCustom = path is not null;
             }
