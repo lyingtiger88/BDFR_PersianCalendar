@@ -4919,7 +4919,7 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private async Task ApplyBackgroundAsync()
+    private async Task ApplyBackgroundAsync(bool forceRandom = false)
     {
         try
         {
@@ -4932,8 +4932,72 @@ public sealed partial class MainWindow : Window
             var isCustom = false;
 
             IReadOnlyList<string> seasonalFiles = [];
+            var wallpaperMode = (_settings.WallpaperMode ?? "manual").Trim().ToLowerInvariant();
 
-            if (isElena && _settings.UseSeasonalBackground)
+            if (wallpaperMode == "random")
+            {
+                var gallery = _wallpaperService.GetGalleryFiles();
+                var previous = _settings.LastRandomWallpaperPath;
+                if (!forceRandom && !string.IsNullOrWhiteSpace(previous) && File.Exists(previous))
+                    path = previous;
+                else if (gallery.Count > 0)
+                {
+                    var candidates = gallery.Where(x => !string.Equals(x, previous, StringComparison.OrdinalIgnoreCase)).ToArray();
+                    if (candidates.Length == 0) candidates = gallery.ToArray();
+                    path = candidates[Random.Shared.Next(candidates.Length)];
+                    _settings.LastRandomWallpaperPath = path;
+                    _settingsService.Save(_settings);
+                }
+                isCustom = path is not null;
+                label = path is null ? "حالت تصادفی فعال است؛ ابتدا از Wallpaper Manager تصویر دریافت کنید." : $"تصویر تصادفی · {Path.GetFileName(path)}";
+            }
+            else if (wallpaperMode == "seasonal")
+            {
+                var seasonKey = ThemeService.GetSeasonKey(_month);
+                if (_settings.SeasonalWallpaperPaths is not null &&
+                    _settings.SeasonalWallpaperPaths.TryGetValue(seasonKey, out var mapped) && File.Exists(mapped))
+                {
+                    path = mapped;
+                    isCustom = true;
+                    label = $"پس‌زمینه فصلی · {GetCurrentSeasonName()} · {Path.GetFileName(path)}";
+                }
+                else if (isElena && _settings.UseSeasonalBackground)
+                {
+                    seasonalFiles = _themeService.GetSeasonalBackgroundPaths(_month);
+                    path = _themeService.GetSeasonalBackgroundPath(_month, _seasonCarouselIndex);
+                    label = path is null ? $"برای فصل {GetCurrentSeasonName()} تصویری تنظیم نشده است." : $"پس‌زمینه فصلی · {Path.GetFileName(path)}";
+                }
+                else
+                {
+                    seasonalFiles = _themeService.GetSeasonalBackgroundPaths(_month);
+                    path = _themeService.GetSeasonalBackgroundPath(_month, _seasonCarouselIndex);
+                    label = path is null ? $"برای فصل {GetCurrentSeasonName()} تصویری تنظیم نشده است." : $"پس‌زمینه فصلی · {Path.GetFileName(path)}";
+                }
+                isCustom = path is not null;
+            }
+            else if (wallpaperMode == "monthly")
+            {
+                var monthKey = _month.ToString("00", CultureInfo.InvariantCulture);
+                if (_settings.MonthlyWallpaperPaths is not null &&
+                    _settings.MonthlyWallpaperPaths.TryGetValue(monthKey, out var mapped) && File.Exists(mapped))
+                {
+                    path = mapped;
+                    isCustom = true;
+                    label = $"پس‌زمینه ماهانه · {PersianDate.MonthNames[_month - 1]} · {Path.GetFileName(path)}";
+                }
+                else
+                {
+                    var seasonKey = ThemeService.GetSeasonKey(_month);
+                    if (_settings.SeasonalWallpaperPaths is not null &&
+                        _settings.SeasonalWallpaperPaths.TryGetValue(seasonKey, out var seasonal) && File.Exists(seasonal))
+                        path = seasonal;
+                    else
+                        path = _themeService.GetSeasonalBackgroundPath(_month);
+                    isCustom = path is not null;
+                    label = path is null ? $"برای {PersianDate.MonthNames[_month - 1]} تصویری تنظیم نشده است." : $"پس‌زمینه جایگزین فصلی · {Path.GetFileName(path)}";
+                }
+            }
+            else if (isElena && _settings.UseSeasonalBackground)
             {
                 StartupDiagnostics.MarkPhase("manual-background-seasonal-resolve");
 
@@ -4964,10 +5028,8 @@ public sealed partial class MainWindow : Window
                     ? $"Elena Mode · {season} · Season Carousel · فایل Season_N پیدا نشد"
                     : $"Elena Mode · {season} · {ToPersianDigits((_seasonCarouselIndex + 1).ToString())}/{ToPersianDigits(seasonalFiles.Count.ToString())} · {Path.GetFileName(path)}";
             }
-            else if (string.Equals(
-                         _settings.BackgroundMode,
-                         "custom",
-                         StringComparison.OrdinalIgnoreCase) &&
+            else if (wallpaperMode == "manual" &&
+                     string.Equals(_settings.BackgroundMode, "custom", StringComparison.OrdinalIgnoreCase) &&
                      !string.IsNullOrWhiteSpace(_settings.CustomBackgroundPath) &&
                      File.Exists(_settings.CustomBackgroundPath))
             {
@@ -5009,17 +5071,15 @@ public sealed partial class MainWindow : Window
 
             _backgroundPathText.Text = label;
 
-            if (isElena &&
-                _settings.UseSeasonalBackground &&
-                source is not null &&
-                seasonalFiles.Count > 1)
-            {
+            if (wallpaperMode == "random" || wallpaperMode == "monthly" || wallpaperMode == "seasonal")
+                StartWallpaperRotationTimer();
+            else
+                StopWallpaperRotationTimer();
+
+            if (isElena && _settings.UseSeasonalBackground && source is not null && seasonalFiles.Count > 1)
                 StartSeasonCarousel();
-            }
             else if (!isElena || isCustom || seasonalFiles.Count <= 1)
-            {
                 StopSeasonCarousel(resetPosition: false);
-            }
 
             StartupDiagnostics.MarkPhase("manual-background-apply-complete");
         }
