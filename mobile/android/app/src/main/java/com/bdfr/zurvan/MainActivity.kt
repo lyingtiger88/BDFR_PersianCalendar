@@ -1779,7 +1779,11 @@ private fun OccasionsScreen(
                         Text("تقویم رسمی و رویدادهای سال", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = .82f))
                         Text("نمادهای فلکی و حال‌وهوای کیهانی زروان", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = .78f))
                     }
-                    Text(if (selectedZodiacStyle == "cute") "☾" else "♈", fontSize = 42.sp, color = Color(0xFFFFD68A))
+                    ZodiacArtworkImage(
+                        month = AndroidCalendarEngine.currentPersianYearMonth().second,
+                        styleId = selectedZodiacStyle,
+                        modifier = Modifier.size(92.dp)
+                    )
                 }
             }
         }
@@ -1811,6 +1815,12 @@ private fun OccasionsScreen(
                         }
                         Spacer(Modifier.weight(1f))
                         Text("${entries.size} رویداد", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(Modifier.width(8.dp))
+                        ZodiacArtworkImage(
+                            month = month,
+                            styleId = selectedZodiacStyle,
+                            modifier = Modifier.size(72.dp)
+                        )
                     }
                 }
                 items(entries, key = { it.id }) { item ->
@@ -3065,7 +3075,11 @@ private fun SettingsScreen(
                             border = BorderStroke(if (selected) 2.dp else 1.dp, if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant)
                         ) {
                             Column(Modifier.padding(9.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                                Text(style.third, fontSize = 25.sp, color = MaterialTheme.colorScheme.primary)
+                                ZodiacArtworkImage(
+                                    month = AndroidCalendarEngine.currentPersianYearMonth().second,
+                                    styleId = style.first,
+                                    modifier = Modifier.size(68.dp)
+                                )
                                 Text(style.second, style = MaterialTheme.typography.labelSmall, textAlign = TextAlign.Center, maxLines = 2)
                             }
                         }
