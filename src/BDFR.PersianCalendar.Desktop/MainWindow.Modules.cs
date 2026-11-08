@@ -1,9 +1,11 @@
 using System.Text.Json;
+using System.Diagnostics;
 using BDFR.PersianCalendar.Core;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
+using Microsoft.UI.Windowing;
 
 namespace BDFR.PersianCalendar.Desktop;
 
@@ -86,6 +88,34 @@ public sealed partial class MainWindow
 
     private FrameworkElement BuildWallpaperManagerPage()
     {
+        Border Card(string title, string description, FrameworkElement content)
+        {
+            var body = new StackPanel { Spacing = 10, Padding = new Thickness(18) };
+            if (!string.IsNullOrWhiteSpace(title))
+                body.Children.Add(new TextBlock
+                {
+                    Text = title, FontSize = 17,
+                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                    Foreground = ThemeService.Brush(_theme.PrimaryText)
+                });
+            if (!string.IsNullOrWhiteSpace(description))
+                body.Children.Add(new TextBlock
+                {
+                    Text = description, TextWrapping = TextWrapping.Wrap,
+                    Foreground = ThemeService.Brush(_theme.SecondaryText)
+                });
+            body.Children.Add(content);
+            return new Border
+            {
+                Background = CreateSideSurfaceBrush(),
+                BorderBrush = BrushWithAlpha(_theme.Accent, 0x80),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(16),
+                Child = body,
+                HorizontalAlignment = HorizontalAlignment.Stretch
+            };
+        }
+
         var root = new StackPanel { Spacing = 14, Padding = new Thickness(18), FlowDirection = FlowDirection.RightToLeft };
         var intro = new StackPanel { Spacing = 5 };
         intro.Children.Add(new TextBlock { Text = "Wallpaper Manager", FontSize = 25, FontWeight = Microsoft.UI.Text.FontWeights.Bold, Foreground = ThemeService.Brush(_theme.PrimaryText) });
