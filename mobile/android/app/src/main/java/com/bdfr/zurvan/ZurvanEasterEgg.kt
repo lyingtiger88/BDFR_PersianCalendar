@@ -19,7 +19,7 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.cos
 import kotlin.math.sin
 
-/** Discreet trigger: 24 taps on the app title, with a short inactivity reset. */
+/** Discreet trigger: 7 taps on the app title, with a short inactivity reset. */
 @Composable
 fun ZurvanSecretTitle() {
     var taps by remember { mutableIntStateOf(0) }
@@ -31,7 +31,7 @@ fun ZurvanSecretTitle() {
             val now = SystemClock.elapsedRealtime()
             taps = if (now - lastTapAt > 8000L) 1 else taps + 1
             lastTapAt = now
-            if (taps >= 24) {
+            if (taps >= 7) {
                 taps = 0
                 showStory = true
             }
