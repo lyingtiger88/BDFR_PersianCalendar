@@ -5623,11 +5623,20 @@ public sealed partial class MainWindow : Window
             EventsPanel.Children.Clear();
             foreach (var item in snapshot.Events)
             {
-                EventsPanel.Children.Add(new TextBlock
+                var row = new StackPanel { Spacing = 5 };
+                row.Children.Add(new TextBlock
                 {
                     Text = $"{(item.Privacy == PrivacyLevel.Private ? "🔒 " : "")}{(string.IsNullOrWhiteSpace(item.Category) ? "📌" : item.Category)} {(item.StartTime is null ? "تمام‌روز" : item.StartTime.Value.ToString("HH:mm"))}  {item.Title}",
                     TextWrapping = TextWrapping.Wrap
                 });
+                var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
+                var edit = MakeButton("ویرایش");
+                edit.Click += async (_, _) => await EditEventAsync(item);
+                var delete = MakeButton("حذف");
+                delete.Click += async (_, _) => await DeleteEventAsync(item);
+                actions.Children.Add(edit); actions.Children.Add(delete);
+                row.Children.Add(actions);
+                EventsPanel.Children.Add(row);
             }
             if (snapshot.Events.Count == 0)
                 EventsPanel.Children.Add(new TextBlock { Text = "رویدادی ندارید", Opacity = 0.55 });
@@ -5660,7 +5669,16 @@ public sealed partial class MainWindow : Window
                     }
                 };
 
-                TasksPanel.Children.Add(checkbox);
+                var row = new StackPanel { Spacing = 4 };
+                row.Children.Add(checkbox);
+                var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
+                var edit = MakeButton("ویرایش");
+                edit.Click += async (_, _) => await EditTaskAsync(item);
+                var delete = MakeButton("حذف");
+                delete.Click += async (_, _) => await DeleteTaskAsync(item);
+                actions.Children.Add(edit); actions.Children.Add(delete);
+                row.Children.Add(actions);
+                TasksPanel.Children.Add(row);
             }
             if (snapshot.Tasks.Count == 0)
                 TasksPanel.Children.Add(new TextBlock { Text = "کاری ندارید", Opacity = 0.55 });
