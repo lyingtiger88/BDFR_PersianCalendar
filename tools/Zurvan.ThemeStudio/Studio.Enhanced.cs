@@ -549,8 +549,8 @@ internal sealed partial class Studio
             const int gap = 18;
             var paneWidth = (bounds.Width - gap - 32) / 2;
             if (paneWidth < 170) return;
-            var left = new Rectangle(bounds.X + 8, bounds.Y + 8, paneWidth, bounds.Height - 16);
-            var right = new Rectangle(left.Right + gap, bounds.Y + 8, paneWidth, bounds.Height - 16);
+            var left = new Rectangle(bounds.X + 8, bounds.Y + 26, paneWidth, bounds.Height - 34);
+            var right = new Rectangle(left.Right + gap, bounds.Y + 26, paneWidth, bounds.Height - 34);
             DrawPlatformPreview(g, left, false);
             DrawPlatformPreview(g, right, true);
             using var labelFont = new Font("Segoe UI", 9, FontStyle.Bold);
@@ -568,7 +568,7 @@ internal sealed partial class Studio
         if (bounds.Width < 160 || bounds.Height < 200) return;
 var w = mobile ? Math.Min(360, bounds.Width - 38) : Math.Min(bounds.Width - 28, 950);
         var h = mobile ? Math.Min(bounds.Height - 34, 690) : Math.Min(bounds.Height - 32, 660);
-        var rect = new Rectangle((bounds.Width - w) / 2, (bounds.Height - h) / 2, w, h);
+        var rect = new Rectangle(bounds.X + (bounds.Width - w) / 2, bounds.Y + (bounds.Height - h) / 2, w, h);
         using (var shadow = new SolidBrush(Color.FromArgb(30, Color.Black)))
             g.FillRounded(shadow, new Rectangle(rect.X + 5, rect.Y + 7, rect.Width, rect.Height), 20);
         using (var fill = new SolidBrush(colors["background"])) g.FillRounded(fill, rect, mobile ? 25 : 18);
