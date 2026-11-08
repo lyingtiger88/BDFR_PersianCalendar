@@ -128,7 +128,7 @@ public sealed class WallpaperProviderService
         if (extension is not (".jpg" or ".jpeg" or ".png" or ".webp"))
             throw new InvalidOperationException("قالب تصویر پشتیبانی نمی‌شود.");
 
-        var category = SanitizeCategory(item.Category);
+        var category = SanitizeCategory(item.Tags.FirstOrDefault() ?? item.Category);
         var folder = Path.Combine(GalleryRoot, category);
         Directory.CreateDirectory(folder);
         var target = Path.Combine(folder, item.Id + extension);
@@ -164,7 +164,7 @@ public sealed class WallpaperProviderService
             File.Move(temporary, target, true);
             var metadata = new
             {
-                item.Id, item.Title, item.Category, item.Width, item.Height,
+                item.Id, item.Title, item.Category, GalleryCategory = category, item.Width, item.Height,
                 item.PageUrl, item.ImageUrl, item.Tags,
                 Provider = "Wallhaven", DownloadedAtUtc = DateTimeOffset.UtcNow
             };
@@ -177,6 +177,16 @@ public sealed class WallpaperProviderService
         {
             if (File.Exists(temporary)) File.Delete(temporary);
         }
+    }
+
+    public IReadOnlyList<string> GetGalleryCategories()
+    {
+        if (!Directory.Exists(GalleryRoot)) return [];
+        return Directory.EnumerateDirectories(GalleryRoot)
+            .Select(Path.GetFileName)
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
+            .ToArray()!;
     }
 
     public IReadOnlyList<string> GetGalleryFiles(string? category = null)
@@ -194,8 +204,12 @@ public sealed class WallpaperProviderService
 
     private static string SanitizeCategory(string? value)
     {
-        var safe = new string((value ?? "general").Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
-        return safe is "general" or "anime" or "people" ? safe : "general";
+        var safe = new string((value ?? "general")
+            .Trim().ToLowerInvariant()
+            .Where(ch => char.IsLetterOrDigit(ch) || ch is '-' or '_')
+            .Take(48)
+            .ToArray());
+        return string.IsNullOrWhiteSpace(safe) ? "general" : safe;
     }
 
     private static string ReadString(JsonElement element, string name)
