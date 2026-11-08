@@ -1730,11 +1730,13 @@ private fun OccasionsScreen(
         Triple("minimal", "مینیمال مدرن", "☾"),
         Triple("watercolor", "آبرنگی هنری", "✿"),
         Triple("mythic", "اسطوره‌ای", "♜"),
-        Triple("cute", "کارتونی کیوت", "☺"),
+        Triple("cute_1", "کیوت ۱", "☺"),
+        Triple("cute_2", "کیوت ۲", "♡"),
+        Triple("cute_3", "کیوت ۳", "✿"),
         Triple("luxury", "سه‌بعدی لوکس", "✧")
     )
     val zodiacPrefs = remember(context) { context.getSharedPreferences("zurvan_zodiac", Context.MODE_PRIVATE) }
-    var selectedZodiacStyle by remember { mutableStateOf(zodiacPrefs.getString("style", "cosmic") ?: "cosmic") }
+    var selectedZodiacStyle by remember { mutableStateOf(zodiacPrefs.getString("style", "cosmic")?.let { if (it == "cute") "cute_1" else it } ?: "cosmic") }
     LaunchedEffect(currentYear) {
         if (officialItems.isEmpty()) updating = true
     }
@@ -1762,7 +1764,7 @@ private fun OccasionsScreen(
                 "minimal" -> listOf(Color(0xFF171A24), Color(0xFF414655))
                 "watercolor" -> listOf(Color(0xFF60436E), Color(0xFFB879A0))
                 "mythic" -> listOf(Color(0xFF38200D), Color(0xFF93602C))
-                "cute" -> listOf(Color(0xFF6D3157), Color(0xFFC879A8))
+                "cute", "cute_1", "cute_2", "cute_3" -> listOf(Color(0xFF6D3157), Color(0xFFC879A8))
                 "luxury" -> listOf(Color(0xFF102536), Color(0xFF53647E))
                 else -> listOf(Color(0xFF100D35), Color(0xFF39236F))
             }
@@ -2700,11 +2702,13 @@ private fun SettingsScreen(
         Triple("minimal", "مینیمال مدرن", "☾"),
         Triple("watercolor", "آبرنگی هنری", "✿"),
         Triple("mythic", "اسطوره‌ای", "♜"),
-        Triple("cute", "کارتونی کیوت", "☺"),
+        Triple("cute_1", "کیوت ۱", "☺"),
+        Triple("cute_2", "کیوت ۲", "♡"),
+        Triple("cute_3", "کیوت ۳", "✿"),
         Triple("luxury", "سه‌بعدی لوکس", "✧")
     )
     val zodiacPrefs = remember(context) { context.getSharedPreferences("zurvan_zodiac", Context.MODE_PRIVATE) }
-    var selectedZodiacStyle by remember { mutableStateOf(zodiacPrefs.getString("style", "cosmic") ?: "cosmic") }
+    var selectedZodiacStyle by remember { mutableStateOf(zodiacPrefs.getString("style", "cosmic")?.let { if (it == "cute") "cute_1" else it } ?: "cosmic") }
     val tabsShown = ZurvanTabConfig.visible.current
     val updateTabs = ZurvanTabConfig.update.current
     val navigateTab = ZurvanTabConfig.open.current
