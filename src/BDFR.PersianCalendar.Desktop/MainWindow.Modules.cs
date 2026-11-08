@@ -406,11 +406,11 @@ public sealed partial class MainWindow
                         EndPoint = new Windows.Foundation.Point(1, 1),
                         GradientStops =
                         {
-                            new GradientStop { Color = Windows.UI.ColorHelper.FromArgb(255,
+                            new GradientStop { Color = Windows.UI.Color.FromArgb(255,
                                 Convert.ToByte(zodiacPalette.Item1.Substring(3, 2), 16),
                                 Convert.ToByte(zodiacPalette.Item1.Substring(5, 2), 16),
                                 Convert.ToByte(zodiacPalette.Item1.Substring(7, 2), 16)), Offset = 0 },
-                            new GradientStop { Color = Windows.UI.ColorHelper.FromArgb(255,
+                            new GradientStop { Color = Windows.UI.Color.FromArgb(255,
                                 Convert.ToByte(zodiacPalette.Item2.Substring(3, 2), 16),
                                 Convert.ToByte(zodiacPalette.Item2.Substring(5, 2), 16),
                                 Convert.ToByte(zodiacPalette.Item2.Substring(7, 2), 16)), Offset = 1 }
