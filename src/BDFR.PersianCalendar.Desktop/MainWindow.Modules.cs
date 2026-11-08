@@ -682,6 +682,7 @@ public sealed partial class MainWindow
                             "task-reopened" => "کار دوباره باز شد",
                             "note-saved" => "یادداشت ذخیره شد",
                             "special-occasion-created" => "مناسبت شخصی",
+                            "special-occasion-recovered" => "بازیابی سابقه مناسبت شخصی",
                             "notification-fired" => "اعلان نمایش داده شد",
                             "reminder-acknowledged" => "یادآور تأیید شد",
                             "reminder-completed" => "یادآور انجام شد",
