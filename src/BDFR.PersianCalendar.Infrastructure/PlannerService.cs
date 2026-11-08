@@ -76,6 +76,37 @@ public sealed class PlannerService(
         return task;
     }
 
+    public async Task UpdateEventAsync(
+        CalendarEvent calendarEvent,
+        int[]? reminderMinutes = null,
+        int reminderRepeatCount = 3,
+        int reminderRepeatIntervalMinutes = 5,
+        CancellationToken cancellationToken = default)
+    {
+        await repository.UpdateEventAsync(calendarEvent, cancellationToken);
+        await repository.DeleteRemindersForItemAsync(CalendarItemKind.Event, calendarEvent.Id, cancellationToken);
+        foreach (var reminder in ReminderEngine.ForEvent(
+            calendarEvent, timeZone, reminderRepeatCount, reminderRepeatIntervalMinutes, reminderMinutes ?? [10]))
+            await PersistReminderAsync(reminder, cancellationToken);
+        await repository.AddActivityAsync(new ActivityLogEntry(
+            Guid.NewGuid().ToString("N"), DateTimeOffset.UtcNow, "event-updated",
+            CalendarItemKind.Event, calendarEvent.Id, calendarEvent.Title), cancellationToken);
+    }
+
+    public async Task UpdateTaskAsync(
+        CalendarTask task,
+        int reminderMinutes = 10,
+        CancellationToken cancellationToken = default)
+    {
+        await repository.UpdateTaskAsync(task, cancellationToken);
+        await repository.DeleteRemindersForItemAsync(CalendarItemKind.Task, task.Id, cancellationToken);
+        foreach (var reminder in ReminderEngine.ForTask(task, timeZone, reminderMinutes))
+            await PersistReminderAsync(reminder, cancellationToken);
+        await repository.AddActivityAsync(new ActivityLogEntry(
+            Guid.NewGuid().ToString("N"), DateTimeOffset.UtcNow, "task-updated",
+            CalendarItemKind.Task, task.Id, task.Title), cancellationToken);
+    }
+
     public async Task<int> SyncOccasionsAsync(
         IOccasionSource source,
         int year,
