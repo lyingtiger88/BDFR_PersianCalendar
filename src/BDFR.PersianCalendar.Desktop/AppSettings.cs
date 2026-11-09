@@ -104,6 +104,13 @@ public sealed class AppSettings
     public double NavigationRailWidth { get; set; } = 138.0;
     public string NavigationRailSide { get; set; } = "left";
 
+    // Zurvan clock: selectable analog or digital presentation.
+    public string ClockDisplayMode { get; set; } = "analog";
+    public string DigitalClockStyle { get; set; } = "classic";
+    public bool DigitalClockTwentyFourHours { get; set; } = true;
+    public bool ClockShowSeconds { get; set; } = true;
+    public string AnalogClockNumeralStyle { get; set; } = "zurvan";
+
     // Independent visual style for zodiac artwork in the Occasions module.
     public string ZodiacThemeId { get; set; } = "cosmic";
 
