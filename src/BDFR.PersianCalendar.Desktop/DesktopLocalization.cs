@@ -98,8 +98,6 @@ internal static class DesktopLocalization
             case Control control when control is not ContentControl:
                 if (control is Button button && button.Content is string buttonText)
                     button.Content = Translate(buttonText, language);
-                if (control is HeaderedContentControl headered && headered.Header is string header)
-                    headered.Header = Translate(header, language);
                 break;
             case MenuFlyoutItem menu:
                 menu.Text = Translate(menu.Text, language);
