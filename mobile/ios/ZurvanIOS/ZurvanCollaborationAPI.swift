@@ -56,7 +56,11 @@ struct ZurvanCollaborationAPI {
 
     private func request<T: Decodable>(_ method: String, _ path: String, token: String,
                                        body: [String: Any]? = nil, as type: T.Type) async throws -> T {
-        var request = URLRequest(url: baseURL.appending(path: path))
+        let parts = path.split(separator: "?", maxSplits: 1, omittingEmptySubsequences: false)
+        var components = URLComponents(url: baseURL.appending(path: String(parts[0])), resolvingAgainstBaseURL: false)
+        if parts.count > 1 { components?.percentEncodedQuery = String(parts[1]) }
+        guard let targetURL = components?.url else { throw ZurvanCollabAPIError.invalidConfiguration }
+        var request = URLRequest(url: targetURL)
         request.httpMethod = method
         request.timeoutInterval = 35
         request.setValue("application/json", forHTTPHeaderField: "Accept")
@@ -137,7 +141,11 @@ struct ZurvanCollaborationAPI {
 
     private func raw(_ method: String, _ path: String, token: String,
                      body: [String: Any]? = nil) async throws -> Any {
-        var request = URLRequest(url: baseURL.appending(path: path))
+        let parts = path.split(separator: "?", maxSplits: 1, omittingEmptySubsequences: false)
+        var components = URLComponents(url: baseURL.appending(path: String(parts[0])), resolvingAgainstBaseURL: false)
+        if parts.count > 1 { components?.percentEncodedQuery = String(parts[1]) }
+        guard let targetURL = components?.url else { throw ZurvanCollabAPIError.invalidConfiguration }
+        var request = URLRequest(url: targetURL)
         request.httpMethod = method; request.timeoutInterval = 35
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
