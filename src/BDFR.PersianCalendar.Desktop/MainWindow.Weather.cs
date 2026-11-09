@@ -293,7 +293,7 @@ public sealed partial class MainWindow
     {
         if (_weatherHourlyStrip is null) return;
         _weatherHourlyStrip.Children.Clear();
-        var now = DateTime.Now;
+        var now = snapshot.ForecastLocalTime;
         // The weather service returns wall-clock times for the selected forecast city.
         // Display its next 24 forecast observations, without claiming local GPS data.
         var hours = snapshot.Hours.Where(h => h.LocalTime >= now.AddHours(-1))
