@@ -23,6 +23,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -154,14 +155,35 @@ fun ZurvanTimeIllustration(modifier: Modifier = Modifier) {
                     .padding(vertical = 10.dp, horizontal = 6.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    time.format(formatter),
-                    fontSize = if (showSeconds) 23.sp else 29.sp,
-                    color = accent,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    textAlign = TextAlign.Center
-                )
+                if (clockStyle == "flip") {
+                    Row(horizontalArrangement = Arrangement.spacedBy(2.dp),
+                        verticalAlignment = Alignment.CenterVertically) {
+                        time.format(formatter).forEach { character ->
+                            Text(
+                                character.toString(),
+                                color = Color.White,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = if (showSeconds) 16.sp else 22.sp,
+                                maxLines = 1,
+                                modifier = Modifier.background(
+                                    if (character.isDigit()) Color(0xFF404859) else Color.Transparent,
+                                    RoundedCornerShape(3.dp)
+                                ).padding(horizontal = 2.dp, vertical = 5.dp)
+                            )
+                        }
+                    }
+                } else {
+                    Text(
+                        time.format(formatter),
+                        fontSize = if (showSeconds) 23.sp else 29.sp,
+                        color = accent,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = if (clockStyle == "dots") FontFamily.Monospace else FontFamily.Default,
+                        letterSpacing = if (clockStyle == "dots") 1.sp else 0.sp,
+                        maxLines = 1,
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
         } else Canvas(Modifier.fillMaxSize()) {
             val center = Offset(size.width / 2f, size.height / 2f)
