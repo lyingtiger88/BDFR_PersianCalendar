@@ -153,7 +153,7 @@ as $$
 declare current_role text; invitation_id uuid;
 begin
   current_role := public.collab_role(g);
-  if current_role not in ('owner','assistant') then raise exception 'Not authorized' using errcode='42501'; end if;
+  if coalesce(current_role,'') not in ('owner','assistant') then raise exception 'Not authorized' using errcode='42501'; end if;
   if requested_role not in ('member','assistant') or
      (requested_role='assistant' and current_role<>'owner')
   then raise exception 'Role not authorized' using errcode='42501'; end if;
@@ -182,7 +182,7 @@ begin
   end if;
   select role into issuer_role from public.collab_members
     where group_id=i.group_id and user_id=i.invited_by;
-  if issuer_role not in ('owner','assistant') or
+  if coalesce(issuer_role,'') not in ('owner','assistant') or
      (i.role='assistant' and issuer_role<>'owner') then
     raise exception 'Inviter no longer authorized' using errcode='42501';
   end if;
@@ -202,7 +202,7 @@ begin
   manager_role := public.collab_role(g);
   select role into target_role from public.collab_members
   where group_id=g and user_id=target for update;
-  if manager_role not in ('owner','assistant')
+  if coalesce(manager_role,'') not in ('owner','assistant')
     or target_role is null or target_role='owner'
     or (target_role='assistant' and manager_role<>'owner')
   then raise exception 'Permission change not authorized' using errcode='42501'; end if;
@@ -221,7 +221,7 @@ begin
   select role into target_role from public.collab_members
   where group_id=g and user_id=target for update;
   if target_role is null or target_role='owner' or
-     (auth.uid()<>target and (manager_role not in ('owner','assistant')
+     (auth.uid()<>target and (coalesce(manager_role,'') not in ('owner','assistant')
       or (target_role='assistant' and manager_role<>'owner')))
   then raise exception 'Member removal not authorized' using errcode='42501'; end if;
   delete from public.collab_members where group_id=g and user_id=target;
