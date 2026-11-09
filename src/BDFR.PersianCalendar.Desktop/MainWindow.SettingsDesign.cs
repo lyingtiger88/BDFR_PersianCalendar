@@ -282,7 +282,7 @@ public sealed partial class MainWindow
             Child = element
         };
 
-    private static FrameworkElement SettingsOptionRow(string title, string hint, UIElement control, string icon = "\uE713")
+    private static FrameworkElement SettingsOptionRow(string title, string hint, UIElement control, string icon = "\uE713", FrameworkElement? iconElement = null)
     {
         var grid = new Grid
         {
@@ -293,7 +293,7 @@ public sealed partial class MainWindow
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(31) });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        var glyph = new FontIcon
+        var glyph = iconElement ?? new FontIcon
         {
             Glyph = icon,
             FontFamily = new FontFamily("Segoe MDL2 Assets"),
@@ -319,6 +319,62 @@ public sealed partial class MainWindow
         return grid;
     }
 
+    private static FrameworkElement CreateNavigationPlacementIcon(bool tabs)
+    {
+        var canvas = new Canvas { Width = 42, Height = 36, FlowDirection = FlowDirection.LeftToRight };
+        var color = ThemeService.Brush(tabs ? "#FF278FD2" : "#FF5636B5");
+        if (tabs)
+        {
+            for (var i = 0; i < 3; i++)
+            {
+                var tab = new Border
+                {
+                    Width = 12, Height = 17,
+                    BorderBrush = color, BorderThickness = new Thickness(1.7),
+                    CornerRadius = new CornerRadius(3, 3, 0, 0),
+                    Background = ThemeService.Brush("#00FFFFFF")
+                };
+                Canvas.SetLeft(tab, 5 + i * 13);
+                Canvas.SetTop(tab, 3);
+                canvas.Children.Add(tab);
+            }
+            canvas.Children.Add(new Border
+            {
+                Width = 39, Height = 2, Background = color
+            }.AlsoPlace(1, 22));
+        }
+        else
+        {
+            foreach (var x in new[] { 3.0, 27.0 })
+            {
+                var rail = new Border
+                {
+                    Width = 12, Height = 27,
+                    BorderBrush = color, BorderThickness = new Thickness(1.8),
+                    CornerRadius = new CornerRadius(3),
+                    Background = ThemeService.Brush("#00FFFFFF")
+                };
+                Canvas.SetLeft(rail, x); Canvas.SetTop(4);
+                canvas.Children.Add(rail);
+                var mark = new Border { Width = 5, Height = 2, Background = color };
+                Canvas.SetLeft(mark, x + 3.5); Canvas.SetTop(mark, 11);
+                canvas.Children.Add(mark);
+                var mark2 = new Border { Width = 5, Height = 2, Background = color };
+                Canvas.SetLeft(mark2, x + 3.5); Canvas.SetTop(mark2, 20);
+                canvas.Children.Add(mark2);
+            }
+            var arrow = new TextBlock
+            {
+                Text = "↔", FontSize = 18, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                Foreground = color, Width = 20, TextAlignment = TextAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            Canvas.SetLeft(arrow, 11); Canvas.SetTop(7);
+            canvas.Children.Add(arrow);
+        }
+        return canvas;
+    }
+
     private static void AddSettingsSeparator(StackPanel panel)
         => panel.Children.Add(new Border
         {
@@ -336,13 +392,15 @@ public sealed partial class MainWindow
             Spacing = 10,
             FlowDirection = FlowDirection.RightToLeft
         };
-        header.Children.Add(new FontIcon
-        {
-            Glyph = glyph,
-            FontFamily = new FontFamily("Segoe MDL2 Assets"),
-            Foreground = ThemeService.Brush(color),
-            FontSize = 27
-        });
+        header.Children.Add(title == "محل قرارگیری سربرگ‌ها"
+            ? CreateNavigationPlacementIcon(true)
+            : new FontIcon
+            {
+                Glyph = glyph,
+                FontFamily = new FontFamily("Segoe MDL2 Assets"),
+                Foreground = ThemeService.Brush(color),
+                FontSize = 27
+            });
         var texts = new StackPanel { Spacing = 3 };
         texts.Children.Add(SettingsLabel(title, 19, true));
         texts.Children.Add(SettingsHint(description));
@@ -716,12 +774,13 @@ public sealed partial class MainWindow
         };
         var navigationPosition = SettingsGroup("محل قرارگیری سربرگ‌ها",
             "نوار اصلی ناوبری را در سمت دلخواه صفحه قرار دهید.",
-            "\\uE700", "#FF4B91C8");
+            "\uE700", "#FF4B91C8");
         navigationPosition.Children.Add(SettingsOptionRow(
             "جایگاه سربرگ‌ها",
             "چپ یا راست صفحه",
             navigationSide,
-            "\\uE700"));
+            "\uE700",
+            CreateNavigationPlacementIcon(false)));
         contents.Children.Add(SettingsCard(navigationPosition));
         AddSettingsSeparator(contents);
 
