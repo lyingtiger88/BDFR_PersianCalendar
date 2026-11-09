@@ -1,0 +1,64 @@
+package com.bdfr.zurvan
+
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.URL
+
+data class CollabGroup(val id:String,val name:String,val agenda:Boolean,val kanban:Boolean,val school:Boolean)
+data class CollabMember(val accountId:String,val identifier:String,val role:String,val canChat:Boolean,val canReport:Boolean,val canEdit:Boolean)
+data class CollabEvent(val sequence:Long,val kind:String,val resourceId:String?)
+
+class ZurvanCollaborationApi(private val baseUrl:String = BuildConfig.COLLAB_API_BASE_URL) {
+    private fun connection(method:String,path:String,token:String,body:String?=null):HttpURLConnection {
+        return (URL(baseUrl.trimEnd('/')+"/"+path.trimStart('/')).openConnection() as HttpURLConnection).apply {
+            requestMethod=method;connectTimeout=15000;readTimeout=20000
+            setRequestProperty("Accept","application/json")
+            setRequestProperty("Authorization","Bearer $token")
+            setRequestProperty("apikey",BuildConfig.DESK_SUPABASE_PUBLISHABLE_KEY)
+            if(body!=null){doOutput=true;setRequestProperty("Content-Type","application/json; charset=utf-8")}
+        }
+    }
+    private suspend fun request(token:String,method:String,path:String,body:JSONObject?=null):String=withContext(Dispatchers.IO){
+        val c=connection(method,path,token,body?.toString())
+        try{
+            if(body!=null)c.outputStream.use{it.write(body.toString().toByteArray(Charsets.UTF_8))}
+            val code=c.responseCode
+            val stream=if(code in 200..299)c.inputStream else c.errorStream
+            val text=stream?.bufferedReader()?.use{it.readText()}?: ""
+            if(code !in 200..299){
+                val message=runCatching{JSONObject(text).optString("error","HTTP $code")}.getOrDefault("HTTP $code")
+                throw IllegalStateException(message)
+            }
+            text
+        }finally{c.disconnect()}
+    }
+    suspend fun groups(token:String):List<CollabGroup>{
+        val a=JSONArray(request(token,"GET","/groups"))
+        return (0 until a.length()).map{val o=a.getJSONObject(it);CollabGroup(o.getString("id"),o.optString("name"),o.optBoolean("agenda_enabled"),o.optBoolean("kanban_enabled"),o.optBoolean("school_enabled"))}
+    }
+    suspend fun createGroup(token:String,name:String,agenda:Boolean,kanban:Boolean,school:Boolean):CollabGroup{
+        val o=JSONObject(request(token,"POST","/groups",JSONObject().put("name",name).put("agenda",agenda).put("kanban",kanban).put("school",school)))
+        return CollabGroup(o.getString("id"),o.getString("name"),o.optBoolean("agenda_enabled"),o.optBoolean("kanban_enabled"),o.optBoolean("school_enabled"))
+    }
+    suspend fun invite(token:String,groupId:String,identifier:String,assistant:Boolean){
+        request(token,"POST","/groups/$groupId/invites",JSONObject().put("identifier",identifier).put("role",if(assistant)"assistant" else "member"))
+    }
+    suspend fun accept(token:String,inviteId:String){request(token,"POST","/invitations/$inviteId/accept",JSONObject())}
+    suspend fun members(token:String,groupId:String):List<CollabMember>{
+        val o=JSONObject(request(token,"GET","/groups/$groupId"))
+        val a=o.optJSONArray("members")?:JSONArray()
+        return (0 until a.length()).map{val x=a.getJSONObject(it);val account=x.optJSONObject("account")?:JSONObject()
+            CollabMember(x.getString("account_id"),account.optString("identifier",x.getString("account_id")),x.optString("role"),x.optBoolean("can_chat"),x.optBoolean("can_report"),x.optBoolean("can_edit"))}
+    }
+    suspend fun changes(token:String,groupId:String,after:Long):Pair<List<CollabEvent>,Long>{
+        val o=JSONObject(request(token,"GET","/groups/$groupId/changes?after=$after"))
+        val a=o.optJSONArray("events")?:JSONArray()
+        val rows=(0 until a.length()).map{val x=a.getJSONObject(it);CollabEvent(x.optLong("seq"),x.optString("kind"),x.optString("resource_id").takeIf{v->v.isNotBlank()})}
+        return rows to o.optLong("nextCursor",after)
+    }
+    suspend fun items(token:String,groupId:String):JSONArray=JSONArray(request(token,"GET","/groups/$groupId/items"))
+    suspend fun messages(token:String,groupId:String):JSONArray=JSONArray(request(token,"GET","/groups/$groupId/messages"))
+}
