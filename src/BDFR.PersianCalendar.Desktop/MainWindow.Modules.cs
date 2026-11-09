@@ -797,8 +797,7 @@ public sealed partial class MainWindow
                 var submissionBody = new TextBox { Header = "پاسخ دانش‌آموز", AcceptsReturn = true, Height = 90 };
                 var gradeBox = new NumberBox { Header = "نمره (۰ تا ۱۰۰)", Minimum = 0, Maximum = 100, Value = 0 };
                 var feedbackBox = new TextBox { Header = "بازخورد معلم" };
-                var schoolRefresh = MakeButton("بارگذاری درس‌ها، برنامه هفتگی و تکالیف");
-                schoolRefresh.Click += async (_, _) =>
+                async Task RefreshSchoolData()
                 {
                     try
                     {
@@ -816,11 +815,13 @@ public sealed partial class MainWindow
                         _schoolHomeworkIds = homeworkRows.Select(x => x.GetProperty("id").GetString() ?? "").ToList();
                     }
                     catch (Exception ex) { timetableStatus.Text = ex.Message; }
-                };
+                }
+                var schoolRefresh = MakeButton("بارگذاری درس‌ها، برنامه هفتگی و تکالیف");
+                schoolRefresh.Click += async (_, _) => await RefreshSchoolData();
                 var addSubject = MakeButton("افزودن درس");
                 addSubject.Click += async (_, _) =>
                 {
-                    try { using var _ = await _deskClient.CreateCollaborationSubjectAsync(_collaborationGroupId, subjectName.Text.Trim()); subjectName.Text = ""; schoolRefresh.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); }
+                    try { using var _ = await _deskClient.CreateCollaborationSubjectAsync(_collaborationGroupId, subjectName.Text.Trim()); subjectName.Text = ""; await RefreshSchoolData(); }
                     catch (Exception ex) { timetableStatus.Text = ex.Message; }
                 };
                 var addTimetable = MakeButton("ثبت جلسه نمونه برای روز انتخابی (۸ تا ۹)");
@@ -897,8 +898,7 @@ public sealed partial class MainWindow
                 var kanbanColumnPicker = new ComboBox { Header = "ستون‌ها", MinWidth = 260 };
                 var kanbanColumnIds = new List<string>();
                 var kanbanStatus = new TextBlock { TextWrapping = TextWrapping.Wrap };
-                var loadKanban = MakeButton("بارگذاری ستون‌های Kanban");
-                loadKanban.Click += async (_, _) =>
+                async Task LoadKanbanData()
                 {
                     try
                     {
@@ -910,11 +910,13 @@ public sealed partial class MainWindow
                         kanbanStatus.Text = $"{rows.Count} ستون بارگذاری شد.";
                     }
                     catch (Exception ex) { kanbanStatus.Text = ex.Message; }
-                };
+                }
+                var loadKanban = MakeButton("بارگذاری ستون‌های Kanban");
+                loadKanban.Click += async (_, _) => await LoadKanbanData();
                 var addKanbanColumn = MakeButton("افزودن ستون");
                 addKanbanColumn.Click += async (_, _) =>
                 {
-                    try { using var _ = await _deskClient.CreateKanbanColumnAsync(_collaborationGroupId, kanbanColumnName.Text.Trim()); kanbanColumnName.Text = ""; loadKanban.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); }
+                    try { using var _ = await _deskClient.CreateKanbanColumnAsync(_collaborationGroupId, kanbanColumnName.Text.Trim()); kanbanColumnName.Text = ""; await LoadKanbanData(); }
                     catch (Exception ex) { kanbanStatus.Text = ex.Message; }
                 };
                 var moveKanbanColumn = MakeButton("انتقال ستون انتخابی به انتهای برد");
