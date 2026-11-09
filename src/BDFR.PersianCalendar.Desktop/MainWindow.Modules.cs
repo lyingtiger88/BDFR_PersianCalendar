@@ -729,6 +729,72 @@ public sealed partial class MainWindow
                     }
                     catch (Exception ex) { _collaborationStatus.Text = ex.Message; }
                 };
+                var sharedTaskBox = new TextBox { Header = "عنوان کار مشترک", PlaceholderText = "کار جدید برای همه اعضا" };
+                var sharedTaskMode = new ComboBox { Header = "نوع برنامه", Items = { "Agenda", "Kanban", "School" }, SelectedIndex = 0 };
+                var addSharedTask = MakeButton("ثبت کار مشترک");
+                addSharedTask.Click += async (_, _) =>
+                {
+                    if (string.IsNullOrWhiteSpace(_collaborationGroupId) || !_deskClient.IsAuthenticated)
+                    { _collaborationStatus!.Text = "ابتدا وارد حساب شوید و به گروه متصل شوید."; return; }
+                    if (string.IsNullOrWhiteSpace(sharedTaskBox.Text)) { _collaborationStatus!.Text = "عنوان کار را وارد کنید."; return; }
+                    try
+                    {
+                        var mode = sharedTaskMode.SelectedIndex switch { 1 => "kanban", 2 => "school", _ => "agenda" };
+                        using var item = await _deskClient.CreateCollaborationItemAsync(_collaborationGroupId, sharedTaskBox.Text.Trim(), mode);
+                        sharedTaskBox.Text = "";
+                        _collaborationStatus!.Text = "کار مشترک در سرور ثبت شد.";
+                    }
+                    catch (Exception ex) { _collaborationStatus!.Text = ex.Message; }
+                };
+                var sharedMessageBox = new TextBox { Header = "پیام گروه", PlaceholderText = "پیام برای اعضای گروه" };
+                var sendSharedMessage = MakeButton("ارسال پیام");
+                sendSharedMessage.Click += async (_, _) =>
+                {
+                    if (string.IsNullOrWhiteSpace(_collaborationGroupId) || !_deskClient.IsAuthenticated ||
+                        string.IsNullOrWhiteSpace(sharedMessageBox.Text))
+                    { _collaborationStatus!.Text = "به گروه متصل شوید و متن پیام را وارد کنید."; return; }
+                    try
+                    {
+                        using var message = await _deskClient.SendCollaborationMessageAsync(_collaborationGroupId, sharedMessageBox.Text.Trim());
+                        sharedMessageBox.Text = "";
+                        _collaborationStatus!.Text = "پیام برای گروه ارسال شد.";
+                    }
+                    catch (Exception ex) { _collaborationStatus!.Text = ex.Message; }
+                };
+                var checkInvitations = MakeButton("بررسی دعوت‌های دریافتی");
+                checkInvitations.Click += async (_, _) =>
+                {
+                    try
+                    {
+                        using var invitations = await _deskClient.ReadCollaborationInvitationsAsync();
+                        var rows = invitations.RootElement.EnumerateArray().ToList();
+                        if (rows.Count == 0) { _collaborationStatus!.Text = "دعوت جدیدی ندارید."; return; }
+                        var first = rows[0];
+                        var inviteId = first.GetProperty("id").GetString() ?? "";
+                        var groupTitle = first.TryGetProperty("collab_groups", out var group)
+                            ? group.GetProperty("name").GetString() : "گروه";
+                        var dialog = new ContentDialog
+                        {
+                            XamlRoot = _desktopModulePage!.XamlRoot,
+                            Title = "دعوت عضویت",
+                            Content = $"برای عضویت در گروه «{groupTitle}» دعوت شده‌اید. دعوت را می‌پذیرید؟",
+                            PrimaryButtonText = "پذیرش دعوت",
+                            CloseButtonText = "بعداً"
+                        };
+                        if (await dialog.ShowAsync() == ContentDialogResult.Primary)
+                        {
+                            await _deskClient.AcceptCollaborationInvitationAsync(inviteId);
+                            _collaborationStatus!.Text = "عضویت در گروه پذیرفته شد.";
+                        }
+                    }
+                    catch (Exception ex) { _collaborationStatus!.Text = ex.Message; }
+                };
+                collaboration.Children.Add(sharedTaskBox);
+                collaboration.Children.Add(sharedTaskMode);
+                collaboration.Children.Add(addSharedTask);
+                collaboration.Children.Add(sharedMessageBox);
+                collaboration.Children.Add(sendSharedMessage);
+                collaboration.Children.Add(checkInvitations);
                 collaboration.Children.Add(groupNameBox);
                 collaboration.Children.Add(new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12,
                     Children = { agendaMode, kanbanMode, schoolMode } });
