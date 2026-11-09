@@ -17,10 +17,8 @@ public sealed partial class MainWindow
     private TextBlock? _weatherRainText;
     private TextBlock? _weatherSymbolText;
     private TextBlock? _weatherStatusText;
-    private Grid? _weatherForecastGrid;
     private StackPanel? _weatherHourlyStrip;
     private readonly Dictionary<DateOnly, TextBlock> _weatherDayBadges = new();
-    private Button? _weatherFullForecastButton;
     private Microsoft.UI.Dispatching.DispatcherQueueTimer? _weatherRefreshTimer;
     private WeatherSnapshot? _weatherSnapshot;
     private bool _weatherLoading;
@@ -146,13 +144,10 @@ public sealed partial class MainWindow
         currentRow.Children.Add(details);
         panel.Children.Add(currentRow);
 
-        _weatherForecastGrid = new Grid { ColumnSpacing = 4, FlowDirection = FlowDirection.LeftToRight };
-        for (var i = 0; i < 5; i++)
-            _weatherForecastGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         _weatherHourlyStrip = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4 };
         panel.Children.Add(new TextBlock
         {
-            Text = "روند دمای ۲۴ ساعت آینده",
+            Text = "دما و وضعیت آسمان در ۲۴ ساعت گذشته",
             TextAlignment = TextAlignment.Right,
             FontSize = 11,
             Foreground = WeatherBrush(222, 233, 252)
@@ -176,20 +171,6 @@ public sealed partial class MainWindow
         };
         panel.Children.Add(_weatherStatusText);
 
-        _weatherFullForecastButton = new Button
-        {
-            Content = "نمایش پیش‌بینی کامل",
-            HorizontalAlignment = HorizontalAlignment.Stretch,
-            Background = WeatherBrush(255, 255, 255, 12),
-            Foreground = WeatherBrush(111, 209, 244),
-            FontSize = 11,
-            Padding = new Thickness(6, 5, 6, 5),
-            BorderThickness = new Thickness(0),
-            IsEnabled = false
-        };
-        _weatherFullForecastButton.Click += async (_, _) => await ShowCompleteWeatherForecastAsync();
-        // The seven-day outlook is also attached to each matching calendar day card.
-        panel.Children.Add(_weatherFullForecastButton);
         panel.Children.Add(new HyperlinkButton
         {
             Content = "Weather data by Open-Meteo.com",
@@ -268,7 +249,6 @@ public sealed partial class MainWindow
                 _weatherRainText.Text = $"💧 {snapshot.PrecipitationChance}%";
             RenderWeatherForecast(snapshot);
             RenderWeatherDayBadges();
-            if (_weatherFullForecastButton is not null) _weatherFullForecastButton.IsEnabled = true;
             if (_weatherStatusText is not null)
                 _weatherStatusText.Text = $"به‌روزرسانی: {DateTime.Now:HH:mm} · {(_settings.WeatherFahrenheit ? "°F" : "°C")}";
         }
@@ -298,9 +278,20 @@ public sealed partial class MainWindow
         var now = snapshot.ForecastLocalTime;
         // The weather service returns wall-clock times for the selected forecast city.
         // Display its next 24 forecast observations, without claiming local GPS data.
-        var hours = snapshot.Hours.Where(h => h.LocalTime >= now.AddHours(-1))
-            .Take(24).ToList();
-        if (hours.Count == 0) hours = snapshot.Hours.Take(24).ToList();
+        // Historical hourly values only; never substitute tomorrow's forecast
+        // when the requested last-24-hour window has no records.
+        var hours = snapshot.Hours.Where(h => h.LocalTime <= now &&
+            h.LocalTime > now.AddHours(-24)).OrderBy(h => h.LocalTime).TakeLast(24).ToList();
+        if (hours.Count == 0)
+        {
+            _weatherHourlyStrip.Children.Add(new TextBlock
+            {
+                Text = "اطلاعات ۲۴ ساعت گذشته در دسترس نیست.",
+                Foreground = WeatherBrush(225, 238, 253),
+                FontSize = 11
+            });
+            return;
+        }
         foreach (var hour in hours)
         {
             var temperature = Math.Round(hour.Temperature).ToString("0") + "°";
@@ -340,13 +331,16 @@ public sealed partial class MainWindow
         if (!_settings.WeatherEnabled || !_settings.WeatherOnCalendarCards || _weatherSnapshot is null)
             return;
         var lookup = _weatherSnapshot.Days.ToDictionary(day => day.Date);
+        var localToday = DateOnly.FromDateTime(_weatherSnapshot.ForecastLocalTime);
         foreach (var (date, badge) in _weatherDayBadges)
         {
+            if (date < localToday.AddDays(-7) || date > localToday.AddDays(7)) continue;
             if (!lookup.TryGetValue(date, out var day)) continue;
             badge.Text = ZurvanWeatherService.Describe(day.Code).Icon + " " +
                 Math.Round(day.High).ToString("0") + "°/" + Math.Round(day.Low).ToString("0") + "°";
             badge.Visibility = Visibility.Visible;
             ToolTipService.SetToolTip(badge,
+                (date < localToday ? "آرشیو پیش‌بینی · " : "پیش‌بینی · ") +
                 ZurvanWeatherService.Describe(day.Code).Description +
                 " · احتمال بارش " + day.PrecipitationChance + "%");
         }
@@ -453,29 +447,5 @@ public sealed partial class MainWindow
         }
     }
 
-    private async Task ShowCompleteWeatherForecastAsync()
-    {
-        if (_desktopSelectedDayPanel?.XamlRoot is null || _weatherSnapshot is null) return;
-        var forecast = _weatherSnapshot;
-        var rows = new StackPanel { Spacing = 9, Padding = new Thickness(12) };
-        foreach (var day in forecast.Days)
-        {
-            var details = ZurvanWeatherService.Describe(day.Code);
-            rows.Children.Add(new TextBlock
-            {
-                Text = $"{day.Date:yyyy/MM/dd}   {details.Icon} {details.Description}   " +
-                    $"{Math.Round(day.High)}° / {Math.Round(day.Low)}°   💧 {day.PrecipitationChance}%",
-                TextWrapping = TextWrapping.Wrap
-            });
-        }
-        rows.Children.Add(new TextBlock { Text = "منبع: Open-Meteo · داده‌ها پیش‌بینی هستند، نه مشاهدات قطعی.", Opacity = 0.65, FontSize = 11 });
-        var dialog = new ContentDialog
-        {
-            XamlRoot = _desktopSelectedDayPanel.XamlRoot,
-            Title = "پیش‌بینی هفت‌روزه · " + forecast.Place.DisplayName,
-            Content = new ScrollViewer { Content = rows, MaxHeight = 440 },
-            CloseButtonText = "بستن"
-        };
-        await dialog.ShowAsync();
-    }
+
 }
