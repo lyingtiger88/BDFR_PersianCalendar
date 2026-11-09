@@ -319,7 +319,17 @@ fun ZurvanTeamPlanner(
                         val payload=JSONObject().put("title",sharedTaskTitle.trim()).put("mode","agenda").put("state","todo").put("timezone",java.util.TimeZone.getDefault().id);agendaRecurrence?.let{payload.put("recurrenceRule",it)}
                         runCatching { collaborationApi.replayCommand(sessionToken,remoteGroupId,commandId,"create_item",payload) }
                             .onSuccess { sharedTaskTitle="";status="کار مشترک ثبت شد." }
-                            .onFailure { val message=it.message.orEmpty();if(message in listOf("version_conflict","command_denied","command_rejected"))status="سرور فرمان را رد کرد: $message" else { store.enqueueCommand(remoteGroupId,commandId,"create_item",payload);status="کار در صف آفلاین ذخیره شد و پس از اتصال ارسال می‌شود." };sharedTaskTitle="" }
+                            .onFailure { error ->
+                                val message=error.message.orEmpty()
+                                val code=(error as? CollaborationApiException)?.statusCode
+                                if(code in listOf(400,403,404,409,422)) status="سرور فرمان را رد کرد: $message"
+                                else {
+                                    runCatching { store.enqueueCommand(remoteGroupId,commandId,"create_item",payload) }
+                                        .onSuccess { status="کار در صف آفلاین رمزگذاری‌شده ذخیره شد و پس از اتصال ارسال می‌شود." }
+                                        .onFailure { status="ذخیره امن فرمان آفلاین ناموفق بود: ${it.message}" }
+                                }
+                                sharedTaskTitle=""
+                            }
                     }
                 }) { Text("ثبت کار مشترک آنلاین") }
                 OutlinedTextField(sharedMessage,{sharedMessage=it},label={Text("پیام گروه")},modifier=Modifier.fillMaxWidth())
@@ -330,7 +340,17 @@ fun ZurvanTeamPlanner(
                         val payload=JSONObject().put("body",sharedMessage.trim())
                         runCatching { collaborationApi.replayCommand(sessionToken,remoteGroupId,commandId,"send_message",payload) }
                             .onSuccess { sharedMessage="";status="پیام ارسال شد." }
-                            .onFailure { val message=it.message.orEmpty();if(message in listOf("version_conflict","command_denied","command_rejected"))status="سرور پیام را رد کرد: $message" else { store.enqueueCommand(remoteGroupId,commandId,"send_message",payload);status="پیام در صف آفلاین ذخیره شد و پس از اتصال ارسال می‌شود." };sharedMessage="" }
+                            .onFailure { error ->
+                                val message=error.message.orEmpty()
+                                val code=(error as? CollaborationApiException)?.statusCode
+                                if(code in listOf(400,403,404,409,422)) status="سرور پیام را رد کرد: $message"
+                                else {
+                                    runCatching { store.enqueueCommand(remoteGroupId,commandId,"send_message",payload) }
+                                        .onSuccess { status="پیام در صف آفلاین رمزگذاری‌شده ذخیره شد و پس از اتصال ارسال می‌شود." }
+                                        .onFailure { status="ذخیره امن پیام آفلاین ناموفق بود: ${it.message}" }
+                                }
+                                sharedMessage=""
+                            }
                     }
                 }) { Text("ارسال پیام گروه") }
                 Button(onClick={
@@ -560,8 +580,10 @@ fun ZurvanTeamPlanner(
                                         queued.getString("kind"),queued.getJSONObject("payload"))
                                 }
                                 if(replay.isSuccess) store.removeQueuedCommand(queued.getString("commandId")) else {
-                                    val message=replay.exceptionOrNull()?.message.orEmpty()
-                                    if(message=="version_conflict"||message=="command_denied"||message=="command_rejected") {
+                                    val error=replay.exceptionOrNull()
+                                    val message=error?.message.orEmpty()
+                                    val code=(error as? CollaborationApiException)?.statusCode
+                                    if(code in listOf(400,403,404,409,422)) {
                                         store.blockQueuedCommand(queued.getString("commandId"),message)
                                         remoteSyncStatus="فرمان آفلاین نیازمند بازبینی است: $message"
                                     }
