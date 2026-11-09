@@ -18,6 +18,8 @@ public sealed partial class MainWindow
     private long _collaborationCursor;
     private System.Threading.Timer? _collaborationTimer;
     private TextBlock? _collaborationStatus;
+    private TextBlock? _collaborationDataStatus;
+    private int _collaborationPollBusy;
 
 
     private static void DetachDesktopElement(FrameworkElement element)
@@ -40,6 +42,7 @@ public sealed partial class MainWindow
         if (!_deskClient.IsAuthenticated || string.IsNullOrWhiteSpace(_collaborationGroupId)) return;
         _collaborationTimer = new System.Threading.Timer(async _ =>
         {
+            if (System.Threading.Interlocked.Exchange(ref _collaborationPollBusy, 1) != 0) return;
             try
             {
                 using var result = await _deskClient.ReadCollaborationChangesAsync(
@@ -49,15 +52,21 @@ public sealed partial class MainWindow
                 var count = root.TryGetProperty("events", out var events) && events.ValueKind == JsonValueKind.Array
                     ? events.GetArrayLength() : 0;
                 if (next > _collaborationCursor) _collaborationCursor = next;
+                using var items = await _deskClient.ReadCollaborationItemsAsync(_collaborationGroupId);
+                using var messages = await _deskClient.ReadCollaborationMessagesAsync(_collaborationGroupId);
+                var itemCount = items.RootElement.ValueKind == JsonValueKind.Array ? items.RootElement.GetArrayLength() : 0;
+                var messageCount = messages.RootElement.ValueKind == JsonValueKind.Array ? messages.RootElement.GetArrayLength() : 0;
                 _desktopModulePage?.DispatcherQueue.TryEnqueue(() =>
                 {
                     if (_collaborationStatus is not null)
                         _collaborationStatus.Text = count > 0
                             ? $"همگام‌سازی آنلاین فعال • {count} تغییر جدید دریافت شد."
                             : "همگام‌سازی آنلاین فعال • آخرین وضعیت به‌روز است.";
+                    if (_collaborationDataStatus is not null)
+                        _collaborationDataStatus.Text = $"داده مشترک: {itemCount} کار/برنامه • {messageCount} پیام";
                 });
             }
-            catch (Exception ex)
+            catch
             {
                 _desktopModulePage?.DispatcherQueue.TryEnqueue(() =>
                 {
@@ -65,6 +74,7 @@ public sealed partial class MainWindow
                         _collaborationStatus.Text = "اتصال گروه موقتاً قطع است؛ تلاش مجدد انجام می‌شود.";
                 });
             }
+            finally { System.Threading.Interlocked.Exchange(ref _collaborationPollBusy, 0); }
         }, null, TimeSpan.Zero, TimeSpan.FromSeconds(3));
     }
 
@@ -676,6 +686,7 @@ public sealed partial class MainWindow
                 var schoolMode = new CheckBox { Content = "School Mode", IsChecked = false };
                 var assistantMode = new CheckBox { Content = "دعوت به‌عنوان دستیار مدیر" };
                 _collaborationStatus = new TextBlock { TextWrapping = TextWrapping.Wrap, Opacity = 0.8 };
+                _collaborationDataStatus = new TextBlock { TextWrapping = TextWrapping.Wrap, Opacity = 0.8 };
                 var createGroup = MakeButton("ساخت گروه آنلاین");
                 createGroup.Click += async (_, _) =>
                 {
@@ -835,6 +846,7 @@ public sealed partial class MainWindow
                 collaboration.Children.Add(assistantMode);
                 collaboration.Children.Add(inviteMember);
                 collaboration.Children.Add(_collaborationStatus);
+                collaboration.Children.Add(_collaborationDataStatus);
                 page.Children.Add(Card("همکاری آنلاین و گروه‌ها",
                     "ساخت گروه، دعوت با شناسه واقعی زروان و دریافت تغییرات مشترک. ورود به حساب Zurvan Desk الزامی است.",
                     collaboration));
