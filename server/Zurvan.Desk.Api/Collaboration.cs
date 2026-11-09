@@ -114,6 +114,21 @@ public static class CollaborationApi
             return Results.Ok(result.Value);
         });
 
+        api.MapGet("/groups/{groupId}/reports", (string groupId, HttpContext h,
+            DeskAccountStore a, CollaborationStore s) =>
+            Results.Ok(s.Reports(groupId, CurrentUser(h, a)!.Id)));
+
+        api.MapPost("/groups/{groupId}/reports", async (string groupId, ReportRequest request,
+            HttpContext h, DeskAccountStore a, CollaborationStore s, IHubContext<CollaborationHub> hub) =>
+        {
+            var actor = CurrentUser(h, a)!.Id;
+            var result = s.SubmitReport(groupId, actor, request);
+            // Reports are not broadcast to ordinary members, even as metadata.
+            foreach (var recipient in s.ReportReaders(groupId, actor))
+                await hub.Clients.Group(UserChannel(recipient)).SendAsync("collaborationChanged", result.Change);
+            return Results.Ok(result.Value);
+        });
+
         // Reconciliation endpoint: clients retain a cursor and fetch missed changes on reconnect.
         api.MapGet("/groups/{groupId}/changes", (string groupId, long after,
             HttpContext h, DeskAccountStore a, CollaborationStore s) =>
@@ -157,6 +172,7 @@ public record MemberPermissions(bool CanChat, bool CanReport, bool CanEdit);
 public record ItemRequest(string Title, string Mode, string State, DateTimeOffset? DueAt);
 public record ItemUpdateRequest(string Title, string State, DateTimeOffset? DueAt, int ExpectedVersion);
 public record MessageRequest(string Body);
+public record ReportRequest(string Title, string Body);
 
 public record CollaborationGroup(string Id, string OwnerId, string Name, bool Agenda, bool Kanban,
     bool School, DateTimeOffset CreatedAt);
@@ -166,6 +182,8 @@ public record CollaborationInvite(string Id, string GroupId, string InviterId,
 public record CollaborationItem(string Id, string GroupId, string CreatedBy, string Title,
     string Mode, string State, DateTimeOffset? DueAt, int Version, DateTimeOffset UpdatedAt);
 public record CollaborationMessage(string Id, string GroupId, string SenderId, string Body, DateTimeOffset SentAt);
+public record CollaborationReport(string Id, string GroupId, string AuthorId, string Title,
+    string Body, string Status, DateTimeOffset SubmittedAt);
 public record CollaborationChange(long Sequence, string GroupId, string Kind, string ResourceId,
     string ActorId, DateTimeOffset Timestamp);
 public record CollaborationMutation<T>(T Value, CollaborationChange Change);
@@ -180,6 +198,7 @@ public sealed class CollaborationDatabase
     public List<CollaborationInvite> Invites { get; set; } = [];
     public List<CollaborationItem> Items { get; set; } = [];
     public List<CollaborationMessage> Messages { get; set; } = [];
+    public List<CollaborationReport> Reports { get; set; } = [];
     public List<CollaborationChange> Changes { get; set; } = [];
 }
 
@@ -386,13 +405,44 @@ public sealed class CollaborationStore
             Change(groupId, "message.created", msg.Id, actor));
     });
 
+    public IReadOnlyList<string> ReportReaders(string groupId, string author) => Read(() =>
+    {
+        return _db.Members.Where(m => m.GroupId == groupId &&
+            (m.Role is "owner" or "assistant" || m.UserId == author)).Select(m => m.UserId).ToArray();
+    });
+
+    public IReadOnlyList<CollaborationReport> Reports(string groupId, string actor) => Read(() =>
+    {
+        var member = Member(groupId, actor);
+        return _db.Reports.Where(r => r.GroupId == groupId &&
+            (Manager(member) || r.AuthorId == actor)).ToArray();
+    });
+
+    public CollaborationMutation<CollaborationReport> SubmitReport(string groupId, string actor,
+        ReportRequest request) => Commit(() =>
+    {
+        var member = Member(groupId, actor);
+        if (!member.Permissions.CanReport) throw new UnauthorizedAccessException();
+        if (string.IsNullOrWhiteSpace(request.Title) || request.Title.Length > 160 ||
+            string.IsNullOrWhiteSpace(request.Body) || request.Body.Length > 12000)
+            throw new ArgumentException("Report title or body is invalid.");
+        var report = new CollaborationReport("rpt_" + Guid.NewGuid().ToString("N"),
+            groupId, actor, request.Title.Trim(), request.Body.Trim(), "submitted", DateTimeOffset.UtcNow);
+        _db.Reports.Add(report);
+        return new CollaborationMutation<CollaborationReport>(report,
+            Change(groupId, "report.created", report.Id, actor));
+    });
+
     public CollaborationChangePage Changes(string groupId, string actor, long after) => Read(() =>
     {
-        Member(groupId, actor);
+        var member = Member(groupId, actor);
         var available = _db.Changes.Where(x => x.GroupId == groupId).OrderBy(x => x.Sequence).ToArray();
         var first = available.FirstOrDefault()?.Sequence ?? 0;
-        var events = available.Where(x => x.Sequence > after).Take(100).ToArray();
-        return new CollaborationChangePage(events, events.LastOrDefault()?.Sequence ?? after,
+        var candidates = available.Where(x => x.Sequence > after).Take(100).ToArray();
+        var events = candidates.Where(x => !x.Kind.StartsWith("report.", StringComparison.Ordinal) ||
+            Manager(member) || _db.Reports.Any(r => r.Id == x.ResourceId && r.AuthorId == actor)).ToArray();
+        // Advance the cursor even across confidential events that were filtered out.
+        return new CollaborationChangePage(events, candidates.LastOrDefault()?.Sequence ?? after,
             after > 0 && first > 0 && after < first - 1);
     });
 }
