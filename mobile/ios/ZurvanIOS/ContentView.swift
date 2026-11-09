@@ -478,6 +478,11 @@ private struct ZurvanCloudShellView: View {
 
 private struct MobileSettingsView: View {
     @AppStorage("zurvan.appearance.theme") private var themeID = "windows-light"
+    @AppStorage("zurvan.weather.enabled") private var weatherEnabled = true
+    @AppStorage("zurvan.weather.city") private var weatherCity = "تهران"
+    @AppStorage("zurvan.weather.latitude") private var weatherLatitude = 35.6892
+    @AppStorage("zurvan.weather.longitude") private var weatherLongitude = 51.3890
+    @AppStorage("zurvan.weather.timezone") private var weatherTimeZone = "Asia/Tehran"
     @AppStorage("zurvan.language") private var language = "fa"
     @AppStorage("zurvan.zodiac.theme") private var zodiacTheme = "cosmic"
     private let zodiacStyles: [(String, String, String)] = [
@@ -520,6 +525,31 @@ private struct MobileSettingsView: View {
                     }
                     .pickerStyle(.menu)
                     Text("تم‌های متناظر با ویندوز و اندروید؛ انتخاب در دستگاه ذخیره می‌شود.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
+                .padding()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
+
+                VStack(alignment: .leading, spacing: 9) {
+                    Text("آب‌وهوا در تقویم").font(.headline)
+                    Toggle("نمایش آب‌وهوای امروز، روند دمای ۲۴ ساعت و پیش‌بینی ۷ روزه", isOn: $weatherEnabled)
+                    Picker("شهر آب‌وهوا و اوقات شرعی", selection: $weatherCity) {
+                        Text("تهران").tag("تهران")
+                        Text("زنجان").tag("زنجان")
+                        Text("فرانکفورت").tag("فرانکفورت")
+                        Text("سیاتل").tag("سیاتل")
+                    }
+                    .pickerStyle(.menu)
+                    .onChange(of: weatherCity) { _, city in
+                        switch city {
+                        case "زنجان": weatherLatitude = 36.6736; weatherLongitude = 48.4787; weatherTimeZone = "Asia/Tehran"
+                        case "فرانکفورت": weatherLatitude = 50.1109; weatherLongitude = 8.6821; weatherTimeZone = "Europe/Berlin"
+                        case "سیاتل": weatherLatitude = 47.6062; weatherLongitude = -122.3321; weatherTimeZone = "America/Los_Angeles"
+                        default: weatherLatitude = 35.6892; weatherLongitude = 51.3890; weatherTimeZone = "Asia/Tehran"
+                        }
+                    }
+                    Text("داده‌های هواشناسی: Open-Meteo؛ اوقات شرعی محاسباتی هستند.")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
                 .padding()
