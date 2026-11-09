@@ -74,6 +74,7 @@ final class ZurvanCloudSecureStoreIOS {
     static let secretKey = "arvan_secret_key"
     static let vaultKey = "vault_key"
     static let deskSessionToken = "desk_session_token"
+    static let collaborationQueueKey = "collaboration_queue_key"
 }
 
 enum ZurvanCloudKeychainError: Error {
