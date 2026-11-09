@@ -353,7 +353,7 @@ public sealed partial class MainWindow
                     CornerRadius = new CornerRadius(3),
                     Background = ThemeService.Brush("#00FFFFFF")
                 };
-                Canvas.SetLeft(rail, x); Canvas.SetTop(4);
+                Canvas.SetLeft(rail, x); Canvas.SetTop(rail, 4);
                 canvas.Children.Add(rail);
                 var mark = new Border { Width = 5, Height = 2, Background = color };
                 Canvas.SetLeft(mark, x + 3.5); Canvas.SetTop(mark, 11);
