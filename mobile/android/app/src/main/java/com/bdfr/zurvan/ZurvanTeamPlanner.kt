@@ -322,7 +322,7 @@ fun ZurvanTeamPlanner(
                             .onFailure { error ->
                                 val message=error.message.orEmpty()
                                 val code=(error as? CollaborationApiException)?.statusCode
-                                if(code in listOf(400,403,404,409,422)) status="سرور فرمان را رد کرد: $message"
+                                if(code != null && code in listOf(400,403,404,409,422)) status="سرور فرمان را رد کرد: $message"
                                 else {
                                     runCatching { store.enqueueCommand(remoteGroupId,commandId,"create_item",payload) }
                                         .onSuccess { status="کار در صف آفلاین رمزگذاری‌شده ذخیره شد و پس از اتصال ارسال می‌شود." }
@@ -343,7 +343,7 @@ fun ZurvanTeamPlanner(
                             .onFailure { error ->
                                 val message=error.message.orEmpty()
                                 val code=(error as? CollaborationApiException)?.statusCode
-                                if(code in listOf(400,403,404,409,422)) status="سرور پیام را رد کرد: $message"
+                                if(code != null && code in listOf(400,403,404,409,422)) status="سرور پیام را رد کرد: $message"
                                 else {
                                     runCatching { store.enqueueCommand(remoteGroupId,commandId,"send_message",payload) }
                                         .onSuccess { status="پیام در صف آفلاین رمزگذاری‌شده ذخیره شد و پس از اتصال ارسال می‌شود." }
@@ -583,7 +583,7 @@ fun ZurvanTeamPlanner(
                                     val error=replay.exceptionOrNull()
                                     val message=error?.message.orEmpty()
                                     val code=(error as? CollaborationApiException)?.statusCode
-                                    if(code in listOf(400,403,404,409,422)) {
+                                    if(code != null && code in listOf(400,403,404,409,422)) {
                                         store.blockQueuedCommand(queued.getString("commandId"),message)
                                         remoteSyncStatus="فرمان آفلاین نیازمند بازبینی است: $message"
                                     }
