@@ -9,7 +9,7 @@ using Windows.Security.Credentials;
 namespace BDFR.PersianCalendar.Desktop;
 
 internal sealed record QueuedCollaborationCommand(
-    Guid CommandId, string GroupId, string Kind, JsonElement Payload, DateTimeOffset CreatedAt);
+    Guid CommandId, string GroupId, string Kind, JsonElement Payload, DateTimeOffset CreatedAt, string? BlockedReason = null);
 
 /// <summary>Durable local queue. Commands are replayed with stable IDs; server receipts make retries idempotent.</summary>
 internal sealed class CollaborationOfflineQueue
@@ -45,6 +45,15 @@ internal sealed class CollaborationOfflineQueue
             if (rows.All(x => x.CommandId != row.CommandId)) rows.Add(row);
             Save(rows);
             return row;
+        }
+    }
+
+    internal void Block(Guid commandId, string reason)
+    {
+        lock (Gate)
+        {
+            var rows = ReadAll().Select(x => x.CommandId == commandId ? x with { BlockedReason = reason } : x).ToList();
+            Save(rows);
         }
     }
 
