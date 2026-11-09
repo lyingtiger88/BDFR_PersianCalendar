@@ -45,7 +45,7 @@ struct ContentView: View {
 
             NavigationStack {
                 if licensed {
-                    PlaceholderView(title: "برنامه‌ها")
+                    ZurvanCollaborationView()
                 } else {
                     ZurvanLockedView()
                 }
@@ -370,6 +370,7 @@ private struct ZurvanCloudShellView: View {
                         Button("خروج از حساب") {
                             run {
                                 try await api.logout(token: session.token)
+                                try? ZurvanCloudSecureStoreIOS().remove(ZurvanCloudSecureStoreIOS.deskSessionToken)
                                 self.session = nil
                                 files = []
                                 password = ""
@@ -431,6 +432,7 @@ private struct ZurvanCloudShellView: View {
                                 ? api.register(identifier: identifier, password: password, displayName: displayName)
                                 : api.login(identifier: identifier, password: password))
                             session = result
+                            try ZurvanCloudSecureStoreIOS().set(result.token, for: ZurvanCloudSecureStoreIOS.deskSessionToken)
                             password = ""
                             files = try await api.listFiles(token: result.token)
                         }
