@@ -1,0 +1,25 @@
+services:
+  zurvan-desk-api:
+    build:
+      context: .
+      dockerfile: server/Zurvan.Desk.Api/Dockerfile
+    image: zurvan-desk-api:latest
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      ZURVAN_DESK_ACCOUNT_DATA_ROOT: /var/lib/zurvan-desk
+      ZURVAN_DESK_S3_ENDPOINT: ${ZURVAN_DESK_S3_ENDPOINT:?Set Arvan S3 endpoint}
+      ZURVAN_DESK_S3_REGION: ${ZURVAN_DESK_S3_REGION:?Set Arvan S3 region}
+      ZURVAN_DESK_S3_BUCKET: ${ZURVAN_DESK_S3_BUCKET:?Set private Arvan bucket}
+      ZURVAN_DESK_S3_ACCESS_KEY: ${ZURVAN_DESK_S3_ACCESS_KEY:?Set server-only access key}
+      ZURVAN_DESK_S3_SECRET_KEY: ${ZURVAN_DESK_S3_SECRET_KEY:?Set server-only secret key}
+    ports:
+      - "127.0.0.1:5088:8080"
+    volumes:
+      - zurvan_desk_data:/var/lib/zurvan-desk
+    # Keep exactly one API replica while accounts.json is the metadata store.
+    # Put a TLS reverse proxy in front; do not expose port 5088 publicly.
+
+volumes:
+  zurvan_desk_data:
