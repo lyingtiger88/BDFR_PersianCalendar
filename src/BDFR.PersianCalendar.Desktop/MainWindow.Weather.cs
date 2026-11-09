@@ -107,22 +107,36 @@ public sealed partial class MainWindow
         _weatherDays.Children.Clear();
         try
         {
-            using var geoResponse = await WeatherHttp.GetAsync(
-                "https://geocoding-api.open-meteo.com/v1/search?name=" +
-                Uri.EscapeDataString(city) + "&count=1&language=en&format=json");
-            geoResponse.EnsureSuccessStatusCode();
-            using var geo = JsonDocument.Parse(await geoResponse.Content.ReadAsStringAsync());
-            if (!geo.RootElement.TryGetProperty("results", out var matches) ||
-                matches.GetArrayLength() == 0)
+            string lat, lon, place;
+            // The prayer city already has exact coordinates in the user's settings;
+            // use those for the first weather load instead of relying on Persian-name
+            // transliteration by a third-party geocoder.
+            if (string.IsNullOrWhiteSpace(_settings.WeatherCity) &&
+                string.Equals(city, _settings.PrayerCity, StringComparison.OrdinalIgnoreCase))
             {
-                _weatherNow.Text = "شهر پیدا نشد";
-                _weatherDescription.Text = "نام شهر را به فارسی یا انگلیسی تغییر دهید.";
-                return;
+                lat = _settings.PrayerLatitude.ToString(CultureInfo.InvariantCulture);
+                lon = _settings.PrayerLongitude.ToString(CultureInfo.InvariantCulture);
+                place = city;
             }
-            var chosen = matches[0];
-            var lat = chosen.GetProperty("latitude").GetDouble().ToString(CultureInfo.InvariantCulture);
-            var lon = chosen.GetProperty("longitude").GetDouble().ToString(CultureInfo.InvariantCulture);
-            var place = chosen.GetProperty("name").GetString() ?? city;
+            else
+            {
+                using var geoResponse = await WeatherHttp.GetAsync(
+                    "https://geocoding-api.open-meteo.com/v1/search?name=" +
+                    Uri.EscapeDataString(city) + "&count=1&language=en&format=json");
+                geoResponse.EnsureSuccessStatusCode();
+                using var geo = JsonDocument.Parse(await geoResponse.Content.ReadAsStringAsync());
+                if (!geo.RootElement.TryGetProperty("results", out var matches) ||
+                    matches.GetArrayLength() == 0)
+                {
+                    _weatherNow.Text = "شهر پیدا نشد";
+                    _weatherDescription.Text = "نام شهر را به فارسی یا انگلیسی تغییر دهید.";
+                    return;
+                }
+                var chosen = matches[0];
+                lat = chosen.GetProperty("latitude").GetDouble().ToString(CultureInfo.InvariantCulture);
+                lon = chosen.GetProperty("longitude").GetDouble().ToString(CultureInfo.InvariantCulture);
+                place = chosen.GetProperty("name").GetString() ?? city;
+            }
             using var forecastResponse = await WeatherHttp.GetAsync(
                 "https://api.open-meteo.com/v1/forecast?latitude=" + lat +
                 "&longitude=" + lon +
