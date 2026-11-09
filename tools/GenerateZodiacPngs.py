@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the 84 approved zodiac PNG assets (7 styles × 12 signs) from catalog.json."""
+"""Generate all 108 zodiac PNG assets (9 styles × 12 signs); preserve the 36 approved Cute crops from catalog.json."""
 from pathlib import Path
 import json
 from io import BytesIO
@@ -24,6 +24,21 @@ GLYPHS = {
 def svg_for(sign, style):
     bg, accent, glow = style["bg"], style["accent"], style["glow"]
     stroke = float(style.get("stroke", 3.5))
+    sid = style["id"]
+    if sid == "cosmic":
+        frame = f'<circle cx="50" cy="50" r="47" fill="url(#disc)"/><circle cx="50" cy="50" r="45" fill="none" stroke="{glow}" stroke-width=".7"/><path d="M18 28 Q50 -3 82 28 M18 72 Q50 103 82 72" fill="none" stroke="{glow}" stroke-opacity=".55" stroke-width=".7"/>' + "".join(f'<circle cx="{x}" cy="{y}" r="{r}" fill="{accent}"/>' for x,y,r in [(13,18,1),(26,10,.7),(83,17,1),(90,36,.7),(12,70,.8),(24,89,1),(78,86,.8),(89,68,1)])
+    elif sid == "neon":
+        frame = f'<rect x="4" y="4" width="92" height="92" rx="19" fill="{bg}"/><rect x="9" y="9" width="82" height="82" rx="16" fill="none" stroke="{glow}" stroke-width="2"/><rect x="14" y="14" width="72" height="72" rx="12" fill="none" stroke="{accent}" stroke-width=".6"/><path d="M18 25 H28 M18 25 V35 M82 25 H72 M82 25 V35 M18 75 H28 M18 75 V65 M82 75 H72 M82 75 V65" stroke="{glow}" stroke-width="1.5" fill="none"/>'
+    elif sid == "minimal":
+        frame = f'<rect x="3" y="3" width="94" height="94" rx="2" fill="{bg}"/><circle cx="50" cy="50" r="43" fill="none" stroke="{accent}" stroke-width=".45"/><path d="M50 5 V14 M50 86 V95 M5 50 H14 M86 50 H95" stroke="{accent}" stroke-width=".8"/>'
+    elif sid == "watercolor":
+        frame = f'<rect width="100" height="100" fill="{bg}"/><path d="M9 28 C4 9 36 2 48 17 C65 1 95 18 85 40 C102 57 82 75 91 84 C67 103 49 84 34 94 C10 87 17 69 6 57 C-1 44 4 36 9 28Z" fill="{glow}" opacity=".34"/><path d="M17 19 C39 4 68 15 82 31 C93 51 78 76 61 85 C39 96 15 77 12 56 C8 39 10 28 17 19Z" fill="{accent}" opacity=".2"/><circle cx="50" cy="50" r="44" fill="none" stroke="{accent}" stroke-opacity=".7" stroke-width=".8" stroke-dasharray="2 2"/>'
+    elif sid == "mythic":
+        frame = f'<circle cx="50" cy="50" r="47" fill="url(#disc)" stroke="{accent}" stroke-width="1.2"/><circle cx="50" cy="50" r="39" fill="none" stroke="{accent}" stroke-width=".7" stroke-dasharray="1 2"/><path d="M50 4 L55 13 L50 22 L45 13Z M96 50 L87 55 L78 50 L87 45Z M50 96 L45 87 L50 78 L55 87Z M4 50 L13 45 L22 50 L13 55Z M18 18 L24 20 L20 24Z M82 18 L80 24 L76 20Z M18 82 L20 76 L24 80Z M82 82 L76 80 L80 76Z" fill="{accent}"/>'
+    elif sid == "luxury":
+        frame = f'<rect width="100" height="100" fill="{bg}"/><rect x="5" y="5" width="90" height="90" rx="2" fill="none" stroke="{accent}" stroke-width="1.2"/><rect x="10" y="10" width="80" height="80" fill="none" stroke="{glow}" stroke-width=".6"/><path d="M5 23 Q15 23 15 5 M95 23 Q85 23 85 5 M5 77 Q15 77 15 95 M95 77 Q85 77 85 95" fill="none" stroke="{accent}" stroke-width="1.3"/><path d="M50 6 l3 5 -3 5 -3 -5Z M94 50 l-5 3 -5 -3 5 -3Z M50 94 l-3 -5 3 -5 3 5Z M6 50 l5 -3 5 3 -5 3Z" fill="{accent}"/>'
+    else:
+        frame = f'<circle cx="50" cy="50" r="47" fill="url(#disc)"/>'
     return f"""<svg xmlns="http://www.w3.org/2000/svg" width="{SIZE}" height="{SIZE}" viewBox="0 0 100 100">
       <defs><radialGradient id="disc" cx="35%" cy="28%" r="80%">
         <stop offset="0" stop-color="{glow}" stop-opacity=".42"/>
@@ -32,11 +47,7 @@ def svg_for(sign, style):
       <linearGradient id="line" x1="0" y1="0" x2="1" y2="1">
         <stop offset="0" stop-color="{accent}"/><stop offset=".55" stop-color="{glow}"/><stop offset="1" stop-color="{accent}"/>
       </linearGradient></defs>
-      <circle cx="50" cy="50" r="47" fill="url(#disc)"/>
-      <circle cx="50" cy="50" r="45" fill="none" stroke="{glow}" stroke-opacity=".48" stroke-width=".8"/>
-      <circle cx="50" cy="50" r="41.5" fill="none" stroke="{accent}" stroke-opacity=".52" stroke-width=".45" stroke-dasharray="1.2 2.2"/>
-      <g fill="{accent}" opacity=".9"><circle cx="50" cy="7" r="1.1"/><circle cx="50" cy="93" r="1.1"/>
-        <circle cx="7" cy="50" r="1.1"/><circle cx="93" cy="50" r="1.1"/></g>
+      {frame}
       <path d="{sign["path"]}" fill="none" stroke="{glow}" stroke-opacity=".38" stroke-width="{stroke+2.1}" stroke-linecap="round" stroke-linejoin="round" transform="translate(3 3)"/>
       <path d="{sign["path"]}" fill="none" stroke="url(#line)" stroke-width="{stroke}" stroke-linecap="round" stroke-linejoin="round"/>
     </svg>"""
