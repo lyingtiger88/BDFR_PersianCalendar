@@ -74,6 +74,24 @@ Default presets are editable; explicit denies and scoped grants are evaluated by
   subject, period, body/data, attachments, status, reviewer and review history.
 - Chat send permission and report-submit permission are independent.
 
+## Realtime collaboration and synchronization — mandatory requirement
+All group/workspace changes must be delivered to every currently authorized member online in realtime. This is a core product requirement, not an optional enhancement or a manual refresh feature.
+
+- Use an authenticated realtime transport (SignalR/WebSockets) connected to server-authorized group/workspace channels.
+- Server is authoritative: clients submit commands; the server validates identity, membership, permission and version, commits the change, then broadcasts the committed event.
+- Broadcast events include create/update/archive/delete, assignment changes, due-date changes, Kanban column/order changes, timetable/homework/exam/attendance/grade changes, report lifecycle changes and chat messages.
+- Never broadcast private messages, confidential student records, grades, reports or attachments to an entire group by default. Resolve recipients from the resource scope and each member's current permissions.
+- Re-check membership and permissions when joining channels and before every subscription/broadcast. Revocation must disconnect or exclude the member immediately.
+- Persist an event/outbox record in the same transaction as each successful mutation. Publish only committed outbox events; retry delivery safely and use stable event IDs for deduplication.
+- Each event carries event_id, workspace_id, resource_type, resource_id, operation, actor_id, resource_version and server_timestamp. Clients apply only newer versions.
+- Support online presence and connection state as advisory signals; do not treat presence as proof of delivery or authorization.
+- On disconnect, clients keep a last-seen event cursor. On reconnect, fetch missed events from the durable event log before resuming live delivery.
+- Offline edits are queued as commands/drafts and reconciled against server versions. Detect conflicts explicitly; never silently overwrite another member's change.
+- Delivery semantics: durable at-least-once event publication with client deduplication; UI must distinguish sent, server-accepted, delivered and read where applicable.
+- Chat supports message delivery/read receipts; work updates support realtime state refresh and targeted notifications.
+- Push notifications are a fallback for offline/background devices, not a replacement for realtime synchronization.
+- Use backpressure, bounded payloads, pagination for history, rate limits and per-user/group connection limits.
+
 ## API and security requirements
 - Authenticated API with server-derived user identity; never trust user_id sent by client.
 - Row-level authorization for every read/write; membership revocation takes effect immediately.
