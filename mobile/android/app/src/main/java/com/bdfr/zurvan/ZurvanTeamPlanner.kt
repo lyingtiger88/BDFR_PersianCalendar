@@ -392,13 +392,22 @@ fun ZurvanTeamPlanner(
                     Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(6.dp)) {
                         Text(card.optString("title")+" • "+card.optString("state"),modifier=Modifier.weight(1f))
                         if(currentIndex>=0&&currentIndex<kanbanColumns.lastIndex) TextButton(onClick={
-                            scope.launch { runCatching {
-                                collaborationApi.updatePlanningItem(sessionToken,remoteGroupId,card.getString("id"),
-                                    card.optInt("version",1),card.optString("title"),card.optString("details"),
-                                    card.optString("state","todo"),columnId=kanbanColumns[currentIndex+1].first)
-                                val all=collaborationApi.items(sessionToken,remoteGroupId)
-                                kanbanCards=(0 until all.length()).map{all.getJSONObject(it)}.filter{it.optString("mode")=="kanban"}
-                            }.onFailure { status=it.message ?: "انتقال کارت ناموفق بود." } }
+                            scope.launch {
+                                val commandId=UUID.randomUUID().toString()
+                                val payload=JSONObject().put("itemId",card.optString("id"))
+                                    .put("expectedVersion",card.optInt("version",1)).put("title",card.optString("title"))
+                                    .put("details",card.optString("details")).put("state",card.optString("state","todo"))
+                                    .put("columnId",kanbanColumns[currentIndex+1].first)
+                                    .put("timezone",java.util.TimeZone.getDefault().id)
+                                runCatching { collaborationApi.replayCommand(sessionToken,remoteGroupId,commandId,"update_item",payload) }
+                                    .onSuccess {
+                                        val all=collaborationApi.items(sessionToken,remoteGroupId)
+                                        kanbanCards=(0 until all.length()).map{all.getJSONObject(it)}.filter{it.optString("mode")=="kanban"}
+                                    }.onFailure {
+                                        store.enqueueCommand(remoteGroupId,commandId,"update_item",payload)
+                                        status="انتقال کارت در صف آفلاین ذخیره شد؛ در صورت تعارض نسخه، نیاز به بازبینی دارد."
+                                    }
+                            }
                         }) { Text("انتقال ←") }
                     }
                 }
