@@ -21,6 +21,8 @@ public sealed partial class MainWindow
     private TextBlock? _collaborationDataStatus;
     private int _collaborationPollBusy;
     private readonly CollaborationOfflineQueue _collaborationOfflineQueue = new();
+    private List<string> _schoolSubjectIds = new();
+    private List<string> _schoolHomeworkIds = new();
 
 
     private static void DetachDesktopElement(FrameworkElement element)
@@ -784,6 +786,157 @@ public sealed partial class MainWindow
                 var sharedTaskBox = new TextBox { Header = "عنوان کار مشترک", PlaceholderText = "کار جدید برای همه اعضا" };
                 var sharedTaskMode = new ComboBox { Header = "نوع برنامه", Items = { "Agenda", "Kanban", "School" }, SelectedIndex = 0 };
                 var sharedTaskRecurrence = new ComboBox { Header = "تکرار برنامه (Agenda)", Items = { "بدون تکرار", "روزانه", "روزهای کاری", "هفتگی", "ماهانه" }, SelectedIndex = 0 };
+
+                var schoolWorkspace = new StackPanel { Spacing = 8 };
+                var subjectName = new TextBox { Header = "نام درس", PlaceholderText = "مثلاً ریاضی" };
+                var subjectPicker = new ComboBox { Header = "درس", MinWidth = 260 };
+                var timetableStatus = new TextBlock { TextWrapping = TextWrapping.Wrap };
+                var homeworkTitle = new TextBox { Header = "عنوان تکلیف" };
+                var homeworkInstructions = new TextBox { Header = "شرح تکلیف", AcceptsReturn = true, Height = 76 };
+                var homeworkPicker = new ComboBox { Header = "تکلیف", MinWidth = 260 };
+                var submissionBody = new TextBox { Header = "پاسخ دانش‌آموز", AcceptsReturn = true, Height = 90 };
+                var gradeBox = new NumberBox { Header = "نمره (۰ تا ۱۰۰)", Minimum = 0, Maximum = 100, Value = 0 };
+                var feedbackBox = new TextBox { Header = "بازخورد معلم" };
+                var schoolRefresh = MakeButton("بارگذاری درس‌ها، برنامه هفتگی و تکالیف");
+                schoolRefresh.Click += async (_, _) =>
+                {
+                    try
+                    {
+                        using var subjects = await _deskClient.ReadCollaborationSubjectsAsync(_collaborationGroupId);
+                        var subjectRows = subjects.RootElement.EnumerateArray().ToList();
+                        subjectPicker.ItemsSource = subjectRows.Select(x => x.GetProperty("name").GetString() ?? "").ToArray();
+                        subjectPicker.SelectedIndex = subjectRows.Count > 0 ? 0 : -1;
+                        using var timetable = await _deskClient.ReadCollaborationTimetableAsync(_collaborationGroupId);
+                        using var homework = await _deskClient.ReadCollaborationHomeworkAsync(_collaborationGroupId);
+                        var homeworkRows = homework.RootElement.EnumerateArray().ToList();
+                        homeworkPicker.ItemsSource = homeworkRows.Select(x => x.GetProperty("title").GetString() ?? "").ToArray();
+                        homeworkPicker.SelectedIndex = homeworkRows.Count > 0 ? 0 : -1;
+                        timetableStatus.Text = $"درس: {subjectRows.Count} • جلسه هفتگی: {timetable.RootElement.GetArrayLength()} • تکلیف: {homeworkRows.Count}";
+                        _schoolSubjectIds = subjectRows.Select(x => x.GetProperty("id").GetString() ?? "").ToList();
+                        _schoolHomeworkIds = homeworkRows.Select(x => x.GetProperty("id").GetString() ?? "").ToList();
+                    }
+                    catch (Exception ex) { timetableStatus.Text = ex.Message; }
+                };
+                var addSubject = MakeButton("افزودن درس");
+                addSubject.Click += async (_, _) =>
+                {
+                    try { using var _ = await _deskClient.CreateCollaborationSubjectAsync(_collaborationGroupId, subjectName.Text.Trim()); subjectName.Text = ""; schoolRefresh.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); }
+                    catch (Exception ex) { timetableStatus.Text = ex.Message; }
+                };
+                var addTimetable = MakeButton("ثبت جلسه نمونه برای روز انتخابی (۸ تا ۹)");
+                addTimetable.Click += async (_, _) =>
+                {
+                    try
+                    {
+                        if (subjectPicker.SelectedIndex < 0) throw new InvalidOperationException("ابتدا درس را بارگذاری و انتخاب کنید.");
+                        using var _ = await _deskClient.CreateCollaborationTimetableSlotAsync(
+                            _collaborationGroupId, _schoolSubjectIds[subjectPicker.SelectedIndex], 0, "08:00", "09:00");
+                        schoolRefresh.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                    }
+                    catch (Exception ex) { timetableStatus.Text = ex.Message; }
+                };
+                var addHomework = MakeButton("ثبت تکلیف برای درس انتخابی");
+                addHomework.Click += async (_, _) =>
+                {
+                    try
+                    {
+                        if (subjectPicker.SelectedIndex < 0) throw new InvalidOperationException("ابتدا درس را انتخاب کنید.");
+                        using var _ = await _deskClient.CreateCollaborationHomeworkAsync(
+                            _collaborationGroupId, _schoolSubjectIds[subjectPicker.SelectedIndex],
+                            homeworkTitle.Text.Trim(), homeworkInstructions.Text);
+                        homeworkTitle.Text = ""; homeworkInstructions.Text = "";
+                        schoolRefresh.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                    }
+                    catch (Exception ex) { timetableStatus.Text = ex.Message; }
+                };
+                var submitHomework = MakeButton("ارسال پاسخ تکلیف انتخابی");
+                submitHomework.Click += async (_, _) =>
+                {
+                    try
+                    {
+                        if (homeworkPicker.SelectedIndex < 0) throw new InvalidOperationException("ابتدا تکلیف را انتخاب کنید.");
+                        using var _ = await _deskClient.SubmitHomeworkAsync(
+                            _schoolHomeworkIds[homeworkPicker.SelectedIndex], submissionBody.Text);
+                        timetableStatus.Text = "پاسخ تکلیف ثبت شد.";
+                    }
+                    catch (Exception ex) { timetableStatus.Text = ex.Message; }
+                };
+                var schoolGrade = MakeButton("ثبت نمره و بازخورد پاسخ انتخابی");
+                schoolGrade.Click += async (_, _) =>
+                {
+                    try
+                    {
+                        if (homeworkPicker.SelectedIndex < 0) throw new InvalidOperationException("ابتدا تکلیف را انتخاب کنید.");
+                        using var submissions = await _deskClient.ReadHomeworkSubmissionsAsync(_schoolHomeworkIds[homeworkPicker.SelectedIndex]);
+                        if (submissions.RootElement.GetArrayLength() == 0) throw new InvalidOperationException("هنوز پاسخی ثبت نشده است.");
+                        var first = submissions.RootElement[0];
+                        using var _ = await _deskClient.GradeHomeworkSubmissionAsync(
+                            _schoolHomeworkIds[homeworkPicker.SelectedIndex],
+                            first.GetProperty("id").GetString()!, (decimal)gradeBox.Value, feedbackBox.Text);
+                        timetableStatus.Text = "نمره و بازخورد ثبت شد.";
+                    }
+                    catch (Exception ex) { timetableStatus.Text = ex.Message; }
+                };
+                schoolWorkspace.Children.Add(schoolRefresh);
+                schoolWorkspace.Children.Add(subjectName);
+                schoolWorkspace.Children.Add(addSubject);
+                schoolWorkspace.Children.Add(subjectPicker);
+                schoolWorkspace.Children.Add(addTimetable);
+                schoolWorkspace.Children.Add(homeworkTitle);
+                schoolWorkspace.Children.Add(homeworkInstructions);
+                schoolWorkspace.Children.Add(addHomework);
+                schoolWorkspace.Children.Add(homeworkPicker);
+                schoolWorkspace.Children.Add(submissionBody);
+                schoolWorkspace.Children.Add(submitHomework);
+                schoolWorkspace.Children.Add(gradeBox);
+                schoolWorkspace.Children.Add(feedbackBox);
+                schoolWorkspace.Children.Add(schoolGrade);
+                schoolWorkspace.Children.Add(timetableStatus);
+                var kanbanWorkspace = new StackPanel { Spacing = 6 };
+                var kanbanColumnName = new TextBox { Header = "ستون جدید Kanban", PlaceholderText = "مثلاً در انتظار" };
+                var kanbanColumnPicker = new ComboBox { Header = "ستون‌ها", MinWidth = 260 };
+                var kanbanColumnIds = new List<string>();
+                var kanbanStatus = new TextBlock { TextWrapping = TextWrapping.Wrap };
+                var loadKanban = MakeButton("بارگذاری ستون‌های Kanban");
+                loadKanban.Click += async (_, _) =>
+                {
+                    try
+                    {
+                        using var columns = await _deskClient.ReadKanbanColumnsAsync(_collaborationGroupId);
+                        var rows = columns.RootElement.EnumerateArray().ToList();
+                        kanbanColumnIds = rows.Select(x => x.GetProperty("id").GetString() ?? "").ToList();
+                        kanbanColumnPicker.ItemsSource = rows.Select(x => x.GetProperty("name").GetString() ?? "").ToArray();
+                        kanbanColumnPicker.SelectedIndex = rows.Count > 0 ? 0 : -1;
+                        kanbanStatus.Text = $"{rows.Count} ستون بارگذاری شد.";
+                    }
+                    catch (Exception ex) { kanbanStatus.Text = ex.Message; }
+                };
+                var addKanbanColumn = MakeButton("افزودن ستون");
+                addKanbanColumn.Click += async (_, _) =>
+                {
+                    try { using var _ = await _deskClient.CreateKanbanColumnAsync(_collaborationGroupId, kanbanColumnName.Text.Trim()); kanbanColumnName.Text = ""; loadKanban.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); }
+                    catch (Exception ex) { kanbanStatus.Text = ex.Message; }
+                };
+                var moveKanbanColumn = MakeButton("انتقال ستون انتخابی به انتهای برد");
+                moveKanbanColumn.Click += async (_, _) =>
+                {
+                    try
+                    {
+                        if (kanbanColumnPicker.SelectedIndex < 0) return;
+                        var index = kanbanColumnPicker.SelectedIndex;
+                        var ids = kanbanColumnIds.ToList();
+                        var selected = ids[index]; ids.RemoveAt(index); ids.Add(selected);
+                        using var _ = await _deskClient.ReorderKanbanColumnsAsync(_collaborationGroupId, ids);
+                        loadKanban.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                    }
+                    catch (Exception ex) { kanbanStatus.Text = ex.Message; }
+                };
+                kanbanWorkspace.Children.Add(loadKanban);
+                kanbanWorkspace.Children.Add(kanbanColumnName);
+                kanbanWorkspace.Children.Add(addKanbanColumn);
+                kanbanWorkspace.Children.Add(kanbanColumnPicker);
+                kanbanWorkspace.Children.Add(moveKanbanColumn);
+                kanbanWorkspace.Children.Add(kanbanStatus);
                 var addSharedTask = MakeButton("ثبت کار مشترک");
                 addSharedTask.Click += async (_, _) =>
                 {
@@ -870,6 +1023,8 @@ public sealed partial class MainWindow
                 collaboration.Children.Add(sharedTaskBox);
                 collaboration.Children.Add(sharedTaskMode);
                 collaboration.Children.Add(sharedTaskRecurrence);
+                collaboration.Children.Add(kanbanWorkspace);
+                collaboration.Children.Add(schoolWorkspace);
                 collaboration.Children.Add(addSharedTask);
                 collaboration.Children.Add(sharedMessageBox);
                 collaboration.Children.Add(sendSharedMessage);
