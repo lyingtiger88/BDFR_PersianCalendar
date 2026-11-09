@@ -44,7 +44,8 @@ final class ZurvanWeatherModelIOS: ObservableObject {
             .init(name: "current", value: "temperature_2m,weather_code"),
             .init(name: "hourly", value: "temperature_2m,weather_code"),
             .init(name: "daily", value: "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max"),
-            .init(name: "forecast_days", value: "7"),
+            .init(name: "past_days", value: "7"),
+            .init(name: "forecast_days", value: "8"),
             .init(name: "timezone", value: "auto")
         ]
         guard let url = components.url else { error = "آدرس سرویس آب‌وهوا نامعتبر است."; return }
@@ -64,10 +65,10 @@ final class ZurvanWeatherModelIOS: ObservableObject {
             let cityClock = formatter.string(from: localNow)
             let hourly = (0..<min(root.hourly.time.count, root.hourly.temperature_2m.count,
                                   root.hourly.weather_code.count)).compactMap { index -> ZurvanWeatherHourIOS? in
-                guard root.hourly.time[index] >= cityClock else { return nil }
+                guard root.hourly.time[index] <= cityClock else { return nil }
                 return ZurvanWeatherHourIOS(time: root.hourly.time[index],
                     temperature: root.hourly.temperature_2m[index], code: root.hourly.weather_code[index])
-            }.prefix(24)
+            }.suffix(24)
             var days: [String: ZurvanWeatherDayIOS] = [:]
             let count = min(root.daily.time.count, root.daily.temperature_2m_max.count,
                             root.daily.temperature_2m_min.count, root.daily.weather_code.count,
@@ -128,7 +129,7 @@ struct ZurvanTodayWeatherIOS: View {
             if let snapshot {
                 Text("\(ZurvanWeatherModelIOS.icon(snapshot.code)) \(Int(snapshot.temperature.rounded()))°C")
                     .font(.title2.bold())
-                Text("تغییرات دما در ۲۴ ساعت آینده").font(.caption)
+                Text("دما و وضعیت آسمان در ۲۴ ساعت گذشته").font(.caption)
                     .foregroundStyle(.secondary)
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 6) {
