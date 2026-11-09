@@ -1003,6 +1003,13 @@ public sealed partial class MainWindow : Window
         decoratedMonthTitle.Children.Add(MonthLeftDecoration);
         decoratedMonthTitle.Children.Add(MonthTitle);
         decoratedMonthTitle.Children.Add(MonthRightDecoration);
+        decoratedMonthTitle.Children.Add(new TextBlock
+        {
+            Text = "⌄",
+            FontSize = 15,
+            Foreground = ThemeService.Brush(_theme.SecondaryText),
+            VerticalAlignment = VerticalAlignment.Center
+        });
 
         var monthPicker = new Button
         {
