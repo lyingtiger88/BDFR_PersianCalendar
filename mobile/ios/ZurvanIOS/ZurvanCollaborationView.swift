@@ -8,6 +8,7 @@ private struct ZurvanQueuedCollabCommand: Codable, Identifiable {
     let kind: String
     let payload: Data
     let createdAt: Date
+    var blockedReason: String? = nil
 }
 
 struct ZurvanCollaborationView: View {
@@ -325,6 +326,15 @@ struct ZurvanCollaborationView: View {
             do {
                 try await api.replay(token: token, groupID: groupID, commandID: id, kind: kind, payload: payload)
                 status = "فرمان در سرور ثبت شد."
+            } catch let error as ZurvanCollabAPIError {
+                if case .http(let code, _) = error, code == 400 || code == 403 || code == 409 {
+                    status = "فرمان توسط سرور رد شد و به صف آفلاین منتقل نشد: " + error.localizedDescription
+                    return
+                }
+                guard let data = try? JSONSerialization.data(withJSONObject: payload) else { status = error.localizedDescription; return }
+                queue.append(ZurvanQueuedCollabCommand(id: id, groupID: groupID, kind: kind, payload: data, createdAt: Date()))
+                saveQueue()
+                status = "فرمان در صف آفلاین ذخیره شد و بعداً با شناسه ثابت ارسال می‌شود."
             } catch {
                 guard let data = try? JSONSerialization.data(withJSONObject: payload) else { status = error.localizedDescription; return }
                 queue.append(ZurvanQueuedCollabCommand(id: id, groupID: groupID, kind: kind, payload: data, createdAt: Date()))
@@ -334,11 +344,23 @@ struct ZurvanCollaborationView: View {
         }
     }
     private func flushQueue() async throws {
-        for command in queue.filter({ $0.groupID == groupID }).prefix(20) {
+        for command in queue.filter({ $0.groupID == groupID && $0.blockedReason == nil }).prefix(20) {
             let payload = try JSONSerialization.jsonObject(with: command.payload) as? [String: Any] ?? [:]
-            try await api.replay(token: token, groupID: groupID, commandID: command.id, kind: command.kind, payload: payload)
-            queue.removeAll { $0.id == command.id }
-            saveQueue()
+            do {
+                try await api.replay(token: token, groupID: groupID, commandID: command.id, kind: command.kind, payload: payload)
+                queue.removeAll { $0.id == command.id }
+                saveQueue()
+            } catch let error as ZurvanCollabAPIError {
+                if case .http(let code, let message) = error, code == 409 || code == 400 || code == 403 {
+                    if let index = queue.firstIndex(where: { $0.id == command.id }) {
+                        queue[index].blockedReason = message
+                        saveQueue()
+                    }
+                    status = "فرمان آفلاین به علت تعارض یا مجوز متوقف شد و نیازمند بازبینی است."
+                    break
+                }
+                throw error
+            }
         }
     }
 }
