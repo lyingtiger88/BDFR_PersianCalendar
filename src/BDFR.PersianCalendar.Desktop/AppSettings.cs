@@ -95,6 +95,7 @@ public sealed class AppSettings
     public double WeatherLatitude { get; set; } = 47.6062;
     public double WeatherLongitude { get; set; } = -122.3321;
     public bool WeatherFahrenheit { get; set; } = true;
+    public bool WeatherOnCalendarCards { get; set; } = true;
 
     // Workspace layout / side navigation.
     // These values describe the physical left/right sidebars.
