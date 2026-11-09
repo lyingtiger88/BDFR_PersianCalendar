@@ -12,6 +12,7 @@ private struct ZurvanQueuedCollabCommand: Codable, Identifiable {
 struct ZurvanCollaborationView: View {
     @State private var token = ""
     @State private var groups: [ZurvanCollabGroup] = []
+    @State private var members: [ZurvanCollabMember] = []
     @State private var groupID = ""
     @State private var groupName = ""
     @State private var newGroupName = ""
@@ -59,6 +60,30 @@ struct ZurvanCollaborationView: View {
                 }
             }
             if !groupID.isEmpty {
+                Section("اعضای گروه و مجوزها") {
+                    ForEach($members) { member in
+                        DisclosureGroup(member.wrappedValue.account?.identifier ?? member.wrappedValue.account_id) {
+                            Text("نقش: \(member.wrappedValue.role)").font(.caption).foregroundStyle(.secondary)
+                            Toggle("اجازه گفت‌وگو", isOn: member.can_chat)
+                            Toggle("اجازه ثبت گزارش", isOn: member.can_report)
+                            Toggle("اجازه ویرایش", isOn: member.can_edit)
+                            Button("ذخیره مجوزها") {
+                                let row = member.wrappedValue
+                                run { try await api.setPermissions(token: token, groupID: groupID,
+                                    memberID: row.account_id, canChat: row.can_chat,
+                                    canReport: row.can_report, canEdit: row.can_edit) }
+                            }
+                            if member.wrappedValue.role != "owner" {
+                                Button("حذف عضو", role: .destructive) {
+                                    let row = member.wrappedValue
+                                    run { try await api.removeMember(token: token, groupID: groupID, memberID: row.account_id)
+                                        members.removeAll { $0.account_id == row.account_id } }
+                                }
+                            }
+                        }
+                    }
+                    Button("بارگذاری اعضا") { run { try await loadMembers() } }
+                }
                 Section("Agenda") {
                     TextField("عنوان برنامه", text: $agendaTitle)
                     Picker("تکرار", selection: $recurrenceRule) {
@@ -178,6 +203,7 @@ struct ZurvanCollaborationView: View {
                     if !feed.events.isEmpty {
                         try await loadSchool()
                         try await loadKanban()
+                        try await loadMembers()
                         let items = try await api.items(token: token, groupID: groupID)
                         sharedItems = items.compactMap { $0["title"] as? String }
                         let messages = try await api.messages(token: token, groupID: groupID)
@@ -203,7 +229,11 @@ struct ZurvanCollaborationView: View {
             groups = try await api.groups(token: token)
             if !groups.contains(where: { $0.id == groupID }) { groupID = groups.first?.id ?? "" }
             status = groups.isEmpty ? "هنوز عضو گروهی نیستید." : "گروه‌ها بارگذاری شدند."
+            if !groupID.isEmpty { try? await loadMembers() }
         } catch { status = error.localizedDescription }
+    }
+    private func loadMembers() async throws {
+        members = try await api.groupDetail(token: token, groupID: groupID).members
     }
     private func loadSchool() async throws {
         async let s = api.subjects(token: token, groupID: groupID)
