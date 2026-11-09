@@ -1050,7 +1050,7 @@ public sealed partial class MainWindow
                         var payload = new { title = sharedTaskBox.Text.Trim(), mode, state = "todo",
                             recurrenceRule = mode == "agenda" && sharedTaskRecurrence.SelectedIndex > 0
                                 ? new[] { "", "daily", "weekdays", "weekly", "monthly" }[sharedTaskRecurrence.SelectedIndex] : null,
-                            timezone = "Asia/Tehran" };
+                            timezone = (TimeZoneInfo.TryConvertWindowsIdToIanaId(TimeZoneInfo.Local.Id, out var localZone) ? localZone : "Asia/Tehran") };
                         var commandId = Guid.NewGuid();
                         try
                         {
