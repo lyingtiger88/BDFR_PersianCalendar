@@ -137,6 +137,15 @@ struct ZurvanCollaborationAPI {
         if let recurrenceRule { body["recurrenceRule"] = recurrenceRule }
         _ = try await raw("POST", "groups/\(groupID)/items", token: token, body: body)
     }
+    func updatePlanningItem(token: String, groupID: String, itemID: String, expectedVersion: Int,
+                             title: String, details: String, state: String, columnID: String? = nil,
+                             recurrenceRule: String? = nil, timezone: String = "Asia/Tehran") async throws {
+        var body: [String: Any] = ["expectedVersion": expectedVersion, "title": title,
+            "details": details, "state": state, "timezone": timezone]
+        if let columnID { body["columnId"] = columnID }
+        if let recurrenceRule { body["recurrenceRule"] = recurrenceRule }
+        _ = try await raw("PUT", "groups/\(groupID)/items/\(itemID)", token: token, body: body)
+    }
     func replay(token: String, groupID: String, commandID: String, kind: String, payload: [String: Any]) async throws {
         _ = try await raw("POST", "groups/\(groupID)/commands", token: token,
             body: ["commandId": commandID, "kind": kind, "payload": payload])
