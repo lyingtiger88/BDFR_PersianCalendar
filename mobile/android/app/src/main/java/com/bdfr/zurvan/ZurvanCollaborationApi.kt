@@ -85,6 +85,14 @@ class ZurvanCollaborationApi(private val baseUrl:String = BuildConfig.COLLAB_API
         if(recurrenceUntil!=null)p.put("recurrenceUntil",recurrenceUntil)
         return JSONObject(request(token,"POST","/groups/$groupId/items",p))
     }
+    suspend fun updatePlanningItem(token:String,groupId:String,itemId:String,expectedVersion:Int,title:String,details:String,state:String,
+        dueAt:String?=null,assignedTo:String?=null,columnId:String?=null,startsAt:String?=null,recurrenceRule:String?=null,recurrenceUntil:String?=null,timezone:String="Asia/Tehran"):JSONObject {
+        val p=JSONObject().put("expectedVersion",expectedVersion).put("title",title).put("details",details).put("state",state).put("timezone",timezone)
+        if(dueAt!=null)p.put("dueAt",dueAt);if(assignedTo!=null)p.put("assignedTo",assignedTo)
+        if(columnId!=null)p.put("columnId",columnId);if(startsAt!=null)p.put("startsAt",startsAt)
+        if(recurrenceRule!=null)p.put("recurrenceRule",recurrenceRule);if(recurrenceUntil!=null)p.put("recurrenceUntil",recurrenceUntil)
+        return JSONObject(request(token,"PUT","/groups/$groupId/items/$itemId",p))
+    }
     suspend fun replayCommand(token:String,groupId:String,commandId:String,kind:String,payload:JSONObject):JSONObject=
         JSONObject(request(token,"POST","/groups/$groupId/commands",JSONObject().put("commandId",commandId).put("kind",kind).put("payload",payload)))
     suspend fun items(token:String,groupId:String):JSONArray=JSONArray(request(token,"GET","/groups/$groupId/items"))
