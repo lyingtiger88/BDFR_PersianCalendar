@@ -87,6 +87,15 @@ public sealed class AppSettings
     public string CloudPrefix { get; set; } = "zurvan";
     public string CloudVaultId { get; set; } = "";
 
+    // Weather sidebar: defaults mirror the requested Seattle preview. The user can change city and units.
+    // No GPS permission or automatic location tracking is used.
+    public bool WeatherEnabled { get; set; } = true;
+    public string WeatherCity { get; set; } = "Seattle";
+    public string WeatherCountryCode { get; set; } = "US";
+    public double WeatherLatitude { get; set; } = 47.6062;
+    public double WeatherLongitude { get; set; } = -122.3321;
+    public bool WeatherFahrenheit { get; set; } = true;
+
     // Workspace layout / side navigation.
     // These values describe the physical left/right sidebars.
     public double LeftSidebarWidth { get; set; } = 390.0;
