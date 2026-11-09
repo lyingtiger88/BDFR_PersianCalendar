@@ -9,6 +9,8 @@ internal sealed record WeatherPlace(string Name, string Country, double Latitude
     public string DisplayName => string.IsNullOrWhiteSpace(Country) ? Name : $"{Name}, {Country}";
 }
 
+internal sealed record WeatherHour(DateTime LocalTime, double Temperature, int Code);
+
 internal sealed record WeatherDay(DateOnly Date, int Code, double High, double Low, int PrecipitationChance);
 
 internal sealed record WeatherSnapshot(
@@ -18,7 +20,8 @@ internal sealed record WeatherSnapshot(
     int WeatherCode,
     bool IsDay,
     int PrecipitationChance,
-    IReadOnlyList<WeatherDay> Days);
+    IReadOnlyList<WeatherDay> Days,
+    IReadOnlyList<WeatherHour> Hours);
 
 /// <summary>
 /// Weather data from Open-Meteo, with no external API key and no OS location permission.
@@ -72,7 +75,7 @@ internal sealed class ZurvanWeatherService
         var url = "https://api.open-meteo.com/v1/forecast?latitude=" +
             place.Latitude.ToString("R", CultureInfo.InvariantCulture) +
             "&longitude=" + place.Longitude.ToString("R", CultureInfo.InvariantCulture) +
-            "&current=temperature_2m,weather_code,is_day&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max" +
+            "&current=temperature_2m,weather_code,is_day&hourly=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max" +
             "&forecast_days=7&temperature_unit=" + unit + "&timezone=auto";
 
         using var response = await Client.GetAsync(url);
@@ -100,11 +103,25 @@ internal sealed class ZurvanWeatherService
             days.Add(new WeatherDay(day, codes[i].GetInt32(), highs[i].GetDouble(),
                 lows[i].GetDouble(), rain[i].ValueKind == JsonValueKind.Number ? rain[i].GetInt32() : 0));
         }
+        var hourly = root.GetProperty("hourly");
+        var hourlyTimes = hourly.GetProperty("time");
+        var hourlyTemperatures = hourly.GetProperty("temperature_2m");
+        var hourlyCodes = hourly.GetProperty("weather_code");
+        var hourCount = Math.Min(hourlyTimes.GetArrayLength(),
+            Math.Min(hourlyTemperatures.GetArrayLength(), hourlyCodes.GetArrayLength()));
+        var hours = new List<WeatherHour>();
+        for (var index = 0; index < hourCount; index++)
+        {
+            if (DateTime.TryParseExact(hourlyTimes[index].GetString(), "yyyy-MM-dd'T'HH:mm",
+                CultureInfo.InvariantCulture, DateTimeStyles.None, out var localTime))
+                hours.Add(new WeatherHour(localTime, hourlyTemperatures[index].GetDouble(),
+                    hourlyCodes[index].GetInt32()));
+        }
         var snapshot = new WeatherSnapshot(place, DateTimeOffset.UtcNow,
             current.GetProperty("temperature_2m").GetDouble(),
             current.GetProperty("weather_code").GetInt32(),
             current.GetProperty("is_day").GetInt32() == 1,
-            days[0].PrecipitationChance, days);
+            days[0].PrecipitationChance, days, hours);
         _cached = snapshot;
         _cachedFahrenheit = fahrenheit;
         return snapshot;
