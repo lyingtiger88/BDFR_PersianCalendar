@@ -79,7 +79,7 @@ internal sealed class ZurvanDeskDesktopClient
     internal async Task AcceptCollaborationInvitationAsync(string invitationId)
     {
         using var _ = await SendCollaborationAsync(HttpMethod.Post,
-            $"/invitations/{Uri.EscapeDataString(invitationId)}/accept", new { });
+            $"/invitations/{Uri.EscapeDataString(invitationId)}/accept", new { accept = true });
     }
 
     internal async Task<JsonDocument> CreateCollaborationItemAsync(
