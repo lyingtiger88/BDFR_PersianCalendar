@@ -58,7 +58,7 @@ struct ZurvanPrayerTodayIOS: View {
                     .font(.caption2).foregroundStyle(.secondary)
             } else {
                 HStack(spacing: 3) {
-                    ForEach(times, id: \.0) { item in
+                    ForEach(Array(times.enumerated()), id: \.offset) { _, item in
                         VStack(spacing: 3) {
                             Text(item.0).font(.system(size: 9))
                             Text(item.1).font(.system(size: 10, weight: .semibold))
