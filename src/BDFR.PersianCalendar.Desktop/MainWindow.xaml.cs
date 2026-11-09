@@ -1098,6 +1098,9 @@ public sealed partial class MainWindow : Window
         HijriDateText.FontFamily = new FontFamily("Traditional Arabic");
         stack.Children.Add(HijriDateText);
 
+        // Live five-day forecast in the left information sidebar, above occasions.
+        stack.Children.Add(BuildWeatherCard());
+
         var occasionsTitle = SectionTitle("مناسبت‌ها");
         _occasionsSectionAnchor = occasionsTitle;
         stack.Children.Add(occasionsTitle);
