@@ -10,6 +10,7 @@ namespace BDFR.PersianCalendar.Desktop;
 public sealed partial class MainWindow
 {
     private readonly ZurvanWeatherService _weatherService = new();
+    private FrameworkElement? _weatherCalendarHost;
     private TextBlock? _weatherLocationText;
     private TextBlock? _weatherTemperatureText;
     private TextBlock? _weatherConditionText;
@@ -348,6 +349,48 @@ public sealed partial class MainWindow
                 ZurvanWeatherService.Describe(day.Code).Description +
                 " · احتمال بارش " + day.PrecipitationChance + "%");
         }
+    }
+
+    private async Task ShowDesktopMonthPickerAsync()
+    {
+        if (_desktopCalendarPage?.XamlRoot is null) return;
+        var monthBox = new ComboBox
+        {
+            Header = "ماه شمسی",
+            MinWidth = 235,
+            SelectedIndex = _month - 1
+        };
+        foreach (var monthName in BDFR.PersianCalendar.Core.PersianDate.MonthNames)
+            monthBox.Items.Add(monthName);
+        var yearBox = new NumberBox
+        {
+            Header = "سال شمسی",
+            Value = _year,
+            Minimum = 1,
+            Maximum = 9377,
+            SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Compact,
+            MinWidth = 235
+        };
+        var form = new StackPanel { Spacing = 12 };
+        form.Children.Add(monthBox);
+        form.Children.Add(yearBox);
+        var dialog = new ContentDialog
+        {
+            XamlRoot = _desktopCalendarPage.XamlRoot,
+            Title = "انتخاب ماه و سال",
+            Content = form,
+            PrimaryButtonText = "نمایش ماه",
+            CloseButtonText = "انصراف",
+            DefaultButton = ContentDialogButton.Primary
+        };
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+        if (monthBox.SelectedIndex is < 0 or > 11 || !double.IsFinite(yearBox.Value)) return;
+        var year = (int)yearBox.Value;
+        if (year < 1 || year > 9377) return;
+        _year = year;
+        _month = monthBox.SelectedIndex + 1;
+        BuildCalendar();
+        QueueSeasonCarouselRefreshForDisplayedMonth();
     }
 
     private async Task ShowWeatherOptionsAsync()
