@@ -694,6 +694,8 @@ private fun CalendarScreen(
             }
         }
 
+        ZurvanTimeIllustration(Modifier.fillMaxWidth().height(142.dp))
+
         val prayerContext = LocalContext.current
         val prayerSettings = remember { ZurvanPrayerTimes.settings(prayerContext) }
         val todayPrayers = remember(prayerSettings) {
@@ -2912,6 +2914,9 @@ private fun SettingsScreen(
                 context.getSharedPreferences("zurvan_clock", Context.MODE_PRIVATE)
             }
             var clockMode by remember { mutableStateOf(clockPreferences.getString("mode", "analog") ?: "analog") }
+            var analogNumerals by remember {
+                mutableStateOf(clockPreferences.getString("analog_numerals", "zurvan") ?: "zurvan")
+            }
             var digitalStyle by remember { mutableStateOf(clockPreferences.getString("digital_style", "classic") ?: "classic") }
             var use24Hour by remember { mutableStateOf(clockPreferences.getBoolean("24_hour", true)) }
             var showClockSeconds by remember { mutableStateOf(clockPreferences.getBoolean("show_seconds", true)) }
@@ -2941,6 +2946,30 @@ private fun SettingsScreen(
                         clockMode = "digital"
                         clockPreferences.edit().putString("mode", clockMode).apply()
                     })
+                }
+                ZurvanTimeIllustration(Modifier.fillMaxWidth().height(170.dp))
+                if (clockMode == "analog") {
+                    Text("سبک شمارگان ساعت آنالوگ", fontWeight = FontWeight.SemiBold)
+                    listOf(
+                        "zurvan" to "زروان (ارقام فارسی)",
+                        "khwarazmi" to "خوارزمی (نشانگر تزئینی)",
+                        "pahlavi" to "پهلوی (نشانگر تزئینی)",
+                        "cuneiform" to "میخی (نشانگر تزئینی)",
+                        "roman" to "رومی (I–XII)"
+                    ).forEach { (key, label) ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(selected = analogNumerals == key, onClick = {
+                                analogNumerals = key
+                                clockPreferences.edit().putString("analog_numerals", key).apply()
+                            })
+                            Text(label, modifier = Modifier.clickable {
+                                analogNumerals = key
+                                clockPreferences.edit().putString("analog_numerals", key).apply()
+                            })
+                        }
+                    }
+                    Text("نشانه‌های خوارزمی، پهلوی و میخی فعلاً تزئینی‌اند؛ به‌عنوان شمارگان تاریخی تأییدشده معرفی نمی‌شوند.",
+                        style = MaterialTheme.typography.bodySmall)
                 }
                 if (clockMode == "digital") {
                     Text("طرح ساعت دیجیتال", fontWeight = FontWeight.SemiBold)
