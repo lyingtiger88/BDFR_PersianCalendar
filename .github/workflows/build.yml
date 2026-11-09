@@ -268,31 +268,6 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Generate seven zodiac PNG themes
-        shell: pwsh
-        run: |
-          python -m pip install --disable-pip-version-check pillow
-          if ($LASTEXITCODE -ne 0) { throw "Pillow installation failed." }
-          python -m pip install --disable-pip-version-check cairosvg
-          if ($LASTEXITCODE -ne 0) { Write-Warning "CairoSVG unavailable; portable PNG fallback will be used." }
-          python tools/GenerateZodiacPngs.py
-          if ($LASTEXITCODE -ne 0) { throw "Zodiac PNG generation failed." }
-
-      - name: Commit generated zodiac artwork to repository
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        shell: pwsh
-        run: |
-          git add picture/zodiac/png
-          $changes = git diff --cached --name-only
-          if ($changes) {
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git commit -m "Add generated zodiac PNG artwork"
-            git push origin HEAD:main
-          } else {
-            Write-Host "Zodiac PNG artwork is already up to date in the repository."
-          }
-
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
@@ -325,6 +300,12 @@ jobs:
             -p:AnahitaBuildNumber="${{ github.run_number }}" `
             -p:ZurvanLicensePublicKeyB64="$env:ZURVAN_PUBLIC_KEY_B64" `
             -o artifacts/Zurvan-win-x64
+
+      - name: Verify canonical zodiac PNG package integrity
+        shell: pwsh
+        run: |
+          python tools/VerifyZodiacAssets.py --source picture/zodiac/png --output artifacts/Zurvan-win-x64/picture/zodiac/png
+          if ($LASTEXITCODE -ne 0) { throw "Zodiac PNG package integrity verification failed." }
 
       - name: Package portable test ZIP
         shell: pwsh
