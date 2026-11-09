@@ -279,7 +279,7 @@ fun ZurvanTeamPlanner(
                 Text(remoteSyncStatus,style=MaterialTheme.typography.bodySmall)
                 if(sessionToken.isBlank()) Text("برای استفاده از گروه آنلاین، ورود به حساب Zurvan Desk الزامی است.",color=MaterialTheme.colorScheme.error)
                 LaunchedEffect(remoteGroupId,sessionToken,activeSection) {
-                    if(remoteGroupId.isNotBlank() && sessionToken.isNotBlank() && activeSection==1) {
+                    if(sessionToken.isNotBlank() && activeSection==1) {
                         if(remoteGroupId.isBlank()) {
                             runCatching { collaborationApi.groups(sessionToken) }
                                 .onSuccess { groups -> groups.firstOrNull()?.let { remoteGroupId=it.id;store.set("remote_group_id",it.id);groupName=it.name } }
