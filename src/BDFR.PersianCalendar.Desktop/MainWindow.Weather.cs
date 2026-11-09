@@ -190,12 +190,13 @@ public sealed partial class MainWindow
         _weatherFullForecastButton.Click += async (_, _) => await ShowCompleteWeatherForecastAsync();
         // The seven-day outlook is also attached to each matching calendar day card.
         panel.Children.Add(_weatherFullForecastButton);
-        panel.Children.Add(new TextBlock
+        panel.Children.Add(new HyperlinkButton
         {
-            Text = "Weather: Open-Meteo",
+            Content = "Weather data by Open-Meteo.com",
+            NavigateUri = new Uri("https://open-meteo.com/"),
+            HorizontalAlignment = HorizontalAlignment.Center,
             FontSize = 9,
-            Foreground = WeatherBrush(162, 189, 218),
-            TextAlignment = TextAlignment.Center
+            Foreground = WeatherBrush(162, 189, 218)
         });
 
         // Subtle star-field behind the data, matching the supplied nighttime preview.
