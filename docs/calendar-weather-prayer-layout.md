@@ -17,3 +17,6 @@ The free api.open-meteo.com endpoint is for non-commercial use. The Zurvan proje
 
 ## Build/test gate
 No build was started for this feature change. The source still needs native Windows, Android and iOS compilation, UI visual validation, city/time-zone edge-case checks, 24-hour refresh tests, and verification on narrow screens. Draft PR #24 is intentionally unmerged.
+
+## Build authorization
+On 2026-11-09, the user explicitly requested test builds. PR #24 was labeled `build-approved` and marked ready for review to enable CI compilation. This does **not** authorize a merge or production release. Test APKs and simulator builds remain non-production artifacts.
