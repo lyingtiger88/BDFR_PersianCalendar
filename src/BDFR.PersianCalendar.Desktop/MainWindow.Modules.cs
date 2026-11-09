@@ -832,7 +832,7 @@ public sealed partial class MainWindow
                         if (subjectPicker.SelectedIndex < 0) throw new InvalidOperationException("ابتدا درس را بارگذاری و انتخاب کنید.");
                         using var _ = await _deskClient.CreateCollaborationTimetableSlotAsync(
                             _collaborationGroupId, _schoolSubjectIds[subjectPicker.SelectedIndex], 0, "08:00", "09:00");
-                        schoolRefresh.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                        await RefreshSchoolData();
                     }
                     catch (Exception ex) { timetableStatus.Text = ex.Message; }
                 };
@@ -846,7 +846,7 @@ public sealed partial class MainWindow
                             _collaborationGroupId, _schoolSubjectIds[subjectPicker.SelectedIndex],
                             homeworkTitle.Text.Trim(), homeworkInstructions.Text);
                         homeworkTitle.Text = ""; homeworkInstructions.Text = "";
-                        schoolRefresh.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                        await RefreshSchoolData();
                     }
                     catch (Exception ex) { timetableStatus.Text = ex.Message; }
                 };
