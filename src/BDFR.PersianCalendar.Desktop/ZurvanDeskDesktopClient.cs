@@ -77,6 +77,15 @@ internal sealed class ZurvanDeskDesktopClient
     internal async Task<JsonDocument> ReorderKanbanColumnsAsync(string groupId, IReadOnlyList<string> columnIds)
         => await SendCollaborationAsync(HttpMethod.Put, $"/groups/{Uri.EscapeDataString(groupId)}/kanban/columns/reorder", new { columnIds });
 
+    internal async Task<JsonDocument> UpdatePlanningItemAsync(
+        string groupId, string itemId, int expectedVersion, string title, string details, string state,
+        DateTimeOffset? dueAt = null, string? assignedTo = null, string? columnId = null,
+        DateTimeOffset? startsAt = null, string? recurrenceRule = null,
+        DateTimeOffset? recurrenceUntil = null, string timezone = "Asia/Tehran")
+        => await SendCollaborationAsync(HttpMethod.Put,
+            $"/groups/{Uri.EscapeDataString(groupId)}/items/{Uri.EscapeDataString(itemId)}",
+            new { expectedVersion, title, details, state, dueAt, assignedTo, columnId, startsAt, recurrenceRule, recurrenceUntil, timezone });
+
     internal async Task<JsonDocument> ReplayCollaborationCommandAsync(
         string groupId, Guid commandId, string kind, object payload)
         => await SendCollaborationAsync(HttpMethod.Post, $"/groups/{Uri.EscapeDataString(groupId)}/commands",
