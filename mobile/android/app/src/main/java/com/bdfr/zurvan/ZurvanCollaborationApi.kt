@@ -7,6 +7,8 @@ import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 
+class CollaborationApiException(val statusCode:Int,val apiCode:String) : java.io.IOException(apiCode)
+
 data class CollabGroup(val id:String,val name:String,val agenda:Boolean,val kanban:Boolean,val school:Boolean)
 data class CollabMember(val accountId:String,val identifier:String,val role:String,val canChat:Boolean,val canReport:Boolean,val canEdit:Boolean)
 data class CollabEvent(val sequence:Long,val kind:String,val resourceId:String?)
@@ -30,7 +32,7 @@ class ZurvanCollaborationApi(private val baseUrl:String = BuildConfig.COLLAB_API
             val text=stream?.bufferedReader()?.use{it.readText()}?: ""
             if(code !in 200..299){
                 val message=runCatching{JSONObject(text).optString("error","HTTP $code")}.getOrDefault("HTTP $code")
-                throw IllegalStateException(message)
+                throw CollaborationApiException(code,message)
             }
             text
         }finally{c.disconnect()}
