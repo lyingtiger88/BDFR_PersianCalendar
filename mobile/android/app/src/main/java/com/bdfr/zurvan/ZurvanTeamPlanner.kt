@@ -539,7 +539,6 @@ fun ZurvanTeamPlanner(
                         .onFailure { status=it.message ?: "ثبت نمره ناموفق بود." } }
                 }) { Text("تصحیح اولین پاسخ تکلیف") }
                 Text(remoteSyncStatus,style=MaterialTheme.typography.bodySmall)
-                TextButton(onClick={store.unblockQueuedCommands()}) { Text("تلاش مجدد فرمان‌های متعارض پس از بازبینی") }
                 if(sessionToken.isBlank()) Text("برای استفاده از گروه آنلاین، ورود به حساب Zurvan Desk الزامی است.",color=MaterialTheme.colorScheme.error)
                 LaunchedEffect(remoteGroupId,sessionToken,activeSection) {
                     if(sessionToken.isNotBlank() && activeSection==1) {
