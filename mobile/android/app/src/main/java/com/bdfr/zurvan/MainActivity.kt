@@ -758,7 +758,7 @@ private fun CalendarScreen(
                         val forecast = weatherToday!!
                         Text("${ZurvanWeather.icon(forecast.nowCode)}  ${forecast.nowTemperature.toInt()}°C",
                             color = Color.White, style = MaterialTheme.typography.titleMedium)
-                        Text("تغییرات دما در ۲۴ ساعت آینده", color = Color(0xFFCCDEF2),
+                        Text("دما و وضعیت آسمان در ۲۴ ساعت گذشته", color = Color(0xFFCCDEF2),
                             style = MaterialTheme.typography.labelSmall)
                         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                             horizontalArrangement = Arrangement.spacedBy(5.dp)) {
