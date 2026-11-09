@@ -667,16 +667,58 @@ public sealed partial class MainWindow
             var style = zodiacStyles[index];
             var selected = string.Equals(_settings.ZodiacThemeId, style.Id, StringComparison.OrdinalIgnoreCase) ||
                 (style.Id == "cute_1" && _settings.ZodiacThemeId == "cute");
-            var tileContent = new StackPanel { Spacing = 5, Padding = new Thickness(10), HorizontalAlignment = HorizontalAlignment.Center };
+            var tileContent = new StackPanel { Spacing = 6, Padding = new Thickness(9), HorizontalAlignment = HorizontalAlignment.Center };
+            var previewSurface = new Grid
+            {
+                Width = 126,
+                Height = 126,
+                Background = BrushWithAlpha("#13243A", 0xFF)
+            };
             var previewArt = new Image
             {
-                Width = 82, Height = 82,
+                Width = 116, Height = 116,
                 Stretch = Stretch.Uniform,
-                HorizontalAlignment = HorizontalAlignment.Center
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
             };
-            _ = ZodiacArtwork.PopulateAsync(previewArt, _selected.Month, style.Id);
-            tileContent.Children.Add(previewArt);
-            tileContent.Children.Add(new TextBlock { Text = style.Title, FontSize = 11, TextAlignment = TextAlignment.Center, TextWrapping = TextWrapping.Wrap, Foreground = ThemeService.Brush(_theme.PrimaryText) });
+            previewSurface.Children.Add(previewArt);
+            var imageMissing = new TextBlock
+            {
+                Text = "تصویر اصلی موجود نیست",
+                FontSize = 10,
+                Foreground = BrushWithAlpha("#FFF0F0", 0xFF),
+                TextAlignment = TextAlignment.Center,
+                TextWrapping = TextWrapping.Wrap,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(8),
+                Visibility = Visibility.Collapsed
+            };
+            previewSurface.Children.Add(imageMissing);
+            var previewMonth = _selected.Month;
+            _ = LoadStylePreviewAsync();
+            async Task LoadStylePreviewAsync()
+            {
+                var artwork = await ZodiacArtwork.LoadAsync(previewMonth, style.Id);
+                if (artwork is null)
+                {
+                    previewArt.Visibility = Visibility.Collapsed;
+                    imageMissing.Visibility = Visibility.Visible;
+                }
+                else
+                {
+                    previewArt.Source = artwork;
+                }
+            }
+            tileContent.Children.Add(new Border
+            {
+                CornerRadius = new CornerRadius(8),
+                Child = previewSurface
+            });
+            tileContent.Children.Add(new TextBlock
+            {
+                Text = style.Title, FontSize = 12, TextAlignment = TextAlignment.Center,
+                TextWrapping = TextWrapping.Wrap, Foreground = ThemeService.Brush(_theme.PrimaryText)
+            });
             var tile = new Button
             {
                 Content = new Border
