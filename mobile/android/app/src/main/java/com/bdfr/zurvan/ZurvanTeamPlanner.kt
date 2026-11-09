@@ -1,6 +1,14 @@
 package com.bdfr.zurvan
 
 import android.content.Context
+import android.security.keystore.KeyGenParameterSpec
+import android.security.keystore.KeyProperties
+import android.util.Base64
+import java.security.KeyStore
+import javax.crypto.Cipher
+import javax.crypto.KeyGenerator
+import javax.crypto.SecretKey
+import javax.crypto.spec.GCMParameterSpec
 import android.graphics.BitmapFactory
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -53,15 +61,40 @@ private class TeamStore(private val context: Context) {
         rows.forEach { (id, role) -> a.put(JSONObject().put("id", id).put("role", role)) }
         set("members", a.toString())
     }
+    private fun offlineQueueSecret(): SecretKey {
+        val alias = "zurvan.collaboration.offline.v1"
+        val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+        (store.getKey(alias, null) as? SecretKey)?.let { return it }
+        val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
+        generator.init(KeyGenParameterSpec.Builder(alias,
+            KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
+            .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+            .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+            .setRandomizedEncryptionRequired(true).build())
+        return generator.generateKey()
+    }
+    private fun encryptQueue(value:String):String {
+        val cipher=Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.ENCRYPT_MODE,offlineQueueSecret())
+        val encrypted=cipher.doFinal(value.toByteArray(Charsets.UTF_8))
+        return Base64.encodeToString(cipher.iv+encrypted,Base64.NO_WRAP)
+    }
+    private fun decryptQueue(value:String):String {
+        val raw=Base64.decode(value,Base64.NO_WRAP)
+        require(raw.size>12) { "صف آفلاین رمزگذاری‌شده معتبر نیست." }
+        val cipher=Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.DECRYPT_MODE,offlineQueueSecret(),GCMParameterSpec(128,raw.copyOfRange(0,12)))
+        return String(cipher.doFinal(raw.copyOfRange(12,raw.size)),Charsets.UTF_8)
+    }
     fun enqueueCommand(groupId:String,commandId:String,kind:String,payload:JSONObject) {
-        val rows=JSONArray(get("offline_commands").ifBlank { "[]" })
+        val rows=JSONArray(prefs.getString("offline_commands","")?.takeIf{it.isNotBlank()}?.let(::decryptQueue) ?: "[]")
         if((0 until rows.length()).any { rows.getJSONObject(it).optString("commandId")==commandId }) return
         rows.put(JSONObject().put("groupId",groupId).put("commandId",commandId)
             .put("kind",kind).put("payload",payload).put("createdAt",System.currentTimeMillis()))
-        set("offline_commands",rows.toString())
+        prefs.edit().putString("offline_commands",encryptQueue(rows.toString())).apply()
     }
     fun queuedCommands():List<JSONObject> {
-        val rows=JSONArray(get("offline_commands").ifBlank { "[]" })
+        val rows=JSONArray(prefs.getString("offline_commands","")?.takeIf{it.isNotBlank()}?.let(::decryptQueue) ?: "[]")
         return (0 until rows.length()).map { rows.getJSONObject(it) }
     }
     fun removeQueuedCommand(commandId:String) {
