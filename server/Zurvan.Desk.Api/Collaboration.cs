@@ -46,7 +46,7 @@ public static class CollaborationApi
             if (target is null) return (IResult)Results.NotFound(new ApiError("Zurvan Desk account not found."));
             var result = s.Invite(groupId, actor.Id, target.Id, request.Role ?? "member");
             await Notify(hub, s, result.Change);
-            await hub.Clients.Group(UserChannel(target.Id)).SendAsync("collaborationChanged", result.Change);
+            await SafeSend(hub, target.Id, "collaborationChanged", result.Change);
             return Results.Ok(result.Value);
         });
 
@@ -76,8 +76,7 @@ public static class CollaborationApi
         {
             var result = s.RemoveMember(groupId, CurrentUser(h, a)!.Id, memberId);
             await Notify(hub, s, result.Change);
-            await hub.Clients.Group(UserChannel(memberId)).SendAsync("collaborationAccessRevoked",
-                new { GroupId = groupId });
+            await SafeSend(hub, memberId, "collaborationAccessRevoked", new { GroupId = groupId });
             return Results.NoContent();
         });
 
@@ -125,7 +124,7 @@ public static class CollaborationApi
             var result = s.SubmitReport(groupId, actor, request);
             // Reports are not broadcast to ordinary members, even as metadata.
             foreach (var recipient in s.ReportReaders(groupId, actor))
-                await hub.Clients.Group(UserChannel(recipient)).SendAsync("collaborationChanged", result.Change);
+                await SafeSend(hub, recipient, "collaborationChanged", result.Change);
             return Results.Ok(result.Value);
         });
 
@@ -150,7 +149,23 @@ public static class CollaborationApi
         // Resolve recipients *after* the committed operation. A removed member cannot
         // continue to receive group events through an old SignalR connection.
         foreach (var recipient in s.ActiveMemberIds(change.GroupId))
-            await hub.Clients.Group(UserChannel(recipient)).SendAsync("collaborationChanged", change);
+            await SafeSend(hub, recipient, "collaborationChanged", change);
+    }
+
+    private static async Task SafeSend(IHubContext<CollaborationHub> hub,
+        string userId, string eventName, object payload)
+    {
+        try
+        {
+            await hub.Clients.Group(UserChannel(userId)).SendAsync(eventName, payload);
+        }
+        catch (Exception e)
+        {
+            // A transient socket failure cannot roll back an already committed
+            // mutation or make an otherwise successful write look unsuccessful.
+            // Reconnecting clients reconcile using the persisted change cursor.
+            Console.Error.WriteLine("Zurvan realtime delivery failed: " + e.GetType().Name);
+        }
     }
 }
 
