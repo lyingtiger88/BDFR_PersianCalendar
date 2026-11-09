@@ -2908,6 +2908,72 @@ private fun SettingsScreen(
             }
         }
         if (settingsCategory == "appearance") item {
+            val clockPreferences = remember(context) {
+                context.getSharedPreferences("zurvan_clock", Context.MODE_PRIVATE)
+            }
+            var clockMode by remember { mutableStateOf(clockPreferences.getString("mode", "analog") ?: "analog") }
+            var digitalStyle by remember { mutableStateOf(clockPreferences.getString("digital_style", "classic") ?: "classic") }
+            var use24Hour by remember { mutableStateOf(clockPreferences.getBoolean("24_hour", true)) }
+            var showClockSeconds by remember { mutableStateOf(clockPreferences.getBoolean("show_seconds", true)) }
+            val digitalStyles = listOf(
+                "classic" to "کلاسیک طلایی",
+                "modern" to "مدرن فیروزه‌ای",
+                "dots" to "نقطه‌ای بنفش",
+                "flip" to "فلیپ"
+            )
+            SettingsCard(title = "ساعت زروان") {
+                Text("نوع نمایش ساعت را انتخاب کنید. انتخاب شما ذخیره شده و در ساعت زروان اعمال می‌شود.")
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(selected = clockMode == "analog", onClick = {
+                        clockMode = "analog"
+                        clockPreferences.edit().putString("mode", clockMode).apply()
+                    })
+                    Text("آنالوگ", modifier = Modifier.clickable {
+                        clockMode = "analog"
+                        clockPreferences.edit().putString("mode", clockMode).apply()
+                    })
+                    Spacer(Modifier.width(16.dp))
+                    RadioButton(selected = clockMode == "digital", onClick = {
+                        clockMode = "digital"
+                        clockPreferences.edit().putString("mode", clockMode).apply()
+                    })
+                    Text("دیجیتال", modifier = Modifier.clickable {
+                        clockMode = "digital"
+                        clockPreferences.edit().putString("mode", clockMode).apply()
+                    })
+                }
+                if (clockMode == "digital") {
+                    Text("طرح ساعت دیجیتال", fontWeight = FontWeight.SemiBold)
+                    digitalStyles.forEach { (id, title) ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(selected = digitalStyle == id, onClick = {
+                                digitalStyle = id
+                                clockPreferences.edit().putString("digital_style", id).apply()
+                            })
+                            Text(title, modifier = Modifier.clickable {
+                                digitalStyle = id
+                                clockPreferences.edit().putString("digital_style", id).apply()
+                            })
+                        }
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("قالب ۲۴ ساعته", modifier = Modifier.weight(1f))
+                        Switch(checked = use24Hour, onCheckedChange = {
+                            use24Hour = it
+                            clockPreferences.edit().putBoolean("24_hour", it).apply()
+                        })
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("نمایش ثانیه", modifier = Modifier.weight(1f))
+                        Switch(checked = showClockSeconds, onCheckedChange = {
+                            showClockSeconds = it
+                            clockPreferences.edit().putBoolean("show_seconds", it).apply()
+                        })
+                    }
+                }
+            }
+        }
+        if (settingsCategory == "appearance") item {
             SettingsCard(title = "جهت نمایش تقویم") {
                 val weekRtl = ZurvanThemes.weekRightToLeft.current
                 val setWeekRtl = ZurvanThemes.setWeekRightToLeft.current
