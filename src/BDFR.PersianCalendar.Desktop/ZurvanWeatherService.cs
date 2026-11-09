@@ -77,7 +77,7 @@ internal sealed class ZurvanWeatherService
             place.Latitude.ToString("R", CultureInfo.InvariantCulture) +
             "&longitude=" + place.Longitude.ToString("R", CultureInfo.InvariantCulture) +
             "&current=temperature_2m,weather_code,is_day&hourly=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max" +
-            "&forecast_days=7&temperature_unit=" + unit + "&timezone=auto";
+            "&past_days=7&forecast_days=8&temperature_unit=" + unit + "&timezone=auto";
 
         using var response = await Client.GetAsync(url);
         response.EnsureSuccessStatusCode();
@@ -92,8 +92,8 @@ internal sealed class ZurvanWeatherService
         var lows = daily.GetProperty("temperature_2m_min");
         var rain = daily.GetProperty("precipitation_probability_max");
         var length = new[] { dates.GetArrayLength(), codes.GetArrayLength(), highs.GetArrayLength(),
-            lows.GetArrayLength(), rain.GetArrayLength(), 7 }.Min();
-        if (length < 5) throw new InvalidOperationException("پیش‌بینی پنج‌روزه کامل دریافت نشد.");
+            lows.GetArrayLength(), rain.GetArrayLength(), 15 }.Min();
+        if (length < 8) throw new InvalidOperationException("اطلاعات روزانه کافی دریافت نشد.");
 
         var days = new List<WeatherDay>(length);
         for (var i = 0; i < length; i++)
@@ -122,7 +122,7 @@ internal sealed class ZurvanWeatherService
             current.GetProperty("temperature_2m").GetDouble(),
             current.GetProperty("weather_code").GetInt32(),
             current.GetProperty("is_day").GetInt32() == 1,
-            days[0].PrecipitationChance, days, hours,
+            days.FirstOrDefault(d => d.Date == DateOnly.FromDateTime(DateTime.UtcNow.AddSeconds(root.GetProperty("utc_offset_seconds").GetInt32())))?.PrecipitationChance ?? 0, days, hours,
             DateTime.UtcNow.AddSeconds(root.GetProperty("utc_offset_seconds").GetInt32()));
         _cached = snapshot;
         _cachedFahrenheit = fahrenheit;
