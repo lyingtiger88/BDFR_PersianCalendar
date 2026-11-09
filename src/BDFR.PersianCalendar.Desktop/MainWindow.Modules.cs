@@ -1088,11 +1088,14 @@ public sealed partial class MainWindow
                                 _collaborationGroupId, commandId, "create_item", payload);
                             _collaborationStatus!.Text = "کار مشترک در سرور ثبت شد.";
                         }
-                        catch
+                        catch (Exception ex) when (!ex.Message.Contains("command_denied", StringComparison.OrdinalIgnoreCase) &&
+                            !ex.Message.Contains("command_rejected", StringComparison.OrdinalIgnoreCase) &&
+                            !ex.Message.Contains("version_conflict", StringComparison.OrdinalIgnoreCase))
                         {
                             _collaborationOfflineQueue.Enqueue(_collaborationGroupId, "create_item", payload, commandId);
                             _collaborationStatus!.Text = "ارتباط قطع است؛ کار در صف آفلاین ذخیره و با همین شناسه پس از اتصال ارسال می‌شود.";
                         }
+                        catch (Exception ex) { _collaborationStatus!.Text = "فرمان توسط سرور رد شد: " + ex.Message; }
                         sharedTaskBox.Text = "";
                     }
                     catch (Exception ex) { _collaborationStatus!.Text = ex.Message; }
@@ -1114,11 +1117,14 @@ public sealed partial class MainWindow
                                 _collaborationGroupId, commandId, "send_message", payload);
                             _collaborationStatus!.Text = "پیام برای گروه ارسال شد.";
                         }
-                        catch
+                        catch (Exception ex) when (!ex.Message.Contains("command_denied", StringComparison.OrdinalIgnoreCase) &&
+                            !ex.Message.Contains("command_rejected", StringComparison.OrdinalIgnoreCase) &&
+                            !ex.Message.Contains("version_conflict", StringComparison.OrdinalIgnoreCase))
                         {
                             _collaborationOfflineQueue.Enqueue(_collaborationGroupId, "send_message", payload, commandId);
                             _collaborationStatus!.Text = "پیام در صف آفلاین ذخیره شد و پس از اتصال ارسال می‌شود.";
                         }
+                        catch (Exception ex) { _collaborationStatus!.Text = "پیام توسط سرور رد شد: " + ex.Message; }
                         sharedMessageBox.Text = "";
                     }
                     catch (Exception ex) { _collaborationStatus!.Text = ex.Message; }
