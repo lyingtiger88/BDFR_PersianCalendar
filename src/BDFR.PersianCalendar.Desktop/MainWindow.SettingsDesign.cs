@@ -902,6 +902,43 @@ public sealed partial class MainWindow
             "تنظیمات کامل", OpenLegacySettings, "\uE787");
         AddSettingsAction(contents, "مناسبت‌ها", "نمایش مناسبت‌های ثبت‌شده و رسمی",
             "بازکردن مناسبت‌ها", () => ShowDesktopModule("مناسبت‌ها"), "\uE787");
+
+        var clockGroup = SettingsGroup("ساعت زروان", "تنظیم نمایش ساعت در گوشه بالای سمت راست سربرگ تقویم", "\uE823", "#FFB88942");
+        var clockMode = new ComboBox { HorizontalAlignment = HorizontalAlignment.Stretch };
+        clockMode.Items.Add(new ComboBoxItem { Content = "ساعت آنالوگ", Tag = "analog" });
+        clockMode.Items.Add(new ComboBoxItem { Content = "ساعت دیجیتال", Tag = "digital" });
+        clockMode.SelectedIndex = _settings.CalendarClockMode == "digital" ? 1 : 0;
+        clockMode.SelectionChanged += (_, _) =>
+        {
+            if (clockMode.SelectedItem is ComboBoxItem item && item.Tag is string mode)
+            {
+                _settings.CalendarClockMode = mode;
+                _settingsService.Save(_settings);
+                ApplyClockMode();
+            }
+        };
+        clockGroup.Children.Add(SettingsOptionRow("نوع نمایش ساعت", "انتخاب ساعت عقربه‌ای یا دیجیتال", clockMode, "\uE823"));
+        AddSettingsSeparator(clockGroup);
+
+        var numeralStyle = new ComboBox { HorizontalAlignment = HorizontalAlignment.Stretch };
+        numeralStyle.Items.Add(new ComboBoxItem { Content = "خوارزمی", Tag = "khwarazmi" });
+        numeralStyle.Items.Add(new ComboBoxItem { Content = "پهلوی", Tag = "pahlavi" });
+        numeralStyle.Items.Add(new ComboBoxItem { Content = "میخی", Tag = "cuneiform" });
+        numeralStyle.Items.Add(new ComboBoxItem { Content = "رومی", Tag = "roman" });
+        var numeralStyles = new[] { "khwarazmi", "pahlavi", "cuneiform", "roman" };
+        numeralStyle.SelectedIndex = Math.Max(0, Array.IndexOf(numeralStyles, _settings.CalendarClockNumeralStyle));
+        numeralStyle.SelectionChanged += (_, _) =>
+        {
+            if (numeralStyle.SelectedItem is ComboBoxItem item && item.Tag is string style)
+            {
+                _settings.CalendarClockNumeralStyle = style;
+                _settingsService.Save(_settings);
+                AddClockNumerals();
+                UpdateZurvanClock();
+            }
+        };
+        clockGroup.Children.Add(SettingsOptionRow("سبک شمارگان", "خوارزمی، پهلوی، میخی یا رومی", numeralStyle, "\uE8D2"));
+        contents.Children.Add(SettingsCard(clockGroup));
         _settingsContent!.Children.Add(SettingsCard(contents));
     }
 
