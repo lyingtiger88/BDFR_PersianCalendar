@@ -8,6 +8,21 @@ struct ZurvanCollabGroup: Decodable, Identifiable {
     let school_enabled: Bool
 }
 
+struct ZurvanCollabMember: Decodable, Identifiable {
+    struct Account: Decodable { let identifier: String? }
+    let account_id: String
+    let role: String
+    let account: Account?
+    var can_chat: Bool
+    var can_report: Bool
+    var can_edit: Bool
+    var id: String { account_id }
+}
+struct ZurvanCollabGroupDetail: Decodable {
+    let group: ZurvanCollabGroup
+    let members: [ZurvanCollabMember]
+}
+
 struct ZurvanCollabSubject: Decodable, Identifiable {
     let id: String
     let name: String
@@ -85,6 +100,17 @@ struct ZurvanCollaborationAPI {
     func createGroup(token: String, name: String, agenda: Bool, kanban: Bool, school: Bool) async throws -> ZurvanCollabGroup {
         try await request("POST", "groups", token: token,
             body: ["name": name, "agenda": agenda, "kanban": kanban, "school": school], as: ZurvanCollabGroup.self)
+    }
+    func groupDetail(token: String, groupID: String) async throws -> ZurvanCollabGroupDetail {
+        try await request("GET", "groups/\(groupID)", token: token, as: ZurvanCollabGroupDetail.self)
+    }
+    func setPermissions(token: String, groupID: String, memberID: String,
+                        canChat: Bool, canReport: Bool, canEdit: Bool) async throws {
+        _ = try await raw("PUT", "groups/\(groupID)/members/\(memberID)/permissions", token: token,
+            body: ["canChat": canChat, "canReport": canReport, "canEdit": canEdit])
+    }
+    func removeMember(token: String, groupID: String, memberID: String) async throws {
+        _ = try await raw("DELETE", "groups/\(groupID)/members/\(memberID)", token: token)
     }
     func subjects(token: String, groupID: String) async throws -> [ZurvanCollabSubject] {
         try await request("GET", "groups/\(groupID)/subjects", token: token, as: [ZurvanCollabSubject].self)
