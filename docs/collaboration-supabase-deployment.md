@@ -114,3 +114,48 @@ given deployment. The free Supabase path is currently preferred.
 - End-to-end authorization/revocation tests on real accounts and devices.
 - Confirm free tier limits and accept potential pauses/quotas.
 - No GitHub Actions build, production publish or live migration until authorized.
+
+## Implementation update — 2026-11-09
+
+The migration has now been applied to the existing project
+`yztithydgdvydaktuxlw`. The collaboration Edge Function
+`zurvan-collaboration` is deployed and active (version 4).
+It validates the existing opaque Desk session against
+`zurvan_desk_sessions` and resolves the account through
+`zurvan_desk_accounts`; it does not require a separate Supabase Auth login.
+The Edge Function source is tracked at
+`supabase/functions/zurvan-collaboration/index.ts`.
+
+Implemented authenticated routes include:
+- group create/list/detail
+- invitations by verified Desk identifier and explicit acceptance
+- member permission changes and member removal
+- shared Agenda/Kanban/School generic items
+- group chat and permission-gated private reports
+- event cursor endpoint for reconnect/reconciliation
+
+Windows and Android now have API clients and initial UI for online group
+creation, invitations, shared task creation, chat, and polling. Both clients
+poll the event cursor every three seconds while the collaboration screen is
+open and refresh shared items/messages after new events. This is **near-live
+polling**, not a persistent WebSocket or push channel. Android also has
+invitation acceptance; Windows can accept an invitation from its invitation
+prompt.
+
+Database smoke checks ran inside a rolled-back transaction: owner membership
+trigger, adding a second member, item insert, message insert and event triggers
+all passed. No test accounts or business data were retained. The current
+Desk accounts table has zero rows, so end-to-end API testing with two real
+accounts has not yet been possible.
+
+Security advisors still report informational "RLS enabled, no policies" on
+collaboration tables. This is intentional: direct anon/authenticated table
+access is revoked and the service-role Edge Function is the sole access path.
+The exposed security-definer trigger functions have had EXECUTE revoked from
+public/anon/authenticated. Existing unrelated project findings (including
+leaked-password protection configuration) are outside this migration.
+
+Not yet complete: direct WebSocket subscription, offline write queue,
+push notifications, full timetable/homework APIs and UI, granular audit UI,
+real two-account end-to-end test, and cross-platform iOS client.
+Do not represent these items as finished.
