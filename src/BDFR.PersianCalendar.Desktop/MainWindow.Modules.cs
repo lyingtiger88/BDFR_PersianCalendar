@@ -1,5 +1,7 @@
 using System.Text.Json;
 using System.Diagnostics;
+using System.Net;
+using System.Net.Http;
 using BDFR.PersianCalendar.Core;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -20,6 +22,96 @@ public sealed partial class MainWindow
     private TextBlock? _collaborationStatus;
     private TextBlock? _collaborationDataStatus;
     private int _collaborationPollBusy;
+    private readonly CollaborationOfflineQueue _collaborationOfflineQueue = new();
+
+    private async Task<bool> SendOrQueueCollaborationCommandAsync(string kind, object payload)
+    {
+        if (string.IsNullOrWhiteSpace(_collaborationGroupId) || !_deskClient.IsAuthenticated)
+        {
+            if (_collaborationStatus is not null) _collaborationStatus.Text = "ابتدا وارد حساب شوید و به گروه متصل شوید.";
+            return false;
+        }
+
+        var commandId = Guid.NewGuid();
+        try
+        {
+            using var result = await _deskClient.ReplayCollaborationCommandAsync(
+                _collaborationGroupId, commandId, kind, JsonSerializer.SerializeToElement(payload));
+            if (_collaborationStatus is not null) _collaborationStatus.Text = "فرمان با موفقیت در گروه ثبت شد.";
+            return true;
+        }
+        catch (HttpRequestException ex)
+        {
+            var status = ex.StatusCode;
+            var retryable = status is null || status == HttpStatusCode.TooManyRequests ||
+                (int)status.Value >= 500;
+            if (!retryable)
+            {
+                if (_collaborationStatus is not null) _collaborationStatus.Text = ex.Message;
+                return false;
+            }
+
+            try
+            {
+                _collaborationOfflineQueue.Enqueue(_collaborationGroupId, kind, payload, commandId);
+                if (_collaborationStatus is not null)
+                    _collaborationStatus.Text = "ارتباط برقرار نیست؛ فرمان با شناسه ثابت در صف آفلاین رمزگذاری‌شده ذخیره شد.";
+                return true;
+            }
+            catch (Exception queueError)
+            {
+                if (_collaborationStatus is not null)
+                    _collaborationStatus.Text = "ذخیره امن فرمان آفلاین ناموفق بود: " + queueError.Message;
+                return false;
+            }
+        }
+        catch (TaskCanceledException)
+        {
+            try
+            {
+                _collaborationOfflineQueue.Enqueue(_collaborationGroupId, kind, payload, commandId);
+                if (_collaborationStatus is not null)
+                    _collaborationStatus.Text = "مهلت ارتباط پایان یافت؛ فرمان در صف آفلاین رمزگذاری‌شده ذخیره شد.";
+                return true;
+            }
+            catch (Exception queueError)
+            {
+                if (_collaborationStatus is not null)
+                    _collaborationStatus.Text = "ذخیره امن فرمان آفلاین ناموفق بود: " + queueError.Message;
+                return false;
+            }
+        }
+    }
+
+    private async Task<int> FlushCollaborationOfflineQueueAsync()
+    {
+        if (!_deskClient.IsAuthenticated || string.IsNullOrWhiteSpace(_collaborationGroupId)) return 0;
+        var sent = 0;
+        foreach (var command in _collaborationOfflineQueue.ReadAll()
+            .Where(x => x.GroupId == _collaborationGroupId && x.BlockedReason is null)
+            .OrderBy(x => x.CreatedAt).Take(20))
+        {
+            try
+            {
+                using var result = await _deskClient.ReplayCollaborationCommandAsync(
+                    command.GroupId, command.CommandId, command.Kind, command.Payload);
+                _collaborationOfflineQueue.Remove(command.CommandId);
+                sent++;
+            }
+            catch (HttpRequestException ex) when (ex.StatusCode is HttpStatusCode.BadRequest
+                or HttpStatusCode.Forbidden or HttpStatusCode.NotFound
+                or HttpStatusCode.Conflict or HttpStatusCode.UnprocessableEntity)
+            {
+                _collaborationOfflineQueue.Block(command.CommandId, ex.Message);
+            }
+            catch
+            {
+                // Transient network/auth/rate-limit failures remain queued for a later poll.
+                break;
+            }
+        }
+        return sent;
+    }
 
 
     private static void DetachDesktopElement(FrameworkElement element)
@@ -45,6 +137,9 @@ public sealed partial class MainWindow
             if (System.Threading.Interlocked.Exchange(ref _collaborationPollBusy, 1) != 0) return;
             try
             {
+                var replayed = await FlushCollaborationOfflineQueueAsync();
+                var pending = _collaborationOfflineQueue.ReadAll()
+                    .Count(x => x.GroupId == _collaborationGroupId);
                 using var result = await _deskClient.ReadCollaborationChangesAsync(
                     _collaborationGroupId, _collaborationCursor);
                 var root = result.RootElement;
@@ -63,7 +158,8 @@ public sealed partial class MainWindow
                             ? $"همگام‌سازی آنلاین فعال • {count} تغییر جدید دریافت شد."
                             : "همگام‌سازی آنلاین فعال • آخرین وضعیت به‌روز است.";
                     if (_collaborationDataStatus is not null)
-                        _collaborationDataStatus.Text = $"داده مشترک: {itemCount} کار/برنامه • {messageCount} پیام";
+                        _collaborationDataStatus.Text = $"داده مشترک: {itemCount} کار/برنامه • {messageCount} پیام • {pending} فرمان در صف آفلاین" +
+                            (replayed > 0 ? $" • {replayed} فرمان ارسال شد" : "");
                 });
             }
             catch
@@ -781,9 +877,9 @@ public sealed partial class MainWindow
                     try
                     {
                         var mode = sharedTaskMode.SelectedIndex switch { 1 => "kanban", 2 => "school", _ => "agenda" };
-                        using var item = await _deskClient.CreateCollaborationItemAsync(_collaborationGroupId, sharedTaskBox.Text.Trim(), mode);
-                        sharedTaskBox.Text = "";
-                        _collaborationStatus!.Text = "کار مشترک در سرور ثبت شد.";
+                        var accepted = await SendOrQueueCollaborationCommandAsync("create_item",
+                            new { title = sharedTaskBox.Text.Trim(), mode, state = "todo" });
+                        if (accepted) sharedTaskBox.Text = "";
                     }
                     catch (Exception ex) { _collaborationStatus!.Text = ex.Message; }
                 };
@@ -796,9 +892,9 @@ public sealed partial class MainWindow
                     { _collaborationStatus!.Text = "به گروه متصل شوید و متن پیام را وارد کنید."; return; }
                     try
                     {
-                        using var message = await _deskClient.SendCollaborationMessageAsync(_collaborationGroupId, sharedMessageBox.Text.Trim());
-                        sharedMessageBox.Text = "";
-                        _collaborationStatus!.Text = "پیام برای گروه ارسال شد.";
+                        var accepted = await SendOrQueueCollaborationCommandAsync("send_message",
+                            new { body = sharedMessageBox.Text.Trim() });
+                        if (accepted) sharedMessageBox.Text = "";
                     }
                     catch (Exception ex) { _collaborationStatus!.Text = ex.Message; }
                 };
