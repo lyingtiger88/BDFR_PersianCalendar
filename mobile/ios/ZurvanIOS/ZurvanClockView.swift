@@ -39,6 +39,7 @@ struct ZurvanClockViewIOS: View {
         case "flip": .white
         default: Color(red: 0.96, green: 0.81, blue: 0.49)
         }
+        let characters = Array(formatter.string(from: date))
         let background: Color = switch digitalStyle {
         case "modern": Color(red: 0.04, green: 0.16, blue: 0.22)
         case "dots": Color(red: 0.15, green: 0.11, blue: 0.23)
@@ -48,7 +49,8 @@ struct ZurvanClockViewIOS: View {
         return Group {
             if digitalStyle == "flip" {
                 HStack(spacing: 2) {
-                    ForEach(Array(formatter.string(from: date).enumerated()), id: \.offset) { _, character in
+                    ForEach(characters.indices, id: \.self) { index in
+                        let character = characters[index]
                         Text(String(character))
                             .font(.system(size: showSeconds ? 19 : 25, weight: .bold, design: .monospaced))
                             .foregroundStyle(.white)
