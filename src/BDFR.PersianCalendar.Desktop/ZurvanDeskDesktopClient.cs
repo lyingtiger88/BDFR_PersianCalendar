@@ -73,6 +73,25 @@ internal sealed class ZurvanDeskDesktopClient
 
     internal async Task<JsonDocument> ReadCollaborationMessagesAsync(string groupId)
         => await SendCollaborationAsync(HttpMethod.Get, $"/groups/{Uri.EscapeDataString(groupId)}/messages");
+    internal async Task<JsonDocument> ReadCollaborationInvitationsAsync()
+        => await SendCollaborationAsync(HttpMethod.Get, "/invitations");
+
+    internal async Task AcceptCollaborationInvitationAsync(string invitationId)
+    {
+        using var _ = await SendCollaborationAsync(HttpMethod.Post,
+            $"/invitations/{Uri.EscapeDataString(invitationId)}/accept", new { });
+    }
+
+    internal async Task<JsonDocument> CreateCollaborationItemAsync(
+        string groupId, string title, string mode = "agenda")
+        => await SendCollaborationAsync(HttpMethod.Post,
+            $"/groups/{Uri.EscapeDataString(groupId)}/items",
+            new { title, mode, state = "todo" });
+
+    internal async Task<JsonDocument> SendCollaborationMessageAsync(string groupId, string body)
+        => await SendCollaborationAsync(HttpMethod.Post,
+            $"/groups/{Uri.EscapeDataString(groupId)}/messages", new { body });
+
 
 
     private PasswordCredential? ReadSessionCredential()
