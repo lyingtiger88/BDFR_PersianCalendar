@@ -17,6 +17,8 @@ public sealed partial class MainWindow
     private TextBlock? _weatherSymbolText;
     private TextBlock? _weatherStatusText;
     private Grid? _weatherForecastGrid;
+    private StackPanel? _weatherHourlyStrip;
+    private readonly Dictionary<DateOnly, TextBlock> _weatherDayBadges = new();
     private Button? _weatherFullForecastButton;
     private Microsoft.UI.Dispatching.DispatcherQueueTimer? _weatherRefreshTimer;
     private WeatherSnapshot? _weatherSnapshot;
@@ -146,7 +148,22 @@ public sealed partial class MainWindow
         _weatherForecastGrid = new Grid { ColumnSpacing = 4, FlowDirection = FlowDirection.LeftToRight };
         for (var i = 0; i < 5; i++)
             _weatherForecastGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        panel.Children.Add(_weatherForecastGrid);
+        _weatherHourlyStrip = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4 };
+        panel.Children.Add(new TextBlock
+        {
+            Text = "روند دمای ۲۴ ساعت آینده",
+            TextAlignment = TextAlignment.Right,
+            FontSize = 11,
+            Foreground = WeatherBrush(222, 233, 252)
+        });
+        panel.Children.Add(new ScrollViewer
+        {
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollMode = ScrollMode.Enabled,
+            VerticalScrollMode = ScrollMode.Disabled,
+            Content = _weatherHourlyStrip,
+            MaxHeight = 98
+        });
 
         _weatherStatusText = new TextBlock
         {
@@ -170,6 +187,7 @@ public sealed partial class MainWindow
             IsEnabled = false
         };
         _weatherFullForecastButton.Click += async (_, _) => await ShowCompleteWeatherForecastAsync();
+        // The seven-day outlook is also attached to each matching calendar day card.
         panel.Children.Add(_weatherFullForecastButton);
         panel.Children.Add(new TextBlock
         {
@@ -247,6 +265,7 @@ public sealed partial class MainWindow
             if (_weatherRainText is not null)
                 _weatherRainText.Text = $"💧 {snapshot.PrecipitationChance}%";
             RenderWeatherForecast(snapshot);
+            RenderWeatherDayBadges();
             if (_weatherFullForecastButton is not null) _weatherFullForecastButton.IsEnabled = true;
             if (_weatherStatusText is not null)
                 _weatherStatusText.Text = $"به‌روزرسانی: {DateTime.Now:HH:mm} · {(_settings.WeatherFahrenheit ? "°F" : "°C")}";
@@ -272,51 +291,62 @@ public sealed partial class MainWindow
 
     private void RenderWeatherForecast(WeatherSnapshot snapshot)
     {
-        if (_weatherForecastGrid is null) return;
-        _weatherForecastGrid.Children.Clear();
-        for (var index = 0; index < Math.Min(5, snapshot.Days.Count); index++)
+        if (_weatherHourlyStrip is null) return;
+        _weatherHourlyStrip.Children.Clear();
+        var now = DateTime.Now;
+        // The weather service returns wall-clock times for the selected forecast city.
+        // Display its next 24 forecast observations, without claiming local GPS data.
+        var hours = snapshot.Hours.Where(h => h.LocalTime >= now.AddHours(-1))
+            .Take(24).ToList();
+        if (hours.Count == 0) hours = snapshot.Hours.Take(24).ToList();
+        foreach (var hour in hours)
         {
-            var day = snapshot.Days[index];
-            var details = ZurvanWeatherService.Describe(day.Code);
+            var temperature = Math.Round(hour.Temperature).ToString("0") + "°";
             var tile = new StackPanel
             {
-                Spacing = 5,
-                Padding = new Thickness(2, 8, 2, 7),
-                HorizontalAlignment = HorizontalAlignment.Stretch
+                Width = 46,
+                Spacing = 3,
+                Padding = new Thickness(3, 5, 3, 5),
+                Background = WeatherBrush(255, 255, 255, 15)
             };
-            var dayLabel = index == 0 ? "امروز" :
-                day.Date.ToDateTime(TimeOnly.MinValue).ToString("ddd", new System.Globalization.CultureInfo("fa-IR"));
             tile.Children.Add(new TextBlock
             {
-                Text = dayLabel, FontSize = 10, TextAlignment = TextAlignment.Center,
-                Foreground = WeatherBrush(235, 242, 251), TextTrimming = TextTrimming.CharacterEllipsis,
-                MaxLines = 1
+                Text = hour.LocalTime.ToString("HH:mm"),
+                FontSize = 9, Foreground = WeatherBrush(196, 215, 238),
+                TextAlignment = TextAlignment.Center
             });
             tile.Children.Add(new TextBlock
             {
-                Text = details.Icon, FontSize = 22, TextAlignment = TextAlignment.Center,
-                Foreground = WeatherBrush(246, 251, 255)
+                Text = ZurvanWeatherService.Describe(hour.Code).Icon,
+                FontSize = 17, TextAlignment = TextAlignment.Center
             });
             tile.Children.Add(new TextBlock
             {
-                Text = Math.Round(day.High).ToString("0") + "°",
-                FontSize = 12, FontWeight = FontWeights.SemiBold,
-                Foreground = WeatherBrush(251, 252, 255), TextAlignment = TextAlignment.Center
+                Text = temperature, FontSize = 11,
+                FontWeight = FontWeights.SemiBold,
+                TextAlignment = TextAlignment.Center,
+                Foreground = WeatherBrush(255, 255, 255)
             });
-            tile.Children.Add(new TextBlock
-            {
-                Text = Math.Round(day.Low).ToString("0") + "°",
-                FontSize = 10,
-                Foreground = WeatherBrush(177, 199, 230), TextAlignment = TextAlignment.Center
-            });
-            var border = new Border
-            {
-                CornerRadius = new CornerRadius(7),
-                Background = WeatherBrush(99, 127, 164, 37),
-                Child = tile
-            };
-            Grid.SetColumn(border, index);
-            _weatherForecastGrid.Children.Add(border);
+            _weatherHourlyStrip.Children.Add(tile);
+        }
+    }
+
+    private void RenderWeatherDayBadges()
+    {
+        foreach (var badge in _weatherDayBadges.Values)
+            badge.Visibility = Visibility.Collapsed;
+        if (!_settings.WeatherEnabled || !_settings.WeatherOnCalendarCards || _weatherSnapshot is null)
+            return;
+        var lookup = _weatherSnapshot.Days.ToDictionary(day => day.Date);
+        foreach (var (date, badge) in _weatherDayBadges)
+        {
+            if (!lookup.TryGetValue(date, out var day)) continue;
+            badge.Text = ZurvanWeatherService.Describe(day.Code).Icon + " " +
+                Math.Round(day.High).ToString("0") + "°/" + Math.Round(day.Low).ToString("0") + "°";
+            badge.Visibility = Visibility.Visible;
+            ToolTipService.SetToolTip(badge,
+                ZurvanWeatherService.Describe(day.Code).Description +
+                " · احتمال بارش " + day.PrecipitationChance + "%");
         }
     }
 
