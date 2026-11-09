@@ -1,3 +1,7 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using System.Text.Json;
 using System.Security.Cryptography;
 using Windows.Security.Credentials;
@@ -13,7 +17,7 @@ internal sealed class CollaborationOfflineQueue
     private static readonly object Gate = new();
     private static readonly string QueuePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "Zurvan", "Desk", "collaboration-queue.json");
+        "Zurvan", "Desk", "collaboration-queue.bin");
 
     internal IReadOnlyList<QueuedCollaborationCommand> ReadAll()
     {
