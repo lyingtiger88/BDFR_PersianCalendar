@@ -124,13 +124,12 @@ struct ZurvanCollaborationView: View {
                             Spacer()
                             if index >= 0 && index < kanbanColumns.count - 1 {
                                 Button("انتقال ←") {
-                                    run {
-                                        try await api.updatePlanningItem(token: token, groupID: groupID,
-                                            itemID: card.id, expectedVersion: card.version,
-                                            title: card.title, details: card.details, state: card.state,
-                                            columnID: kanbanColumns[index + 1].id)
-                                        try await loadKanban()
-                                    }
+                                    enqueueOrSend("update_item", payload: [
+                                        "itemId": card.id, "expectedVersion": card.version,
+                                        "title": card.title, "details": card.details,
+                                        "state": card.state, "columnId": kanbanColumns[index + 1].id,
+                                        "timezone": TimeZone.current.identifier
+                                    ])
                                 }
                             }
                         }
@@ -257,7 +256,9 @@ struct ZurvanCollaborationView: View {
                         status = "همگام‌سازی آنلاین: \(feed.events.count) تغییر جدید"
                     }
                 } catch {
-                    status = "اتصال موقتاً قطع است؛ صف آفلاین حفظ می‌شود."
+                    status = error.localizedDescription.contains("version_conflict")
+                        ? "تعارض نسخه در صف آفلاین؛ تغییر نیازمند بازبینی است."
+                        : "اتصال موقتاً قطع است؛ صف آفلاین حفظ می‌شود."
                     try? await Task.sleep(for: .seconds(2))
                 }
             }
