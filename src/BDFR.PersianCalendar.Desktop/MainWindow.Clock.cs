@@ -2,6 +2,7 @@ using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Media.Imaging;
 using Microsoft.UI.Xaml.Shapes;
 using Windows.UI;
 
@@ -31,37 +32,16 @@ public sealed partial class MainWindow
         };
 
         var faceHost = new Grid { Width = 172, Height = 172 };
+        var faceArtwork = new Image
+        {
+            Width = 172, Height = 172, Stretch = Stretch.Uniform,
+            Source = new SvgImageSource { UriSource = new Uri("ms-appx:///picture/clock/zurvan-clock-face.svg") }
+        };
+        faceHost.Children.Add(faceArtwork);
         _zurvanClockFace = new Canvas { Width = 172, Height = 172 };
         faceHost.Children.Add(_zurvanClockFace);
 
         var center = 86.0;
-        var outer = new Ellipse
-        {
-            Width = 164, Height = 164,
-            Stroke = ThemeService.Brush(_theme.PrimaryText),
-            StrokeThickness = 1.2,
-            Opacity = .55
-        };
-        Canvas.SetLeft(outer, 4); Canvas.SetTop(outer, 4);
-        _zurvanClockFace.Children.Add(outer);
-
-        // Twelve-petal Zurvan rosette, drawn as scalable vector geometry.
-        for (var i = 0; i < 12; i++)
-        {
-            var petal = new Ellipse
-            {
-                Width = 22, Height = 58,
-                Fill = new SolidColorBrush(Color.FromArgb(34, 198, 158, 91)),
-                Stroke = ThemeService.Brush(_theme.PrimaryText),
-                StrokeThickness = .8,
-                Opacity = .82,
-                RenderTransformOrigin = new Windows.Foundation.Point(.5, .5),
-                RenderTransform = new RotateTransform { Angle = i * 30 }
-            };
-            Canvas.SetLeft(petal, center - 11);
-            Canvas.SetTop(petal, center - 76);
-            _zurvanClockFace.Children.Add(petal);
-        }
 
         AddClockNumerals();
         _zurvanHourHand = new Line { Stroke = ThemeService.Brush(_theme.PrimaryText), StrokeThickness = 4, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round };
