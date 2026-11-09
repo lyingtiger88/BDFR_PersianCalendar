@@ -369,13 +369,13 @@ public sealed partial class MainWindow
     private StackPanel? FindDeskFileList()
     {
         if (_deskWorkspace is null) return null;
-        // File list is the third child of the current file-manager card.
+        // File list follows header, action bar, queue title, pending queue and remote-list title.
         if (_deskWorkspace.Children.Count < 2) return null;
         if (_deskWorkspace.Children[1] is not Border card ||
             card.Child is not StackPanel panel ||
-            panel.Children.Count < 4)
+            panel.Children.Count < 6)
             return null;
-        return panel.Children[3] as StackPanel;
+        return panel.Children[5] as StackPanel;
     }
 
     private FrameworkElement BuildDeskFileRow(ZurvanDeskFile file)
