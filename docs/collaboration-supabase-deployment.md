@@ -274,3 +274,10 @@ The draft PR initially triggered the repository's automatic GitHub Actions workf
 - Added a School workspace to the Windows collaboration page: create/list subjects, create weekly timetable slots, create homework with optional ISO-8601 due date, submit answers, inspect permitted submissions and grade/leave feedback.
 - All permissions remain server-enforced; the UI does not grant teacher/manager rights locally.
 - This UI addition is source-reviewed only; no Windows build was run.
+
+
+### Offline replay integrity hardening
+- Added and applied migration 000008 to align offline create/update replay validation with the direct planning API.
+- Offline create now validates state values, confirms assignees belong to the same group, requires a base timestamp for recurring items, validates recurrence end ordering, and persists assigned_to.
+- Offline update now rejects recurrence metadata without a valid base date or with an end date before the base date.
+- Re-ran the rollback-only security regression against the live database after migration 000008. It passed, including valid same-group assignment and rejection of invalid state, non-member assignee and recurrence without a base date.
