@@ -274,6 +274,26 @@ revoke all on function public.collab_update_work_item(uuid,uuid,uuid,int,text,te
  from public,anon,authenticated;
 grant execute on function public.collab_update_work_item(uuid,uuid,uuid,int,text,text,text,timestamptz,uuid)
  to service_role;
+revoke all on function public.collab_group_owner_insert() from public,anon,authenticated;
+revoke all on function public.collab_guard_item_mode() from public,anon,authenticated;
+revoke all on function public.collab_record_change() from public,anon,authenticated;
+create index if not exists collab_groups_owner_idx on public.collab_groups(owner_id);
+create index if not exists collab_invites_inviter_idx on public.collab_invites(invited_by);
+create index if not exists collab_invites_recipient_idx on public.collab_invites(recipient_id);
+create index if not exists collab_items_created_by_idx on public.collab_items(created_by);
+create index if not exists collab_items_updated_by_idx on public.collab_items(updated_by);
+create index if not exists collab_items_assignee_idx on public.collab_items(assigned_to);
+create index if not exists collab_messages_sender_idx on public.collab_messages(sender_id);
+create index if not exists collab_reports_author_idx on public.collab_reports(author_id);
+create index if not exists collab_reports_group_idx on public.collab_reports(group_id);
+create index if not exists collab_subjects_group_idx on public.collab_subjects(group_id);
+create index if not exists collab_timetable_group_idx on public.collab_timetable(group_id);
+create index if not exists collab_timetable_subject_idx on public.collab_timetable(subject_id);
+create index if not exists collab_timetable_teacher_idx on public.collab_timetable(teacher_id);
+create index if not exists collab_homework_group_idx on public.collab_homework(group_id);
+create index if not exists collab_homework_subject_idx on public.collab_homework(subject_id);
+create index if not exists collab_homework_created_by_idx on public.collab_homework(created_by);
+create index if not exists collab_homework_submissions_student_idx on public.collab_homework_submissions(student_id);
 
 -- Realtime Postgres Changes is intentionally not exposed to clients: Desk sessions
 -- are not Supabase Auth JWTs. Edge authenticated change-feed / streaming is required.
