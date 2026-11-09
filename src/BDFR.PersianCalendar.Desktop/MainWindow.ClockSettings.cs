@@ -212,6 +212,16 @@ public sealed partial class MainWindow
                     : (_settings.ClockShowSeconds ? "hh:mm:ss tt" : "hh:mm tt");
                 digits.Text = now.ToString(pattern, CultureInfo.InvariantCulture);
                 digits.FontSize = _settings.ClockShowSeconds ? 39 : 47;
+                digits.FontFamily = new FontFamily(_settings.DigitalClockStyle == "dots" ? "Consolas" : "Segoe UI Variable");
+                digitalFace.CornerRadius = _settings.DigitalClockStyle == "flip"
+                    ? new CornerRadius(5) : new CornerRadius(20);
+                digitalFace.Background = _settings.DigitalClockStyle switch
+                {
+                    "modern" => new SolidColorBrush(Windows.UI.Color.FromArgb(255, 7, 44, 62)),
+                    "dots" => new SolidColorBrush(Windows.UI.Color.FromArgb(255, 38, 28, 61)),
+                    "flip" => new SolidColorBrush(Windows.UI.Color.FromArgb(255, 44, 48, 64)),
+                    _ => navy
+                };
                 digits.Foreground = _settings.DigitalClockStyle switch
                 {
                     "modern" => new SolidColorBrush(Windows.UI.Color.FromArgb(255, 103, 229, 244)),
@@ -385,6 +395,17 @@ public sealed partial class MainWindow
                     : (_settings.ClockShowSeconds ? "hh:mm:ss tt" : "hh:mm tt");
                 clockText.Text = now.ToString(format, CultureInfo.InvariantCulture);
                 clockText.FontSize = _settings.ClockShowSeconds ? 30 : 36;
+                clockText.FontFamily = new FontFamily(_settings.DigitalClockStyle == "dots"
+                    ? "Consolas" : "Segoe UI Variable");
+                digital.CornerRadius = _settings.DigitalClockStyle == "flip"
+                    ? new CornerRadius(5) : new CornerRadius(14);
+                digital.Background = _settings.DigitalClockStyle switch
+                {
+                    "modern" => new SolidColorBrush(Windows.UI.Color.FromArgb(255, 7, 44, 62)),
+                    "dots" => new SolidColorBrush(Windows.UI.Color.FromArgb(255, 38, 28, 61)),
+                    "flip" => new SolidColorBrush(Windows.UI.Color.FromArgb(255, 44, 48, 64)),
+                    _ => dark
+                };
                 clockText.Foreground = _settings.DigitalClockStyle switch
                 {
                     "modern" => new SolidColorBrush(Windows.UI.Color.FromArgb(255, 100, 222, 243)),
