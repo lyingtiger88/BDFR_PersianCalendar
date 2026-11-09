@@ -60,6 +60,12 @@ private enum ZurvanOccasions {
 struct ZurvanCalendarView: View {
     @State private var monthOffset = 0
     @State private var selectedDate: Date?
+    @StateObject private var weather = ZurvanWeatherModelIOS()
+    @AppStorage("zurvan.weather.enabled") private var weatherEnabled = true
+    @AppStorage("zurvan.weather.city") private var weatherCity = "تهران"
+    @AppStorage("zurvan.weather.latitude") private var weatherLatitude = 35.6892
+    @AppStorage("zurvan.weather.longitude") private var weatherLongitude = 51.3890
+    @AppStorage("zurvan.weather.timezone") private var weatherTimeZone = "Asia/Tehran"
     private let persian = Calendar(identifier: .persian)
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: 7)
     private let weekdays = ["ش", "ی", "د", "س", "چ", "پ", "ج"]
@@ -94,6 +100,12 @@ struct ZurvanCalendarView: View {
                     Spacer()
                     Button { monthOffset += 1 } label: { Image(systemName: "chevron.left") }
                 }
+                ZurvanPrayerTodayIOS(city: weatherCity,
+                    latitude: weatherLatitude, longitude: weatherLongitude,
+                    timeZoneID: weatherTimeZone)
+                if weatherEnabled {
+                    ZurvanTodayWeatherIOS(snapshot: weather.current, error: weather.error)
+                }
                 HStack {
                     ForEach(weekdays, id: \.self) { name in
                         Text(name).frame(maxWidth:.infinity).foregroundColor(name == "ج" ? Color.red : Color.primary)
@@ -105,6 +117,11 @@ struct ZurvanCalendarView: View {
                         let items = ZurvanOccasions.forDate(date)
                         let mourning = items.contains(where: \.mourning)
                         let holiday = ZurvanOccasions.holiday(date)
+                        let gregorian = Calendar(identifier: .gregorian)
+                        let dateParts = gregorian.dateComponents([.year, .month, .day], from: date)
+                        let dateKey = String(format: "%04d-%02d-%02d",
+                            dateParts.year ?? 0, dateParts.month ?? 0, dateParts.day ?? 0)
+                        let forecast = weatherEnabled ? weather.current?.days[dateKey] : nil
                         Button { selectedDate = date } label: {
                             ZStack(alignment:.topLeading) {
                                 RoundedRectangle(cornerRadius: 10)
@@ -119,6 +136,15 @@ struct ZurvanCalendarView: View {
                                         .font(.caption2)
                                 }
                                 .frame(maxWidth:.infinity,maxHeight:.infinity)
+                                if let forecast {
+                                    Text("\(ZurvanWeatherModelIOS.icon(forecast.code)) \(Int(forecast.high.rounded()))°/\(Int(forecast.low.rounded()))°")
+                                        .font(.system(size: 8, weight: .medium))
+                                        .foregroundStyle(.primary)
+                                        .padding(2)
+                                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 4))
+                                        .frame(maxWidth: .infinity, maxHeight: .infinity,
+                                            alignment: .bottomTrailing)
+                                }
                                 if mourning {
                                     Text("◢").foregroundStyle(.black).font(.title3).padding(1)
                                 }
@@ -134,6 +160,10 @@ struct ZurvanCalendarView: View {
             }.padding()
         }
         .background { ZurvanBackgroundView() }
+        .task(id: weatherEnabled ? "\(weatherLatitude),\(weatherLongitude),\(weatherCity)" : "disabled") {
+            guard weatherEnabled else { return }
+            await weather.load(latitude: weatherLatitude, longitude: weatherLongitude, city: weatherCity)
+        }
         .sheet(item: Binding(
             get: { selectedDate.map { SelectedZurvanDate(date:$0) } },
             set: { selectedDate = $0?.date }
