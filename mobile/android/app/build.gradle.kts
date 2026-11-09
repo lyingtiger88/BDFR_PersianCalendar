@@ -22,6 +22,9 @@ android {
     val deskPublishableKey = providers.gradleProperty("ZURVAN_DESK_SUPABASE_PUBLISHABLE_KEY")
         .orElse("sb_publishable_UAKFYbxgWOCVRDDdv_0JLg_oIIiubmT")
         .get()
+    val collaborationApiBaseUrl = providers.gradleProperty("ZURVAN_COLLAB_API_BASE_URL")
+        .orElse("https://yztithydgdvydaktuxlw.supabase.co/functions/v1/zurvan-collaboration")
+        .get()
 
     defaultConfig {
         applicationId = "com.bdfr.zurvan"
@@ -41,6 +44,11 @@ android {
             "String",
             "DESK_SUPABASE_PUBLISHABLE_KEY",
             "\"$deskPublishableKey\""
+        )
+        buildConfigField(
+            "String",
+            "COLLAB_API_BASE_URL",
+            "\"$collaborationApiBaseUrl\""
         )
     }
 
