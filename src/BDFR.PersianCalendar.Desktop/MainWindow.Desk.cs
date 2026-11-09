@@ -15,6 +15,7 @@ public sealed partial class MainWindow
     private readonly ZurvanDeskDesktopClient _deskClient = new();
     private StackPanel? _deskWorkspace;
     private TextBlock? _deskWorkspaceStatus;
+    private readonly List<(string Name, string? MimeType, byte[] Bytes)> _deskPendingUploads = new();
 
     private FrameworkElement BuildZurvanDeskWorkspace()
     {
@@ -294,27 +295,46 @@ public sealed partial class MainWindow
         var actions = new StackPanel
         {
             Orientation = Orientation.Horizontal,
-            Spacing = 8
+            Spacing = 8,
+            FlowDirection = FlowDirection.RightToLeft
         };
         var upload = new Button
         {
-            Content = "＋ آپلود فایل",
+            Content = "＋ انتخاب فایل‌ها",
             MinHeight = 42
         };
-        upload.Click += async (_, _) => await PickAndUploadDeskFileAsync(upload);
+        var sync = new Button
+        {
+            Content = "🔐 نهایی‌سازی و همگام‌سازی",
+            MinHeight = 42,
+            IsEnabled = _deskPendingUploads.Count > 0
+        };
+        upload.Click += async (_, _) => await PickDeskFilesForSyncAsync(upload, sync, pendingList);
+        sync.Click += async (_, _) => await FinalizeDeskUploadsAsync(sync, upload, pendingList, list);
         actions.Children.Add(upload);
+        actions.Children.Add(sync);
 
+        var pendingTitle = new TextBlock
+        {
+            Text = "صف ارسال؛ فایل‌ها تا زمان تأیید نهایی روی دستگاه باقی می‌مانند",
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Margin = new Thickness(0, 8, 0, 0)
+        };
+        var pendingList = new StackPanel { Spacing = 6 };
         var list = new StackPanel { Spacing = 8 };
         panel.Children.Add(header);
         panel.Children.Add(actions);
+        panel.Children.Add(pendingTitle);
+        panel.Children.Add(pendingList);
         panel.Children.Add(new TextBlock
         {
-            Text = "فایل‌های شما",
+            Text = "فایل‌های همگام‌سازی‌شده",
             FontSize = 17,
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
         });
         panel.Children.Add(list);
         _deskWorkspace!.Children.Add(DeskCard(panel));
+        RenderPendingDeskUploads(pendingList, sync);
         _ = RefreshDeskFilesAsync(list, upload);
     }
 
@@ -405,31 +425,141 @@ public sealed partial class MainWindow
         };
     }
 
-    private async Task PickAndUploadDeskFileAsync(Button button)
+    private async Task PickDeskFilesForSyncAsync(
+        Button pickButton,
+        Button syncButton,
+        StackPanel pendingList)
     {
         var picker = new FileOpenPicker();
         picker.FileTypeFilter.Add("*");
         InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(this));
-        var file = await picker.PickSingleFileAsync();
-        if (file is null) return;
+        var files = await picker.PickMultipleFilesAsync();
+        if (files is null || files.Count == 0) return;
 
-        button.IsEnabled = false;
+        pickButton.IsEnabled = false;
         try
         {
-            var properties = await file.GetBasicPropertiesAsync();
-            if (properties.Size <= 0 || properties.Size > 37L * 1024 * 1024)
-                throw new InvalidOperationException("حداکثر حجم فایل اصلی برای رمزگذاری و ذخیره‌سازی در پلن فعلی ۳۷ مگابایت است.");
+            foreach (var file in files)
+            {
+                var properties = await file.GetBasicPropertiesAsync();
+                if (properties.Size <= 0 || properties.Size > 37L * 1024 * 1024)
+                {
+                    SetDeskStatus($"فایل «{file.Name}» از محدوده حجم مجاز فعلی (۳۷ مگابایت) خارج است و به صف اضافه نشد.", true);
+                    continue;
+                }
 
-            await using var stream = await file.OpenStreamForReadAsync();
-            using var memory = new MemoryStream();
-            await stream.CopyToAsync(memory);
-            var bytes = memory.ToArray();
-            await _deskClient.UploadFileAsync(file.Name, file.ContentType, bytes);
-            SetDeskStatus($"فایل «{file.Name}» با رمزگذاری سمت دستگاه آپلود شد.");
-            await RefreshDeskFilesAsync();
+                await using var stream = await file.OpenStreamForReadAsync();
+                using var memory = new MemoryStream();
+                await stream.CopyToAsync(memory);
+                _deskPendingUploads.Add((file.Name, file.ContentType, memory.ToArray()));
+            }
+
+            RenderPendingDeskUploads(pendingList, syncButton);
+            SetDeskStatus($"{_deskPendingUploads.Count} فایل در صف آماده‌سازی است. تا تأیید نهایی هیچ فایلی ارسال نمی‌شود.");
         }
-        catch (Exception ex) { SetDeskStatus(ex.Message, true); }
-        finally { button.IsEnabled = true; }
+        catch (Exception ex)
+        {
+            SetDeskStatus("افزودن فایل به صف انجام نشد: " + ex.Message, true);
+        }
+        finally { pickButton.IsEnabled = true; }
+    }
+
+    private void RenderPendingDeskUploads(StackPanel target, Button syncButton)
+    {
+        target.Children.Clear();
+        if (_deskPendingUploads.Count == 0)
+        {
+            target.Children.Add(new TextBlock
+            {
+                Text = "فایلی برای همگام‌سازی انتخاب نشده است.",
+                Opacity = 0.7,
+                Margin = new Thickness(4, 4, 4, 8)
+            });
+        }
+
+        for (var index = 0; index < _deskPendingUploads.Count; index++)
+        {
+            var item = _deskPendingUploads[index];
+            var row = new Grid { ColumnSpacing = 8 };
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            row.Children.Add(new TextBlock
+            {
+                Text = $"{item.Name} · {FormatDeskBytes(item.Bytes.LongLength)} · آماده ارسال پس از رمزگذاری",
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                VerticalAlignment = VerticalAlignment.Center
+            });
+            var remove = new Button { Content = "حذف از صف", Tag = index };
+            remove.Click += (_, _) =>
+            {
+                var removeIndex = (int)remove.Tag;
+                if (removeIndex < 0 || removeIndex >= _deskPendingUploads.Count) return;
+                CryptographicOperations.ZeroMemory(_deskPendingUploads[removeIndex].Bytes);
+                _deskPendingUploads.RemoveAt(removeIndex);
+                RenderPendingDeskUploads(target, syncButton);
+            };
+            Grid.SetColumn(remove, 1);
+            row.Children.Add(remove);
+            target.Children.Add(new Border
+            {
+                Padding = new Thickness(8, 5, 8, 5),
+                BorderBrush = BrushWithAlpha(_theme.SecondaryText, 0x35),
+                BorderThickness = new Thickness(0, 0, 0, 1),
+                Child = row
+            });
+        }
+
+        syncButton.IsEnabled = _deskPendingUploads.Count > 0;
+    }
+
+    private async Task FinalizeDeskUploadsAsync(
+        Button syncButton,
+        Button pickButton,
+        StackPanel pendingList,
+        StackPanel remoteList)
+    {
+        if (_deskPendingUploads.Count == 0) return;
+
+        var count = _deskPendingUploads.Count;
+        var dialog = new ContentDialog
+        {
+            XamlRoot = _deskWorkspace!.XamlRoot,
+            Title = "تأیید همگام‌سازی",
+            Content = $"آیا {count} فایل انتخاب‌شده برای رمزگذاری روی این دستگاه و ارسال امن به فضای ابری ارسال شوند؟",
+            PrimaryButtonText = "رمزگذاری و ارسال",
+            CloseButtonText = "بازگشت",
+            DefaultButton = ContentDialogButton.Primary
+        };
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+
+        syncButton.IsEnabled = pickButton.IsEnabled = false;
+        var completed = 0;
+        try
+        {
+            while (_deskPendingUploads.Count > 0)
+            {
+                var item = _deskPendingUploads[0];
+                SetDeskStatus($"در حال رمزگذاری و ارسال فایل {completed + 1} از {count}: {item.Name}");
+                await _deskClient.UploadFileAsync(item.Name, item.MimeType, item.Bytes);
+                CryptographicOperations.ZeroMemory(item.Bytes);
+                _deskPendingUploads.RemoveAt(0);
+                completed++;
+                RenderPendingDeskUploads(pendingList, syncButton);
+            }
+
+            SetDeskStatus($"{completed} فایل با موفقیت روی دستگاه رمزگذاری و به فضای ابری ارسال شد.");
+            await RefreshDeskFilesAsync(remoteList);
+        }
+        catch (Exception ex)
+        {
+            SetDeskStatus($"همگام‌سازی پس از ارسال {completed} فایل متوقف شد: {ex.Message}. فایل‌های باقی‌مانده در صف حفظ شده‌اند.", true);
+            StartupDiagnostics.Log("Zurvan Desk staged sync failed: " + ex);
+        }
+        finally
+        {
+            pickButton.IsEnabled = true;
+            syncButton.IsEnabled = _deskPendingUploads.Count > 0;
+        }
     }
 
     private async Task DownloadDeskFileAsync(ZurvanDeskFile file, Button button)
