@@ -168,3 +168,7 @@ Theme Studio jobs are intentionally excluded from that targeted run.
 Android first compile attempt found and fixed a missing closing brace in the
 new Compose group panel. The corrected source is committed; the targeted
 Android/Windows build is being rerun.
+
+Final targeted build after the Windows invitation payload adjustment: rebuild
+Core, Windows desktop and Android from the latest main commit. This is the
+release candidate build for the collaboration client changes.
