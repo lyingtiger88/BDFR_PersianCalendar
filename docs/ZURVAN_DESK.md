@@ -27,7 +27,16 @@ The .NET Desk API includes an S3-compatible ArvanCloud object-store adapter. To 
 - `ZURVAN_DESK_S3_ACCESS_KEY=<server-only access key>`
 - `ZURVAN_DESK_S3_SECRET_KEY=<server-only secret key>`
 
-The Windows client can target the deployed API with `ZURVAN_DESK_API_BASE_URL`. Do not put Arvan S3 credentials in the Windows or Android app. The API must be deployed with durable account/metadata storage, HTTPS, backups, request-size limits and monitoring before production use. If the S3 variables are absent, the .NET API falls back to local blob storage; this is not ArvanCloud.
+The Windows client can target the deployed API with `ZURVAN_DESK_API_BASE_URL`. Do not put Arvan S3 credentials in the Windows or Android app.
+
+A production Dockerfile and single-instance Compose file are provided at:
+- `server/Zurvan.Desk.Api/Dockerfile`
+- `server/Zurvan.Desk.Api/compose.production.yml`
+- `server/Zurvan.Desk.Api/.env.production.example`
+
+Run Compose from the repository root after setting the required variables in a private server-side `.env` file. The Compose service binds its HTTP port to loopback only; place a TLS reverse proxy in front and expose only HTTPS. Persist the named `zurvan_desk_data` volume and back it up. The API now refuses to start in Production if the Arvan S3 bucket and server-only credentials are missing; local blob fallback is development-only.
+
+**Important current limitation:** `DeskAccountStore` persists accounts, sessions, recovery envelopes and file metadata in a JSON file. The Compose deployment is deliberately single-instance and requires a persistent volume. It is not suitable for multiple replicas or high availability. Before a public production launch, migrate account/session/file metadata to a transactional database (for example PostgreSQL), add automated backups/restore tests, rate limiting and operational monitoring. No live host, DNS/TLS certificate or Arvan credentials are configured by this repository, so these files prepare deployment but do not constitute a live deployment.
 
 Important deployment distinction: the current Windows default API URL is still the Supabase Edge Function. The existence of the Arvan S3 adapter in the .NET API does not mean the hosted Windows client is already using ArvanCloud. Switch the client endpoint only after the .NET API is deployed and verified.
 
