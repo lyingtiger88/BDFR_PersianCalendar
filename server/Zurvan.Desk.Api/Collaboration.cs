@@ -43,7 +43,7 @@ public static class CollaborationApi
         {
             var actor = CurrentUser(h, a)!;
             var target = a.FindUserByIdentifier((request.Identifier ?? "").Trim().ToLowerInvariant());
-            if (target is null) return Results.NotFound(new ApiError("Zurvan Desk account not found."));
+            if (target is null) return (IResult)Results.NotFound(new ApiError("Zurvan Desk account not found."));
             var result = s.Invite(groupId, actor.Id, target.Id, request.Role ?? "member");
             await Notify(hub, s, result.Change);
             await hub.Clients.Group(UserChannel(target.Id)).SendAsync("collaborationChanged", result.Change);
