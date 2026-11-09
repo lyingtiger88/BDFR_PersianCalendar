@@ -326,6 +326,29 @@ jobs:
             -p:ZurvanLicensePublicKeyB64="$env:ZURVAN_PUBLIC_KEY_B64" `
             -o artifacts/Zurvan-win-x64
 
+      - name: Replace packaged zodiac PNG directory from repository
+        shell: pwsh
+        run: |
+          $source = Join-Path $env:GITHUB_WORKSPACE "picture/zodiac/png"
+          $target = Join-Path $env:GITHUB_WORKSPACE "artifacts/Zurvan-win-x64/picture/zodiac/png"
+          if (-not (Test-Path $source -PathType Container)) { throw "Repository zodiac PNG source folder is missing: $source" }
+          if (Test-Path $target) { Remove-Item $target -Recurse -Force }
+          New-Item -ItemType Directory -Path $target -Force | Out-Null
+          Copy-Item -Path (Join-Path $source "*") -Destination $target -Recurse -Force
+          $sourceFiles = @(Get-ChildItem $source -File -Recurse)
+          $targetFiles = @(Get-ChildItem $target -File -Recurse)
+          if ($sourceFiles.Count -eq 0) { throw "Repository zodiac PNG folder is empty." }
+          if ($sourceFiles.Count -ne $targetFiles.Count) { throw "Zodiac asset copy count mismatch. Source=$($sourceFiles.Count), target=$($targetFiles.Count)" }
+          foreach ($file in $sourceFiles) {
+            $relative = $file.FullName.Substring($source.Length).TrimStart([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
+            $copied = Join-Path $target $relative
+            if (-not (Test-Path $copied -PathType Leaf)) { throw "Missing packaged zodiac asset: $relative" }
+            $sourceHash = (Get-FileHash $file.FullName -Algorithm SHA256).Hash
+            $targetHash = (Get-FileHash $copied -Algorithm SHA256).Hash
+            if ($sourceHash -ne $targetHash) { throw "Zodiac asset hash mismatch: $relative" }
+          }
+          Write-Host "Replaced packaged zodiac PNG folder with $($sourceFiles.Count) exact repository files; SHA256 verified."
+
       - name: Package portable test ZIP
         shell: pwsh
         run: |
@@ -436,6 +459,22 @@ jobs:
             -p:ZurvanLicensePublicKeyB64="$env:ZURVAN_PUBLIC_KEY_B64" `
             -o artifacts/Zurvan-win-x64-Debug
           $output = "artifacts/Zurvan-win-x64-Debug"
+          $source = Join-Path $env:GITHUB_WORKSPACE "picture/zodiac/png"
+          $target = Join-Path $output "picture/zodiac/png"
+          if (-not (Test-Path $source -PathType Container)) { throw "Repository zodiac PNG source folder is missing: $source" }
+          if (Test-Path $target) { Remove-Item $target -Recurse -Force }
+          New-Item -ItemType Directory -Path $target -Force | Out-Null
+          Copy-Item -Path (Join-Path $source "*") -Destination $target -Recurse -Force
+          $sourceFiles = @(Get-ChildItem $source -File -Recurse)
+          $targetFiles = @(Get-ChildItem $target -File -Recurse)
+          if ($sourceFiles.Count -eq 0 -or $sourceFiles.Count -ne $targetFiles.Count) { throw "Debug zodiac asset copy count mismatch. Source=$($sourceFiles.Count), target=$($targetFiles.Count)" }
+          foreach ($file in $sourceFiles) {
+            $relative = $file.FullName.Substring($source.Length).TrimStart([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
+            $copied = Join-Path $target $relative
+            if (-not (Test-Path $copied -PathType Leaf)) { throw "Missing Debug zodiac asset: $relative" }
+            if ((Get-FileHash $file.FullName -Algorithm SHA256).Hash -ne (Get-FileHash $copied -Algorithm SHA256).Hash) { throw "Debug zodiac asset hash mismatch: $relative" }
+          }
+          Write-Host "Debug output zodiac folder replaced with $($sourceFiles.Count) repository files and SHA256 verified."
           $catalog = Join-Path $output "picture/zodiac/catalog.json"
           $cloud = Join-Path $output "picture/desk/welcome.svg"
           if (-not (Test-Path $catalog)) { throw "Zodiac artwork missing from Debug publish output: $catalog" }
