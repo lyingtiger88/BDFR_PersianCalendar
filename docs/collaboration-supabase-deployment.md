@@ -241,3 +241,29 @@ This section supersedes the earlier "not yet complete" lists above for the featu
 
 ### Build workflow safeguard and incident record
 The draft PR initially triggered the repository's automatic GitHub Actions workflow. This was unintended given the no-build instruction. One automatic run completed successfully and produced Windows, Android and iOS test artifacts (workflow run `42588103550`); the Windows Theme Studio and core jobs also completed. This was not manually initiated from the development session. The workflow has since been changed so draft PRs skip build jobs and commits marked `[no-build]` skip all build jobs. The latest safeguard run `42588763193` completed with conclusion `skipped`. Do not interpret the automatic artifacts as user-approved release builds.
+
+
+## Follow-up completion pass — 2026-11-09
+
+### Windows offline queue integration
+- Connected the WinUI collaboration create-item and send-message actions to the encrypted CollaborationOfflineQueue.
+- Added stable-UUID command replay through the authenticated /groups/{id}/commands endpoint.
+- The 3-second collaboration poll now attempts to flush up to 20 queued commands for the active group, oldest first.
+- Transient network, timeout, rate-limit and server failures remain queued. Validation, membership, permission, missing-resource and version-conflict responses are quarantined with a reason instead of being retried indefinitely.
+- The UI reports the pending queue count and how many commands were replayed.
+- An unreadable/decryption-failed Windows queue now raises a visible error and leaves its encrypted file untouched; it is no longer silently treated as an empty queue.
+
+### Mobile retry classification
+- Android API errors now retain their HTTP status. The app quarantines terminal 400/403/404/409/422 responses and queues transient failures; queue-write failures are surfaced rather than reported as successful persistence.
+- iOS uses the same terminal-response classification and no longer reports that a command was queued if encryption/persistence fails.
+
+### Repeatable regression test
+- Added supabase/tests/collaboration_security_regression.sql.
+- Executed it against the live Supabase project inside a rollback-only transaction. It passed: default Kanban columns, two-account membership, idempotent create, receipt minimization, member chat permission, denial of unauthorized create/update, and exactly-once School submission event.
+- The test transaction was rolled back; no fixture accounts or records remain.
+
+### Remaining release gates
+- The live Desk account table still has zero real accounts, so authenticated HTTP/device integration with two real users cannot yet be exercised.
+- FCM/APNs delivery remains dependent on credentials, app entitlements and device-token registration.
+- Native WebSocket is not implemented; the current synchronization transport is bounded long-polling.
+- No build or release was run. Pull-request workflows now require the explicit build-approved label in addition to a non-draft PR, preventing accidental build execution when a draft is marked ready.
