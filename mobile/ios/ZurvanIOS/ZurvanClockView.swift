@@ -45,17 +45,35 @@ struct ZurvanClockViewIOS: View {
         case "flip": Color(red: 0.13, green: 0.15, blue: 0.20)
         default: Color(red: 0.11, green: 0.09, blue: 0.18)
         }
-        return Text(formatter.string(from: date))
-            .font(.system(size: showSeconds ? 32 : 42, weight: .medium, design: digitalStyle == "dots" ? .monospaced : .rounded))
-            .monospacedDigit()
-            .foregroundStyle(accent)
-            .minimumScaleFactor(0.6)
-            .lineLimit(1)
-            .frame(maxWidth: 310, minHeight: 105)
-            .padding(.horizontal, 12)
-            .background(background, in: RoundedRectangle(cornerRadius: 18))
-            .overlay(RoundedRectangle(cornerRadius: 18).stroke(.yellow.opacity(0.7), lineWidth: 2))
-            .accessibilityLabel(formatter.string(from: date))
+        return Group {
+            if digitalStyle == "flip" {
+                HStack(spacing: 2) {
+                    ForEach(Array(formatter.string(from: date).enumerated()), id: \.offset) { _, character in
+                        Text(String(character))
+                            .font(.system(size: showSeconds ? 19 : 25, weight: .bold, design: .monospaced))
+                            .foregroundStyle(.white)
+                            .frame(minWidth: character.isNumber ? 19 : 8)
+                            .padding(.vertical, 11)
+                            .background(character.isNumber ? Color.white.opacity(0.14) : .clear,
+                                        in: RoundedRectangle(cornerRadius: 4))
+                    }
+                }
+            } else {
+                Text(formatter.string(from: date))
+                    .font(.system(size: showSeconds ? 32 : 42, weight: .medium,
+                                  design: digitalStyle == "dots" ? .monospaced : .rounded))
+                    .monospacedDigit()
+                    .kerning(digitalStyle == "dots" ? 2 : 0)
+                    .foregroundStyle(accent)
+                    .minimumScaleFactor(0.6)
+                    .lineLimit(1)
+            }
+        }
+        .frame(maxWidth: 310, minHeight: 105)
+        .padding(.horizontal, 12)
+        .background(background, in: RoundedRectangle(cornerRadius: 18))
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(.yellow.opacity(0.7), lineWidth: 2))
+        .accessibilityLabel(formatter.string(from: date))
     }
 
     private func analogClock(_ date: Date) -> some View {
