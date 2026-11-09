@@ -953,6 +953,7 @@ public sealed partial class MainWindow : Window
     {
         var panel = new Grid { Padding = new Thickness(16), RowSpacing = 6 };
         panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // Prayer times
+        panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // User-selected live clock
         panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // Month picker
         panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // Calendar actions
         panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // Weekdays
@@ -960,6 +961,9 @@ public sealed partial class MainWindow : Window
         var prayerHeader = BuildPrayerTimesAboveCalendar();
         Grid.SetRow(prayerHeader, 0);
         panel.Children.Add(prayerHeader);
+        var userClock = BuildCompactCalendarClock();
+        Grid.SetRow(userClock, 1);
+        panel.Children.Add(userClock);
 
         var header = new Grid();
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -1025,7 +1029,7 @@ public sealed partial class MainWindow : Window
         Grid.SetColumn(prev, 2);
         header.Children.Add(prev);
 
-        Grid.SetRow(header, 1);
+        Grid.SetRow(header, 2);
         panel.Children.Add(header);
 
         var calendarTools = new StackPanel
@@ -1049,7 +1053,7 @@ public sealed partial class MainWindow : Window
         dateConverter.Click += DateConverter_Click;
         calendarTools.Children.Add(dateConverter);
 
-        Grid.SetRow(calendarTools, 2);
+        Grid.SetRow(calendarTools, 3);
         panel.Children.Add(calendarTools);
 
         var weekdays = new Grid { Margin = new Thickness(0, 10, 0, 10) };
@@ -1088,10 +1092,10 @@ public sealed partial class MainWindow : Window
             weekdays.Children.Add(label);
         }
 
-        Grid.SetRow(weekdays, 3);
+        Grid.SetRow(weekdays, 4);
         panel.Children.Add(weekdays);
 
-        Grid.SetRow(CalendarGrid, 4);
+        Grid.SetRow(CalendarGrid, 5);
         panel.Children.Add(CalendarGrid);
 
         // Both new information strips remain above the calendar without clipping
