@@ -215,7 +215,7 @@ fun ZurvanTimeIllustration(modifier: Modifier = Modifier) {
             // Three distinct hands: short hour, long minute, fine red seconds.
             hand(hourAngle, .27f, ink, 6.5f)
             hand(minuteAngle, .39f, gold, 4.5f)
-            hand(secondAngle, .46f, secondsColor, 1.9f, tail = .09f)
+            if (showSeconds) hand(secondAngle, .46f, secondsColor, 1.9f, tail = .09f)
 
             drawCircle(Color.White, radius = 7.2f, center = center)
             drawCircle(ink, radius = 5.3f, center = center)
