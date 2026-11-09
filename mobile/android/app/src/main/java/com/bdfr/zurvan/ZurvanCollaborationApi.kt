@@ -72,4 +72,24 @@ class ZurvanCollaborationApi(private val baseUrl:String = BuildConfig.COLLAB_API
     }
     suspend fun items(token:String,groupId:String):JSONArray=JSONArray(request(token,"GET","/groups/$groupId/items"))
     suspend fun messages(token:String,groupId:String):JSONArray=JSONArray(request(token,"GET","/groups/$groupId/messages"))
+    suspend fun subjects(token:String,groupId:String):JSONArray=JSONArray(request(token,"GET","/groups/$groupId/subjects"))
+    suspend fun createSubject(token:String,groupId:String,name:String):JSONObject=
+        JSONObject(request(token,"POST","/groups/$groupId/subjects",JSONObject().put("name",name)))
+    suspend fun timetable(token:String,groupId:String):JSONArray=JSONArray(request(token,"GET","/groups/$groupId/timetable"))
+    suspend fun createTimetableSlot(token:String,groupId:String,subjectId:String,weekday:Int,startTime:String,endTime:String,room:String="",teacherId:String?=null):JSONObject {
+        val payload=JSONObject().put("subjectId",subjectId).put("weekday",weekday).put("startTime",startTime).put("endTime",endTime).put("room",room)
+        if(teacherId!=null)payload.put("teacherId",teacherId)
+        return JSONObject(request(token,"POST","/groups/$groupId/timetable",payload))
+    }
+    suspend fun homework(token:String,groupId:String):JSONArray=JSONArray(request(token,"GET","/groups/$groupId/homework"))
+    suspend fun createHomework(token:String,groupId:String,subjectId:String,title:String,instructions:String,dueAt:String?=null):JSONObject {
+        val payload=JSONObject().put("subjectId",subjectId).put("title",title).put("instructions",instructions)
+        if(dueAt!=null)payload.put("dueAt",dueAt)
+        return JSONObject(request(token,"POST","/groups/$groupId/homework",payload))
+    }
+    suspend fun submissions(token:String,homeworkId:String):JSONArray=JSONArray(request(token,"GET","/homework/$homeworkId/submissions"))
+    suspend fun submitHomework(token:String,homeworkId:String,body:String):JSONObject=
+        JSONObject(request(token,"POST","/homework/$homeworkId/submissions",JSONObject().put("body",body)))
+    suspend fun gradeSubmission(token:String,homeworkId:String,submissionId:String,grade:Double,feedback:String):JSONObject=
+        JSONObject(request(token,"PUT","/homework/$homeworkId/submissions/$submissionId/grade",JSONObject().put("grade",grade).put("feedback",feedback)))
 }
