@@ -53,6 +53,22 @@ private class TeamStore(private val context: Context) {
         rows.forEach { (id, role) -> a.put(JSONObject().put("id", id).put("role", role)) }
         set("members", a.toString())
     }
+    fun enqueueCommand(groupId:String,commandId:String,kind:String,payload:JSONObject) {
+        val rows=JSONArray(get("offline_commands").ifBlank { "[]" })
+        if((0 until rows.length()).any { rows.getJSONObject(it).optString("commandId")==commandId }) return
+        rows.put(JSONObject().put("groupId",groupId).put("commandId",commandId)
+            .put("kind",kind).put("payload",payload).put("createdAt",System.currentTimeMillis()))
+        set("offline_commands",rows.toString())
+    }
+    fun queuedCommands():List<JSONObject> {
+        val rows=JSONArray(get("offline_commands").ifBlank { "[]" })
+        return (0 until rows.length()).map { rows.getJSONObject(it) }
+    }
+    fun removeQueuedCommand(commandId:String) {
+        val old=queuedCommands().filterNot { it.optString("commandId")==commandId }
+        val rows=JSONArray();old.forEach{rows.put(it)}
+        set("offline_commands",rows.toString())
+    }
 }
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -234,18 +250,22 @@ fun ZurvanTeamPlanner(
                 Button(onClick={
                     if(sessionToken.isBlank()||remoteGroupId.isBlank()||sharedTaskTitle.isBlank())status="ابتدا وارد حساب شوید، گروه را انتخاب کنید و عنوان کار را بنویسید."
                     else scope.launch {
-                        runCatching { collaborationApi.createItem(sessionToken,remoteGroupId,sharedTaskTitle.trim()) }
+                        val commandId=UUID.randomUUID().toString()
+                        val payload=JSONObject().put("title",sharedTaskTitle.trim()).put("mode","agenda").put("state","todo")
+                        runCatching { collaborationApi.replayCommand(sessionToken,remoteGroupId,commandId,"create_item",payload) }
                             .onSuccess { sharedTaskTitle="";status="کار مشترک ثبت شد." }
-                            .onFailure { status=it.message ?: "ثبت کار انجام نشد." }
+                            .onFailure { store.enqueueCommand(remoteGroupId,commandId,"create_item",payload);sharedTaskTitle="";status="کار در صف آفلاین ذخیره شد و پس از اتصال ارسال می‌شود." }
                     }
                 }) { Text("ثبت کار مشترک آنلاین") }
                 OutlinedTextField(sharedMessage,{sharedMessage=it},label={Text("پیام گروه")},modifier=Modifier.fillMaxWidth())
                 Button(onClick={
                     if(sessionToken.isBlank()||remoteGroupId.isBlank()||sharedMessage.isBlank())status="متن پیام را وارد کنید."
                     else scope.launch {
-                        runCatching { collaborationApi.sendMessage(sessionToken,remoteGroupId,sharedMessage.trim()) }
+                        val commandId=UUID.randomUUID().toString()
+                        val payload=JSONObject().put("body",sharedMessage.trim())
+                        runCatching { collaborationApi.replayCommand(sessionToken,remoteGroupId,commandId,"send_message",payload) }
                             .onSuccess { sharedMessage="";status="پیام ارسال شد." }
-                            .onFailure { status=it.message ?: "ارسال پیام انجام نشد." }
+                            .onFailure { store.enqueueCommand(remoteGroupId,commandId,"send_message",payload);sharedMessage="";status="پیام در صف آفلاین ذخیره شد و پس از اتصال ارسال می‌شود." }
                     }
                 }) { Text("ارسال پیام گروه") }
                 Button(onClick={
@@ -285,6 +305,13 @@ fun ZurvanTeamPlanner(
                                 .onSuccess { groups -> groups.firstOrNull()?.let { remoteGroupId=it.id;store.set("remote_group_id",it.id);groupName=it.name } }
                         }
                         while(remoteGroupId.isNotBlank()) {
+                            for (queued in store.queuedCommands().filter { it.optString("groupId")==remoteGroupId }.take(20)) {
+                                val replay=runCatching {
+                                    collaborationApi.replayCommand(sessionToken,remoteGroupId,queued.getString("commandId"),
+                                        queued.getString("kind"),queued.getJSONObject("payload"))
+                                }
+                                if(replay.isSuccess) store.removeQueuedCommand(queued.getString("commandId")) else break
+                            }
                             runCatching {
                                 val (events,next)=collaborationApi.changes(sessionToken,remoteGroupId,remoteSequence)
                                 if(next>remoteSequence) {
@@ -297,7 +324,7 @@ fun ZurvanTeamPlanner(
                                     remoteSyncStatus="همگام‌سازی آنلاین فعال • آخرین تغییر: ${events.size}"
                                 } else remoteSyncStatus="متصل • بدون تغییر جدید"
                             }.onFailure { remoteSyncStatus="اتصال موقتاً قطع است؛ تلاش مجدد انجام می‌شود." }
-                            delay(3000)
+                            delay(250)
                         }
                     }
                 }
