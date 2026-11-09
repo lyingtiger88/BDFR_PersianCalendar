@@ -1061,7 +1061,59 @@ public sealed partial class MainWindow
         contents.Children.Add(SettingsOptionRow("زبان برنامه",
             "انتخاب زبان رابط کاربری",
             combo, "\uE774"));
-        _settingsContent!.Children.Add(SettingsCard(contents));
+        var weatherContents = SettingsGroup("موقعیت آب‌وهوا",
+            "ابتدا کشور و سپس شهر موردنظر را انتخاب کنید", "\\uE753", "#FF2995D5");
+        var countryCombo = new ComboBox
+        {
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            MinWidth = 200
+        };
+        var countries = new (string Code, string Label)[]
+        {
+            ("IR", "ایران"), ("DE", "آلمان"), ("TR", "ترکیه"),
+            ("AE", "امارات متحده عربی"), ("GB", "بریتانیا"),
+            ("US", "ایالات متحده"), ("CA", "کانادا"),
+            ("FR", "فرانسه"), ("IT", "ایتالیا"), ("NL", "هلند"),
+            ("SE", "سوئد"), ("IQ", "عراق"), ("AF", "افغانستان"),
+            ("PK", "پاکستان"), ("IN", "هند"), ("JP", "ژاپن"),
+            ("CN", "چین"), ("RU", "روسیه"), ("AU", "استرالیا")
+        };
+        foreach (var country in countries)
+            countryCombo.Items.Add(new ComboBoxItem { Content = country.Label, Tag = country.Code });
+        countryCombo.SelectedItem = countryCombo.Items.OfType<ComboBoxItem>()
+            .FirstOrDefault(x => string.Equals((string?)x.Tag, _settings.WeatherCountryCode, StringComparison.OrdinalIgnoreCase))
+            ?? countryCombo.Items.OfType<ComboBoxItem>().First(x => (string)x.Tag == "IR");
+        var cityInput = new TextBox
+        {
+            Text = _settings.WeatherCity,
+            PlaceholderText = "ابتدا کشور را انتخاب کنید، سپس نام شهر را بنویسید",
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            MinWidth = 200,
+            FlowDirection = FlowDirection.RightToLeft
+        };
+        var saveWeatherLocation = new Button { Content = "ذخیره موقعیت", HorizontalAlignment = HorizontalAlignment.Left };
+        saveWeatherLocation.Click += (_, _) =>
+        {
+            if (countryCombo.SelectedItem is not ComboBoxItem selected || selected.Tag is not string code)
+                return;
+            var city = cityInput.Text.Trim();
+            if (string.IsNullOrWhiteSpace(city))
+            {
+                StatusText.Text = "لطفاً شهر موردنظر را وارد کنید.";
+                return;
+            }
+            _settings.WeatherCountryCode = code;
+            _settings.WeatherCountryName = selected.Content?.ToString() ?? "";
+            _settings.WeatherCity = city;
+            _settingsService.Save(_settings);
+            StatusText.Text = "موقعیت آب‌وهوا ذخیره شد.";
+            _ = RefreshWeatherForSettingsAsync();
+        };
+        weatherContents.Children.Add(SettingsOptionRow("کشور", "کشور محل دریافت پیش‌بینی", countryCombo, "\\uE81C"));
+        weatherContents.Children.Add(SettingsOptionRow("شهر", "نام شهر موردنظر برای نمایش آب‌وهوا", cityInput, "\\uE80F"));
+        weatherContents.Children.Add(saveWeatherLocation);
+        _settingsContent!.Children.Add(SettingsCard(weatherContents));
+        _settingsContent.Children.Add(SettingsCard(contents));
     }
 
     private void BuildSettingsAbout()
