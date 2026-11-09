@@ -164,3 +164,7 @@ Build validation requested after wiring the Windows and Android clients. The
 GitHub Actions workflow is triggered with the `[pc-android-only]` marker to
 compile Core, the Windows desktop app and the Android debug APK; iOS and
 Theme Studio jobs are intentionally excluded from that targeted run.
+
+Android first compile attempt found and fixed a missing closing brace in the
+new Compose group panel. The corrected source is committed; the targeted
+Android/Windows build is being rerun.
