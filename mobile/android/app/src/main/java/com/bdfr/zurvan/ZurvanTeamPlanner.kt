@@ -105,6 +105,10 @@ fun ZurvanTeamPlanner(
     var alertMinutes by remember { mutableStateOf(store.get("alert_minutes").ifBlank { "30" }) }
     var activeSection by remember { mutableStateOf(0) }
     var agendaRecurrence by remember { mutableStateOf<String?>(null) }
+    var permissionMemberId by remember { mutableStateOf<String?>(null) }
+    var permissionChat by remember { mutableStateOf(true) }
+    var permissionReport by remember { mutableStateOf(true) }
+    var permissionEdit by remember { mutableStateOf(false) }
     var kanbanCards by remember { mutableStateOf<List<JSONObject>>(emptyList()) }
     var status by remember { mutableStateOf("") }
     val avatar = remember(photoRevision) {
@@ -423,7 +427,33 @@ fun ZurvanTeamPlanner(
                 }
                 Text("اعضای گروه",fontWeight=FontWeight.SemiBold)
                 remoteMembers.forEach { member ->
-                    ListItem(headlineContent={Text(member.identifier)},supportingContent={Text(member.role)})
+                    ListItem(headlineContent={Text(member.identifier)},supportingContent={Text(member.role)},
+                        trailingContent={
+                            Row {
+                                TextButton(onClick={
+                                    permissionMemberId=member.accountId
+                                    permissionChat=member.canChat;permissionReport=member.canReport;permissionEdit=member.canEdit
+                                }) { Text("مجوزها") }
+                                if(member.role!="owner") TextButton(onClick={
+                                    scope.launch { runCatching { collaborationApi.removeMember(sessionToken,remoteGroupId,member.accountId);remoteMembers=collaborationApi.members(sessionToken,remoteGroupId);status="عضو از گروه حذف شد." }
+                                        .onFailure { status=it.message ?: "حذف عضو ناموفق بود." } }
+                                }) { Text("حذف") }
+                            }
+                        })
+                }
+                if(permissionMemberId!=null) {
+                    Text("تنظیم مجوز عضو",fontWeight=FontWeight.SemiBold)
+                    Row(verticalAlignment=Alignment.CenterVertically) { Checkbox(permissionChat,{permissionChat=it});Text("گفت‌وگو") }
+                    Row(verticalAlignment=Alignment.CenterVertically) { Checkbox(permissionReport,{permissionReport=it});Text("گزارش") }
+                    Row(verticalAlignment=Alignment.CenterVertically) { Checkbox(permissionEdit,{permissionEdit=it});Text("ویرایش") }
+                    Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                        Button(onClick={
+                            val id=permissionMemberId ?: return@Button
+                            scope.launch { runCatching { collaborationApi.setPermissions(sessionToken,remoteGroupId,id,permissionChat,permissionReport,permissionEdit);remoteMembers=collaborationApi.members(sessionToken,remoteGroupId);permissionMemberId=null;status="مجوزها ذخیره شد." }
+                                .onFailure { status=it.message ?: "ذخیره مجوزها ناموفق بود." } }
+                        }) { Text("ذخیره مجوزها") }
+                        TextButton(onClick={permissionMemberId=null}) { Text("انصراف") }
+                    }
                 }
                 Text("کارهای مشترک",fontWeight=FontWeight.SemiBold)
                 sharedItems.forEach { Text("• $it",style=MaterialTheme.typography.bodySmall) }
