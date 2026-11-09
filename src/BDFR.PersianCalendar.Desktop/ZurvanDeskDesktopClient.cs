@@ -29,6 +29,52 @@ internal sealed class ZurvanDeskDesktopClient
     internal bool IsAuthenticated => !string.IsNullOrWhiteSpace(ReadSessionValue("token"));
     private string? Token => ReadSessionValue("token");
 
+    private string CollaborationBaseUrl => _baseUrl.Replace(
+        "/zurvan-desk-api", "/zurvan-collaboration", StringComparison.OrdinalIgnoreCase);
+
+    private async Task<JsonDocument> SendCollaborationAsync(HttpMethod method, string path, object? payload = null)
+    {
+        var token = Token ?? throw new InvalidOperationException("ابتدا وارد حساب زروان دسک شوید.");
+        using var request = new HttpRequestMessage(method, CollaborationBaseUrl + path);
+        request.Headers.TryAddWithoutValidation("apikey", _publishableKey);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        if (payload is not null) request.Content = JsonContent.Create(payload, options: JsonOptions);
+        using var response = await Http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+        var raw = await response.Content.ReadAsStringAsync();
+        if (!response.IsSuccessStatusCode)
+            throw new InvalidOperationException(ParseError(raw, (int)response.StatusCode));
+        return JsonDocument.Parse(string.IsNullOrWhiteSpace(raw) ? "{}" : raw);
+    }
+
+    internal async Task<JsonDocument> ListCollaborationGroupsAsync()
+        => await SendCollaborationAsync(HttpMethod.Get, "/groups");
+
+    internal async Task<JsonDocument> CreateCollaborationGroupAsync(
+        string name, bool agenda, bool kanban, bool school)
+        => await SendCollaborationAsync(HttpMethod.Post, "/groups",
+            new { name, agenda, kanban, school });
+
+    internal async Task InviteCollaborationMemberAsync(string groupId, string identifier, bool assistant)
+    {
+        using var _ = await SendCollaborationAsync(HttpMethod.Post,
+            $"/groups/{Uri.EscapeDataString(groupId)}/invites",
+            new { identifier, role = assistant ? "assistant" : "member" });
+    }
+
+    internal async Task<JsonDocument> ReadCollaborationGroupAsync(string groupId)
+        => await SendCollaborationAsync(HttpMethod.Get, $"/groups/{Uri.EscapeDataString(groupId)}");
+
+    internal async Task<JsonDocument> ReadCollaborationChangesAsync(string groupId, long after)
+        => await SendCollaborationAsync(HttpMethod.Get,
+            $"/groups/{Uri.EscapeDataString(groupId)}/changes?after={after.ToString(System.Globalization.CultureInfo.InvariantCulture)}");
+
+    internal async Task<JsonDocument> ReadCollaborationItemsAsync(string groupId)
+        => await SendCollaborationAsync(HttpMethod.Get, $"/groups/{Uri.EscapeDataString(groupId)}/items");
+
+    internal async Task<JsonDocument> ReadCollaborationMessagesAsync(string groupId)
+        => await SendCollaborationAsync(HttpMethod.Get, $"/groups/{Uri.EscapeDataString(groupId)}/messages");
+
+
     private PasswordCredential? ReadSessionCredential()
     {
         try { return _vault.FindAllByResource(SessionResource).FirstOrDefault(); }
