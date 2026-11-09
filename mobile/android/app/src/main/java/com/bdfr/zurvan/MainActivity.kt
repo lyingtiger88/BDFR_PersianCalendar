@@ -598,7 +598,17 @@ private fun CalendarScreen(
                             monthNames.forEachIndexed { index, name ->
                                 DropdownMenuItem(
                                     text = { Text(monthSymbols[index] + " " + name) },
-                                    onClick = { month = index + 1; monthsMenu = false }
+                                    onClick = {
+                                        // Dismiss the popup before rebuilding the month grid.
+                                        // Otherwise the popup can hold references to disposed day cells.
+                                        monthsMenu = false
+                                        val selectedMonth = (index + 1).coerceIn(1, 12)
+                                        if (selectedMonth != month) {
+                                            selectedDay = null
+                                            pendingSelectedDay = 0
+                                            month = selectedMonth
+                                        }
+                                    }
                                 )
                             }
                         }
