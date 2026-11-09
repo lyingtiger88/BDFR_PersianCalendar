@@ -7,6 +7,8 @@ using BDFR.PersianCalendar.Infrastructure;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddSingleton<DeskAccountStore>();
+builder.Services.AddSingleton<CollaborationStore>();
+builder.Services.AddSignalR();
 builder.Services.AddSingleton<HttpClient>();
 
 builder.Services.AddSingleton<IDeskBlobStore>(sp =>
@@ -343,6 +345,8 @@ app.MapDelete("/api/v1/files/{id}", async (
     return Results.NoContent();
 });
 
+app.MapCollaboration();
+
 app.Run();
 
 static string NormalizeIdentifier(string? value)
@@ -512,6 +516,12 @@ public sealed class DeskAccountStore
             _gate.Release();
         }
     }
+
+    // Resolve invite recipients from established server accounts, never from
+    // unverified local identifiers. This does not grant group access.
+    public DeskUser? FindUserByIdentifier(string identifier)
+        => _database.Users.FirstOrDefault(x =>
+            string.Equals(x.Identifier, identifier, StringComparison.OrdinalIgnoreCase));
 
     public DeskUser? ResolveSession(string token)
     {
