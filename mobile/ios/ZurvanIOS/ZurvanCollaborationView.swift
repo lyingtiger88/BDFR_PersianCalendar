@@ -27,6 +27,7 @@ struct ZurvanCollaborationView: View {
     @State private var gradeFeedback = ""
     @State private var timetableCount = 0
     @State private var kanbanColumns: [ZurvanCollabColumn] = []
+    @State private var kanbanCards: [ZurvanCollabCard] = []
     @State private var kanbanColumnName = ""
     @State private var kanbanTaskTitle = ""
     @State private var agendaTitle = ""
@@ -113,6 +114,27 @@ struct ZurvanCollaborationView: View {
                         run { try await api.createKanbanColumn(token: token, groupID: groupID, name: kanbanColumnName); kanbanColumnName = ""; try await loadKanban() }
                     }
                     Button("بارگذاری ستون‌ها") { run { try await loadKanban() } }
+                    ForEach(kanbanCards) { card in
+                        let index = kanbanColumns.firstIndex(where: { $0.id == card.column_id }) ?? -1
+                        HStack {
+                            VStack(alignment: .leading) {
+                                Text(card.title)
+                                Text(card.state).font(.caption).foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            if index >= 0 && index < kanbanColumns.count - 1 {
+                                Button("انتقال ←") {
+                                    run {
+                                        try await api.updatePlanningItem(token: token, groupID: groupID,
+                                            itemID: card.id, expectedVersion: card.version,
+                                            title: card.title, details: card.details, state: card.state,
+                                            columnID: kanbanColumns[index + 1].id)
+                                        try await loadKanban()
+                                    }
+                                }
+                            }
+                        }
+                    }
                     ForEach(kanbanColumns) { column in
                         let index = kanbanColumns.firstIndex(where: { $0.id == column.id }) ?? 0
                         HStack {
@@ -269,7 +291,10 @@ struct ZurvanCollaborationView: View {
         timetableCount = try await t.count
     }
     private func loadKanban() async throws {
-        kanbanColumns = try await api.kanbanColumns(token: token, groupID: groupID)
+        async let c = api.kanbanColumns(token: token, groupID: groupID)
+        async let i = api.items(token: token, groupID: groupID)
+        kanbanColumns = try await c
+        kanbanCards = try await i.filter { $0.mode == "kanban" }
     }
     private func queueEncryptionKey() throws -> SymmetricKey {
         if let encoded = try secureStore.get(ZurvanCloudSecureStoreIOS.collaborationQueueKey),
