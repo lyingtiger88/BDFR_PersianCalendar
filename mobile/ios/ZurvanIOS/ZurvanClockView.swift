@@ -60,7 +60,8 @@ struct ZurvanClockViewIOS: View {
 
     private func analogClock(_ date: Date) -> some View {
         let parts = Calendar.current.dateComponents([.hour, .minute, .second], from: date)
-        let hour = Double(parts.hour ?? 0), minute = Double(parts.minute ?? 0)
+        let hour = Double(parts.hour ?? 0)
+        let minute = Double(parts.minute ?? 0)
         let second = Double(parts.second ?? 0)
         return Canvas { context, size in
             let side = min(size.width, size.height)
@@ -70,8 +71,8 @@ struct ZurvanClockViewIOS: View {
             for index in 0..<24 {
                 let angle = Double(index) * .pi / 12 - .pi / 2
                 let radius = outerRadius * (index.isMultiple(of: 2) ? 1.0 : 0.79)
-                let point = CGPoint(x: center.x + radius * cos(angle),
-                                    y: center.y + radius * sin(angle))
+                let point = CGPoint(x: center.x + radius * CGFloat(cos(angle)),
+                                    y: center.y + radius * CGFloat(sin(angle)))
                 if index == 0 { star.move(to: point) } else { star.addLine(to: point) }
             }
             star.closeSubpath()
@@ -82,8 +83,8 @@ struct ZurvanClockViewIOS: View {
             for index in 0..<24 {
                 let angle = Double(index) * .pi / 12 - .pi / 2
                 let radius = outerRadius * (index.isMultiple(of: 2) ? 0.57 : 0.45)
-                let point = CGPoint(x: center.x + radius * cos(angle),
-                                    y: center.y + radius * sin(angle))
+                let point = CGPoint(x: center.x + radius * CGFloat(cos(angle)),
+                                    y: center.y + radius * CGFloat(sin(angle)))
                 if index == 0 { inner.move(to: point) } else { inner.addLine(to: point) }
             }
             inner.closeSubpath()
@@ -93,8 +94,8 @@ struct ZurvanClockViewIOS: View {
             for index in 0..<12 {
                 let angle = Double(index) * .pi / 6 - .pi / 2
                 let radius = outerRadius * 0.72
-                let point = CGPoint(x: center.x + radius * cos(angle),
-                                    y: center.y + radius * sin(angle))
+                let point = CGPoint(x: center.x + radius * CGFloat(cos(angle)),
+                                    y: center.y + radius * CGFloat(sin(angle)))
                 let text: String = switch numeralStyle {
                 case "khwarazmi": "◇"
                 case "pahlavi": "✣"
@@ -107,10 +108,10 @@ struct ZurvanClockViewIOS: View {
             func hand(_ angleDegrees: Double, length: Double, width: CGFloat, color: Color, tail: Double = 0) {
                 let angle = angleDegrees * .pi / 180 - .pi / 2
                 var path = Path()
-                path.move(to: CGPoint(x: center.x - outerRadius * tail * cos(angle),
-                                      y: center.y - outerRadius * tail * sin(angle)))
-                path.addLine(to: CGPoint(x: center.x + outerRadius * length * cos(angle),
-                                         y: center.y + outerRadius * length * sin(angle)))
+                path.move(to: CGPoint(x: center.x - outerRadius * CGFloat(tail * cos(angle)),
+                                      y: center.y - outerRadius * CGFloat(tail * sin(angle))))
+                path.addLine(to: CGPoint(x: center.x + outerRadius * CGFloat(length * cos(angle)),
+                                         y: center.y + outerRadius * CGFloat(length * sin(angle))))
                 context.stroke(path, with: .color(color), style: StrokeStyle(lineWidth: width, lineCap: .round))
             }
             hand((hour.truncatingRemainder(dividingBy: 12)) * 30 + minute / 2, length: 0.34, width: 7, color: .black)
