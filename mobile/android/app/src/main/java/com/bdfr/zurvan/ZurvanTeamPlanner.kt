@@ -163,6 +163,13 @@ fun ZurvanTeamPlanner(
     var permissionEdit by remember { mutableStateOf(false) }
     var kanbanCards by remember { mutableStateOf<List<JSONObject>>(emptyList()) }
     var status by remember { mutableStateOf("") }
+    LaunchedEffect(remoteGroupId) {
+        if(remoteGroupId.isNotBlank() && store.get("last_group_id")!=remoteGroupId) {
+            remoteSequence=0L
+            store.set("remote_sequence","0")
+            store.set("last_group_id",remoteGroupId)
+        }
+    }
     val avatar = remember(photoRevision) {
         val f = File(context.filesDir, "zurvan_profile_photo")
         if (f.exists()) BitmapFactory.decodeFile(f.absolutePath)?.asImageBitmap() else null
