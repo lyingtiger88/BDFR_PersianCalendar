@@ -66,7 +66,29 @@ internal sealed class ZurvanDeskDesktopClient
 
     internal async Task<JsonDocument> ReadCollaborationChangesAsync(string groupId, long after)
         => await SendCollaborationAsync(HttpMethod.Get,
-            $"/groups/{Uri.EscapeDataString(groupId)}/changes?after={after.ToString(System.Globalization.CultureInfo.InvariantCulture)}");
+            $"/groups/{Uri.EscapeDataString(groupId)}/changes?after={after.ToString(System.Globalization.CultureInfo.InvariantCulture)}&wait=20");
+
+    internal async Task<JsonDocument> ReadKanbanColumnsAsync(string groupId)
+        => await SendCollaborationAsync(HttpMethod.Get, $"/groups/{Uri.EscapeDataString(groupId)}/kanban/columns");
+
+    internal async Task<JsonDocument> CreateKanbanColumnAsync(string groupId, string name, string color = "slate")
+        => await SendCollaborationAsync(HttpMethod.Post, $"/groups/{Uri.EscapeDataString(groupId)}/kanban/columns", new { name, color });
+
+    internal async Task<JsonDocument> ReorderKanbanColumnsAsync(string groupId, IReadOnlyList<string> columnIds)
+        => await SendCollaborationAsync(HttpMethod.Put, $"/groups/{Uri.EscapeDataString(groupId)}/kanban/columns/reorder", new { columnIds });
+
+    internal async Task<JsonDocument> ReplayCollaborationCommandAsync(
+        string groupId, Guid commandId, string kind, object payload)
+        => await SendCollaborationAsync(HttpMethod.Post, $"/groups/{Uri.EscapeDataString(groupId)}/commands",
+            new { commandId, kind, payload });
+
+    internal async Task<JsonDocument> CreateAdvancedCollaborationItemAsync(
+        string groupId, string title, string mode, string? details = null,
+        DateTimeOffset? startsAt = null, DateTimeOffset? dueAt = null,
+        string? columnId = null, string? recurrenceRule = null,
+        DateTimeOffset? recurrenceUntil = null, string timezone = "Asia/Tehran")
+        => await SendCollaborationAsync(HttpMethod.Post, $"/groups/{Uri.EscapeDataString(groupId)}/items",
+            new { title, mode, details, state = "todo", startsAt, dueAt, columnId, recurrenceRule, recurrenceUntil, timezone });
 
     internal async Task<JsonDocument> ReadCollaborationItemsAsync(string groupId)
         => await SendCollaborationAsync(HttpMethod.Get, $"/groups/{Uri.EscapeDataString(groupId)}/items");
