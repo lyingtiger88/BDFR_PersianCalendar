@@ -217,9 +217,10 @@ $$;
 
 create or replace function public.collab_remove_member(g uuid, target uuid)
 returns void language plpgsql security definer set search_path = ''
-as $$
+as $
 declare manager_role text; target_role text;
 begin
+  if auth.uid() is null then raise exception 'Authentication required' using errcode='42501'; end if;
   manager_role := public.collab_role(g);
   select role into target_role from public.collab_members
   where group_id=g and user_id=target for update;
