@@ -1510,6 +1510,7 @@ public sealed partial class MainWindow : Window
             {
                 _settings.LanguageCode = code;
                 _settingsService.Save(_settings);
+                ApplyDesktopLocalization();
             }
         };
         _settingsPanel.Children.Add(languagePicker);
