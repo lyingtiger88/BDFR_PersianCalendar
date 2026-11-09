@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 import Foundation
 
 private struct ZurvanOccasion: Identifiable {
@@ -163,6 +164,10 @@ struct ZurvanCalendarView: View {
         .task(id: weatherEnabled ? "\(weatherLatitude),\(weatherLongitude),\(weatherCity)" : "disabled") {
             guard weatherEnabled else { return }
             await weather.load(latitude: weatherLatitude, longitude: weatherLongitude, city: weatherCity)
+        }
+        .onReceive(Timer.publish(every: 1800, on: .main, in: .common).autoconnect()) { _ in
+            guard weatherEnabled else { return }
+            Task { await weather.load(latitude: weatherLatitude, longitude: weatherLongitude, city: weatherCity) }
         }
         .sheet(item: Binding(
             get: { selectedDate.map { SelectedZurvanDate(date:$0) } },
