@@ -954,6 +954,7 @@ public sealed partial class MainWindow : Window
         panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         panel.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
 
         var header = new Grid();
@@ -1066,10 +1067,14 @@ public sealed partial class MainWindow : Window
             weekdays.Children.Add(label);
         }
 
-        Grid.SetRow(weekdays, 2);
+        var clockRow = BuildZurvanClockPanel();
+        Grid.SetRow(clockRow, 2);
+        panel.Children.Add(clockRow);
+
+        Grid.SetRow(weekdays, 3);
         panel.Children.Add(weekdays);
 
-        Grid.SetRow(CalendarGrid, 3);
+        Grid.SetRow(CalendarGrid, 4);
         panel.Children.Add(CalendarGrid);
 
         return panel;
