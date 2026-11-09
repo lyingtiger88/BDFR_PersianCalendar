@@ -218,6 +218,7 @@ public sealed partial class MainWindow : Window
             _inAppReminderTimer?.Stop();
             _seasonCarouselTimer?.Stop();
             _wallpaperRotationTimer?.Stop();
+            _weatherRefreshTimer?.Stop();
             StartupDiagnostics.Log("MainWindow Closed event fired.");
         };
         AppWindow.Changed += (_, e) =>
@@ -1097,6 +1098,10 @@ public sealed partial class MainWindow : Window
         HijriDateText.FlowDirection = FlowDirection.RightToLeft;
         HijriDateText.FontFamily = new FontFamily("Traditional Arabic");
         stack.Children.Add(HijriDateText);
+
+        // Screenshot-matched live weather card: directly below the date, before occasions.
+        if (_settings.WeatherEnabled)
+            stack.Children.Add(BuildWeatherCard());
 
         var occasionsTitle = SectionTitle("مناسبت‌ها");
         _occasionsSectionAnchor = occasionsTitle;
