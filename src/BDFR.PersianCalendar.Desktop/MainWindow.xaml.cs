@@ -1126,13 +1126,63 @@ public sealed partial class MainWindow : Window
         stack.Children.Add(NoteBox);
         stack.Children.Add(NotePinnedCheck);
 
+        var noteActions = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            FlowDirection = FlowDirection.RightToLeft,
+            HorizontalAlignment = HorizontalAlignment.Left,
+            Spacing = 8
+        };
+
         var saveNote = MakeButton("ذخیره یادداشت");
+        saveNote.HorizontalAlignment = HorizontalAlignment.Left;
+        saveNote.HorizontalContentAlignment = HorizontalAlignment.Center;
+        saveNote.MinWidth = 0;
+        saveNote.Padding = new Thickness(12, 7, 12, 7);
+        saveNote.Content = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            FlowDirection = FlowDirection.RightToLeft,
+            Spacing = 6,
+            Children =
+            {
+                new FontIcon
+                {
+                    Glyph = "\\uE74E",
+                    FontFamily = new FontFamily("Segoe MDL2 Assets"),
+                    FontSize = 14
+                },
+                new TextBlock { Text = "ذخیره یادداشت", VerticalAlignment = VerticalAlignment.Center }
+            }
+        };
         saveNote.Click += SaveNote_Click;
-        stack.Children.Add(saveNote);
+        noteActions.Children.Add(saveNote);
 
         var deleteNote = MakeButton("حذف یادداشت روز");
+        deleteNote.HorizontalAlignment = HorizontalAlignment.Left;
+        deleteNote.HorizontalContentAlignment = HorizontalAlignment.Center;
+        deleteNote.MinWidth = 0;
+        deleteNote.Padding = new Thickness(12, 7, 12, 7);
+        deleteNote.Content = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            FlowDirection = FlowDirection.RightToLeft,
+            Spacing = 6,
+            Children =
+            {
+                new FontIcon
+                {
+                    Glyph = "\\uE74D",
+                    FontFamily = new FontFamily("Segoe MDL2 Assets"),
+                    FontSize = 14
+                },
+                new TextBlock { Text = "حذف یادداشت روز", VerticalAlignment = VerticalAlignment.Center }
+            }
+        };
         deleteNote.Click += DeleteNote_Click;
-        stack.Children.Add(deleteNote);
+        noteActions.Children.Add(deleteNote);
+
+        stack.Children.Add(noteActions);
 
         _dayMediaPanel.Spacing = 6;
         stack.Children.Add(_dayMediaPanel);
