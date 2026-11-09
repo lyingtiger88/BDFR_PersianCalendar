@@ -14,7 +14,7 @@ data class CollabEvent(val sequence:Long,val kind:String,val resourceId:String?)
 class ZurvanCollaborationApi(private val baseUrl:String = BuildConfig.COLLAB_API_BASE_URL) {
     private fun connection(method:String,path:String,token:String,body:String?=null):HttpURLConnection {
         return (URL(baseUrl.trimEnd('/')+"/"+path.trimStart('/')).openConnection() as HttpURLConnection).apply {
-            requestMethod=method;connectTimeout=15000;readTimeout=20000
+            requestMethod=method;connectTimeout=15000;readTimeout=30000
             setRequestProperty("Accept","application/json")
             setRequestProperty("Authorization","Bearer $token")
             setRequestProperty("apikey",BuildConfig.DESK_SUPABASE_PUBLISHABLE_KEY)
@@ -65,11 +65,28 @@ class ZurvanCollaborationApi(private val baseUrl:String = BuildConfig.COLLAB_API
             CollabMember(x.getString("account_id"),account.optString("identifier",x.getString("account_id")),x.optString("role"),x.optBoolean("can_chat"),x.optBoolean("can_report"),x.optBoolean("can_edit"))}
     }
     suspend fun changes(token:String,groupId:String,after:Long):Pair<List<CollabEvent>,Long>{
-        val o=JSONObject(request(token,"GET","/groups/$groupId/changes?after=$after"))
+        val o=JSONObject(request(token,"GET","/groups/$groupId/changes?after=$after&wait=20"))
         val a=o.optJSONArray("events")?:JSONArray()
         val rows=(0 until a.length()).map{val x=a.getJSONObject(it);CollabEvent(x.optLong("seq"),x.optString("kind"),x.optString("resource_id").takeIf{v->v.isNotBlank()})}
         return rows to o.optLong("nextCursor",after)
     }
+
+    suspend fun kanbanColumns(token:String,groupId:String):JSONArray=JSONArray(request(token,"GET","/groups/$groupId/kanban/columns"))
+    suspend fun createKanbanColumn(token:String,groupId:String,name:String,color:String="slate"):JSONObject=
+        JSONObject(request(token,"POST","/groups/$groupId/kanban/columns",JSONObject().put("name",name).put("color",color)))
+    suspend fun reorderKanbanColumns(token:String,groupId:String,ids:List<String>){
+        val a=JSONArray();ids.forEach{a.put(it)}
+        request(token,"PUT","/groups/$groupId/kanban/columns/reorder",JSONObject().put("columnIds",a))
+    }
+    suspend fun createItemAdvanced(token:String,groupId:String,title:String,mode:String,details:String="",startsAt:String?=null,dueAt:String?=null,columnId:String?=null,recurrenceRule:String?=null,recurrenceUntil:String?=null,timezone:String="Asia/Tehran"):JSONObject{
+        val p=JSONObject().put("title",title).put("mode",mode).put("details",details).put("state","todo").put("timezone",timezone)
+        if(startsAt!=null)p.put("startsAt",startsAt);if(dueAt!=null)p.put("dueAt",dueAt)
+        if(columnId!=null)p.put("columnId",columnId);if(recurrenceRule!=null)p.put("recurrenceRule",recurrenceRule)
+        if(recurrenceUntil!=null)p.put("recurrenceUntil",recurrenceUntil)
+        return JSONObject(request(token,"POST","/groups/$groupId/items",p))
+    }
+    suspend fun replayCommand(token:String,groupId:String,commandId:String,kind:String,payload:JSONObject):JSONObject=
+        JSONObject(request(token,"POST","/groups/$groupId/commands",JSONObject().put("commandId",commandId).put("kind",kind).put("payload",payload)))
     suspend fun items(token:String,groupId:String):JSONArray=JSONArray(request(token,"GET","/groups/$groupId/items"))
     suspend fun messages(token:String,groupId:String):JSONArray=JSONArray(request(token,"GET","/groups/$groupId/messages"))
     suspend fun subjects(token:String,groupId:String):JSONArray=JSONArray(request(token,"GET","/groups/$groupId/subjects"))
