@@ -21,7 +21,8 @@ internal sealed record WeatherSnapshot(
     bool IsDay,
     int PrecipitationChance,
     IReadOnlyList<WeatherDay> Days,
-    IReadOnlyList<WeatherHour> Hours);
+    IReadOnlyList<WeatherHour> Hours,
+    DateTime ForecastLocalTime);
 
 /// <summary>
 /// Weather data from Open-Meteo, with no external API key and no OS location permission.
@@ -121,7 +122,8 @@ internal sealed class ZurvanWeatherService
             current.GetProperty("temperature_2m").GetDouble(),
             current.GetProperty("weather_code").GetInt32(),
             current.GetProperty("is_day").GetInt32() == 1,
-            days[0].PrecipitationChance, days, hours);
+            days[0].PrecipitationChance, days, hours,
+            DateTime.UtcNow.AddSeconds(root.GetProperty("utc_offset_seconds").GetInt32()));
         _cached = snapshot;
         _cachedFahrenheit = fahrenheit;
         return snapshot;
