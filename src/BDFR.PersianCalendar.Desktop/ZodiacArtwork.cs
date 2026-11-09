@@ -56,10 +56,9 @@ internal static class ZodiacArtwork
         var signId = SignIds[month - 1];
         var root = Path.Combine(AppContext.BaseDirectory, "picture", "zodiac", "png");
         var path = Path.Combine(root, $"{selectedTheme}_{signId}.png");
-        // Old installations retain the legacy cute files. New style slots are
-        // populated by the user’s separate artwork; never manufacture duplicates.
-        if (!File.Exists(path) && selectedTheme.StartsWith("cute_", StringComparison.Ordinal))
-            path = Path.Combine(root, $"cute_{signId}.png");
+        // Each Cute style must load its own approved repository artwork.
+        // Never silently show a legacy Cute image or generated symbol in its place.
+        var isCuratedCute = selectedTheme is "cute_1" or "cute_2" or "cute_3";
 
         try
         {
@@ -73,12 +72,14 @@ internal static class ZodiacArtwork
                 return bitmap;
             }
 
-            StartupDiagnostics.Log($"Zodiac PNG missing; using catalog fallback: theme={selectedTheme}, sign={signId}.");
+            StartupDiagnostics.Log($"Zodiac PNG missing: theme={selectedTheme}, sign={signId}, path={path}");
+            if (isCuratedCute) return null;
             return await LoadCatalogFallbackAsync(month, selectedTheme);
         }
         catch (Exception ex)
         {
             StartupDiagnostics.Log($"Zodiac artwork could not load for month={month}, theme={selectedTheme}: {ex}");
+            if (isCuratedCute) return null;
             return await LoadCatalogFallbackAsync(month, selectedTheme);
         }
     }
