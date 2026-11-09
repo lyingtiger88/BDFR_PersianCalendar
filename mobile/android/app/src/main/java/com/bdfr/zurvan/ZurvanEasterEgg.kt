@@ -17,6 +17,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -85,7 +87,7 @@ fun ZurvanSecretTitle() {
 
 /** Twelve-point Persian interlace emblem with a live three-hand analog clock. */
 @Composable
-private fun ZurvanTimeIllustration(modifier: Modifier = Modifier) {
+fun ZurvanTimeIllustration(modifier: Modifier = Modifier) {
     val ink = Color(0xFF111111)
     val gold = Color(0xFFD6A64D)
     val secondsColor = Color(0xFFB63D35)
@@ -95,6 +97,7 @@ private fun ZurvanTimeIllustration(modifier: Modifier = Modifier) {
     var clockStyle by remember { mutableStateOf(settings.getString("digital_style", "classic") ?: "classic") }
     var twentyFourHours by remember { mutableStateOf(settings.getBoolean("24_hour", true)) }
     var showSeconds by remember { mutableStateOf(settings.getBoolean("show_seconds", true)) }
+    var analogNumerals by remember { mutableStateOf(settings.getString("analog_numerals", "zurvan") ?: "zurvan") }
     DisposableEffect(settings) {
         val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
             when (key) {
@@ -102,6 +105,7 @@ private fun ZurvanTimeIllustration(modifier: Modifier = Modifier) {
                 "digital_style" -> clockStyle = settings.getString("digital_style", "classic") ?: "classic"
                 "24_hour" -> twentyFourHours = settings.getBoolean("24_hour", true)
                 "show_seconds" -> showSeconds = settings.getBoolean("show_seconds", true)
+                "analog_numerals" -> analogNumerals = settings.getString("analog_numerals", "zurvan") ?: "zurvan"
             }
         }
         settings.registerOnSharedPreferenceChangeListener(listener)
@@ -182,6 +186,31 @@ private fun ZurvanTimeIllustration(modifier: Modifier = Modifier) {
             val hourAngle = ((time.hour % 12) * 30f) + time.minute * .5f + time.second / 120f
             val minuteAngle = time.minute * 6f + time.second * .1f
             val secondAngle = time.second * 6f
+
+            val roman = arrayOf("XII","I","II","III","IV","V","VI","VII","VIII","IX","X","XI")
+            val persian = arrayOf("۱۲","۱","۲","۳","۴","۵","۶","۷","۸","۹","۱۰","۱۱")
+            val ornament = when (analogNumerals) {
+                "khwarazmi" -> "◇"
+                "pahlavi" -> "✣"
+                "cuneiform" -> "◆"
+                else -> ""
+            }
+            val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                color = android.graphics.Color.BLACK
+                textAlign = android.graphics.Paint.Align.CENTER
+                textSize = radius * .14f
+                typeface = android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.BOLD)
+            }
+            drawIntoCanvas { canvas ->
+                for (index in 0 until 12) {
+                    val angle = (index * 30.0 - 90.0) * Math.PI / 180.0
+                    val x = center.x + cos(angle).toFloat() * radius * .61f
+                    val y = center.y + sin(angle).toFloat() * radius * .61f
+                    val label = if (ornament.isNotEmpty()) ornament
+                        else if (analogNumerals == "roman") roman[index] else persian[index]
+                    canvas.nativeCanvas.drawText(label, x, y - (paint.ascent() + paint.descent()) / 2, paint)
+                }
+            }
 
             // Three distinct hands: short hour, long minute, fine red seconds.
             hand(hourAngle, .27f, ink, 6.5f)
