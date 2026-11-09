@@ -1,4 +1,5 @@
 import SwiftUI
+import CryptoKit
 import Foundation
 
 private struct ZurvanQueuedCollabCommand: Codable, Identifiable {
@@ -264,12 +265,28 @@ struct ZurvanCollaborationView: View {
     private func loadKanban() async throws {
         kanbanColumns = try await api.kanbanColumns(token: token, groupID: groupID)
     }
+    private func queueEncryptionKey() throws -> SymmetricKey {
+        if let encoded = try secureStore.get(ZurvanCloudSecureStoreIOS.collaborationQueueKey),
+           let data = Data(base64Encoded: encoded) { return SymmetricKey(data: data) }
+        let key = SymmetricKey(size: .bits256)
+        let data = key.withUnsafeBytes { Data($0) }
+        try secureStore.set(data.base64EncodedString(), for: ZurvanCloudSecureStoreIOS.collaborationQueueKey)
+        return key
+    }
     private func loadQueue() {
-        if let data = UserDefaults.standard.data(forKey: queueKey),
-           let rows = try? JSONDecoder().decode([ZurvanQueuedCollabCommand].self, from: data) { queue = rows }
+        guard let sealedData = UserDefaults.standard.data(forKey: queueKey) else { return }
+        do {
+            let box = try AES.GCM.SealedBox(combined: sealedData)
+            let clear = try AES.GCM.open(box, using: queueEncryptionKey())
+            queue = try JSONDecoder().decode([ZurvanQueuedCollabCommand].self, from: clear)
+        } catch { status = "صف آفلاین رمزگذاری‌شده قابل بازیابی نیست؛ داده محلی حفظ شده است." }
     }
     private func saveQueue() {
-        if let data = try? JSONEncoder().encode(queue) { UserDefaults.standard.set(data, forKey: queueKey) }
+        do {
+            let clear = try JSONEncoder().encode(queue)
+            let sealed = try AES.GCM.seal(clear, using: queueEncryptionKey())
+            if let combined = sealed.combined { UserDefaults.standard.set(combined, forKey: queueKey) }
+        } catch { status = "رمزگذاری صف آفلاین ناموفق بود؛ فرمان‌ها ارسال نشده‌اند." }
     }
     private func enqueueOrSend(_ kind: String, payload: [String: Any]) {
         let id = UUID().uuidString.lowercased()
