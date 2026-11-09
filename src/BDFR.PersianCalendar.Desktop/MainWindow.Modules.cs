@@ -20,6 +20,7 @@ public sealed partial class MainWindow
     private TextBlock? _collaborationStatus;
     private TextBlock? _collaborationDataStatus;
     private int _collaborationPollBusy;
+    private readonly CollaborationOfflineQueue _collaborationOfflineQueue = new();
 
 
     private static void DetachDesktopElement(FrameworkElement element)
@@ -45,6 +46,16 @@ public sealed partial class MainWindow
             if (System.Threading.Interlocked.Exchange(ref _collaborationPollBusy, 1) != 0) return;
             try
             {
+                foreach (var queued in _collaborationOfflineQueue.ReadAll().Where(x => x.GroupId == _collaborationGroupId).Take(20))
+                {
+                    try
+                    {
+                        using var replay = await _deskClient.ReplayCollaborationCommandAsync(
+                            queued.GroupId, queued.CommandId, queued.Kind, queued.Payload);
+                        _collaborationOfflineQueue.Remove(queued.CommandId);
+                    }
+                    catch { break; }
+                }
                 using var result = await _deskClient.ReadCollaborationChangesAsync(
                     _collaborationGroupId, _collaborationCursor);
                 var root = result.RootElement;
@@ -75,7 +86,7 @@ public sealed partial class MainWindow
                 });
             }
             finally { System.Threading.Interlocked.Exchange(ref _collaborationPollBusy, 0); }
-        }, null, TimeSpan.Zero, TimeSpan.FromSeconds(3));
+        }, null, TimeSpan.Zero, TimeSpan.FromSeconds(1));
     }
 
     private void StopCollaborationPolling()
@@ -772,6 +783,7 @@ public sealed partial class MainWindow
                 };
                 var sharedTaskBox = new TextBox { Header = "عنوان کار مشترک", PlaceholderText = "کار جدید برای همه اعضا" };
                 var sharedTaskMode = new ComboBox { Header = "نوع برنامه", Items = { "Agenda", "Kanban", "School" }, SelectedIndex = 0 };
+                var sharedTaskRecurrence = new ComboBox { Header = "تکرار برنامه (Agenda)", Items = { "بدون تکرار", "روزانه", "روزهای کاری", "هفتگی", "ماهانه" }, SelectedIndex = 0 };
                 var addSharedTask = MakeButton("ثبت کار مشترک");
                 addSharedTask.Click += async (_, _) =>
                 {
@@ -781,9 +793,23 @@ public sealed partial class MainWindow
                     try
                     {
                         var mode = sharedTaskMode.SelectedIndex switch { 1 => "kanban", 2 => "school", _ => "agenda" };
-                        using var item = await _deskClient.CreateCollaborationItemAsync(_collaborationGroupId, sharedTaskBox.Text.Trim(), mode);
+                        var payload = new { title = sharedTaskBox.Text.Trim(), mode, state = "todo",
+                            recurrenceRule = mode == "agenda" && sharedTaskRecurrence.SelectedIndex > 0
+                                ? new[] { "", "daily", "weekdays", "weekly", "monthly" }[sharedTaskRecurrence.SelectedIndex] : null,
+                            timezone = "Asia/Tehran" };
+                        var commandId = Guid.NewGuid();
+                        try
+                        {
+                            using var item = await _deskClient.ReplayCollaborationCommandAsync(
+                                _collaborationGroupId, commandId, "create_item", payload);
+                            _collaborationStatus!.Text = "کار مشترک در سرور ثبت شد.";
+                        }
+                        catch
+                        {
+                            _collaborationOfflineQueue.Enqueue(_collaborationGroupId, "create_item", payload, commandId);
+                            _collaborationStatus!.Text = "ارتباط قطع است؛ کار در صف آفلاین ذخیره و با همین شناسه پس از اتصال ارسال می‌شود.";
+                        }
                         sharedTaskBox.Text = "";
-                        _collaborationStatus!.Text = "کار مشترک در سرور ثبت شد.";
                     }
                     catch (Exception ex) { _collaborationStatus!.Text = ex.Message; }
                 };
@@ -796,9 +822,20 @@ public sealed partial class MainWindow
                     { _collaborationStatus!.Text = "به گروه متصل شوید و متن پیام را وارد کنید."; return; }
                     try
                     {
-                        using var message = await _deskClient.SendCollaborationMessageAsync(_collaborationGroupId, sharedMessageBox.Text.Trim());
+                        var payload = new { body = sharedMessageBox.Text.Trim() };
+                        var commandId = Guid.NewGuid();
+                        try
+                        {
+                            using var message = await _deskClient.ReplayCollaborationCommandAsync(
+                                _collaborationGroupId, commandId, "send_message", payload);
+                            _collaborationStatus!.Text = "پیام برای گروه ارسال شد.";
+                        }
+                        catch
+                        {
+                            _collaborationOfflineQueue.Enqueue(_collaborationGroupId, "send_message", payload, commandId);
+                            _collaborationStatus!.Text = "پیام در صف آفلاین ذخیره شد و پس از اتصال ارسال می‌شود.";
+                        }
                         sharedMessageBox.Text = "";
-                        _collaborationStatus!.Text = "پیام برای گروه ارسال شد.";
                     }
                     catch (Exception ex) { _collaborationStatus!.Text = ex.Message; }
                 };
@@ -832,6 +869,7 @@ public sealed partial class MainWindow
                 };
                 collaboration.Children.Add(sharedTaskBox);
                 collaboration.Children.Add(sharedTaskMode);
+                collaboration.Children.Add(sharedTaskRecurrence);
                 collaboration.Children.Add(addSharedTask);
                 collaboration.Children.Add(sharedMessageBox);
                 collaboration.Children.Add(sendSharedMessage);
