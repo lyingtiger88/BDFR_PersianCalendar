@@ -17,6 +17,20 @@ The private bucket has no client-side storage policies. Only the server-side Edg
 
 The initial API is hosted on Supabase Edge Functions and Storage. The API contract is provider-neutral so that the storage implementation can later move to an Iranian or another S3-compatible provider without changing the account model or client encryption protocol.
 
+## ArvanCloud production storage path
+
+The .NET Desk API includes an S3-compatible ArvanCloud object-store adapter. To use ArvanCloud for actual file bytes, deploy `server/Zurvan.Desk.Api` as the Desk API and configure these server-side environment variables:
+
+- `ZURVAN_DESK_S3_ENDPOINT=https://s3.ir-thr-at1.arvanstorage.ir`
+- `ZURVAN_DESK_S3_REGION=ir-thr-at1`
+- `ZURVAN_DESK_S3_BUCKET=<private bucket name>`
+- `ZURVAN_DESK_S3_ACCESS_KEY=<server-only access key>`
+- `ZURVAN_DESK_S3_SECRET_KEY=<server-only secret key>`
+
+The Windows client can target the deployed API with `ZURVAN_DESK_API_BASE_URL`. Do not put Arvan S3 credentials in the Windows or Android app. The API must be deployed with durable account/metadata storage, HTTPS, backups, request-size limits and monitoring before production use. If the S3 variables are absent, the .NET API falls back to local blob storage; this is not ArvanCloud.
+
+Important deployment distinction: the current Windows default API URL is still the Supabase Edge Function. The existence of the Arvan S3 adapter in the .NET API does not mean the hosted Windows client is already using ArvanCloud. Switch the client endpoint only after the .NET API is deployed and verified.
+
 ## Security goal
 
 The storage provider must not receive file plaintext, original filenames, or the Zurvan Vault Key.
@@ -124,6 +138,10 @@ If all trusted devices are lost and the user also loses the recovery phrase, Zur
 ## Current implementation status
 
 Windows:
+- Account registration and login panels
+- Automatic file-manager load after successful login and local Vault unlock
+- Local staged-upload queue with explicit final confirmation before encryption and upload
+- Client-side encryption before transfer and local decryption after download
 - Hosted Supabase Desk API client
 - Login and account creation
 - Windows Password Vault session and Vault Key storage
