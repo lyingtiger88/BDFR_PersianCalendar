@@ -437,6 +437,8 @@ jobs:
       - name: Validate bundled zodiac and desk artwork
         shell: pwsh
         run: |
+          $zodiacAssets = @(Get-ChildItem "picture/zodiac/png" -File)
+          if ($zodiacAssets.Count -ne 143) { throw "Expected 143 approved zodiac assets before Debug packaging; found $($zodiacAssets.Count)." }
           $catalog = "picture/zodiac/catalog.json"
           $cloud = "picture/desk/welcome.svg"
           if (-not (Test-Path $catalog)) { throw "Missing zodiac catalog" }
