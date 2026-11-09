@@ -334,7 +334,7 @@ struct ZurvanCollaborationView: View {
                 try await api.replay(token: token, groupID: groupID, commandID: id, kind: kind, payload: payload)
                 status = "فرمان در سرور ثبت شد."
             } catch let error as ZurvanCollabAPIError {
-                if case .http(let code, _) = error, code == 400 || code == 403 || code == 409 {
+                if case .http(let code, _) = error, code == 400 || code == 403 || code == 404 || code == 409 || code == 422 {
                     status = "فرمان توسط سرور رد شد و به صف آفلاین منتقل نشد: " + error.localizedDescription
                     return
                 }
@@ -346,8 +346,9 @@ struct ZurvanCollaborationView: View {
             } catch {
                 guard let data = try? JSONSerialization.data(withJSONObject: payload) else { status = error.localizedDescription; return }
                 queue.append(ZurvanQueuedCollabCommand(id: id, groupID: groupID, kind: kind, payload: data, createdAt: Date()))
-                saveQueue()
-                status = "فرمان در صف آفلاین ذخیره شد و بعداً با شناسه ثابت ارسال می‌شود."
+                if saveQueue() {
+                    status = "فرمان در صف آفلاین ذخیره شد و بعداً با شناسه ثابت ارسال می‌شود."
+                }
             }
         }
     }
@@ -359,7 +360,7 @@ struct ZurvanCollaborationView: View {
                 queue.removeAll { $0.id == command.id }
                 saveQueue()
             } catch let error as ZurvanCollabAPIError {
-                if case .http(let code, let message) = error, code == 409 || code == 400 || code == 403 {
+                if case .http(let code, let message) = error, code == 409 || code == 400 || code == 403 || code == 404 || code == 422 {
                     if let index = queue.firstIndex(where: { $0.id == command.id }) {
                         queue[index].blockedReason = message
                         saveQueue()
