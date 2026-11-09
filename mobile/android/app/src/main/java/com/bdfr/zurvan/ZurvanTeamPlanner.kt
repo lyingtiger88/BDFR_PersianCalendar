@@ -33,6 +33,8 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.util.UUID
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 
 /** On-device team planner. Remote membership and cross-device sync require a service. */
 private class TeamStore(private val context: Context) {
@@ -62,6 +64,14 @@ fun ZurvanTeamPlanner(
 ) {
     val context = LocalContext.current
     val store = remember { TeamStore(context) }
+    val collaborationApi = remember { ZurvanCollaborationApi() }
+    val secureStore = remember { ZurvanCloudSecureStore(context) }
+    val sessionToken = secureStore.get(ZurvanCloudSecureStore.DESK_SESSION_TOKEN).orEmpty()
+    val scope = rememberCoroutineScope()
+    var remoteGroupId by remember { mutableStateOf(store.get("remote_group_id")) }
+    var remoteSequence by remember { mutableLongStateOf(store.get("remote_sequence").toLongOrNull() ?: 0L) }
+    var remoteMembers by remember { mutableStateOf<List<CollabMember>>(emptyList()) }
+    var remoteSyncStatus by remember { mutableStateOf("همگام‌سازی گروه هنوز انجام نشده است.") }
     var profileName by remember { mutableStateOf(store.get("profile_name")) }
     var profileId by remember { mutableStateOf(store.get("profile_id")) }
     var groupName by remember { mutableStateOf(store.get("group_name")) }
@@ -176,60 +186,66 @@ fun ZurvanTeamPlanner(
             }
             1 -> {
                 OutlinedTextField(groupName, { groupName = it }, label = { Text("نام گروه") }, modifier = Modifier.fillMaxWidth())
-                Button(onClick = {
-                    if (groupName.isNotBlank()) {
-                        store.set("group_name", groupName.trim())
-                        status = "گروه در این دستگاه ذخیره شد."
-                    }
-                }) { Text(if (store.get("group_name").isBlank()) "ساخت گروه" else "ذخیره نام گروه") }
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    if (avatar != null) {
-                        Image(avatar, contentDescription = "عکس مدیر گروه", contentScale = ContentScale.Crop,
-                            modifier = Modifier.size(52.dp).clip(CircleShape))
-                    } else {
-                        Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
-                            Text("👤", modifier = Modifier.padding(12.dp))
-                        }
-                    }
-                    Column {
-                        Text("مدیر گروه: ${profileName.ifBlank { "پروفایل من" }}", fontWeight = FontWeight.SemiBold)
-                        Text(profileId.ifBlank { "شناسه هنوز ثبت نشده" }, style = MaterialTheme.typography.labelSmall)
-                    }
+                var agendaEnabled by remember { mutableStateOf(true) }
+                var kanbanEnabled by remember { mutableStateOf(true) }
+                var schoolEnabled by remember { mutableStateOf(false) }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(agendaEnabled,{agendaEnabled=it},label={Text("Agenda")})
+                    FilterChip(kanbanEnabled,{kanbanEnabled=it},label={Text("Kanban")})
+                    FilterChip(schoolEnabled,{schoolEnabled=it},label={Text("مدرسه")})
                 }
-                OutlinedTextField(newMember, { newMember = it }, label = { Text("شناسه کاربری عضو") }, modifier = Modifier.fillMaxWidth())
+                Button(onClick = {
+                    if (sessionToken.isBlank()) status = "برای ساخت گروه ابتدا وارد حساب Zurvan Desk شوید."
+                    else if (groupName.isBlank() || !(agendaEnabled || kanbanEnabled || schoolEnabled)) status = "نام گروه و حداقل یک حالت کاری را انتخاب کنید."
+                    else scope.launch {
+                        runCatching { collaborationApi.createGroup(sessionToken,groupName.trim(),agendaEnabled,kanbanEnabled,schoolEnabled) }
+                            .onSuccess { g ->
+                                remoteGroupId=g.id;store.set("remote_group_id",g.id);store.set("group_name",g.name)
+                                status="گروه آنلاین ساخته شد.";remoteSyncStatus="گروه به سرور متصل است."
+                                remoteMembers=runCatching{collaborationApi.members(sessionToken,g.id)}.getOrDefault(emptyList())
+                            }.onFailure { status=it.message ?: "ساخت گروه انجام نشد." }
+                    }
+                }) { Text("ساخت گروه آنلاین") }
+                Text("شناسه حساب: ${secureStore.get(ZurvanCloudSecureStore.DESK_ACCOUNT_IDENTIFIER).orEmpty().ifBlank { "وارد نشده" }}")
+                if(remoteGroupId.isNotBlank()) Text("شناسه گروه: $remoteGroupId",style=MaterialTheme.typography.labelSmall)
+                OutlinedTextField(newMember, { newMember = it }, label = { Text("شناسه زروان عضو") }, modifier = Modifier.fillMaxWidth())
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf("عضو", "دستیار مدیر").forEach { role ->
                         FilterChip(selected = selectedRole == role, onClick = { selectedRole = role }, label = { Text(role) })
                     }
                 }
                 Button(onClick = {
-                    val id = newMember.trim()
-                    if (groupName.isBlank()) status = "ابتدا یک گروه بسازید."
-                    else if (id.isBlank() || id == profileId) status = "شناسه معتبر وارد کنید."
-                    else {
-                        members = members.filterNot { it.first == id } + (id to selectedRole)
-                        store.saveMembers(members)
-                        newMember = ""
-                        status = "عضو در فهرست محلی افزوده شد."
+                    val identifier=newMember.trim()
+                    if(sessionToken.isBlank())status="ابتدا وارد حساب Zurvan Desk شوید."
+                    else if(remoteGroupId.isBlank())status="ابتدا یک گروه آنلاین بسازید."
+                    else if(identifier.isBlank())status="شناسه معتبر وارد کنید."
+                    else scope.launch {
+                        runCatching { collaborationApi.invite(sessionToken,remoteGroupId,identifier,selectedRole=="دستیار مدیر") }
+                            .onSuccess { newMember="";status="دعوت برای حساب زروان ارسال شد." }
+                            .onFailure { status=it.message ?: "ارسال دعوت انجام نشد." }
                     }
-                }) { Text("افزودن با شناسه کاربری") }
-                members.forEach { (id, role) ->
-                    ListItem(headlineContent = { Text(id) }, supportingContent = { Text(role) },
-                        leadingContent = {
-                            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer) {
-                                Text(id.take(1).uppercase(), modifier = Modifier.padding(12.dp))
-                            }
-                        },
-                        trailingContent = {
-                            TextButton(onClick = {
-                                members = members.filterNot { it.first == id }
-                                store.saveMembers(members)
-                            }) { Text("حذف") }
-                        })
+                }) { Text("ارسال دعوت آنلاین") }
+                Text("اعضای گروه",fontWeight=FontWeight.SemiBold)
+                remoteMembers.forEach { member ->
+                    ListItem(headlineContent={Text(member.identifier)},supportingContent={Text(member.role)})
                 }
-                Text("اشتراک میان دستگاه‌ها هنوز به سرویس گروهی متصل نیست. عضویت فعلاً فقط روی این دستگاه ثبت می‌شود.",
-                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-            }
+                Text(remoteSyncStatus,style=MaterialTheme.typography.bodySmall)
+                if(sessionToken.isBlank()) Text("برای استفاده از گروه آنلاین، ورود به حساب Zurvan Desk الزامی است.",color=MaterialTheme.colorScheme.error)
+                LaunchedEffect(remoteGroupId,sessionToken,activeSection) {
+                    if(remoteGroupId.isNotBlank() && sessionToken.isNotBlank() && activeSection==1) {
+                        while(true) {
+                            runCatching {
+                                val (events,next)=collaborationApi.changes(sessionToken,remoteGroupId,remoteSequence)
+                                if(next>remoteSequence) {
+                                    remoteSequence=next;store.set("remote_sequence",next.toString())
+                                    remoteMembers=collaborationApi.members(sessionToken,remoteGroupId)
+                                    remoteSyncStatus="همگام‌سازی آنلاین فعال • آخرین تغییر: ${events.size}"
+                                } else remoteSyncStatus="متصل • بدون تغییر جدید"
+                            }.onFailure { remoteSyncStatus="اتصال موقتاً قطع است؛ تلاش مجدد انجام می‌شود." }
+                            delay(3000)
+                        }
+                    }
+                }
             2 -> {
                 if (avatar != null) Image(avatar, contentDescription = "تصویر پروفایل", contentScale = ContentScale.Crop, modifier = Modifier.size(88.dp).clip(CircleShape))
                 else Surface(shape = CircleShape) { Text("👤", modifier = Modifier.padding(20.dp)) }
