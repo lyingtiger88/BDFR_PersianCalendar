@@ -1,0 +1,71 @@
+name: Refresh Zodiac PNG Assets (no application build)
+
+on:
+  push:
+    paths:
+      - 'tools/GenerateZodiacPngs.py'
+      - '.github/workflows/zodiac-assets.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: zodiac-asset-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh-zodiac-assets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install image renderers (assets only; no app build)
+        run: python -m pip install --disable-pip-version-check pillow cairosvg
+      - name: Replace all 72 non-Cute PNG images in repository working tree
+        run: |
+          set -euo pipefail
+          python tools/GenerateZodiacPngs.py
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from PIL import Image
+          base = Path('picture/zodiac')
+          catalog = json.loads((base / 'catalog.json').read_text(encoding='utf-8'))
+          styles = [style['id'] for style in catalog['styles'] if style['id'] not in ('cute_1', 'cute_2', 'cute_3')]
+          assert len(styles) == 6, f'Expected six non-Cute styles, found {styles}'
+          checked = 0
+          for style in styles:
+              for sign in catalog['signs']:
+                  path = base / 'png' / f"{style}_{sign['id']}.png"
+                  assert path.is_file(), f'Missing {path}'
+                  with Image.open(path) as im:
+                      assert im.size == (512, 512) and im.format == 'PNG', f'Invalid PNG {path}'
+                      im.verify()
+                  checked += 1
+          assert checked == 72, f'Expected 72 files, got {checked}'
+          for style in ('cute_1', 'cute_2', 'cute_3'):
+              for sign in catalog['signs']:
+                  assert (base / 'png' / f"{style}_{sign['id']}.png").is_file()
+          print(f'VERIFIED {checked} regenerated non-Cute PNGs; 36 Cute files preserved')
+          PY
+      - name: Confirm PNG contents changed, then commit files directly (no build)
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add picture/zodiac/png
+          changed=$(git diff --cached --name-only -- 'picture/zodiac/png/*.png' | wc -l | tr -d ' ')
+          echo "Changed PNG paths: $changed"
+          if [ "$changed" -ne 72 ]; then
+            echo "::error::Expected exactly 72 changed non-Cute PNG files, got $changed"
+            git diff --cached --name-only -- picture/zodiac/png
+            exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "assets(zodiac): replace 72 non-Cute PNGs directly in repository [no-build]"
+          git push origin HEAD:main
