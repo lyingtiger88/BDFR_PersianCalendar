@@ -230,6 +230,7 @@ struct ZurvanCollaborationView: View {
             }
         }
         .navigationTitle("برنامه‌ها و همکاری")
+        .onChange(of: groupID) { _, _ in cursor = 0 }
         .task {
             token = (try? secureStore.get(ZurvanCloudSecureStoreIOS.deskSessionToken)) ?? ""
             loadQueue()
