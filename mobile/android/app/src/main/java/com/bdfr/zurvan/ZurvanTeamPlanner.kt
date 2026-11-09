@@ -299,7 +299,7 @@ fun ZurvanTeamPlanner(
                     if(sessionToken.isBlank()||remoteGroupId.isBlank()||sharedTaskTitle.isBlank())status="ابتدا وارد حساب شوید، گروه را انتخاب کنید و عنوان کار را بنویسید."
                     else scope.launch {
                         val commandId=UUID.randomUUID().toString()
-                        val payload=JSONObject().put("title",sharedTaskTitle.trim()).put("mode","agenda").put("state","todo").put("timezone","Asia/Tehran");agendaRecurrence?.let{payload.put("recurrenceRule",it)}
+                        val payload=JSONObject().put("title",sharedTaskTitle.trim()).put("mode","agenda").put("state","todo").put("timezone",java.util.TimeZone.getDefault().id);agendaRecurrence?.let{payload.put("recurrenceRule",it)}
                         runCatching { collaborationApi.replayCommand(sessionToken,remoteGroupId,commandId,"create_item",payload) }
                             .onSuccess { sharedTaskTitle="";status="کار مشترک ثبت شد." }
                             .onFailure { store.enqueueCommand(remoteGroupId,commandId,"create_item",payload);sharedTaskTitle="";status="کار در صف آفلاین ذخیره شد و پس از اتصال ارسال می‌شود." }
