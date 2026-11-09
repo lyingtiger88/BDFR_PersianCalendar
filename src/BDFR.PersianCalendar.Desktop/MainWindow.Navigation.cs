@@ -77,10 +77,10 @@ public sealed partial class MainWindow
             ShowDesktopModule("فعالیت‌ها");
             StatusText.Text = "مرکز فعالیت باز شد.";
         });
-        AddNavigationEntry(navItems, "▧", "Wallpaper Manager", () =>
+        AddNavigationEntry(navItems, "▧", "مدیریت تصویر زمینه", () =>
         {
             ShowDesktopModule("Wallpaper Manager");
-            StatusText.Text = "مدیریت کاغذدیواری باز شد.";
+            StatusText.Text = "مدیریت تصویر زمینه باز شد.";
         });
 
         var scroller = new ScrollViewer
