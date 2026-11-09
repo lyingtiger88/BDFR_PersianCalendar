@@ -96,6 +96,8 @@ public sealed class AppSettings
 
     // Weather city is independent of the selected-day calendar and prayer-time settings.
     // Blank uses the configured prayer city as the initial suggestion.
+    public string WeatherCountryCode { get; set; } = "IR";
+    public string WeatherCountryName { get; set; } = "ایران";
     public string WeatherCity { get; set; } = "";
 
     // Calendar clock presentation. Values: analog/digital and khwarazmi/pahlavi/cuneiform/roman.
