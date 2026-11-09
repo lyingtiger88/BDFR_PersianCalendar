@@ -723,6 +723,60 @@ private fun CalendarScreen(
             }
         }
 
+        val weatherContext = LocalContext.current
+        val weatherPrefs = remember(weatherContext) {
+            weatherContext.getSharedPreferences("zurvan_weather", Context.MODE_PRIVATE)
+        }
+        var weatherEnabled by remember { mutableStateOf(weatherPrefs.getBoolean("enabled", true)) }
+        DisposableEffect(weatherPrefs) {
+            val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+                if (key == "enabled") weatherEnabled = weatherPrefs.getBoolean("enabled", true)
+            }
+            weatherPrefs.registerOnSharedPreferenceChangeListener(listener)
+            onDispose { weatherPrefs.unregisterOnSharedPreferenceChangeListener(listener) }
+        }
+        var weatherToday by remember { mutableStateOf<ZurvanWeatherData?>(null) }
+        var weatherError by remember { mutableStateOf<String?>(null) }
+        LaunchedEffect(weatherEnabled) {
+            if (weatherEnabled) {
+                runCatching { ZurvanWeather.load(weatherContext) }
+                    .onSuccess { weatherToday = it; weatherError = null }
+                    .onFailure { weatherError = "آب‌وهوا در دسترس نیست" }
+            }
+        }
+        if (weatherEnabled) {
+            Card(modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF102543))) {
+                Column(Modifier.fillMaxWidth().padding(9.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Text("🌤️ آب‌وهوای امروز · ${weatherToday?.city ?: prayerSettings.city}",
+                        color = Color.White, fontWeight = FontWeight.SemiBold)
+                    if (weatherToday != null) {
+                        val forecast = weatherToday!!
+                        Text("${ZurvanWeather.icon(forecast.nowCode)}  ${forecast.nowTemperature.toInt()}°C",
+                            color = Color.White, style = MaterialTheme.typography.titleMedium)
+                        Text("تغییرات دما در ۲۴ ساعت آینده", color = Color(0xFFCCDEF2),
+                            style = MaterialTheme.typography.labelSmall)
+                        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                            forecast.hours.forEach { hour ->
+                                Column(Modifier.width(46.dp).background(Color.White.copy(alpha=0.09f),
+                                    RoundedCornerShape(6.dp)).padding(3.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(hour.time.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm")),
+                                        color = Color.White, fontSize = 9.sp)
+                                    Text(ZurvanWeather.icon(hour.code), fontSize = 17.sp)
+                                    Text("${hour.temp.toInt()}°", color = Color.White, fontSize = 11.sp)
+                                }
+                            }
+                        }
+                    } else {
+                        Text(weatherError ?: "در حال دریافت آب‌وهوا...", color = Color(0xFFCEDCF2),
+                            style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+        }
+
         val weekRightToLeft = ZurvanThemes.weekRightToLeft.current
         CompositionLocalProvider(LocalLayoutDirection provides
             if (weekRightToLeft) LayoutDirection.Rtl else LayoutDirection.Ltr) {
@@ -796,6 +850,9 @@ private fun CalendarScreen(
                         dayHasContent,
                     hasNote = notes.any { it.dateKey == day.persianKey },
                     hasMedia = preferences.dayMediaEnabled && mediaTags.any { it.dateKey == day.persianKey },
+                    weatherForecast = if (weatherEnabled) weatherToday?.days?.get(
+                        java.time.LocalDate.of(day.gregorianYear, day.gregorianMonth, day.gregorianDay)
+                    ) else null,
                     onClick = {
                         selectedDay = day
                     }
@@ -1022,6 +1079,7 @@ private fun CalendarDayCard(
     hasNote: Boolean,
     hasMedia: Boolean,
     planIcons: List<String>,
+    weatherForecast: ZurvanWeatherDay? = null,
     onClick: () -> Unit
 ) {
     val weekdayColors = ZurvanThemes.weekdayColors.current
@@ -1135,6 +1193,16 @@ private fun CalendarDayCard(
                         .labelSmall
             )
 
+            if (weatherForecast != null) {
+                Text(
+                    ZurvanWeather.icon(weatherForecast.code) + " " +
+                        weatherForecast.high.toInt() + "°/" + weatherForecast.low.toInt() + "°",
+                    modifier = Modifier.align(Alignment.CenterEnd)
+                        .background(Color.White.copy(alpha = 0.55f), RoundedCornerShape(4.dp))
+                        .padding(horizontal = 2.dp),
+                    fontSize = 8.sp, color = Color(0xFF172F4A)
+                )
+            }
             if (occasionIcons.isNotEmpty()) {
                 Row(
                     modifier = Modifier.align(Alignment.TopStart),
@@ -2844,6 +2912,24 @@ private fun SettingsScreen(
                         modifier = Modifier.clickable { setWeekRtl(false) })
                 }
                 Text("تغییر بلافاصله روی تقویم اعمال و برای اجرای بعدی ذخیره می‌شود.",
+                    style = MaterialTheme.typography.bodySmall)
+            }
+        }
+        if (settingsCategory == "appearance") item {
+            val weatherPrefs = remember(context) {
+                context.getSharedPreferences("zurvan_weather", Context.MODE_PRIVATE)
+            }
+            var showWeather by remember { mutableStateOf(weatherPrefs.getBoolean("enabled", true)) }
+            SettingsCard(title = "آب‌وهوا در تقویم") {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text("نمایش دمای امروز، روند ۲۴ ساعت و پیش‌بینی هفت‌روزه",
+                        modifier = Modifier.weight(1f))
+                    Switch(checked = showWeather, onCheckedChange = { enabled ->
+                        showWeather = enabled
+                        weatherPrefs.edit().putBoolean("enabled", enabled).apply()
+                    })
+                }
+                Text("موقعیت آب‌وهوا از شهر تنظیم‌شده در اوقات شرعی گرفته می‌شود.",
                     style = MaterialTheme.typography.bodySmall)
             }
         }
