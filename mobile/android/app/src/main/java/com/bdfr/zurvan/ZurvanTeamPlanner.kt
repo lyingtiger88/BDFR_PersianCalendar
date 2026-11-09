@@ -71,6 +71,11 @@ fun ZurvanTeamPlanner(
     var remoteGroupId by remember { mutableStateOf(store.get("remote_group_id")) }
     var remoteSequence by remember { mutableLongStateOf(store.get("remote_sequence").toLongOrNull() ?: 0L) }
     var remoteMembers by remember { mutableStateOf<List<CollabMember>>(emptyList()) }
+    var sharedTaskTitle by remember { mutableStateOf("") }
+    var sharedMessage by remember { mutableStateOf("") }
+    var sharedItems by remember { mutableStateOf<List<String>>(emptyList()) }
+    var sharedMessages by remember { mutableStateOf<List<String>>(emptyList()) }
+    var pendingInvites by remember { mutableStateOf<List<Pair<String,String>>>(emptyList()) }
     var remoteSyncStatus by remember { mutableStateOf("همگام‌سازی گروه هنوز انجام نشده است.") }
     var profileName by remember { mutableStateOf(store.get("profile_name")) }
     var profileId by remember { mutableStateOf(store.get("profile_id")) }
@@ -225,10 +230,52 @@ fun ZurvanTeamPlanner(
                             .onFailure { status=it.message ?: "ارسال دعوت انجام نشد." }
                     }
                 }) { Text("ارسال دعوت آنلاین") }
+                OutlinedTextField(sharedTaskTitle,{sharedTaskTitle=it},label={Text("عنوان کار مشترک")},modifier=Modifier.fillMaxWidth())
+                Button(onClick={
+                    if(sessionToken.isBlank()||remoteGroupId.isBlank()||sharedTaskTitle.isBlank())status="ابتدا وارد حساب شوید، گروه را انتخاب کنید و عنوان کار را بنویسید."
+                    else scope.launch {
+                        runCatching { collaborationApi.createItem(sessionToken,remoteGroupId,sharedTaskTitle.trim()) }
+                            .onSuccess { sharedTaskTitle="";status="کار مشترک ثبت شد." }
+                            .onFailure { status=it.message ?: "ثبت کار انجام نشد." }
+                    }
+                }) { Text("ثبت کار مشترک آنلاین") }
+                OutlinedTextField(sharedMessage,{sharedMessage=it},label={Text("پیام گروه")},modifier=Modifier.fillMaxWidth())
+                Button(onClick={
+                    if(sessionToken.isBlank()||remoteGroupId.isBlank()||sharedMessage.isBlank())status="متن پیام را وارد کنید."
+                    else scope.launch {
+                        runCatching { collaborationApi.sendMessage(sessionToken,remoteGroupId,sharedMessage.trim()) }
+                            .onSuccess { sharedMessage="";status="پیام ارسال شد." }
+                            .onFailure { status=it.message ?: "ارسال پیام انجام نشد." }
+                    }
+                }) { Text("ارسال پیام گروه") }
+                Button(onClick={
+                    if(sessionToken.isBlank())status="ابتدا وارد حساب شوید."
+                    else scope.launch {
+                        runCatching {
+                            val inv=collaborationApi.invitations(sessionToken)
+                            pendingInvites=(0 until inv.length()).map { val x=inv.getJSONObject(it); x.getString("id") to "دعوت گروه: "+x.optJSONObject("collab_groups")?.optString("name").orEmpty() }
+                            if(pendingInvites.isEmpty())status="دعوت جدیدی ندارید."
+                        }.onFailure { status=it.message ?: "دریافت دعوت‌ها انجام نشد." }
+                    }
+                }) { Text("بررسی دعوت‌های دریافتی") }
+                pendingInvites.forEach { (inviteId,label) ->
+                    Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                        Text(label,modifier=Modifier.weight(1f))
+                        TextButton(onClick={
+                            scope.launch { runCatching { collaborationApi.accept(sessionToken,inviteId) }
+                                .onSuccess { status="عضویت در گروه پذیرفته شد." }
+                                .onFailure { status=it.message ?: "پذیرش دعوت انجام نشد." } }
+                        }) { Text("پذیرش") }
+                    }
+                }
                 Text("اعضای گروه",fontWeight=FontWeight.SemiBold)
                 remoteMembers.forEach { member ->
                     ListItem(headlineContent={Text(member.identifier)},supportingContent={Text(member.role)})
                 }
+                Text("کارهای مشترک",fontWeight=FontWeight.SemiBold)
+                sharedItems.forEach { Text("• $it",style=MaterialTheme.typography.bodySmall) }
+                Text("گفت‌وگوی گروه",fontWeight=FontWeight.SemiBold)
+                sharedMessages.takeLast(8).forEach { Text(it,style=MaterialTheme.typography.bodySmall) }
                 Text(remoteSyncStatus,style=MaterialTheme.typography.bodySmall)
                 if(sessionToken.isBlank()) Text("برای استفاده از گروه آنلاین، ورود به حساب Zurvan Desk الزامی است.",color=MaterialTheme.colorScheme.error)
                 LaunchedEffect(remoteGroupId,sessionToken,activeSection) {
@@ -243,6 +290,10 @@ fun ZurvanTeamPlanner(
                                 if(next>remoteSequence) {
                                     remoteSequence=next;store.set("remote_sequence",next.toString())
                                     remoteMembers=collaborationApi.members(sessionToken,remoteGroupId)
+                                    val items=collaborationApi.items(sessionToken,remoteGroupId)
+                                    sharedItems=(0 until items.length()).map { val x=items.getJSONObject(it); x.optString("title")+" • "+x.optString("state") }
+                                    val messages=collaborationApi.messages(sessionToken,remoteGroupId)
+                                    sharedMessages=(0 until messages.length()).map { val x=messages.getJSONObject(it); x.optString("body") }
                                     remoteSyncStatus="همگام‌سازی آنلاین فعال • آخرین تغییر: ${events.size}"
                                 } else remoteSyncStatus="متصل • بدون تغییر جدید"
                             }.onFailure { remoteSyncStatus="اتصال موقتاً قطع است؛ تلاش مجدد انجام می‌شود." }
