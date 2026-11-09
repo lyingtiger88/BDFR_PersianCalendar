@@ -159,3 +159,8 @@ Not yet complete: direct WebSocket subscription, offline write queue,
 push notifications, full timetable/homework APIs and UI, granular audit UI,
 real two-account end-to-end test, and cross-platform iOS client.
 Do not represent these items as finished.
+
+Build validation requested after wiring the Windows and Android clients. The
+GitHub Actions workflow is triggered with the `[pc-android-only]` marker to
+compile Core, the Windows desktop app and the Android debug APK; iOS and
+Theme Studio jobs are intentionally excluded from that targeted run.
