@@ -67,6 +67,7 @@ public sealed partial class MainWindow
         };
         faceHost.Children.Add(_zurvanDigitalTime);
         _zurvanClockFace.Visibility = _settings.CalendarClockMode == "digital" ? Visibility.Collapsed : Visibility.Visible;
+        faceArtwork.Visibility = _settings.CalendarClockMode == "digital" ? Visibility.Collapsed : Visibility.Visible;
         host.Children.Add(faceHost);
 
         var controls = new StackPanel { Spacing = 5, VerticalAlignment = VerticalAlignment.Center, Width = 142 };
