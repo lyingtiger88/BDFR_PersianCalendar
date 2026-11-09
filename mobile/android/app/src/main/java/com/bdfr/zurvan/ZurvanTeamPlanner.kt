@@ -100,7 +100,7 @@ private class TeamStore(private val context: Context) {
     fun removeQueuedCommand(commandId:String) {
         val old=queuedCommands().filterNot { it.optString("commandId")==commandId }
         val rows=JSONArray();old.forEach{rows.put(it)}
-        set("offline_commands",rows.toString())
+        prefs.edit().putString("offline_commands",encryptQueue(rows.toString())).apply()
     }
 }
 @OptIn(ExperimentalMaterial3Api::class)
