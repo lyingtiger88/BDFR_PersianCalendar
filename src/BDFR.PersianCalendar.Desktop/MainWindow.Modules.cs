@@ -1035,11 +1035,14 @@ public sealed partial class MainWindow
                                 _collaborationGroupId, commandId, "update_item", payload);
                             await LoadKanbanData();
                         }
-                        catch
+                        catch (Exception ex) when (!ex.Message.Contains("version_conflict", StringComparison.OrdinalIgnoreCase) &&
+                            !ex.Message.Contains("command_denied", StringComparison.OrdinalIgnoreCase) &&
+                            !ex.Message.Contains("command_rejected", StringComparison.OrdinalIgnoreCase))
                         {
                             _collaborationOfflineQueue.Enqueue(_collaborationGroupId, "update_item", payload, commandId);
-                            kanbanStatus.Text = "انتقال کارت در صف آفلاین ذخیره شد؛ در صورت تعارض نسخه نیاز به بازبینی دارد.";
+                            kanbanStatus.Text = "انتقال کارت در صف آفلاین ذخیره شد.";
                         }
+                        catch (Exception ex) { kanbanStatus.Text = "تعارض یا رد فرمان: " + ex.Message; }
                     }
                     catch (Exception ex) { kanbanStatus.Text = ex.Message; }
                 };
