@@ -292,6 +292,8 @@ public sealed partial class MainWindow
         Grid.SetColumn(logout, 2);
         header.Children.Add(logout);
 
+        var pendingList = new StackPanel { Spacing = 6 };
+        var list = new StackPanel { Spacing = 8 };
         var actions = new StackPanel
         {
             Orientation = Orientation.Horizontal,
@@ -320,8 +322,6 @@ public sealed partial class MainWindow
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
             Margin = new Thickness(0, 8, 0, 0)
         };
-        var pendingList = new StackPanel { Spacing = 6 };
-        var list = new StackPanel { Spacing = 8 };
         panel.Children.Add(header);
         panel.Children.Add(actions);
         panel.Children.Add(pendingTitle);
