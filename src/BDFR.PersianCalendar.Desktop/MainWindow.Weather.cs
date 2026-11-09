@@ -13,7 +13,8 @@ public sealed partial class MainWindow
     private readonly TextBlock _weatherNow = new();
     private readonly TextBlock _weatherDescription = new();
     private readonly TextBlock _weatherLocation = new();
-    private readonly StackPanel _weatherDays = new();
+    private readonly StackPanel _weatherPastDays = new();
+    private readonly StackPanel _weatherFutureDays = new();
     private readonly TextBox _weatherCityInput = new();
     private DateTime _weatherLastRequestUtc = DateTime.MinValue;
     private string _weatherLastCity = "";
@@ -44,17 +45,25 @@ public sealed partial class MainWindow
         _weatherDescription.TextWrapping = TextWrapping.Wrap;
         layout.Children.Add(_weatherDescription);
 
-        var dayScroll = new ScrollViewer
+        layout.Children.Add(new TextBlock
         {
-            HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
-            VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
-            HorizontalScrollMode = ScrollMode.Enabled,
-            VerticalScrollMode = ScrollMode.Disabled
-        };
-        _weatherDays.Orientation = Orientation.Horizontal;
-        _weatherDays.Spacing = 5;
-        dayScroll.Content = _weatherDays;
-        layout.Children.Add(dayScroll);
+            Text = "۷ روز گذشته",
+            FontSize = 11,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Foreground = ThemeService.Brush("#FFFFFFFF")
+        });
+        var pastScroll = CreateWeatherDayScroller(_weatherPastDays);
+        layout.Children.Add(pastScroll);
+        layout.Children.Add(new TextBlock
+        {
+            Text = "۷ روز آینده",
+            FontSize = 11,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Foreground = ThemeService.Brush("#FFFFFFFF"),
+            Margin = new Thickness(0, 4, 0, 0)
+        });
+        var futureScroll = CreateWeatherDayScroller(_weatherFutureDays);
+        layout.Children.Add(futureScroll);
         layout.Children.Add(new TextBlock
         {
             Text = "داده‌ها: Open-Meteo • دما بر حسب °C",
@@ -97,7 +106,8 @@ public sealed partial class MainWindow
         _weatherBusy = true;
         _weatherNow.Text = "در حال دریافت…";
         _weatherDescription.Text = "در حال اتصال به سرویس هواشناسی";
-        _weatherDays.Children.Clear();
+        _weatherPastDays.Children.Clear();
+        _weatherFutureDays.Children.Clear();
         try
         {
             string lat, lon, place;
@@ -135,7 +145,7 @@ public sealed partial class MainWindow
                 "&longitude=" + lon +
                 "&current=temperature_2m,relative_humidity_2m,weather_code,is_day,wind_speed_10m" +
                 "&daily=weather_code,temperature_2m_max,temperature_2m_min" +
-                "&timezone=auto&forecast_days=5");
+                "&timezone=auto&past_days=7&forecast_days=7");
             forecastResponse.EnsureSuccessStatusCode();
             using var forecast = JsonDocument.Parse(await forecastResponse.Content.ReadAsStringAsync());
             var root = forecast.RootElement;
@@ -155,26 +165,38 @@ public sealed partial class MainWindow
             var highs = daily.GetProperty("temperature_2m_max");
             var lows = daily.GetProperty("temperature_2m_min");
             var codes = daily.GetProperty("weather_code");
-            var count = Math.Min(5, dates.GetArrayLength());
-            for (var i = 0; i < count; i++)
+            var today = DateTime.Today;
+            var culture = new CultureInfo("fa-IR");
+            for (var i = 0; i < dates.GetArrayLength(); i++)
             {
-                var date = DateTime.Parse(dates[i].GetString()!, CultureInfo.InvariantCulture);
+                var date = DateTime.Parse(dates[i].GetString()!, CultureInfo.InvariantCulture).Date;
                 var high = highs[i].GetDouble();
                 var low = lows[i].GetDouble();
                 var codeDay = codes[i].GetInt32();
-                var tile = new StackPanel { Spacing = 4, Width = 44, HorizontalAlignment = HorizontalAlignment.Center };
+                var label = date == today ? "امروز" :
+                    date == today.AddDays(-1) ? "دیروز" :
+                    date == today.AddDays(1) ? "فردا" :
+                    date.ToString("ddd", culture);
+                var tile = new StackPanel { Spacing = 4, Width = 48, HorizontalAlignment = HorizontalAlignment.Center };
                 tile.Children.Add(new TextBlock {
-                    Text = i == 0 ? "امروز" : date.ToString("ddd", new CultureInfo("fa-IR")),
-                    FontSize = 10, Foreground = ThemeService.Brush("#FFFFFFFF"), TextAlignment = TextAlignment.Center });
+                    Text = label, FontSize = 10,
+                    Foreground = ThemeService.Brush("#FFFFFFFF"), TextAlignment = TextAlignment.Center });
                 tile.Children.Add(new TextBlock {
-                    Text = WeatherSymbol(codeDay, true), FontSize = 22, Foreground = ThemeService.Brush("#FFFFFFFF"), TextAlignment = TextAlignment.Center });
+                    Text = date.ToString("MM/dd", CultureInfo.InvariantCulture),
+                    FontSize = 9, Opacity = 0.7,
+                    Foreground = ThemeService.Brush("#FFFFFFFF"), TextAlignment = TextAlignment.Center });
+                tile.Children.Add(new TextBlock {
+                    Text = WeatherSymbol(codeDay, true), FontSize = 22,
+                    Foreground = ThemeService.Brush("#FFFFFFFF"), TextAlignment = TextAlignment.Center });
                 tile.Children.Add(new TextBlock {
                     Text = high.ToString("0", CultureInfo.InvariantCulture) + "°",
                     FontSize = 11, Foreground = ThemeService.Brush("#FFFFFFFF"), TextAlignment = TextAlignment.Center });
                 tile.Children.Add(new TextBlock {
                     Text = low.ToString("0", CultureInfo.InvariantCulture) + "°",
-                    FontSize = 10, Opacity = 0.75, Foreground = ThemeService.Brush("#FFFFFFFF"), TextAlignment = TextAlignment.Center });
-                _weatherDays.Children.Add(new Border {
+                    FontSize = 10, Opacity = 0.75,
+                    Foreground = ThemeService.Brush("#FFFFFFFF"), TextAlignment = TextAlignment.Center });
+                var target = date < today ? _weatherPastDays : _weatherFutureDays;
+                target.Children.Add(new Border {
                     CornerRadius = new CornerRadius(7), Padding = new Thickness(3, 6, 3, 6),
                     Background = BrushWithAlpha("#FFFFFFFF", 0x20), Child = tile });
             }
@@ -189,6 +211,20 @@ public sealed partial class MainWindow
             StartupDiagnostics.Log("Weather fetch failed: " + ex.Message);
         }
         finally { _weatherBusy = false; }
+    }
+
+    private static ScrollViewer CreateWeatherDayScroller(StackPanel days)
+    {
+        days.Orientation = Orientation.Horizontal;
+        days.Spacing = 5;
+        return new ScrollViewer
+        {
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            HorizontalScrollMode = ScrollMode.Enabled,
+            VerticalScrollMode = ScrollMode.Disabled,
+            Content = days
+        };
     }
 
     private static string WeatherCondition(int code) => code switch
