@@ -485,6 +485,11 @@ private struct MobileSettingsView: View {
     @AppStorage("zurvan.weather.timezone") private var weatherTimeZone = "Asia/Tehran"
     @AppStorage("zurvan.language") private var language = "fa"
     @AppStorage("zurvan.zodiac.theme") private var zodiacTheme = "cosmic"
+    @AppStorage("zurvan.clock.mode") private var clockMode = "analog"
+    @AppStorage("zurvan.clock.digitalStyle") private var digitalClockStyle = "classic"
+    @AppStorage("zurvan.clock.analogNumerals") private var analogNumeralStyle = "zurvan"
+    @AppStorage("zurvan.clock.twentyFourHours") private var clockTwentyFour = true
+    @AppStorage("zurvan.clock.showSeconds") private var clockSeconds = true
     private let zodiacStyles: [(String, String, String)] = [
         ("cosmic", "کیهانی کلاسیک", "Classic Cosmic"),
         ("neon", "فانتزی نورانی", "Luminous Fantasy"),
@@ -526,6 +531,42 @@ private struct MobileSettingsView: View {
                     .pickerStyle(.menu)
                     Text("تم‌های متناظر با ویندوز و اندروید؛ انتخاب در دستگاه ذخیره می‌شود.")
                         .font(.footnote).foregroundStyle(.secondary)
+                }
+                .padding()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
+
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("ساعت زروان").font(.headline)
+                    Picker("نوع ساعت", selection: $clockMode) {
+                        Text("آنالوگ").tag("analog")
+                        Text("دیجیتال").tag("digital")
+                    }
+                    .pickerStyle(.segmented)
+                    ZurvanClockViewIOS()
+                        .frame(maxWidth: .infinity)
+                    if clockMode == "analog" {
+                        Picker("شمارگان ساعت", selection: $analogNumeralStyle) {
+                            Text("زروان (فارسی)").tag("zurvan")
+                            Text("خوارزمی (نشانگر تزئینی)").tag("khwarazmi")
+                            Text("پهلوی (نشانگر تزئینی)").tag("pahlavi")
+                            Text("میخی (نشانگر تزئینی)").tag("cuneiform")
+                            Text("رومی (I–XII)").tag("roman")
+                        }
+                        .pickerStyle(.menu)
+                        Text("تا زمان اعتبارسنجی تاریخی، گزینه‌های خوارزمی، پهلوی و میخی با نشانگر گرافیکی موقت نمایش داده می‌شوند.")
+                            .font(.footnote).foregroundStyle(.secondary)
+                    } else {
+                        Picker("طرح دیجیتال", selection: $digitalClockStyle) {
+                            Text("کلاسیک طلایی").tag("classic")
+                            Text("مدرن فیروزه‌ای").tag("modern")
+                            Text("نقطه‌ای بنفش").tag("dots")
+                            Text("فلیپ").tag("flip")
+                        }
+                        .pickerStyle(.menu)
+                        Toggle("نمایش ۲۴ ساعته", isOn: $clockTwentyFour)
+                    }
+                    Toggle("نمایش ثانیه", isOn: $clockSeconds)
                 }
                 .padding()
                 .frame(maxWidth: .infinity, alignment: .leading)
