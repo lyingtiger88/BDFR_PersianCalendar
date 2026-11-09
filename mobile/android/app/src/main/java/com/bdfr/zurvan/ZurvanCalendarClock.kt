@@ -7,6 +7,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Path
@@ -35,8 +36,15 @@ private fun clockNumerals(style: ZurvanNumeralStyle): List<String> = when (style
 
 @Composable
 fun ZurvanCalendarClock(modifier: Modifier = Modifier) {
-    var digital by rememberSaveable { mutableStateOf(false) }
-    var numeralStyle by rememberSaveable { mutableStateOf(ZurvanNumeralStyle.KHWARAZMI) }
+    val context = LocalContext.current
+    val clockPrefs = remember(context) { context.getSharedPreferences("zurvan_clock_preferences", android.content.Context.MODE_PRIVATE) }
+    var digital by rememberSaveable { mutableStateOf(clockPrefs.getBoolean("digital", false)) }
+    var numeralStyle by rememberSaveable {
+        mutableStateOf(
+            ZurvanNumeralStyle.entries.firstOrNull { it.name == clockPrefs.getString("numeral_style", "KHWARAZMI") }
+                ?: ZurvanNumeralStyle.KHWARAZMI
+        )
+    }
     var styleMenu by remember { mutableStateOf(false) }
     var now by remember { mutableStateOf(LocalTime.now()) }
 
@@ -51,7 +59,10 @@ fun ZurvanCalendarClock(modifier: Modifier = Modifier) {
     val accent = MaterialTheme.colorScheme.primary
     Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            TextButton(onClick = { digital = !digital }) {
+            TextButton(onClick = {
+                digital = !digital
+                clockPrefs.edit().putBoolean("digital", digital).apply()
+            }) {
                 Text(if (digital) "نمایش آنالوگ" else "نمایش دیجیتال")
             }
             Box {
@@ -60,7 +71,11 @@ fun ZurvanCalendarClock(modifier: Modifier = Modifier) {
                     ZurvanNumeralStyle.entries.forEach { style ->
                         DropdownMenuItem(
                             text = { Text(style.title) },
-                            onClick = { numeralStyle = style; styleMenu = false }
+                            onClick = {
+                                numeralStyle = style
+                                clockPrefs.edit().putString("numeral_style", style.name).apply()
+                                styleMenu = false
+                            }
                         )
                     }
                 }
