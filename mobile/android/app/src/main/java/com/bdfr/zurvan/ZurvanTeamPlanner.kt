@@ -86,8 +86,17 @@ private class TeamStore(private val context: Context) {
         cipher.init(Cipher.DECRYPT_MODE,offlineQueueSecret(),GCMParameterSpec(128,raw.copyOfRange(0,12)))
         return String(cipher.doFinal(raw.copyOfRange(12,raw.size)),Charsets.UTF_8)
     }
+    private fun offlineQueueText():String {
+        val stored=prefs.getString("offline_commands","")?.takeIf{it.isNotBlank()} ?: return "[]"
+        return try { decryptQueue(stored) } catch (e:Exception) {
+            if(stored.trimStart().startsWith("[")) {
+                prefs.edit().putString("offline_commands",encryptQueue(stored)).apply()
+                stored
+            } else throw e
+        }
+    }
     fun enqueueCommand(groupId:String,commandId:String,kind:String,payload:JSONObject) {
-        val rows=JSONArray(prefs.getString("offline_commands","")?.takeIf{it.isNotBlank()}?.let(::decryptQueue) ?: "[]")
+        val rows=JSONArray(offlineQueueText())
         if((0 until rows.length()).any { rows.getJSONObject(it).optString("commandId")==commandId }) return
         rows.put(JSONObject().put("groupId",groupId).put("commandId",commandId)
             .put("kind",kind).put("payload",payload).put("createdAt",System.currentTimeMillis()))
