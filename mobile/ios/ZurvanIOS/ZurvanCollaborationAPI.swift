@@ -138,7 +138,7 @@ struct ZurvanCollaborationAPI {
         let _: [String: String] = try await request("POST", "groups/\(groupID)/subjects", token: token, body: ["name": name], as: [String: String].self)
     }
     func timetable(token: String, groupID: String) async throws -> [[String: Any]] {
-        try await raw("GET", "groups/\(groupID)/timetable", token: token)
+        try await raw("GET", "groups/\(groupID)/timetable", token: token) as? [[String: Any]] ?? []
     }
     func createTimetableSlot(token: String, groupID: String, subjectID: String, weekday: Int,
                              startTime: String, endTime: String, room: String = "") async throws {
