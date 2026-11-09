@@ -269,4 +269,144 @@ public sealed partial class MainWindow
         group.Unloaded += (_, _) => timer.Stop();
         return group;
     }
+    /// <summary>
+    /// Compact clock mounted on the desktop calendar home screen. A fresh instance
+    /// is created when the calendar page is rebuilt, so persisted preferences
+    /// remain the single source of truth.
+    /// </summary>
+    private FrameworkElement BuildCompactCalendarClock()
+    {
+        var root = new Grid
+        {
+            Width = 240,
+            Height = 145,
+            HorizontalAlignment = HorizontalAlignment.Center
+        };
+        var dark = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 22, 26, 48));
+        var gold = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 214, 166, 77));
+        var ink = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 22, 22, 26));
+        var red = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 195, 63, 52));
+        var canvas = new Canvas
+        {
+            Width = 140,
+            Height = 140,
+            HorizontalAlignment = HorizontalAlignment.Center
+        };
+        var star = new Polygon
+        {
+            Stroke = ink, StrokeThickness = 3,
+            Fill = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 252, 250, 242))
+        };
+        var points = new Microsoft.UI.Xaml.Media.PointCollection();
+        for (var i = 0; i < 24; i++)
+        {
+            var angle = (i * 15 - 90) * Math.PI / 180;
+            var radius = i % 2 == 0 ? 65 : 49;
+            points.Add(new Point(70 + radius * Math.Cos(angle),
+                                 70 + radius * Math.Sin(angle)));
+        }
+        star.Points = points;
+        canvas.Children.Add(star);
+        var roman = new[] { "XII", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI" };
+        var fa = new[] { "۱۲", "۱", "۲", "۳", "۴", "۵", "۶", "۷", "۸", "۹", "۱۰", "۱۱" };
+        for (var i = 0; i < 12; i++)
+        {
+            var angle = (i * 30 - 90) * Math.PI / 180;
+            var text = _settings.AnalogClockNumeralStyle switch
+            {
+                "roman" => roman[i],
+                "khwarazmi" => "◇",
+                "pahlavi" => "✣",
+                "cuneiform" => "◆",
+                _ => fa[i]
+            };
+            var marker = new TextBlock
+            {
+                Text = text, Width = 24, FontSize = 9,
+                Foreground = ink, TextAlignment = TextAlignment.Center,
+                IsHitTestVisible = false
+            };
+            Canvas.SetLeft(marker, 70 + 41 * Math.Cos(angle) - 12);
+            Canvas.SetTop(marker, 70 + 41 * Math.Sin(angle) - 7);
+            canvas.Children.Add(marker);
+        }
+        Line CreateHand(double length, Brush brush, double width)
+        {
+            var hand = new Line
+            {
+                X1 = 70, Y1 = 70, X2 = 70, Y2 = 70 - length,
+                Stroke = brush, StrokeThickness = width,
+                StrokeStartLineCap = PenLineCap.Round,
+                StrokeEndLineCap = PenLineCap.Round,
+                RenderTransform = new RotateTransform { CenterX = 70, CenterY = 70 }
+            };
+            canvas.Children.Add(hand);
+            return hand;
+        }
+        var hours = CreateHand(24, ink, 5);
+        var minutes = CreateHand(34, gold, 3);
+        var seconds = CreateHand(40, red, 1.5);
+        var center = new Ellipse { Width = 8, Height = 8, Fill = gold };
+        Canvas.SetLeft(center, 66);
+        Canvas.SetTop(center, 66);
+        canvas.Children.Add(center);
+        root.Children.Add(canvas);
+
+        var clockText = new TextBlock
+        {
+            Foreground = gold,
+            FontFamily = new FontFamily("Consolas"),
+            FontWeight = Microsoft.UI.Text.FontWeights.Bold,
+            FontSize = 32,
+            TextAlignment = TextAlignment.Center,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        var digital = new Border
+        {
+            Width = 230, Height = 82,
+            CornerRadius = new CornerRadius(14),
+            Background = dark,
+            BorderBrush = gold, BorderThickness = new Thickness(2),
+            Child = clockText
+        };
+        root.Children.Add(digital);
+
+        void Refresh()
+        {
+            var now = DateTime.Now;
+            var isDigital = _settings.ClockDisplayMode == "digital";
+            canvas.Visibility = isDigital ? Visibility.Collapsed : Visibility.Visible;
+            digital.Visibility = isDigital ? Visibility.Visible : Visibility.Collapsed;
+            if (isDigital)
+            {
+                var format = _settings.DigitalClockTwentyFourHours
+                    ? (_settings.ClockShowSeconds ? "HH:mm:ss" : "HH:mm")
+                    : (_settings.ClockShowSeconds ? "hh:mm:ss tt" : "hh:mm tt");
+                clockText.Text = now.ToString(format, CultureInfo.InvariantCulture);
+                clockText.FontSize = _settings.ClockShowSeconds ? 30 : 36;
+                clockText.Foreground = _settings.DigitalClockStyle switch
+                {
+                    "modern" => new SolidColorBrush(Windows.UI.Color.FromArgb(255, 100, 222, 243)),
+                    "dots" => new SolidColorBrush(Windows.UI.Color.FromArgb(255, 220, 198, 248)),
+                    "flip" => new SolidColorBrush(Windows.UI.Color.FromArgb(255, 244, 244, 248)),
+                    _ => gold
+                };
+            }
+            else
+            {
+                ((RotateTransform)hours.RenderTransform).Angle = (now.Hour % 12) * 30 + now.Minute * .5;
+                ((RotateTransform)minutes.RenderTransform).Angle = now.Minute * 6 + now.Second * .1;
+                ((RotateTransform)seconds.RenderTransform).Angle = now.Second * 6;
+                seconds.Visibility = _settings.ClockShowSeconds ? Visibility.Visible : Visibility.Collapsed;
+            }
+        }
+        var timer = DispatcherQueue.CreateTimer();
+        timer.Interval = TimeSpan.FromSeconds(1);
+        timer.Tick += (_, _) => Refresh();
+        root.Loaded += (_, _) => { Refresh(); timer.Start(); };
+        root.Unloaded += (_, _) => timer.Stop();
+        return root;
+    }
+
 }
