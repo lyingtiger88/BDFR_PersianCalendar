@@ -786,15 +786,25 @@ public sealed partial class MainWindow
                 var memberWorkspace = new StackPanel { Spacing = 6 };
                 var memberPicker = new ComboBox { Header = "عضو گروه", MinWidth = 260 };
                 var memberIds = new List<string>();
+                var memberPermissions = new List<(bool Chat, bool Report, bool Edit)>();
                 var memberChat = new CheckBox { Content = "اجازه گفت‌وگو", IsChecked = true };
                 var memberReport = new CheckBox { Content = "اجازه ثبت گزارش", IsChecked = true };
                 var memberEdit = new CheckBox { Content = "اجازه ویرایش", IsChecked = false };
                 var memberStatus = new TextBlock { TextWrapping = TextWrapping.Wrap };
+                memberPicker.SelectionChanged += (_, _) =>
+                {
+                    var index = memberPicker.SelectedIndex;
+                    if (index < 0 || index >= memberPermissions.Count) return;
+                    memberChat.IsChecked = memberPermissions[index].Chat;
+                    memberReport.IsChecked = memberPermissions[index].Report;
+                    memberEdit.IsChecked = memberPermissions[index].Edit;
+                };
                 async Task RefreshMembers()
                 {
                     using var detail = await _deskClient.ReadCollaborationGroupAsync(_collaborationGroupId);
                     var rows = detail.RootElement.GetProperty("members").EnumerateArray().ToList();
                     memberIds = rows.Select(x => x.GetProperty("account_id").GetString() ?? "").ToList();
+                    memberPermissions = rows.Select(x => (x.GetProperty("can_chat").GetBoolean(), x.GetProperty("can_report").GetBoolean(), x.GetProperty("can_edit").GetBoolean())).ToList();
                     memberPicker.ItemsSource = rows.Select(x =>
                     {
                         var account = x.TryGetProperty("account", out var a) ? a : default;
