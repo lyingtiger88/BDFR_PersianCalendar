@@ -53,6 +53,13 @@ builder.Services.AddSingleton<IDeskBlobStore>(sp =>
         return new ArvanDeskBlobStore(objectStore);
     }
 
+    var environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
+    if (string.Equals(environment, "Production", StringComparison.OrdinalIgnoreCase))
+    {
+        throw new InvalidOperationException(
+            "Production startup blocked: configure ZURVAN_DESK_S3_BUCKET, ZURVAN_DESK_S3_ACCESS_KEY and ZURVAN_DESK_S3_SECRET_KEY. Local blob fallback is development-only.");
+    }
+
     var root =
         Environment.GetEnvironmentVariable("ZURVAN_DESK_LOCAL_BLOB_ROOT") ??
         Path.Combine(AppContext.BaseDirectory, "App_Data", "blobs");
