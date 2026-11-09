@@ -368,6 +368,9 @@ fun ZurvanTeamPlanner(
                 var homeworkTitle by remember { mutableStateOf("") }
                 var homeworkInstructions by remember { mutableStateOf("") }
                 var schoolHomework by remember { mutableStateOf<List<Pair<String,String>>>(emptyList()) }
+                var schoolTimetable by remember { mutableStateOf<List<JSONObject>>(emptyList()) }
+                var gradeValue by remember { mutableStateOf("0") }
+                var gradeFeedback by remember { mutableStateOf("") }
                 var submissionText by remember { mutableStateOf("") }
                 Text("محیط مدرسه",fontWeight=FontWeight.SemiBold)
                 OutlinedTextField(subjectName,{subjectName=it},label={Text("نام درس")},modifier=Modifier.fillMaxWidth())
@@ -384,10 +387,21 @@ fun ZurvanTeamPlanner(
                             schoolSubjects=(0 until a.length()).map { val x=a.getJSONObject(it);x.getString("id") to x.getString("name") }
                             val h=collaborationApi.homework(sessionToken,remoteGroupId)
                             schoolHomework=(0 until h.length()).map { val x=h.getJSONObject(it);x.getString("id") to x.getString("title") }
+                            val t=collaborationApi.timetable(sessionToken,remoteGroupId)
+                            schoolTimetable=(0 until t.length()).map{t.getJSONObject(it)}
                         }.onFailure { status=it.message ?: "بارگذاری مدرسه ناموفق بود." } }
                     }) { Text("بارگذاری مدرسه") }
                 }
                 schoolSubjects.forEach { (_,name) -> Text("درس: $name") }
+                schoolSubjects.firstOrNull()?.let { (subjectId,subjectTitle) ->
+                    Text("برنامه هفتگی • $subjectTitle",fontWeight=FontWeight.Medium)
+                    Button(onClick={
+                        scope.launch { runCatching { collaborationApi.createTimetableSlot(sessionToken,remoteGroupId,subjectId,0,"08:00","09:00") }
+                            .onSuccess { status="جلسه هفتگی ثبت شد.";val t=collaborationApi.timetable(sessionToken,remoteGroupId);schoolTimetable=(0 until t.length()).map{t.getJSONObject(it)} }
+                            .onFailure { status=it.message ?: "ثبت جلسه ناموفق بود." } }
+                    }) { Text("افزودن جلسه دوشنبه ۸ تا ۹") }
+                }
+                schoolTimetable.forEach { slot -> Text("روز "+slot.optInt("weekday")+" • "+slot.optString("start_time")+" تا "+slot.optString("end_time")) }
                 OutlinedTextField(homeworkTitle,{homeworkTitle=it},label={Text("عنوان تکلیف")},modifier=Modifier.fillMaxWidth())
                 OutlinedTextField(homeworkInstructions,{homeworkInstructions=it},label={Text("شرح تکلیف")},modifier=Modifier.fillMaxWidth())
                 Button(onClick={
@@ -415,6 +429,20 @@ fun ZurvanTeamPlanner(
                 sharedItems.forEach { Text("• $it",style=MaterialTheme.typography.bodySmall) }
                 Text("گفت‌وگوی گروه",fontWeight=FontWeight.SemiBold)
                 sharedMessages.takeLast(8).forEach { Text(it,style=MaterialTheme.typography.bodySmall) }
+                OutlinedTextField(gradeValue,{gradeValue=it},label={Text("نمره ۰ تا ۱۰۰")},modifier=Modifier.fillMaxWidth())
+                OutlinedTextField(gradeFeedback,{gradeFeedback=it},label={Text("بازخورد معلم")},modifier=Modifier.fillMaxWidth())
+                Button(onClick={
+                    val homeworkId=schoolHomework.firstOrNull()?.first
+                    val grade=gradeValue.toDoubleOrNull()
+                    if(homeworkId==null||grade==null||grade !in 0.0..100.0)status="تکلیف و نمره معتبر انتخاب کنید."
+                    else scope.launch { runCatching {
+                        val a=collaborationApi.submissions(sessionToken,homeworkId)
+                        if(a.length()==0)error("هنوز پاسخی ثبت نشده است.")
+                        val sub=a.getJSONObject(0)
+                        collaborationApi.gradeSubmission(sessionToken,homeworkId,sub.getString("id"),grade,gradeFeedback)
+                    }.onSuccess { status="نمره و بازخورد ثبت شد." }
+                        .onFailure { status=it.message ?: "ثبت نمره ناموفق بود." } }
+                }) { Text("تصحیح اولین پاسخ تکلیف") }
                 Text(remoteSyncStatus,style=MaterialTheme.typography.bodySmall)
                 if(sessionToken.isBlank()) Text("برای استفاده از گروه آنلاین، ورود به حساب Zurvan Desk الزامی است.",color=MaterialTheme.colorScheme.error)
                 LaunchedEffect(remoteGroupId,sessionToken,activeSection) {
