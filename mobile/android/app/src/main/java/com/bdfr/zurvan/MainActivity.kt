@@ -1202,12 +1202,16 @@ private fun CalendarDayCard(
 
             if (weatherForecast != null) {
                 Text(
-                    ZurvanWeather.icon(weatherForecast.code) + " " +
+                    ZurvanWeather.icon(weatherForecast.code) + "\n" +
                         weatherForecast.high.toInt() + "°/" + weatherForecast.low.toInt() + "°",
                     modifier = Modifier.align(Alignment.CenterEnd)
                         .background(Color.White.copy(alpha = 0.55f), RoundedCornerShape(4.dp))
                         .padding(horizontal = 2.dp),
-                    fontSize = 8.sp, color = Color(0xFF172F4A)
+                    fontSize = 7.sp,
+                    lineHeight = 8.sp,
+                    maxLines = 2,
+                    textAlign = TextAlign.Center,
+                    color = Color(0xFF172F4A)
                 )
             }
             if (occasionIcons.isNotEmpty()) {
