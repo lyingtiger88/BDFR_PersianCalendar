@@ -39,6 +39,30 @@ public sealed partial class MainWindow
             style.Items.Add(new ComboBoxItem { Content = item.Name, Tag = item.Id });
         style.SelectedIndex = Math.Max(0, Array.FindIndex(styles, x => x.Id == _settings.DigitalClockStyle));
 
+        var numeral = new ComboBox
+        {
+            Header = "سبک شمارگان صفحه آنالوگ",
+            MinWidth = 230,
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+        var numeralStyles = new (string Id, string Label)[]
+        {
+            ("zurvan", "زروان (ارقام فارسی)"),
+            ("khwarazmi", "خوارزمی (نشانگرهای بازسازی‌شده)"),
+            ("pahlavi", "پهلوی (نشانگرهای بازسازی‌شده)"),
+            ("cuneiform", "میخی (نشانگرهای بازسازی‌شده)"),
+            ("roman", "رومی (I–XII)")
+        };
+        foreach (var item in numeralStyles)
+            numeral.Items.Add(new ComboBoxItem { Content = item.Label, Tag = item.Id });
+        numeral.SelectedIndex = Math.Max(0, Array.FindIndex(numeralStyles,
+            x => x.Id == _settings.AnalogClockNumeralStyle));
+        var analogOptions = new StackPanel { Spacing = 8 };
+        analogOptions.Children.Add(numeral);
+        analogOptions.Children.Add(SettingsHint(
+            "شمارگان خوارزمی، پهلوی و میخی فعلاً نشانگرهای گرافیکی هستند؛ " +
+            "تا زمان تأیید منابع تاریخی به‌عنوان اعداد اصیل نمایش داده نمی‌شوند."));
+
         var use24h = SettingsToggle(_settings.DigitalClockTwentyFourHours, enabled =>
         {
             _settings.DigitalClockTwentyFourHours = enabled;
@@ -92,13 +116,38 @@ public sealed partial class MainWindow
         Canvas.SetTop(dial, 60);
         face.Children.Add(dial);
 
+        var numeralLabels = new List<TextBlock>();
+        var romanNumerals = new[] { "XII", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI" };
+        var persianNumerals = new[] { "۱۲", "۱", "۲", "۳", "۴", "۵", "۶", "۷", "۸", "۹", "۱۰", "۱۱" };
         for (int i = 0; i < 12; i++)
         {
             var angle = (i * 30.0 - 90) * Math.PI / 180.0;
-            var marker = new Ellipse { Width = 5, Height = 5, Fill = black };
-            Canvas.SetLeft(marker, 140 + Math.Cos(angle) * 70 - 2.5);
-            Canvas.SetTop(marker, 140 + Math.Sin(angle) * 70 - 2.5);
+            var marker = new TextBlock
+            {
+                Width = 32, Height = 20,
+                TextAlignment = TextAlignment.Center,
+                FontSize = 12, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                Foreground = black
+            };
+            Canvas.SetLeft(marker, 140 + Math.Cos(angle) * 69 - 16);
+            Canvas.SetTop(marker, 140 + Math.Sin(angle) * 69 - 10);
             face.Children.Add(marker);
+            numeralLabels.Add(marker);
+        }
+        void RefreshNumerals()
+        {
+            for (int i = 0; i < numeralLabels.Count; i++)
+            {
+                numeralLabels[i].Text = _settings.AnalogClockNumeralStyle switch
+                {
+                    "roman" => romanNumerals[i],
+                    "zurvan" => persianNumerals[i],
+                    "cuneiform" => "◆",
+                    "pahlavi" => "✣",
+                    "khwarazmi" => "◇",
+                    _ => persianNumerals[i]
+                };
+            }
         }
 
         Line CreateHand(double length, double stroke, Brush brush)
@@ -154,6 +203,8 @@ public sealed partial class MainWindow
             face.Visibility = digital ? Visibility.Collapsed : Visibility.Visible;
             digitalFace.Visibility = digital ? Visibility.Visible : Visibility.Collapsed;
             digitalOptions.Visibility = digital ? Visibility.Visible : Visibility.Collapsed;
+            analogOptions.Visibility = digital ? Visibility.Collapsed : Visibility.Visible;
+            RefreshNumerals();
             if (digital)
             {
                 var pattern = _settings.DigitalClockTwentyFourHours
@@ -178,6 +229,14 @@ public sealed partial class MainWindow
             }
         }
 
+        numeral.SelectionChanged += (_, _) =>
+        {
+            _settings.AnalogClockNumeralStyle =
+                (numeral.SelectedItem as ComboBoxItem)?.Tag as string ?? "zurvan";
+            _settingsService.Save(_settings);
+            RefreshPreview();
+        };
+
         mode.SelectionChanged += (_, _) =>
         {
             _settings.ClockDisplayMode = (mode.SelectedItem as ComboBoxItem)?.Tag as string ?? "analog";
@@ -195,6 +254,7 @@ public sealed partial class MainWindow
 
         group.Children.Add(mode);
         group.Children.Add(preview);
+        group.Children.Add(analogOptions);
         group.Children.Add(digitalOptions);
         group.Children.Add(SettingsHint("پیش‌نمایش زنده است و انتخاب‌ها برای اجرای بعدی نیز ذخیره می‌شوند."));
 
