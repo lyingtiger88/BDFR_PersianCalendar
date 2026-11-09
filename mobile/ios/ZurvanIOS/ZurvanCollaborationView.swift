@@ -314,12 +314,18 @@ struct ZurvanCollaborationView: View {
             queue = try JSONDecoder().decode([ZurvanQueuedCollabCommand].self, from: clear)
         } catch { status = "صف آفلاین رمزگذاری‌شده قابل بازیابی نیست؛ داده محلی حفظ شده است." }
     }
-    private func saveQueue() {
+    @discardableResult
+    private func saveQueue() -> Bool {
         do {
             let clear = try JSONEncoder().encode(queue)
             let sealed = try AES.GCM.seal(clear, using: queueEncryptionKey())
-            if let combined = sealed.combined { UserDefaults.standard.set(combined, forKey: queueKey) }
-        } catch { status = "رمزگذاری صف آفلاین ناموفق بود؛ فرمان‌ها ارسال نشده‌اند." }
+            guard let combined = sealed.combined else { throw ZurvanCollabAPIError.invalidResponse }
+            UserDefaults.standard.set(combined, forKey: queueKey)
+            return true
+        } catch {
+            status = "رمزگذاری صف آفلاین ناموفق بود؛ فرمان‌ها ارسال نشده‌اند."
+            return false
+        }
     }
     private func enqueueOrSend(_ kind: String, payload: [String: Any]) {
         let id = UUID().uuidString.lowercased()
@@ -334,8 +340,9 @@ struct ZurvanCollaborationView: View {
                 }
                 guard let data = try? JSONSerialization.data(withJSONObject: payload) else { status = error.localizedDescription; return }
                 queue.append(ZurvanQueuedCollabCommand(id: id, groupID: groupID, kind: kind, payload: data, createdAt: Date()))
-                saveQueue()
-                status = "فرمان در صف آفلاین ذخیره شد و بعداً با شناسه ثابت ارسال می‌شود."
+                if saveQueue() {
+                    status = "فرمان در صف آفلاین ذخیره شد و بعداً با شناسه ثابت ارسال می‌شود."
+                }
             } catch {
                 guard let data = try? JSONSerialization.data(withJSONObject: payload) else { status = error.localizedDescription; return }
                 queue.append(ZurvanQueuedCollabCommand(id: id, groupID: groupID, kind: kind, payload: data, createdAt: Date()))
