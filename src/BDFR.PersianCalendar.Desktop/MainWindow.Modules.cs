@@ -897,6 +897,11 @@ public sealed partial class MainWindow
                 var kanbanColumnName = new TextBox { Header = "ستون جدید Kanban", PlaceholderText = "مثلاً در انتظار" };
                 var kanbanColumnPicker = new ComboBox { Header = "ستون‌ها", MinWidth = 260 };
                 var kanbanColumnIds = new List<string>();
+                var kanbanCardIds = new List<string>();
+                var kanbanCardTitles = new List<string>();
+                var kanbanCardColumns = new List<string>();
+                var kanbanCardVersions = new List<int>();
+                var kanbanCardPicker = new ComboBox { Header = "کارت برای جابه‌جایی", MinWidth = 260 };
                 var kanbanStatus = new TextBlock { TextWrapping = TextWrapping.Wrap };
                 async Task LoadKanbanData()
                 {
@@ -907,7 +912,15 @@ public sealed partial class MainWindow
                         kanbanColumnIds = rows.Select(x => x.GetProperty("id").GetString() ?? "").ToList();
                         kanbanColumnPicker.ItemsSource = rows.Select(x => x.GetProperty("name").GetString() ?? "").ToArray();
                         kanbanColumnPicker.SelectedIndex = rows.Count > 0 ? 0 : -1;
-                        kanbanStatus.Text = $"{rows.Count} ستون بارگذاری شد.";
+                        using var items = await _deskClient.ReadCollaborationItemsAsync(_collaborationGroupId);
+                        var cards = items.RootElement.EnumerateArray().Where(x => x.TryGetProperty("mode", out var mode) && mode.GetString() == "kanban").ToList();
+                        kanbanCardIds = cards.Select(x => x.GetProperty("id").GetString() ?? "").ToList();
+                        kanbanCardTitles = cards.Select(x => x.GetProperty("title").GetString() ?? "").ToList();
+                        kanbanCardColumns = cards.Select(x => x.TryGetProperty("column_id", out var col) && col.ValueKind == JsonValueKind.String ? col.GetString()! : "").ToList();
+                        kanbanCardVersions = cards.Select(x => x.TryGetProperty("version", out var ver) ? ver.GetInt32() : 1).ToList();
+                        kanbanCardPicker.ItemsSource = kanbanCardTitles.ToArray();
+                        kanbanCardPicker.SelectedIndex = cards.Count > 0 ? 0 : -1;
+                        kanbanStatus.Text = $"{rows.Count} ستون • {cards.Count} کارت بارگذاری شد.";
                     }
                     catch (Exception ex) { kanbanStatus.Text = ex.Message; }
                 }
@@ -917,6 +930,22 @@ public sealed partial class MainWindow
                 addKanbanColumn.Click += async (_, _) =>
                 {
                     try { using var _ = await _deskClient.CreateKanbanColumnAsync(_collaborationGroupId, kanbanColumnName.Text.Trim()); kanbanColumnName.Text = ""; await LoadKanbanData(); }
+                    catch (Exception ex) { kanbanStatus.Text = ex.Message; }
+                };
+                var moveKanbanCard = MakeButton("انتقال کارت به ستون بعدی");
+                moveKanbanCard.Click += async (_, _) =>
+                {
+                    try
+                    {
+                        var index = kanbanCardPicker.SelectedIndex;
+                        if (index < 0 || index >= kanbanCardIds.Count) return;
+                        var current = kanbanColumnIds.IndexOf(kanbanCardColumns[index]);
+                        if (current < 0 || current >= kanbanColumnIds.Count - 1) return;
+                        using var _ = await _deskClient.UpdatePlanningItemAsync(
+                            _collaborationGroupId, kanbanCardIds[index], kanbanCardVersions[index],
+                            kanbanCardTitles[index], "", "todo", columnId: kanbanColumnIds[current + 1]);
+                        await LoadKanbanData();
+                    }
                     catch (Exception ex) { kanbanStatus.Text = ex.Message; }
                 };
                 var moveKanbanColumn = MakeButton("انتقال ستون انتخابی به انتهای برد");
@@ -929,7 +958,7 @@ public sealed partial class MainWindow
                         var ids = kanbanColumnIds.ToList();
                         var selected = ids[index]; ids.RemoveAt(index); ids.Add(selected);
                         using var _ = await _deskClient.ReorderKanbanColumnsAsync(_collaborationGroupId, ids);
-                        loadKanban.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                        await LoadKanbanData();
                     }
                     catch (Exception ex) { kanbanStatus.Text = ex.Message; }
                 };
@@ -938,6 +967,8 @@ public sealed partial class MainWindow
                 kanbanWorkspace.Children.Add(addKanbanColumn);
                 kanbanWorkspace.Children.Add(kanbanColumnPicker);
                 kanbanWorkspace.Children.Add(moveKanbanColumn);
+                kanbanWorkspace.Children.Add(kanbanCardPicker);
+                kanbanWorkspace.Children.Add(moveKanbanCard);
                 kanbanWorkspace.Children.Add(kanbanStatus);
                 var addSharedTask = MakeButton("ثبت کار مشترک");
                 addSharedTask.Click += async (_, _) =>
