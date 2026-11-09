@@ -268,30 +268,18 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Regenerate six non-Cute zodiac PNG themes and preserve approved Cute sets
+      - name: Validate repository zodiac artwork without modifying source files
         shell: pwsh
         run: |
-          python -m pip install --disable-pip-version-check pillow
-          if ($LASTEXITCODE -ne 0) { throw "Pillow installation failed." }
-          python -m pip install --disable-pip-version-check cairosvg
-          if ($LASTEXITCODE -ne 0) { Write-Warning "CairoSVG unavailable; portable PNG fallback will be used." }
-          python tools/GenerateZodiacPngs.py
-          if ($LASTEXITCODE -ne 0) { throw "Zodiac PNG generation failed." }
-
-      - name: Commit generated zodiac artwork to repository
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        shell: pwsh
-        run: |
-          git add picture/zodiac/png
-          $changes = git diff --cached --name-only
-          if ($changes) {
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git commit -m "Add generated zodiac PNG artwork"
-            git push origin HEAD:main
-          } else {
-            Write-Host "Zodiac PNG artwork is already up to date in the repository."
-          }
+          $source = Join-Path $env:GITHUB_WORKSPACE "picture/zodiac/png"
+          if (-not (Test-Path $source -PathType Container)) { throw "Repository zodiac artwork folder is missing." }
+          $files = @(Get-ChildItem $source -File)
+          if ($files.Count -ne 143) { throw "Expected the approved 143 zodiac assets; found $($files.Count). Restore the complete approved asset set before building." }
+          $png = @($files | Where-Object { $_.Extension -ieq ".png" }).Count
+          $svg = @($files | Where-Object { $_.Extension -ieq ".svg" }).Count
+          $ico = @($files | Where-Object { $_.Extension -ieq ".ico" }).Count
+          if ($png -eq 0 -or $svg -eq 0 -or $ico -eq 0) { throw "Zodiac asset set must include PNG, SVG and ICO files." }
+          Write-Host "Validated $($files.Count) approved zodiac assets ($png PNG, $svg SVG, $ico ICO). No generation or overwrite performed."
 
       - uses: actions/setup-dotnet@v4
         with:
