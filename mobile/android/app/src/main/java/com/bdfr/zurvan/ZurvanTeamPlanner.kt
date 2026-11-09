@@ -301,6 +301,7 @@ fun ZurvanTeamPlanner(
                         }
                     }
                 }
+            }
             2 -> {
                 if (avatar != null) Image(avatar, contentDescription = "تصویر پروفایل", contentScale = ContentScale.Crop, modifier = Modifier.size(88.dp).clip(CircleShape))
                 else Surface(shape = CircleShape) { Text("👤", modifier = Modifier.padding(20.dp)) }
