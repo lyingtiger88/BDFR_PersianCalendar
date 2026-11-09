@@ -961,6 +961,7 @@ public sealed partial class MainWindow : Window
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
         var next = MakeButton("‹");
         next.FontSize = 22;
@@ -1067,14 +1068,15 @@ public sealed partial class MainWindow : Window
             weekdays.Children.Add(label);
         }
 
-        var clockRow = BuildZurvanClockPanel();
-        Grid.SetRow(clockRow, 2);
-        panel.Children.Add(clockRow);
+        var clock = BuildZurvanClockPanel();
+        Grid.SetColumn(clock, 3);
+        clock.HorizontalAlignment = HorizontalAlignment.Right;
+        header.Children.Add(clock);
 
-        Grid.SetRow(weekdays, 3);
+        Grid.SetRow(weekdays, 2);
         panel.Children.Add(weekdays);
 
-        Grid.SetRow(CalendarGrid, 4);
+        Grid.SetRow(CalendarGrid, 3);
         panel.Children.Add(CalendarGrid);
 
         return panel;
