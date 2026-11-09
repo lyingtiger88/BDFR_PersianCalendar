@@ -94,6 +94,10 @@ public sealed class AppSettings
     public double NavigationRailWidth { get; set; } = 138.0;
     public string NavigationRailSide { get; set; } = "left";
 
+    // Weather city is independent of the selected-day calendar and prayer-time settings.
+    // Blank uses the configured prayer city as the initial suggestion.
+    public string WeatherCity { get; set; } = "";
+
     // Calendar clock presentation. Values: analog/digital and khwarazmi/pahlavi/cuneiform/roman.
     public string CalendarClockMode { get; set; } = "analog";
     public string CalendarClockNumeralStyle { get; set; } = "khwarazmi";
