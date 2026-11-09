@@ -104,6 +104,7 @@ fun ZurvanTeamPlanner(
     var expandedDay by remember { mutableStateOf<String?>(null) }
     var alertMinutes by remember { mutableStateOf(store.get("alert_minutes").ifBlank { "30" }) }
     var activeSection by remember { mutableStateOf(0) }
+    var agendaRecurrence by remember { mutableStateOf<String?>(null) }
     var status by remember { mutableStateOf("") }
     val avatar = remember(photoRevision) {
         val f = File(context.filesDir, "zurvan_profile_photo")
@@ -251,7 +252,7 @@ fun ZurvanTeamPlanner(
                     if(sessionToken.isBlank()||remoteGroupId.isBlank()||sharedTaskTitle.isBlank())status="ابتدا وارد حساب شوید، گروه را انتخاب کنید و عنوان کار را بنویسید."
                     else scope.launch {
                         val commandId=UUID.randomUUID().toString()
-                        val payload=JSONObject().put("title",sharedTaskTitle.trim()).put("mode","agenda").put("state","todo")
+                        val payload=JSONObject().put("title",sharedTaskTitle.trim()).put("mode","agenda").put("state","todo").put("timezone","Asia/Tehran");agendaRecurrence?.let{payload.put("recurrenceRule",it)}
                         runCatching { collaborationApi.replayCommand(sessionToken,remoteGroupId,commandId,"create_item",payload) }
                             .onSuccess { sharedTaskTitle="";status="کار مشترک ثبت شد." }
                             .onFailure { store.enqueueCommand(remoteGroupId,commandId,"create_item",payload);sharedTaskTitle="";status="کار در صف آفلاین ذخیره شد و پس از اتصال ارسال می‌شود." }
@@ -287,6 +288,100 @@ fun ZurvanTeamPlanner(
                                 .onFailure { status=it.message ?: "پذیرش دعوت انجام نشد." } }
                         }) { Text("پذیرش") }
                     }
+                }
+
+                Text("تکرار برنامه‌های Agenda",fontWeight=FontWeight.SemiBold)
+                Row(horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+                    listOf("بدون تکرار" to null,"روزانه" to "daily","روزهای کاری" to "weekdays","هفتگی" to "weekly","ماهانه" to "monthly").forEach { (label,value) ->
+                        FilterChip(selected=agendaRecurrence==value,onClick={agendaRecurrence=value},label={Text(label)})
+                    }
+                }
+                var kanbanColumns by remember { mutableStateOf<List<Pair<String,String>>>(emptyList()) }
+                var kanbanColumnName by remember { mutableStateOf("") }
+                var kanbanTaskTitle by remember { mutableStateOf("") }
+                var selectedKanbanColumn by remember { mutableStateOf<String?>(null) }
+                Text("برد Kanban",fontWeight=FontWeight.SemiBold)
+                OutlinedTextField(kanbanColumnName,{kanbanColumnName=it},label={Text("نام ستون جدید")},modifier=Modifier.fillMaxWidth())
+                Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick={
+                        scope.launch { runCatching { collaborationApi.kanbanColumns(sessionToken,remoteGroupId) }
+                            .onSuccess { a -> kanbanColumns=(0 until a.length()).map { val x=a.getJSONObject(it);x.getString("id") to x.getString("name") };if(selectedKanbanColumn==null)selectedKanbanColumn=kanbanColumns.firstOrNull()?.first }
+                            .onFailure { status=it.message ?: "بارگذاری ستون‌ها ناموفق بود." } }
+                    }) { Text("بارگذاری ستون‌ها") }
+                    Button(onClick={
+                        if(kanbanColumnName.isBlank())status="نام ستون را وارد کنید."
+                        else scope.launch { runCatching { collaborationApi.createKanbanColumn(sessionToken,remoteGroupId,kanbanColumnName.trim()) }
+                            .onSuccess { kanbanColumnName="";val a=collaborationApi.kanbanColumns(sessionToken,remoteGroupId);kanbanColumns=(0 until a.length()).map { val x=a.getJSONObject(it);x.getString("id") to x.getString("name") };status="ستون ایجاد شد." }
+                            .onFailure { status=it.message ?: "ایجاد ستون ناموفق بود." } }
+                    }) { Text("افزودن ستون") }
+                }
+                kanbanColumns.forEachIndexed { index, column ->
+                    Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+                        FilterChip(selected=selectedKanbanColumn==column.first,onClick={selectedKanbanColumn=column.first},label={Text(column.second)})
+                        if(index>0) TextButton(onClick={
+                            scope.launch { val ids=kanbanColumns.map{it.first}.toMutableList();val v=ids.removeAt(index);ids.add(index-1,v)
+                                runCatching { collaborationApi.reorderKanbanColumns(sessionToken,remoteGroupId,ids) }
+                                    .onSuccess { val a=collaborationApi.kanbanColumns(sessionToken,remoteGroupId);kanbanColumns=(0 until a.length()).map { val x=a.getJSONObject(it);x.getString("id") to x.getString("name") } }
+                                    .onFailure { status=it.message ?: "تغییر ترتیب ناموفق بود." } }
+                        }) { Text("↑") }
+                        if(index<kanbanColumns.lastIndex) TextButton(onClick={
+                            scope.launch { val ids=kanbanColumns.map{it.first}.toMutableList();val v=ids.removeAt(index);ids.add(index+1,v)
+                                runCatching { collaborationApi.reorderKanbanColumns(sessionToken,remoteGroupId,ids) }
+                                    .onSuccess { val a=collaborationApi.kanbanColumns(sessionToken,remoteGroupId);kanbanColumns=(0 until a.length()).map { val x=a.getJSONObject(it);x.getString("id") to x.getString("name") } }
+                                    .onFailure { status=it.message ?: "تغییر ترتیب ناموفق بود." } }
+                        }) { Text("↓") }
+                    }
+                }
+                OutlinedTextField(kanbanTaskTitle,{kanbanTaskTitle=it},label={Text("عنوان کارت جدید")},modifier=Modifier.fillMaxWidth())
+                Button(onClick={
+                    if(selectedKanbanColumn==null||kanbanTaskTitle.isBlank())status="ستون و عنوان کارت را انتخاب کنید."
+                    else scope.launch { runCatching { collaborationApi.createItemAdvanced(sessionToken,remoteGroupId,kanbanTaskTitle.trim(),"kanban",columnId=selectedKanbanColumn) }
+                        .onSuccess { kanbanTaskTitle="";status="کارت به برد اضافه شد." }
+                        .onFailure { status=it.message ?: "ثبت کارت ناموفق بود." } }
+                }) { Text("افزودن کارت به ستون") }
+                var subjectName by remember { mutableStateOf("") }
+                var schoolSubjects by remember { mutableStateOf<List<Pair<String,String>>>(emptyList()) }
+                var homeworkTitle by remember { mutableStateOf("") }
+                var homeworkInstructions by remember { mutableStateOf("") }
+                var schoolHomework by remember { mutableStateOf<List<Pair<String,String>>>(emptyList()) }
+                var submissionText by remember { mutableStateOf("") }
+                Text("محیط مدرسه",fontWeight=FontWeight.SemiBold)
+                OutlinedTextField(subjectName,{subjectName=it},label={Text("نام درس")},modifier=Modifier.fillMaxWidth())
+                Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                    Button(onClick={
+                        if(subjectName.isBlank())status="نام درس را وارد کنید."
+                        else scope.launch { runCatching { collaborationApi.createSubject(sessionToken,remoteGroupId,subjectName.trim()) }
+                            .onSuccess { subjectName="";status="درس ثبت شد." }
+                            .onFailure { status=it.message ?: "ثبت درس ناموفق بود." } }
+                    }) { Text("افزودن درس") }
+                    OutlinedButton(onClick={
+                        scope.launch { runCatching {
+                            val a=collaborationApi.subjects(sessionToken,remoteGroupId)
+                            schoolSubjects=(0 until a.length()).map { val x=a.getJSONObject(it);x.getString("id") to x.getString("name") }
+                            val h=collaborationApi.homework(sessionToken,remoteGroupId)
+                            schoolHomework=(0 until h.length()).map { val x=h.getJSONObject(it);x.getString("id") to x.getString("title") }
+                        }.onFailure { status=it.message ?: "بارگذاری مدرسه ناموفق بود." } }
+                    }) { Text("بارگذاری مدرسه") }
+                }
+                schoolSubjects.forEach { (_,name) -> Text("درس: $name") }
+                OutlinedTextField(homeworkTitle,{homeworkTitle=it},label={Text("عنوان تکلیف")},modifier=Modifier.fillMaxWidth())
+                OutlinedTextField(homeworkInstructions,{homeworkInstructions=it},label={Text("شرح تکلیف")},modifier=Modifier.fillMaxWidth())
+                Button(onClick={
+                    val subject=schoolSubjects.firstOrNull()?.first
+                    if(subject==null||homeworkTitle.isBlank())status="ابتدا درس بسازید/بارگذاری کنید و عنوان تکلیف را بنویسید."
+                    else scope.launch { runCatching { collaborationApi.createHomework(sessionToken,remoteGroupId,subject,homeworkTitle.trim(),homeworkInstructions) }
+                        .onSuccess { homeworkTitle="";homeworkInstructions="";status="تکلیف ثبت شد." }
+                        .onFailure { status=it.message ?: "ثبت تکلیف ناموفق بود." } }
+                }) { Text("ثبت تکلیف برای اولین درس") }
+                schoolHomework.forEach { (id,title) ->
+                    Text(title,fontWeight=FontWeight.Medium)
+                    OutlinedTextField(submissionText,{submissionText=it},label={Text("پاسخ این تکلیف")},modifier=Modifier.fillMaxWidth())
+                    Button(onClick={
+                        if(submissionText.isBlank())status="متن پاسخ را وارد کنید."
+                        else scope.launch { runCatching { collaborationApi.submitHomework(sessionToken,id,submissionText) }
+                            .onSuccess { submissionText="";status="پاسخ ارسال شد." }
+                            .onFailure { status=it.message ?: "ارسال پاسخ ناموفق بود." } }
+                    }) { Text("ارسال پاسخ") }
                 }
                 Text("اعضای گروه",fontWeight=FontWeight.SemiBold)
                 remoteMembers.forEach { member ->
