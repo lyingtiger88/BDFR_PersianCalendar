@@ -533,7 +533,7 @@ private struct MobileSettingsView: View {
 
                 VStack(alignment: .leading, spacing: 9) {
                     Text("آب‌وهوا در تقویم").font(.headline)
-                    Toggle("نمایش آب‌وهوای امروز، روند دمای ۲۴ ساعت و پیش‌بینی ۷ روزه", isOn: $weatherEnabled)
+                    Toggle("نمایش ۲۴ ساعت گذشته و وضعیت ۷ روز قبل و بعد", isOn: $weatherEnabled)
                     Picker("شهر آب‌وهوا و اوقات شرعی", selection: $weatherCity) {
                         Text("تهران").tag("تهران")
                         Text("زنجان").tag("زنجان")
