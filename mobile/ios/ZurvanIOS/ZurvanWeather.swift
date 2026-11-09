@@ -76,7 +76,7 @@ final class ZurvanWeatherModelIOS: ObservableObject {
                 let date = root.daily.time[index]
                 days[date] = ZurvanWeatherDayIOS(id: date, high: root.daily.temperature_2m_max[index],
                     low: root.daily.temperature_2m_min[index], code: root.daily.weather_code[index],
-                    precipitation: root.daily.precipitation_probability_max[index])
+                    precipitation: root.daily.precipitation_probability_max[index] ?? 0)
             }
             current = ZurvanWeatherSnapshotIOS(temperature: root.current.temperature_2m,
                 code: root.current.weather_code, city: city, hours: Array(hourly), days: days)
@@ -110,7 +110,7 @@ final class ZurvanWeatherModelIOS: ObservableObject {
             let temperature_2m_max: [Double]
             let temperature_2m_min: [Double]
             let weather_code: [Int]
-            let precipitation_probability_max: [Int]
+            let precipitation_probability_max: [Int?]
         }
         let current: Current
         let hourly: Hourly
