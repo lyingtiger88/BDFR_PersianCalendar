@@ -53,6 +53,8 @@ import java.security.SecureRandom
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
@@ -738,10 +740,11 @@ private fun CalendarScreen(
         var weatherToday by remember { mutableStateOf<ZurvanWeatherData?>(null) }
         var weatherError by remember { mutableStateOf<String?>(null) }
         LaunchedEffect(weatherEnabled) {
-            if (weatherEnabled) {
+            while (weatherEnabled && kotlin.coroutines.coroutineContext.isActive) {
                 runCatching { ZurvanWeather.load(weatherContext) }
                     .onSuccess { weatherToday = it; weatherError = null }
                     .onFailure { weatherError = "آب‌وهوا در دسترس نیست" }
+                delay(30 * 60 * 1000L)
             }
         }
         if (weatherEnabled) {
