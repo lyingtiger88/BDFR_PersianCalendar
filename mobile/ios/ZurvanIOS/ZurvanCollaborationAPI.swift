@@ -35,6 +35,13 @@ struct ZurvanCollabHomework: Decodable, Identifiable {
     let due_at: String?
 }
 
+struct ZurvanCollabSubmission: Decodable, Identifiable {
+    let id: String
+    let student_id: String
+    let body: String
+    let grade: Double?
+    let feedback: String?
+}
 struct ZurvanCollabColumn: Decodable, Identifiable {
     let id: String
     let name: String
@@ -133,6 +140,9 @@ struct ZurvanCollaborationAPI {
     func createHomework(token: String, groupID: String, subjectID: String, title: String, instructions: String) async throws {
         _ = try await raw("POST", "groups/\(groupID)/homework", token: token,
             body: ["subjectId": subjectID, "title": title, "instructions": instructions])
+    }
+    func submissions(token: String, homeworkID: String) async throws -> [ZurvanCollabSubmission] {
+        try await request("GET", "homework/\(homeworkID)/submissions", token: token, as: [ZurvanCollabSubmission].self)
     }
     func submitHomework(token: String, homeworkID: String, body: String) async throws {
         _ = try await raw("POST", "homework/\(homeworkID)/submissions", token: token, body: ["body": body])
