@@ -268,7 +268,7 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Generate seven zodiac PNG themes
+      - name: Regenerate six non-Cute zodiac PNG themes and preserve approved Cute sets
         shell: pwsh
         run: |
           python -m pip install --disable-pip-version-check pillow
@@ -440,7 +440,7 @@ jobs:
           if (-not (Test-Path $catalog)) { throw "Missing zodiac catalog" }
           if (-not (Test-Path $cloud)) { throw "Missing Desk cloud illustration" }
           $data = Get-Content $catalog -Raw | ConvertFrom-Json
-          if ($data.signs.Count -ne 12 -or $data.styles.Count -ne 7) { throw "Zodiac catalog must contain 12 signs and 7 themes" }
+          if ($data.signs.Count -ne 12 -or $data.styles.Count -ne 9) { throw "Zodiac catalog must contain 12 signs and 9 themes" }
       - name: Publish Windows x64 Debug build
         shell: pwsh
         env:
@@ -480,8 +480,8 @@ jobs:
           if (-not (Test-Path $catalog)) { throw "Zodiac artwork missing from Debug publish output: $catalog" }
           if (-not (Test-Path $cloud)) { throw "Zurvan Desk cloud missing from Debug publish output: $cloud" }
           $data = Get-Content $catalog -Raw | ConvertFrom-Json
-          if ($data.signs.Count -ne 12 -or $data.styles.Count -ne 7) { throw "Published zodiac catalog invalid" }
-          Write-Host "Verified 12 signs, 7 themes and Desk cloud illustration in Windows Debug output."
+          if ($data.signs.Count -ne 12 -or $data.styles.Count -ne 9) { throw "Published zodiac catalog invalid" }
+          Write-Host "Verified 12 signs, 9 themes and Desk cloud illustration in Windows Debug output."
       - name: Package Debug ZIP only
         shell: pwsh
         run: |
