@@ -235,8 +235,84 @@ public sealed partial class MainWindow
         var totalPages = 1;
         var loadingPage = false;
         var searchGeneration = 0;
-        var gallery = new StackPanel { Spacing = 8 };
+        var gallery = new Grid { ColumnSpacing = 8, RowSpacing = 8 };
+        for (var column = 0; column < 4; column++)
+            gallery.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         var gallerySummary = new TextBlock { Foreground = ThemeService.Brush(_theme.SecondaryText) };
+        string? selectedGalleryPath = null;
+        var selectedPreview = new Image { Stretch = Stretch.Uniform, HorizontalAlignment = HorizontalAlignment.Stretch, VerticalAlignment = VerticalAlignment.Stretch };
+        var selectedFileLabel = new TextBlock { Text = "برای پیش‌نمایش، تصویری از گالری انتخاب کنید.", TextWrapping = TextWrapping.Wrap, Foreground = ThemeService.Brush(_theme.SecondaryText) };
+        var displayTargetPicker = new ComboBox { Header = "نمایشگر مقصد", HorizontalAlignment = HorizontalAlignment.Stretch };
+        displayTargetPicker.Items.Add(new ComboBoxItem { Content = "نمایشگر فعلی زروان", Tag = "current" });
+        displayTargetPicker.Items.Add(new ComboBoxItem { Content = "نمایشگر اصلی", Tag = "primary" });
+        displayTargetPicker.SelectedIndex = string.Equals(_settings.WallpaperDisplayTarget, "primary", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
+        displayTargetPicker.SelectionChanged += (_, _) =>
+        {
+            if (displayTargetPicker.SelectedItem is ComboBoxItem target && target.Tag is string id)
+            {
+                _settings.WallpaperDisplayTarget = id;
+                _settingsService.Save(_settings);
+            }
+        };
+        var applySelected = MakeButton("اعمال تصویر انتخاب‌شده");
+        applySelected.HorizontalAlignment = HorizontalAlignment.Stretch;
+        applySelected.MinHeight = 40;
+        applySelected.IsEnabled = false;
+        applySelected.Click += async (_, _) =>
+        {
+            if (string.IsNullOrWhiteSpace(selectedGalleryPath) || !File.Exists(selectedGalleryPath))
+            {
+                StatusText.Text = "ابتدا یک تصویر معتبر از گالری انتخاب کنید.";
+                return;
+            }
+            applySelected.IsEnabled = false;
+            try
+            {
+                _settings.CustomBackgroundPath = selectedGalleryPath;
+                _settings.BackgroundMode = "custom";
+                _settings.WallpaperMode = "manual";
+                _settings.AppearanceMode = "theme";
+                _settings.UseSeasonalBackground = false;
+                _settingsService.Save(_settings);
+                await ApplyBackgroundAsync();
+                if (_backgroundImage.Source is null)
+                    throw new InvalidOperationException("تصویر بارگذاری نشد؛ مسیر یا قالب فایل را بررسی کنید.");
+                StatusText.Text = $"تصویر روی پس‌زمینه زروان اعمال شد · {Path.GetFileName(selectedGalleryPath)}";
+            }
+            catch (Exception ex)
+            {
+                StatusText.Text = "اعمال تصویر انجام نشد: " + ex.Message;
+                StartupDiagnostics.Log("Wallpaper gallery apply failed: " + ex);
+            }
+            finally { applySelected.IsEnabled = !string.IsNullOrWhiteSpace(selectedGalleryPath) && File.Exists(selectedGalleryPath); }
+        };
+        var galleryLayout = new Grid { ColumnSpacing = 16, FlowDirection = FlowDirection.LeftToRight };
+        galleryLayout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.05, GridUnitType.Star) });
+        galleryLayout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.5, GridUnitType.Star) });
+        var previewPanel = new StackPanel { Spacing = 9, VerticalAlignment = VerticalAlignment.Top };
+        var previewFrame = new Border
+        {
+            Height = 310, MinWidth = 260, CornerRadius = new CornerRadius(12),
+            BorderThickness = new Thickness(1), BorderBrush = BrushWithAlpha(_theme.Accent, 0x88),
+            Background = ThemeService.Brush("#FFF1EFF6"), Child = selectedPreview
+        };
+        previewPanel.Children.Add(previewFrame);
+        previewPanel.Children.Add(selectedFileLabel);
+        previewPanel.Children.Add(displayTargetPicker);
+        previewPanel.Children.Add(applySelected);
+        Grid.SetColumn(previewPanel, 0);
+        galleryLayout.Children.Add(previewPanel);
+        var galleryList = new StackPanel { Spacing = 8 };
+        galleryList.Children.Add(gallerySummary);
+        galleryList.Children.Add(gallery);
+        var galleryListScroll = new ScrollViewer
+        {
+            Content = galleryList, Height = 420,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
+        };
+        Grid.SetColumn(galleryListScroll, 1);
+        galleryLayout.Children.Add(galleryListScroll);
         var galleryCategoryPicker = new ComboBox { Header = "دسته‌بندی گالری", HorizontalAlignment = HorizontalAlignment.Stretch };
         galleryCategoryPicker.Items.Add(new ComboBoxItem { Content = "همه دسته‌ها", Tag = "" });
         foreach (var name in _wallpaperService.GetGalleryCategories())
@@ -445,7 +521,10 @@ public sealed partial class MainWindow
         async Task LoadGalleryAsync()
         {
             gallery.Children.Clear();
+            gallery.RowDefinitions.Clear();
             gallery.Children.Add(galleryRefresh);
+            Grid.SetColumn(galleryRefresh, 0);
+            Grid.SetRow(galleryRefresh, 0);
             var selectedCategory = (galleryCategoryPicker.SelectedItem as ComboBoxItem)?.Tag as string ?? "";
             var currentCategories = _wallpaperService.GetGalleryCategories();
             var previousCategory = selectedCategory;
@@ -464,45 +543,60 @@ public sealed partial class MainWindow
             if (files.Count == 0)
             {
                 gallery.Children.Add(new TextBlock { Text = "هنوز تصویری دانلود نشده است.", Opacity = 0.65 });
+                selectedGalleryPath = null;
+                selectedPreview.Source = null;
+                selectedFileLabel.Text = "گالری خالی است.";
+                applySelected.IsEnabled = false;
                 return;
             }
-            foreach (var path in files.Take(30))
+            var rowIndex = 1;
+            foreach (var path in files)
             {
-                var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10, Padding = new Thickness(8) };
-                var image = new Image { Width = 110, Height = 70, Stretch = Stretch.UniformToFill };
-                image.Source = await PictureService.LoadImageAsync(path, 220);
-                row.Children.Add(image);
-                var details = new StackPanel { Spacing = 4, VerticalAlignment = VerticalAlignment.Center };
-                details.Children.Add(new TextBlock { Text = Path.GetFileName(path), FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap });
-                details.Children.Add(new TextBlock { Text = new DirectoryInfo(Path.GetDirectoryName(path)!).Name, FontSize = 11, Opacity = 0.65 });
-                var apply = MakeButton("اعمال");
-                apply.Click += async (_, _) =>
+                var image = new Image { Width = 94, Height = 68, Stretch = Stretch.UniformToFill };
+                image.Source = await PictureService.LoadImageAsync(path, 240);
+                var select = new Button
                 {
-                    _settings.CustomBackgroundPath = path;
-                    _settings.BackgroundMode = "custom";
-                    _settings.WallpaperMode = "manual";
-                    _settings.AppearanceMode = "theme";
-                    _settings.UseSeasonalBackground = false;
-                    _settingsService.Save(_settings);
-                    await ApplyBackgroundAsync();
-                    StatusText.Text = "تصویر انتخاب‌شده از گالری اعمال شد.";
+                    Padding = new Thickness(5), Background = ThemeService.Brush("#FFFDFDFD"),
+                    BorderBrush = BrushWithAlpha(_theme.Accent, 0x70), BorderThickness = new Thickness(1),
+                    HorizontalAlignment = HorizontalAlignment.Stretch,
+                    Content = new StackPanel
+                    {
+                        Spacing = 4,
+                        Children =
+                        {
+                            new Border { Width = 94, Height = 68, CornerRadius = new CornerRadius(6), Clip = new RectangleGeometry { Rect = new Windows.Foundation.Rect(0,0,94,68) }, Child = image },
+                            new TextBlock { Text = Path.GetFileName(path), FontSize = 9, MaxLines = 2, TextWrapping = TextWrapping.Wrap, TextTrimming = TextTrimming.CharacterEllipsis, Width = 100, TextAlignment = TextAlignment.Center }
+                        }
+                    }
                 };
-                details.Children.Add(apply);
-                row.Children.Add(details);
-                gallery.Children.Add(new Border
+                select.Click += async (_, _) =>
                 {
-                    BorderBrush = BrushWithAlpha(_theme.Accent, 0x70),
-                    BorderThickness = new Thickness(1),
-                    CornerRadius = new CornerRadius(10),
-                    Child = row
-                });
+                    selectedGalleryPath = path;
+                    selectedPreview.Source = await PictureService.LoadImageAsync(path, 1600);
+                    selectedFileLabel.Text = Path.GetFileName(path);
+                    applySelected.IsEnabled = selectedPreview.Source is not null;
+                    StatusText.Text = "تصویر برای پیش‌نمایش انتخاب شد؛ برای اعمال، دکمه زیر پیش‌نمایش را بزنید.";
+                };
+                var tile = new Border
+                {
+                    BorderBrush = BrushWithAlpha(_theme.Accent, 0x55), BorderThickness = new Thickness(1),
+                    CornerRadius = new CornerRadius(9), Padding = new Thickness(3), Child = select
+                };
+                var index = rowIndex - 1;
+                var row = (index / 4) + 1;
+                var column = index % 4;
+                while (gallery.RowDefinitions.Count <= row)
+                    gallery.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                Grid.SetRow(tile, row);
+                Grid.SetColumn(tile, column);
+                gallery.Children.Add(tile);
             }
         }
 
-        root.Children.Add(Card("گالری محلی", "تصاویر دانلودشده در پوشه‌های دسته‌بندی‌شده نگهداری می‌شوند؛ برای هر تصویر اطلاعات منبع نیز ذخیره می‌شود.", new StackPanel
+        root.Children.Add(Card("گالری محلی", "تصویر را از جدول انتخاب کنید تا پیش‌نمایش بزرگ در سمت چپ نمایش داده شود؛ سپس نمایشگر مقصد را تعیین و دکمه اعمال را زیر پیش‌نمایش انتخاب کنید.", new StackPanel
         {
             Spacing = 8,
-            Children = { galleryCategoryPicker, gallerySummary, gallery }
+            Children = { galleryCategoryPicker, galleryLayout }
         }));
         _ = LoadGalleryAsync();
 
