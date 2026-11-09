@@ -22,6 +22,9 @@ struct ZurvanCollaborationView: View {
     @State private var homeworkTitle = ""
     @State private var homeworkInstructions = ""
     @State private var submissionText = ""
+    @State private var gradeText = "0"
+    @State private var gradeFeedback = ""
+    @State private var timetableCount = 0
     @State private var kanbanColumns: [ZurvanCollabColumn] = []
     @State private var kanbanColumnName = ""
     @State private var kanbanTaskTitle = ""
@@ -138,6 +141,7 @@ struct ZurvanCollaborationView: View {
                         run { try await api.createSubject(token: token, groupID: groupID, name: subjectName); subjectName = ""; try await loadSchool() }
                     }
                     Button("بارگذاری دروس و تکالیف") { run { try await loadSchool() } }
+                    Text("جلسه‌های ثبت‌شده در برنامه هفتگی: \(timetableCount)").font(.caption).foregroundStyle(.secondary)
                     ForEach(subjects) { subject in
                         VStack(alignment: .leading) {
                             Text(subject.name).font(.headline)
@@ -165,6 +169,21 @@ struct ZurvanCollaborationView: View {
                                 guard !submissionText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { status = "پاسخ را وارد کنید."; return }
                                 run { try await api.submitHomework(token: token, homeworkID: item.id, body: submissionText); submissionText = ""; status = "پاسخ ثبت شد." }
                             }
+                        }
+                    }
+                    TextField("نمره ۰ تا ۱۰۰", text: $gradeText)
+                        .keyboardType(.decimalPad)
+                    TextField("بازخورد معلم", text: $gradeFeedback, axis: .vertical)
+                    Button("تصحیح اولین پاسخ تکلیف") {
+                        guard let item = homework.first, let grade = Double(gradeText), (0...100).contains(grade) else {
+                            status = "تکلیف و نمره معتبر لازم است."; return
+                        }
+                        run {
+                            let rows = try await api.submissions(token: token, homeworkID: item.id)
+                            guard let submission = rows.first else { status = "هنوز پاسخی ثبت نشده است."; return }
+                            try await api.gradeSubmission(token: token, homeworkID: item.id,
+                                submissionID: submission.id, grade: grade, feedback: gradeFeedback)
+                            status = "نمره و بازخورد ثبت شد."
                         }
                     }
                 }
@@ -238,7 +257,9 @@ struct ZurvanCollaborationView: View {
     private func loadSchool() async throws {
         async let s = api.subjects(token: token, groupID: groupID)
         async let h = api.homework(token: token, groupID: groupID)
+        async let t = api.timetable(token: token, groupID: groupID)
         subjects = try await s; homework = try await h
+        timetableCount = try await t.count
     }
     private func loadKanban() async throws {
         kanbanColumns = try await api.kanbanColumns(token: token, groupID: groupID)
