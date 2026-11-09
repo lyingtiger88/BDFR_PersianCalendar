@@ -138,8 +138,10 @@ struct ZurvanCalendarView: View {
                                 }
                                 .frame(maxWidth:.infinity,maxHeight:.infinity)
                                 if let forecast {
-                                    Text("\(ZurvanWeatherModelIOS.icon(forecast.code)) \(Int(forecast.high.rounded()))°/\(Int(forecast.low.rounded()))°")
+                                    Text("\(ZurvanWeatherModelIOS.icon(forecast.code))\n\(Int(forecast.high.rounded()))°/\(Int(forecast.low.rounded()))°")
                                         .font(.system(size: 8, weight: .medium))
+                                        .multilineTextAlignment(.center)
+                                        .lineLimit(2)
                                         .foregroundStyle(.primary)
                                         .padding(2)
                                         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 4))
