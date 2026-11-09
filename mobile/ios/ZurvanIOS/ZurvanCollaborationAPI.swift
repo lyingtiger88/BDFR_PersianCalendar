@@ -42,6 +42,7 @@ struct ZurvanCollabSubmission: Decodable, Identifiable {
     let grade: Double?
     let feedback: String?
 }
+struct ZurvanCollabOccurrence: Decodable { let at: String; let localDate: String; let timezone: String }
 struct ZurvanCollabCard: Decodable, Identifiable {
     let id: String
     let title: String
@@ -50,6 +51,8 @@ struct ZurvanCollabCard: Decodable, Identifiable {
     let state: String
     let column_id: String?
     let version: Int
+    let recurrence_rule: String?
+    let occurrences: [ZurvanCollabOccurrence]?
 }
 struct ZurvanCollabColumn: Decodable, Identifiable {
     let id: String
