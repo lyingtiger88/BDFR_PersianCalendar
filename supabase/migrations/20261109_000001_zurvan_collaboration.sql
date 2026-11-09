@@ -152,6 +152,7 @@ returns uuid language plpgsql security definer set search_path = ''
 as $$
 declare current_role text; invitation_id uuid;
 begin
+  if auth.uid() is null then raise exception 'Authentication required' using errcode='42501'; end if;
   current_role := public.collab_role(g);
   if coalesce(current_role,'') not in ('owner','assistant') then raise exception 'Not authorized' using errcode='42501'; end if;
   if requested_role not in ('member','assistant') or
@@ -175,6 +176,7 @@ returns uuid language plpgsql security definer set search_path = ''
 as $$
 declare i public.collab_invitations%rowtype; issuer_role text;
 begin
+  if auth.uid() is null then raise exception 'Authentication required' using errcode='42501'; end if;
   select * into i from public.collab_invitations where id=inv for update;
   if not found or i.invited_user_id<>auth.uid() or
      i.status<>'pending' or i.expires_at<=now() then
@@ -199,6 +201,7 @@ returns void language plpgsql security definer set search_path = ''
 as $$
 declare manager_role text; target_role text;
 begin
+  if auth.uid() is null then raise exception 'Authentication required' using errcode='42501'; end if;
   manager_role := public.collab_role(g);
   select role into target_role from public.collab_members
   where group_id=g and user_id=target for update;
@@ -236,6 +239,7 @@ returns public.collab_items language plpgsql security definer set search_path = 
 as $$
 declare original public.collab_items%rowtype; updated public.collab_items;
 begin
+  if auth.uid() is null then raise exception 'Authentication required' using errcode='42501'; end if;
   select * into original from public.collab_items where id=item_id for update;
   if not found then raise exception 'Item missing'; end if;
   if not public.collab_allowed(original.group_id,'edit')
@@ -336,7 +340,7 @@ create policy collab_item_read on public.collab_items for select to authenticate
 using (public.collab_is_member(group_id));
 drop policy if exists collab_item_insert on public.collab_items;
 create policy collab_item_insert on public.collab_items for insert to authenticated
-with check (created_by=auth.uid() and public.collab_allowed(group_id,'edit')
+with check (created_by=auth.uid() and version=1 and public.collab_allowed(group_id,'edit')
   and (assigned_to is null or exists(select 1 from public.collab_members
     where group_id=collab_items.group_id and user_id=assigned_to)));
 
@@ -353,7 +357,8 @@ using (public.collab_is_member(group_id) and
   (public.collab_role(group_id) in ('owner','assistant') or author_id=auth.uid()));
 drop policy if exists collab_report_insert on public.collab_reports;
 create policy collab_report_insert on public.collab_reports for insert to authenticated
-with check (author_id=auth.uid() and public.collab_allowed(group_id,'report'));
+with check (author_id=auth.uid() and status='submitted'
+  and public.collab_allowed(group_id,'report'));
 
 drop policy if exists collab_event_read on public.collab_events;
 create policy collab_event_read on public.collab_events for select to authenticated
