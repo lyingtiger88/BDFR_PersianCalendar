@@ -483,6 +483,116 @@ public sealed partial class MainWindow
         contents.Children.Add(SettingsOptionRow("رسانه‌های روز",
             "اجازه اتصال تصویر و فایل به روز انتخاب‌شده",
             SettingsToggle(_settings.DayMediaEnabled, SetDayMediaEnabled), "\uE8B7"));
+        AddSettingsSeparator(contents);
+
+        // Dedicated General > Weather submenu. Location controls are not visible
+        // until the master module toggle is switched on.
+        var weatherSubmenu = new StackPanel
+        {
+            Spacing = 11,
+            Padding = new Thickness(18, 6, 10, 12),
+            Visibility = _settings.WeatherEnabled ? Visibility.Visible : Visibility.Collapsed
+        };
+        var weatherStatus = new TextBlock
+        {
+            Text = "موقعیت فعلی: " + _settings.WeatherCity + ", " + _settings.WeatherCountryCode,
+            Foreground = ThemeService.Brush(SettingsSecondaryColor),
+            FontSize = 12,
+            TextWrapping = TextWrapping.Wrap
+        };
+        var cityQuery = new TextBox
+        {
+            Header = "جستجوی شهر / لوکیشن",
+            Text = _settings.WeatherCity,
+            PlaceholderText = "مثلاً Tehran, Frankfurt, Seattle",
+            FlowDirection = FlowDirection.LeftToRight,
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+        var cityResults = new ComboBox
+        {
+            Header = "نتایج جستجو — شهر دقیق را انتخاب کنید",
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            MinWidth = 220
+        };
+        var unitPicker = new ComboBox
+        {
+            Header = "واحد دما",
+            ItemsSource = new[] { "سانتی‌گراد (°C)", "فارنهایت (°F)" },
+            SelectedIndex = _settings.WeatherFahrenheit ? 1 : 0,
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+        IReadOnlyList<WeatherPlace> cityMatches = Array.Empty<WeatherPlace>();
+
+        var findCityButton = SettingsActionButton("جستجوی موقعیت", () =>
+        {
+            _ = SearchWeatherCityAsync();
+        });
+        async Task SearchWeatherCityAsync()
+        {
+            findCityButton.IsEnabled = false;
+            try
+            {
+                cityMatches = await _weatherService.FindCitiesAsync(cityQuery.Text.Trim());
+                cityResults.ItemsSource = cityMatches.Select(x =>
+                    x.DisplayName + " · " + x.Latitude.ToString("F3", CultureInfo.InvariantCulture) +
+                    ", " + x.Longitude.ToString("F3", CultureInfo.InvariantCulture)).ToArray();
+                cityResults.SelectedIndex = -1;
+                weatherStatus.Text = cityMatches.Count + " نتیجه یافت شد؛ موقعیت درست را انتخاب و ذخیره کنید.";
+            }
+            catch (Exception ex) { weatherStatus.Text = "جستجو ناموفق بود: " + ex.Message; }
+            finally { findCityButton.IsEnabled = true; }
+        }
+
+        var saveCityButton = SettingsActionButton("ذخیره موقعیت و واحد دما", () =>
+        {
+            if (cityMatches.Count > 0 && cityResults.SelectedIndex < 0)
+            {
+                weatherStatus.Text = "یکی از موقعیت‌های یافته‌شده را انتخاب کنید.";
+                return;
+            }
+            if (cityResults.SelectedIndex >= 0 && cityResults.SelectedIndex < cityMatches.Count)
+            {
+                var chosen = cityMatches[cityResults.SelectedIndex];
+                _settings.WeatherCity = chosen.Name;
+                _settings.WeatherCountryCode = chosen.Country;
+                _settings.WeatherLatitude = chosen.Latitude;
+                _settings.WeatherLongitude = chosen.Longitude;
+            }
+            else if (!string.Equals(cityQuery.Text.Trim(), _settings.WeatherCity, StringComparison.OrdinalIgnoreCase))
+            {
+                weatherStatus.Text = "برای تغییر شهر، ابتدا جستجو و سپس موقعیت صحیح را انتخاب کنید.";
+                return;
+            }
+            _settings.WeatherFahrenheit = unitPicker.SelectedIndex == 1;
+            _settingsService.Save(_settings);
+            _weatherSnapshot = null;
+            RenderWeatherDayBadges();
+            weatherStatus.Text = "تنظیمات آب‌وهوا ذخیره شد: " + _settings.WeatherCity + ", " + _settings.WeatherCountryCode;
+            _ = RefreshWeatherAsync(force: true);
+        });
+        weatherSubmenu.Children.Add(weatherStatus);
+        weatherSubmenu.Children.Add(cityQuery);
+        weatherSubmenu.Children.Add(findCityButton);
+        weatherSubmenu.Children.Add(cityResults);
+        weatherSubmenu.Children.Add(unitPicker);
+        weatherSubmenu.Children.Add(saveCityButton);
+        weatherSubmenu.Children.Add(SettingsHint("موقعیت به‌صورت دستی انتخاب می‌شود و دسترسی GPS درخواست نمی‌شود."));
+        contents.Children.Add(SettingsOptionRow(
+            "آب‌وهوا",
+            "نمایش ۲۴ ساعت گذشته در پنل چپ و ۷ روز گذشته و آینده در کارت روزها",
+            SettingsToggle(_settings.WeatherEnabled, enabled =>
+            {
+                _settings.WeatherEnabled = enabled;
+                _settings.WeatherOnCalendarCards = enabled;
+                _settingsService.Save(_settings);
+                weatherSubmenu.Visibility = enabled ? Visibility.Visible : Visibility.Collapsed;
+                if (_weatherCalendarHost is not null)
+                    _weatherCalendarHost.Visibility = enabled ? Visibility.Visible : Visibility.Collapsed;
+                RenderWeatherDayBadges();
+                if (enabled) _ = RefreshWeatherAsync(force: true);
+            }), "\uE753"));
+        contents.Children.Add(weatherSubmenu);
+
 
         // As in the approved Windows Settings mockup, use two independent card
         // columns rather than a long stack with large unused horizontal space.
@@ -630,22 +740,6 @@ public sealed partial class MainWindow
                 await SelectThemeAsync(id);
         };
         contents.Children.Add(SettingsOptionRow("تم زروان", "قالب فعلی برنامه", combo, "\uE790"));
-        AddSettingsSeparator(contents);
-
-        contents.Children.Add(SettingsOptionRow(
-            "آب‌وهوا در تقویم",
-            "نمایش وضعیت امروز، دمای ۲۴ ساعت آینده و پیش‌بینی هفت‌روزه روی کارت روزها",
-            SettingsToggle(_settings.WeatherEnabled, value =>
-            {
-                _settings.WeatherEnabled = value;
-                _settings.WeatherOnCalendarCards = value;
-                _settingsService.Save(_settings);
-                if (_weatherCalendarHost is not null)
-                    _weatherCalendarHost.Visibility = value ? Visibility.Visible : Visibility.Collapsed;
-                RenderWeatherDayBadges();
-                if (value) _ = RefreshWeatherAsync(force: true);
-            }),
-            "\uE753"));
         AddSettingsSeparator(contents);
 
         var zodiacStyles = new (string Id, string Title, string Glyph)[]
