@@ -21,6 +21,7 @@ public sealed partial class MainWindow
     private Microsoft.UI.Dispatching.DispatcherQueueTimer? _weatherRefreshTimer;
     private WeatherSnapshot? _weatherSnapshot;
     private bool _weatherLoading;
+    private bool _weatherRefreshPending;
     private long _weatherRequestVersion;
 
     private static SolidColorBrush WeatherBrush(byte r, byte g, byte b, byte alpha = 255)
@@ -86,8 +87,7 @@ public sealed partial class MainWindow
             MinHeight = 27,
             Background = WeatherBrush(255, 255, 255, 15),
             BorderThickness = new Thickness(0),
-            Foreground = WeatherBrush(245, 248, 255),
-            ToolTip = null
+            Foreground = WeatherBrush(245, 248, 255)
         };
         ToolTipService.SetToolTip(options, "تغییر شهر و واحد دما");
         options.Click += async (_, _) => await ShowWeatherOptionsAsync();
@@ -204,7 +204,16 @@ public sealed partial class MainWindow
 
     private async Task RefreshWeatherAsync(bool force = false)
     {
-        if (!_settings.WeatherEnabled || _weatherLocationText is null || _weatherLoading) return;
+        if (!_settings.WeatherEnabled || _weatherLocationText is null) return;
+        if (_weatherLoading)
+        {
+            if (force)
+            {
+                _weatherRefreshPending = true;
+                _weatherRequestVersion++;
+            }
+            return;
+        }
 
         var version = ++_weatherRequestVersion;
         _weatherLoading = true;
@@ -236,7 +245,15 @@ public sealed partial class MainWindow
                     : "اتصال قطع است؛ آخرین پیش‌بینی نمایش داده می‌شود.";
             StartupDiagnostics.Log("Weather forecast fetch failed: " + ex.Message);
         }
-        finally { _weatherLoading = false; }
+        finally
+        {
+            _weatherLoading = false;
+            if (_weatherRefreshPending)
+            {
+                _weatherRefreshPending = false;
+                _ = RefreshWeatherAsync(force: true);
+            }
+        }
     }
 
     private void RenderWeatherForecast(WeatherSnapshot snapshot)
