@@ -106,6 +106,16 @@ private class TeamStore(private val context: Context) {
         val rows=JSONArray(prefs.getString("offline_commands","")?.takeIf{it.isNotBlank()}?.let(::decryptQueue) ?: "[]")
         return (0 until rows.length()).map { rows.getJSONObject(it) }
     }
+    fun blockQueuedCommand(commandId:String,reason:String) {
+        val rows=queuedCommands();val out=JSONArray()
+        rows.forEach { row -> if(row.optString("commandId")==commandId)row.put("blockedReason",reason);out.put(row) }
+        prefs.edit().putString("offline_commands",encryptQueue(out.toString())).apply()
+    }
+    fun unblockQueuedCommands() {
+        val out=JSONArray()
+        queuedCommands().forEach { row -> row.remove("blockedReason");out.put(row) }
+        prefs.edit().putString("offline_commands",encryptQueue(out.toString())).apply()
+    }
     fun removeQueuedCommand(commandId:String) {
         val old=queuedCommands().filterNot { it.optString("commandId")==commandId }
         val rows=JSONArray();old.forEach{rows.put(it)}
@@ -529,6 +539,7 @@ fun ZurvanTeamPlanner(
                         .onFailure { status=it.message ?: "ثبت نمره ناموفق بود." } }
                 }) { Text("تصحیح اولین پاسخ تکلیف") }
                 Text(remoteSyncStatus,style=MaterialTheme.typography.bodySmall)
+                TextButton(onClick={store.unblockQueuedCommands()}) { Text("تلاش مجدد فرمان‌های متعارض پس از بازبینی") }
                 if(sessionToken.isBlank()) Text("برای استفاده از گروه آنلاین، ورود به حساب Zurvan Desk الزامی است.",color=MaterialTheme.colorScheme.error)
                 LaunchedEffect(remoteGroupId,sessionToken,activeSection) {
                     if(sessionToken.isNotBlank() && activeSection==1) {
@@ -537,12 +548,19 @@ fun ZurvanTeamPlanner(
                                 .onSuccess { groups -> groups.firstOrNull()?.let { remoteGroupId=it.id;store.set("remote_group_id",it.id);groupName=it.name } }
                         }
                         while(remoteGroupId.isNotBlank()) {
-                            for (queued in store.queuedCommands().filter { it.optString("groupId")==remoteGroupId }.take(20)) {
+                            for (queued in store.queuedCommands().filter { it.optString("groupId")==remoteGroupId && it.optString("blockedReason").isBlank() }.take(20)) {
                                 val replay=runCatching {
                                     collaborationApi.replayCommand(sessionToken,remoteGroupId,queued.getString("commandId"),
                                         queued.getString("kind"),queued.getJSONObject("payload"))
                                 }
-                                if(replay.isSuccess) store.removeQueuedCommand(queued.getString("commandId")) else break
+                                if(replay.isSuccess) store.removeQueuedCommand(queued.getString("commandId")) else {
+                                    val message=replay.exceptionOrNull()?.message.orEmpty()
+                                    if(message=="version_conflict"||message=="command_denied"||message=="command_rejected") {
+                                        store.blockQueuedCommand(queued.getString("commandId"),message)
+                                        remoteSyncStatus="فرمان آفلاین نیازمند بازبینی است: $message"
+                                    }
+                                    break
+                                }
                             }
                             runCatching {
                                 val (events,next)=collaborationApi.changes(sessionToken,remoteGroupId,remoteSequence)
