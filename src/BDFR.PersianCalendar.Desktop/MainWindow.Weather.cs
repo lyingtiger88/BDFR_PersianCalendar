@@ -346,46 +346,85 @@ public sealed partial class MainWindow
         }
     }
 
+    private bool _monthPickerOpen;
+
     private async Task ShowDesktopMonthPickerAsync()
     {
-        if (_desktopCalendarPage?.XamlRoot is null) return;
-        var monthBox = new ComboBox
+        if (_monthPickerOpen) return;
+        // Guard against null/non-visual roots during navigation or window recreation.
+        var root = _desktopCalendarPage?.XamlRoot;
+        if (root is null) return;
+        _monthPickerOpen = true;
+        try
         {
-            Header = "ماه شمسی",
-            MinWidth = 235,
-            SelectedIndex = _month - 1
-        };
-        foreach (var monthName in BDFR.PersianCalendar.Core.PersianDate.MonthNames)
-            monthBox.Items.Add(monthName);
-        var yearBox = new NumberBox
+            var monthBox = new ComboBox
+            {
+                Header = "ماه شمسی",
+                MinWidth = 235
+            };
+            // WinUI may throw if SelectedIndex is set before the Items collection is populated.
+            foreach (var monthName in BDFR.PersianCalendar.Core.PersianDate.MonthNames)
+                monthBox.Items.Add(monthName);
+            monthBox.SelectedIndex = Math.Clamp(_month - 1, 0, 11);
+
+            // Constrain to a supported calendar range with room for the preceding/
+            // following days that MonthGridBuilder includes in the 42-cell grid.
+            var yearBox = new NumberBox
+            {
+                Header = "سال شمسی",
+                Value = _year,
+                Minimum = 2,
+                Maximum = 9376,
+                SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Compact,
+                MinWidth = 235
+            };
+            var form = new StackPanel { Spacing = 12 };
+            form.Children.Add(monthBox);
+            form.Children.Add(yearBox);
+            var dialog = new ContentDialog
+            {
+                XamlRoot = root,
+                Title = "انتخاب ماه و سال",
+                Content = form,
+                PrimaryButtonText = "نمایش ماه",
+                CloseButtonText = "انصراف",
+                DefaultButton = ContentDialogButton.Primary
+            };
+            if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+            if (monthBox.SelectedIndex is < 0 or > 11 ||
+                !double.IsFinite(yearBox.Value) || Math.Abs(yearBox.Value - Math.Truncate(yearBox.Value)) > 0)
+                return;
+            var year = (int)yearBox.Value;
+            var month = monthBox.SelectedIndex + 1;
+            if (year is < 2 or > 9376) return;
+            // Validate the entire 42-day grid before altering the displayed date.
+            BDFR.PersianCalendar.Core.MonthGridBuilder.Build(year, month);
+            var previousYear = _year;
+            var previousMonth = _month;
+            try
+            {
+                _year = year;
+                _month = month;
+                BuildCalendar();
+                QueueSeasonCarouselRefreshForDisplayedMonth();
+            }
+            catch
+            {
+                _year = previousYear;
+                _month = previousMonth;
+                BuildCalendar();
+                throw;
+            }
+        }
+        catch (Exception ex)
         {
-            Header = "سال شمسی",
-            Value = _year,
-            Minimum = 1,
-            Maximum = 9377,
-            SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Compact,
-            MinWidth = 235
-        };
-        var form = new StackPanel { Spacing = 12 };
-        form.Children.Add(monthBox);
-        form.Children.Add(yearBox);
-        var dialog = new ContentDialog
+            StartupDiagnostics.Log("Month picker failed: " + ex);
+            StatusText.Text = "انتخاب ماه انجام نشد: " + ex.Message;
+        }
+        finally
         {
-            XamlRoot = _desktopCalendarPage.XamlRoot,
-            Title = "انتخاب ماه و سال",
-            Content = form,
-            PrimaryButtonText = "نمایش ماه",
-            CloseButtonText = "انصراف",
-            DefaultButton = ContentDialogButton.Primary
-        };
-        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
-        if (monthBox.SelectedIndex is < 0 or > 11 || !double.IsFinite(yearBox.Value)) return;
-        var year = (int)yearBox.Value;
-        if (year < 1 || year > 9377) return;
-        _year = year;
-        _month = monthBox.SelectedIndex + 1;
-        BuildCalendar();
-        QueueSeasonCarouselRefreshForDisplayedMonth();
+            _monthPickerOpen = false;
+        }
     }
 
     private async Task ShowWeatherOptionsAsync()
