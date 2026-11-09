@@ -725,9 +725,9 @@ public sealed partial class MainWindow
         contents.Children.Add(SettingsCard(navigationPosition));
         AddSettingsSeparator(contents);
 
-        AddSettingsAction(contents, "امکانات پیشرفته",
+        AddSettingsAction(contents, "تنظیمات ظاهری پیشرفته",
             "رنگ‌ها، فونت‌ها، Glass Mode، پس‌زمینه و تصویرهای فصلی",
-            "تنظیمات پیشرفته", OpenLegacySettings, "\uE713");
+            "بازکردن تنظیمات کامل", OpenLegacySettings, "\uE771");
         _settingsContent!.Children.Add(SettingsCard(contents));
 
         var tabs = SettingsGroup("نمایش و پنهان‌سازی سربرگ‌ها",
