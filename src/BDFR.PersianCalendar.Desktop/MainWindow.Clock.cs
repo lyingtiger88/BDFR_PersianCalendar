@@ -22,45 +22,43 @@ public sealed partial class MainWindow
 
     private FrameworkElement BuildZurvanClockPanel()
     {
-        var host = new StackPanel
+        const double size = 320;
+        var faceHost = new Grid
         {
-            Orientation = Orientation.Horizontal,
-            Spacing = 10,
+            Width = size, Height = size,
+            FlowDirection = FlowDirection.LeftToRight,
+            HorizontalAlignment = HorizontalAlignment.Right,
             VerticalAlignment = VerticalAlignment.Center,
-            HorizontalAlignment = HorizontalAlignment.Center,
-            FlowDirection = FlowDirection.RightToLeft,
-            Margin = new Thickness(8, 2, 8, 2)
+            Margin = new Thickness(8, 0, 8, 0)
         };
-
-        var faceHost = new Grid { Width = 172, Height = 172 };
         var faceArtwork = new Image
         {
-            Width = 172, Height = 172, Stretch = Stretch.Uniform,
-            Source = new SvgImageSource { UriSource = new Uri("ms-appx:///picture/clock/zurvan-clock-face.svg") }
+            Width = size, Height = size, Stretch = Stretch.Uniform,
+            Source = new SvgImageSource { UriSource = new Uri("ms-appx:///picture/clock/zurvan-clock-face.svg") },
+            FlowDirection = FlowDirection.LeftToRight
         };
         _zurvanClockArtwork = faceArtwork;
         faceHost.Children.Add(faceArtwork);
-        _zurvanClockFace = new Canvas { Width = 172, Height = 172 };
+        _zurvanClockFace = new Canvas { Width = size, Height = size, FlowDirection = FlowDirection.LeftToRight };
         faceHost.Children.Add(_zurvanClockFace);
 
-        var center = 86.0;
-
+        const double center = size / 2;
         AddClockNumerals();
-        _zurvanHourHand = new Line { Stroke = ThemeService.Brush(_theme.PrimaryText), StrokeThickness = 4, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round };
-        _zurvanMinuteHand = new Line { Stroke = ThemeService.Brush(_theme.PrimaryText), StrokeThickness = 2.6, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round };
-        _zurvanSecondHand = new Line { Stroke = new SolidColorBrush(Color.FromArgb(255, 190, 76, 66)), StrokeThickness = 1.2, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round };
+        _zurvanHourHand = new Line { Stroke = ThemeService.Brush(_theme.PrimaryText), StrokeThickness = 7, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round };
+        _zurvanMinuteHand = new Line { Stroke = ThemeService.Brush(_theme.PrimaryText), StrokeThickness = 4.5, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round };
+        _zurvanSecondHand = new Line { Stroke = new SolidColorBrush(Color.FromArgb(255, 190, 76, 66)), StrokeThickness = 2, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round };
         _zurvanClockFace.Children.Add(_zurvanHourHand);
         _zurvanClockFace.Children.Add(_zurvanMinuteHand);
         _zurvanClockFace.Children.Add(_zurvanSecondHand);
-        var hub = new Ellipse { Width = 8, Height = 8, Fill = ThemeService.Brush(_theme.PrimaryText) };
-        Canvas.SetLeft(hub, center - 4); Canvas.SetTop(hub, center - 4);
+        var hub = new Ellipse { Width = 14, Height = 14, Fill = ThemeService.Brush(_theme.PrimaryText) };
+        Canvas.SetLeft(hub, center - 7);
+        Canvas.SetTop(hub, center - 7);
         _zurvanClockFace.Children.Add(hub);
 
         _zurvanDigitalTime = new TextBlock
         {
-            FontSize = 25, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-            HorizontalAlignment = HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Center,
+            FontSize = 48, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
             FlowDirection = FlowDirection.LeftToRight,
             Foreground = ThemeService.Brush(_theme.PrimaryText),
             Visibility = _settings.CalendarClockMode == "digital" ? Visibility.Visible : Visibility.Collapsed
@@ -68,42 +66,6 @@ public sealed partial class MainWindow
         faceHost.Children.Add(_zurvanDigitalTime);
         _zurvanClockFace.Visibility = _settings.CalendarClockMode == "digital" ? Visibility.Collapsed : Visibility.Visible;
         faceArtwork.Visibility = _settings.CalendarClockMode == "digital" ? Visibility.Collapsed : Visibility.Visible;
-        host.Children.Add(faceHost);
-
-        var controls = new StackPanel { Spacing = 5, VerticalAlignment = VerticalAlignment.Center, Width = 142 };
-        _zurvanClockModeLabel = new TextBlock { Text = "ساعت زروان", FontSize = 13, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, Foreground = ThemeService.Brush(_theme.PrimaryText) };
-        controls.Children.Add(_zurvanClockModeLabel);
-        var mode = MakeButton(_settings.CalendarClockMode == "digital" ? "نمایش آنالوگ" : "نمایش دیجیتال");
-        mode.MinWidth = 130;
-        mode.Click += (_, _) =>
-        {
-            _settings.CalendarClockMode = _settings.CalendarClockMode == "digital" ? "analog" : "digital";
-            _settingsService.Save(_settings);
-            ApplyClockMode();
-            mode.Content = _settings.CalendarClockMode == "digital" ? "نمایش آنالوگ" : "نمایش دیجیتال";
-        };
-        controls.Children.Add(mode);
-
-        var numeralLabel = new TextBlock { Text = "سبک شمارگان", FontSize = 11, Opacity = .75, Foreground = ThemeService.Brush(_theme.PrimaryText) };
-        controls.Children.Add(numeralLabel);
-        var numeralPicker = new ComboBox { MinWidth = 132, HorizontalAlignment = HorizontalAlignment.Stretch };
-        numeralPicker.Items.Add(new ComboBoxItem { Content = "خوارزمی", Tag = "khwarazmi" });
-        numeralPicker.Items.Add(new ComboBoxItem { Content = "پهلوی", Tag = "pahlavi" });
-        numeralPicker.Items.Add(new ComboBoxItem { Content = "میخی", Tag = "cuneiform" });
-        numeralPicker.Items.Add(new ComboBoxItem { Content = "رومی", Tag = "roman" });
-        numeralPicker.SelectedIndex = Math.Max(0, new[] { "khwarazmi", "pahlavi", "cuneiform", "roman" }.ToList().IndexOf(_settings.CalendarClockNumeralStyle));
-        numeralPicker.SelectionChanged += (_, _) =>
-        {
-            if (numeralPicker.SelectedItem is ComboBoxItem selected && selected.Tag is string style)
-            {
-                _settings.CalendarClockNumeralStyle = style;
-                _settingsService.Save(_settings);
-                AddClockNumerals();
-                UpdateZurvanClock();
-            }
-        };
-        controls.Children.Add(numeralPicker);
-        host.Children.Add(controls);
 
         UpdateZurvanClock();
         _zurvanClockTimer ??= DispatcherQueue.GetForCurrentThread().CreateTimer();
@@ -111,7 +73,7 @@ public sealed partial class MainWindow
         _zurvanClockTimer.Tick -= ZurvanClockTimer_Tick;
         _zurvanClockTimer.Tick += ZurvanClockTimer_Tick;
         _zurvanClockTimer.Start();
-        return host;
+        return faceHost;
     }
 
     private void ZurvanClockTimer_Tick(DispatcherQueueTimer sender, object args) => UpdateZurvanClock();
@@ -142,15 +104,15 @@ public sealed partial class MainWindow
         {
             var label = new TextBlock
             {
-                Text = values[i], FontSize = _settings.CalendarClockNumeralStyle == "roman" ? 9 : 11,
-                Width = 24, Height = 18, TextAlignment = TextAlignment.Center,
+                Text = values[i], FontSize = _settings.CalendarClockNumeralStyle == "roman" ? 17 : 21,
+                Width = 38, Height = 28, TextAlignment = TextAlignment.Center,
                 Foreground = ThemeService.Brush(_theme.PrimaryText),
                 FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
                 FlowDirection = FlowDirection.LeftToRight
             };
             var angle = (i * 30 - 90) * Math.PI / 180.0;
-            Canvas.SetLeft(label, 86 + Math.Cos(angle) * 59 - 12);
-            Canvas.SetTop(label, 86 + Math.Sin(angle) * 59 - 9);
+            Canvas.SetLeft(label, 160 + Math.Cos(angle) * 111 - 19);
+            Canvas.SetTop(label, 160 + Math.Sin(angle) * 111 - 14);
             _zurvanClockNumerals.Add(label);
             _zurvanClockFace.Children.Add(label);
         }
@@ -169,7 +131,7 @@ public sealed partial class MainWindow
 
     private static void SetClockHand(Line hand, double degrees, double length)
     {
-        const double center = 86;
+        const double center = 160;
         var angle = (degrees - 90) * Math.PI / 180.0;
         hand.X1 = center; hand.Y1 = center;
         hand.X2 = center + Math.Cos(angle) * length;
