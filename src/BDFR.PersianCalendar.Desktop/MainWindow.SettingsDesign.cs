@@ -632,6 +632,22 @@ public sealed partial class MainWindow
         contents.Children.Add(SettingsOptionRow("تم زروان", "قالب فعلی برنامه", combo, "\uE790"));
         AddSettingsSeparator(contents);
 
+        contents.Children.Add(SettingsOptionRow(
+            "آب‌وهوا در تقویم",
+            "نمایش وضعیت امروز، دمای ۲۴ ساعت آینده و پیش‌بینی هفت‌روزه روی کارت روزها",
+            SettingsToggle(_settings.WeatherEnabled, value =>
+            {
+                _settings.WeatherEnabled = value;
+                _settings.WeatherOnCalendarCards = value;
+                _settingsService.Save(_settings);
+                if (_weatherCalendarHost is not null)
+                    _weatherCalendarHost.Visibility = value ? Visibility.Visible : Visibility.Collapsed;
+                RenderWeatherDayBadges();
+                if (value) _ = RefreshWeatherAsync(force: true);
+            }),
+            "\uE753"));
+        AddSettingsSeparator(contents);
+
         var zodiacStyles = new (string Id, string Title, string Glyph)[]
         {
             ("cosmic", "کیهانی کلاسیک", "✦"), ("neon", "فانتزی نورانی", "☄"),
