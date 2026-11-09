@@ -50,7 +50,7 @@ object ZurvanWeather {
             "&current=temperature_2m,weather_code" +
             "&hourly=temperature_2m,weather_code" +
             "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max" +
-            "&forecast_days=7&timezone=auto")
+            "&past_days=7&forecast_days=8&timezone=auto")
         val connection = (url.openConnection() as HttpURLConnection).apply {
             connectTimeout = 12000
             readTimeout = 12000
@@ -74,7 +74,7 @@ object ZurvanWeather {
         val offset = root.optInt("utc_offset_seconds",0)
         val localNow = java.time.Instant.now().plusSeconds(offset.toLong())
             .atZone(java.time.ZoneOffset.UTC).toLocalDateTime()
-        val upcoming = allHours.filter { !it.time.isBefore(localNow.minusHours(1)) }.take(24)
+        val recent = allHours.filter { !it.time.isAfter(localNow) && it.time.isAfter(localNow.minusHours(24)) }.takeLast(24)
         val daily = root.getJSONObject("daily")
         val dates = daily.getJSONArray("time")
         val highs = daily.getJSONArray("temperature_2m_max")
@@ -88,7 +88,7 @@ object ZurvanWeather {
                 day.date to day
             }
         val result = ZurvanWeatherData(place.city, now.getDouble("temperature_2m"),
-            now.getInt("weather_code"), upcoming, days)
+            now.getInt("weather_code"), recent, days)
         synchronized(this@ZurvanWeather) { cachedKey=key; cachedAt=System.currentTimeMillis(); cached=result }
         result
     }
