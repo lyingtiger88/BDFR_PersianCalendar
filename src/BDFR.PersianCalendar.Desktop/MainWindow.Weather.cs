@@ -145,7 +145,7 @@ public sealed partial class MainWindow
                 "&longitude=" + lon +
                 "&current=temperature_2m,relative_humidity_2m,weather_code,is_day,wind_speed_10m" +
                 "&daily=weather_code,temperature_2m_max,temperature_2m_min" +
-                "&timezone=auto&past_days=7&forecast_days=7");
+                "&timezone=auto&past_days=7&forecast_days=8");
             forecastResponse.EnsureSuccessStatusCode();
             using var forecast = JsonDocument.Parse(await forecastResponse.Content.ReadAsStringAsync());
             var root = forecast.RootElement;
