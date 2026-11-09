@@ -338,10 +338,9 @@ public sealed partial class MainWindow
                 Canvas.SetTop(tab, 3);
                 canvas.Children.Add(tab);
             }
-            canvas.Children.Add(new Border
-            {
-                Width = 39, Height = 2, Background = color
-            }.AlsoPlace(1, 22));
+            var baseline = new Border { Width = 39, Height = 2, Background = color };
+            Canvas.SetLeft(baseline, 1); Canvas.SetTop(baseline, 22);
+            canvas.Children.Add(baseline);
         }
         else
         {
