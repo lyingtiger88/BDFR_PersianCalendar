@@ -413,7 +413,7 @@ fun ZurvanTeamPlanner(
                                     remoteSequence=next;store.set("remote_sequence",next.toString())
                                     remoteMembers=collaborationApi.members(sessionToken,remoteGroupId)
                                     val items=collaborationApi.items(sessionToken,remoteGroupId)
-                                    sharedItems=(0 until items.length()).map { val x=items.getJSONObject(it); x.optString("title")+" • "+x.optString("state") }
+                                    sharedItems=(0 until items.length()).map { val x=items.getJSONObject(it); val rule=x.optString("recurrence_rule"); val occurrences=x.optJSONArray("occurrences"); val next=occurrences?.optJSONObject(0)?.optString("at").orEmpty(); x.optString("title")+" • "+x.optString("state")+(if(rule.isNotBlank()&&rule!="null")" • تکرار: $rule"+(if(next.isNotBlank())" • $next" else "") else "") }
                                     val messages=collaborationApi.messages(sessionToken,remoteGroupId)
                                     sharedMessages=(0 until messages.length()).map { val x=messages.getJSONObject(it); x.optString("body") }
                                     remoteSyncStatus="همگام‌سازی آنلاین فعال • آخرین تغییر: ${events.size}"
