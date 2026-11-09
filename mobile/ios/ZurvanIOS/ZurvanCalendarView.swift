@@ -101,6 +101,7 @@ struct ZurvanCalendarView: View {
                     Spacer()
                     Button { monthOffset += 1 } label: { Image(systemName: "chevron.left") }
                 }
+                ZurvanClockViewIOS()
                 ZurvanPrayerTodayIOS(city: weatherCity,
                     latitude: weatherLatitude, longitude: weatherLongitude,
                     timeZoneID: weatherTimeZone)
