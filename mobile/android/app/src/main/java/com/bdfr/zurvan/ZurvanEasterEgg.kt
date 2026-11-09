@@ -1,11 +1,14 @@
 package com.bdfr.zurvan
 
 import android.os.SystemClock
+import android.content.Context
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.border
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -15,13 +18,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import kotlin.math.cos
 import kotlin.math.sin
 import java.time.LocalTime
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 import kotlinx.coroutines.delay
 
 /** Discreet trigger: 7 taps on the app title, with a short inactivity reset. */
@@ -82,6 +89,24 @@ private fun ZurvanTimeIllustration(modifier: Modifier = Modifier) {
     val ink = Color(0xFF111111)
     val gold = Color(0xFFD6A64D)
     val secondsColor = Color(0xFFB63D35)
+    val context = LocalContext.current
+    val settings = remember(context) { context.getSharedPreferences("zurvan_clock", Context.MODE_PRIVATE) }
+    var clockMode by remember { mutableStateOf(settings.getString("mode", "analog") ?: "analog") }
+    var clockStyle by remember { mutableStateOf(settings.getString("digital_style", "classic") ?: "classic") }
+    var twentyFourHours by remember { mutableStateOf(settings.getBoolean("24_hour", true)) }
+    var showSeconds by remember { mutableStateOf(settings.getBoolean("show_seconds", true)) }
+    DisposableEffect(settings) {
+        val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            when (key) {
+                "mode" -> clockMode = settings.getString("mode", "analog") ?: "analog"
+                "digital_style" -> clockStyle = settings.getString("digital_style", "classic") ?: "classic"
+                "24_hour" -> twentyFourHours = settings.getBoolean("24_hour", true)
+                "show_seconds" -> showSeconds = settings.getBoolean("show_seconds", true)
+            }
+        }
+        settings.registerOnSharedPreferenceChangeListener(listener)
+        onDispose { settings.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
     var time by remember { mutableStateOf(LocalTime.now()) }
 
     LaunchedEffect(Unit) {
@@ -98,7 +123,43 @@ private fun ZurvanTimeIllustration(modifier: Modifier = Modifier) {
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Fit
         )
-        Canvas(Modifier.fillMaxSize()) {
+        if (clockMode == "digital") {
+            val formatter = remember(twentyFourHours, showSeconds) {
+                DateTimeFormatter.ofPattern(
+                    if (twentyFourHours) (if (showSeconds) "HH:mm:ss" else "HH:mm")
+                    else (if (showSeconds) "hh:mm:ss a" else "hh:mm a"),
+                    Locale.ENGLISH
+                )
+            }
+            val accent = when (clockStyle) {
+                "modern" -> Color(0xFF67E5F4)
+                "dots" -> Color(0xFFE8D8FB)
+                "flip" -> Color(0xFFFFFFFF)
+                else -> Color(0xFFF5D28D)
+            }
+            val background = when (clockStyle) {
+                "flip" -> Color(0xFF272B3A)
+                "modern" -> Color(0xFF092B3A)
+                "dots" -> Color(0xFF261E3D)
+                else -> Color(0xFF201A31)
+            }
+            Box(
+                Modifier.fillMaxWidth(.77f)
+                    .background(background, RoundedCornerShape(14.dp))
+                    .border(2.dp, gold.copy(alpha = .7f), RoundedCornerShape(14.dp))
+                    .padding(vertical = 10.dp, horizontal = 6.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    time.format(formatter),
+                    fontSize = if (showSeconds) 23.sp else 29.sp,
+                    color = accent,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    textAlign = TextAlign.Center
+                )
+            }
+        } else Canvas(Modifier.fillMaxSize()) {
             val center = Offset(size.width / 2f, size.height / 2f)
             val radius = minOf(size.width, size.height) * .47f
 
