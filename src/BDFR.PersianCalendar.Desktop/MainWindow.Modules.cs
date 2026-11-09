@@ -43,8 +43,8 @@ public sealed partial class MainWindow
         catch (HttpRequestException ex)
         {
             var status = ex.StatusCode;
-            var retryable = status is null || status == HttpStatusCode.TooManyRequests ||
-                (int)status.Value >= 500;
+            var retryable = status is null || status == HttpStatusCode.RequestTimeout ||
+                status == HttpStatusCode.TooManyRequests || (int)status.Value >= 500;
             if (!retryable)
             {
                 if (_collaborationStatus is not null) _collaborationStatus.Text = ex.Message;
