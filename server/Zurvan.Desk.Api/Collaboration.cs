@@ -208,7 +208,7 @@ public sealed class CollaborationStore
 {
     private readonly object _gate = new();
     private readonly string _path;
-    private readonly CollaborationDatabase _db;
+    private CollaborationDatabase _db;
 
     public CollaborationStore()
     {
@@ -226,11 +226,22 @@ public sealed class CollaborationStore
     {
         lock (_gate)
         {
-            var result = action();
-            var temporary = _path + ".tmp";
-            File.WriteAllText(temporary, JsonSerializer.Serialize(_db));
-            File.Move(temporary, _path, true);
-            return result;
+            // A failed disk write must never leave uncommitted membership or
+            // permission changes active in this server process.
+            var before = JsonSerializer.Serialize(_db);
+            try
+            {
+                var result = action();
+                var temporary = _path + ".tmp";
+                File.WriteAllText(temporary, JsonSerializer.Serialize(_db));
+                File.Move(temporary, _path, true);
+                return result;
+            }
+            catch
+            {
+                _db = JsonSerializer.Deserialize<CollaborationDatabase>(before)!;
+                throw;
+            }
         }
     }
 
@@ -306,10 +317,11 @@ public sealed class CollaborationStore
             throw new InvalidOperationException("Invitation expired or already accepted.");
         if (_db.Members.Any(x => x.GroupId == i.GroupId && x.UserId == user))
             throw new InvalidOperationException("Already a member.");
-        // Accepting does not rely on the invitation sender remaining a member, but
-        // owner must still exist. Assistant privileges require a valid owner-issued invite.
-        var owner = Group(i.GroupId).OwnerId;
-        if (i.Role == "assistant" && i.InviterId != owner)
+        // An invite is no longer valid if the issuing manager lost access.
+        var issuer = _db.Members.FirstOrDefault(m =>
+            m.GroupId == i.GroupId && m.UserId == i.InviterId);
+        if (issuer is null || !Manager(issuer) ||
+            (i.Role == "assistant" && issuer.Role != "owner"))
             throw new UnauthorizedAccessException();
         var m = new CollaborationMember(i.GroupId, user, i.Role, new(true, true, false));
         _db.Members.Add(m);
