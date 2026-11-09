@@ -162,12 +162,14 @@ public sealed partial class MainWindow
                             (replayed > 0 ? $" • {replayed} فرمان ارسال شد" : "");
                 });
             }
-            catch
+            catch (Exception ex)
             {
                 _desktopModulePage?.DispatcherQueue.TryEnqueue(() =>
                 {
                     if (_collaborationStatus is not null)
-                        _collaborationStatus.Text = "اتصال گروه موقتاً قطع است؛ تلاش مجدد انجام می‌شود.";
+                        _collaborationStatus.Text = ex.Message.Contains("صف آفلاین", StringComparison.Ordinal)
+                            ? ex.Message
+                            : "اتصال گروه موقتاً قطع است؛ تلاش مجدد انجام می‌شود.";
                 });
             }
             finally { System.Threading.Interlocked.Exchange(ref _collaborationPollBusy, 0); }
