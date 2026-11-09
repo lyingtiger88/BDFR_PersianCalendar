@@ -11,7 +11,7 @@ internal static class DesktopLocalization
         {
             ["en"] = new Dictionary<string, string>
             {
-                ["تقویم"] = "Calendar", ["برنامه‌ها"] = "Events", ["مناسبت‌ها"] = "Occasions",
+                ["زبان ترجیحی ذخیره شد."] = "Language preference saved.", ["تقویم"] = "Calendar", ["برنامه‌ها"] = "Events", ["مناسبت‌ها"] = "Occasions",
                 ["پادآورها"] = "Reminders", ["تنظیمات"] = "Settings", ["مدیریت تصویر زمینه"] = "Wallpaper Manager",
                 ["ذخیره یادداشت"] = "Save note", ["حذف یادداشت روز"] = "Delete day's note",
                 ["زبان و منطقه"] = "Language & region", ["زبان برنامه"] = "Application language",
@@ -29,7 +29,7 @@ internal static class DesktopLocalization
             },
             ["ckb"] = new Dictionary<string, string>
             {
-                ["تقویم"] = "ڕۆژژمێر", ["برنامه‌ها"] = "بەرنامەکان", ["مناسبت‌ها"] = "بۆنەکان",
+                ["زبان ترجیحی ذخیره شد."] = "زمانی هەڵبژێردراو پاشەکەوت کرا.", ["تقویم"] = "ڕۆژژمێر", ["برنامه‌ها"] = "بەرنامەکان", ["مناسبت‌ها"] = "بۆنەکان",
                 ["پادآورها"] = "بیرخەرەوەکان", ["تنظیمات"] = "ڕێکخستنەکان", ["مدیریت تصویر زمینه"] = "بەڕێوەبردنی وێنەی پاشبنەما",
                 ["ذخیره یادداشت"] = "پاشەکەوتکردنی تێبینی", ["حذف یادداشت روز"] = "سڕینەوەی تێبینیی ئەمڕۆ",
                 ["زبان و منطقه"] = "زمان و ناوچە", ["زبان برنامه"] = "زمانی بەرنامە",
@@ -42,7 +42,7 @@ internal static class DesktopLocalization
             },
             ["bal"] = new Dictionary<string, string>
             {
-                ["تقویم"] = "تقویم", ["برنامه‌ها"] = "پلانان", ["مناسبت‌ها"] = "مناسبتاں",
+                ["زبان ترجیحی ذخیره شد."] = "زبان ءِ ترجیح محفوظ بوت.", ["تقویم"] = "تقویم", ["برنامه‌ها"] = "پلانان", ["مناسبت‌ها"] = "مناسبتاں",
                 ["پادآورها"] = "یاد دپادکناں", ["تنظیمات"] = "ترتیب", ["مدیریت تصویر زمینه"] = "پس‌منظر ءِ منیجمنٹ",
                 ["ذخیره یادداشت"] = "نوشتگ ءَ محفوظ کن", ["حذف یادداشت روز"] = "روچ ءِ نوشتگ رد کن",
                 ["زبان و منطقه"] = "زبان ءُ منطقه", ["زبان برنامه"] = "سافٹویر ءِ زبان",
@@ -57,10 +57,26 @@ internal static class DesktopLocalization
 
     public static string Translate(string value, string language)
     {
-        if (string.IsNullOrEmpty(value) || language.Equals("fa", StringComparison.OrdinalIgnoreCase))
-            return value;
-        return Text.TryGetValue(language, out var dictionary) && dictionary.TryGetValue(value, out var translated)
-            ? translated : value;
+        if (string.IsNullOrEmpty(value)) return value;
+
+        // Normalize a previously translated value back to its Persian source before
+        // applying another language, so changing languages repeatedly remains reversible.
+        var source = value;
+        foreach (var dictionary in Text.Values)
+        {
+            var match = dictionary.FirstOrDefault(pair => string.Equals(pair.Value, value, StringComparison.Ordinal));
+            if (!string.IsNullOrEmpty(match.Key))
+            {
+                source = match.Key;
+                break;
+            }
+        }
+
+        if (language.Equals("fa", StringComparison.OrdinalIgnoreCase))
+            return source;
+
+        return Text.TryGetValue(language, out var target) && target.TryGetValue(source, out var translated)
+            ? translated : source;
     }
 
     public static void Apply(FrameworkElement? root, string language)
