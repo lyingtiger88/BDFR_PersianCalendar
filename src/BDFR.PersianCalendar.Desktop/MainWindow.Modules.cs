@@ -14,6 +14,11 @@ public sealed partial class MainWindow
     private TextBlock? _deskStatus;
     private StackPanel? _deskFiles;
     private bool _deskRegisterMode;
+    private string _collaborationGroupId = "";
+    private long _collaborationCursor;
+    private System.Threading.Timer? _collaborationTimer;
+    private TextBlock? _collaborationStatus;
+
 
     private static void DetachDesktopElement(FrameworkElement element)
     {
@@ -27,6 +32,46 @@ public sealed partial class MainWindow
     {
         DetachDesktopElement(element);
         host.Children.Add(element);
+    }
+
+    private void StartCollaborationPolling()
+    {
+        _collaborationTimer?.Dispose();
+        if (!_deskClient.IsAuthenticated || string.IsNullOrWhiteSpace(_collaborationGroupId)) return;
+        _collaborationTimer = new System.Threading.Timer(async _ =>
+        {
+            try
+            {
+                using var result = await _deskClient.ReadCollaborationChangesAsync(
+                    _collaborationGroupId, _collaborationCursor);
+                var root = result.RootElement;
+                var next = root.TryGetProperty("nextCursor", out var cursor) ? cursor.GetInt64() : _collaborationCursor;
+                var count = root.TryGetProperty("events", out var events) && events.ValueKind == JsonValueKind.Array
+                    ? events.GetArrayLength() : 0;
+                if (next > _collaborationCursor) _collaborationCursor = next;
+                _desktopModulePage?.DispatcherQueue.TryEnqueue(() =>
+                {
+                    if (_collaborationStatus is not null)
+                        _collaborationStatus.Text = count > 0
+                            ? $"همگام‌سازی آنلاین فعال • {count} تغییر جدید دریافت شد."
+                            : "همگام‌سازی آنلاین فعال • آخرین وضعیت به‌روز است.";
+                });
+            }
+            catch (Exception ex)
+            {
+                _desktopModulePage?.DispatcherQueue.TryEnqueue(() =>
+                {
+                    if (_collaborationStatus is not null)
+                        _collaborationStatus.Text = "اتصال گروه موقتاً قطع است؛ تلاش مجدد انجام می‌شود.";
+                });
+            }
+        }, null, TimeSpan.Zero, TimeSpan.FromSeconds(3));
+    }
+
+    private void StopCollaborationPolling()
+    {
+        _collaborationTimer?.Dispose();
+        _collaborationTimer = null;
     }
 
     private void ShowDesktopModule(string module)
@@ -622,6 +667,83 @@ public sealed partial class MainWindow
                 tools.Children.Add(addEvent);
                 page.Children.Add(Card("برنامه‌ریز هفتگی", "برنامه‌ها بر اساس روز نمایش داده می‌شوند؛ انجام کارها از همین صفحه قابل تغییر است.", week));
                 page.Children.Add(Card("افزودن برنامه", "ابتدا روز را در تقویم انتخاب کنید؛ سپس کار یا رویداد را ثبت کنید.", tools));
+                var collaboration = new StackPanel { Spacing = 8 };
+                var groupNameBox = new TextBox { Header = "نام گروه آنلاین", PlaceholderText = "نام گروه" };
+                var groupIdBox = new TextBox { Header = "شناسه گروه", PlaceholderText = "پس از ساخت گروه خودکار تکمیل می‌شود" };
+                var inviteIdBox = new TextBox { Header = "شناسه زروان عضو", PlaceholderText = "شناسه حساب عضو" };
+                var agendaMode = new CheckBox { Content = "Agenda Mode", IsChecked = true };
+                var kanbanMode = new CheckBox { Content = "Kanban Mode", IsChecked = true };
+                var schoolMode = new CheckBox { Content = "School Mode", IsChecked = false };
+                var assistantMode = new CheckBox { Content = "دعوت به‌عنوان دستیار مدیر" };
+                _collaborationStatus = new TextBlock { TextWrapping = TextWrapping.Wrap, Opacity = 0.8 };
+                var createGroup = MakeButton("ساخت گروه آنلاین");
+                createGroup.Click += async (_, _) =>
+                {
+                    if (!_deskClient.IsAuthenticated) { _collaborationStatus.Text = "ابتدا در Zurvan Desk وارد شوید."; return; }
+                    if (string.IsNullOrWhiteSpace(groupNameBox.Text) ||
+                        !(agendaMode.IsChecked == true || kanbanMode.IsChecked == true || schoolMode.IsChecked == true))
+                    { _collaborationStatus.Text = "نام گروه و حداقل یک حالت کاری لازم است."; return; }
+                    createGroup.IsEnabled = false;
+                    try
+                    {
+                        using var result = await _deskClient.CreateCollaborationGroupAsync(
+                            groupNameBox.Text.Trim(), agendaMode.IsChecked == true,
+                            kanbanMode.IsChecked == true, schoolMode.IsChecked == true);
+                        _collaborationGroupId = result.RootElement.GetProperty("id").GetString() ?? "";
+                        groupIdBox.Text = _collaborationGroupId;
+                        _collaborationCursor = 0;
+                        _collaborationStatus.Text = "گروه آنلاین ساخته شد؛ همگام‌سازی هر ۳ ثانیه انجام می‌شود.";
+                        StartCollaborationPolling();
+                    }
+                    catch (Exception ex) { _collaborationStatus.Text = ex.Message; }
+                    finally { createGroup.IsEnabled = true; }
+                };
+                var inviteMember = MakeButton("ارسال دعوت");
+                inviteMember.Click += async (_, _) =>
+                {
+                    if (!_deskClient.IsAuthenticated || string.IsNullOrWhiteSpace(_collaborationGroupId) ||
+                        string.IsNullOrWhiteSpace(inviteIdBox.Text))
+                    { _collaborationStatus.Text = "ابتدا وارد حساب شوید، گروه را انتخاب کنید و شناسه عضو را بنویسید."; return; }
+                    inviteMember.IsEnabled = false;
+                    try
+                    {
+                        await _deskClient.InviteCollaborationMemberAsync(
+                            _collaborationGroupId, inviteIdBox.Text.Trim(), assistantMode.IsChecked == true);
+                        _collaborationStatus.Text = "دعوت برای حساب زروان ارسال شد؛ عضو باید آن را بپذیرد.";
+                        inviteIdBox.Text = "";
+                    }
+                    catch (Exception ex) { _collaborationStatus.Text = ex.Message; }
+                    finally { inviteMember.IsEnabled = true; }
+                };
+                var connectGroup = MakeButton("اتصال به گروه و شروع همگام‌سازی");
+                connectGroup.Click += async (_, _) =>
+                {
+                    _collaborationGroupId = groupIdBox.Text.Trim();
+                    if (!_deskClient.IsAuthenticated || string.IsNullOrWhiteSpace(_collaborationGroupId))
+                    { _collaborationStatus.Text = "ابتدا وارد حساب شوید و شناسه گروه را وارد کنید."; return; }
+                    try
+                    {
+                        using var group = await _deskClient.ReadCollaborationGroupAsync(_collaborationGroupId);
+                        _collaborationStatus.Text = "اتصال گروه تأیید شد؛ همگام‌سازی آنلاین فعال است.";
+                        StartCollaborationPolling();
+                    }
+                    catch (Exception ex) { _collaborationStatus.Text = ex.Message; }
+                };
+                collaboration.Children.Add(groupNameBox);
+                collaboration.Children.Add(new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12,
+                    Children = { agendaMode, kanbanMode, schoolMode } });
+                collaboration.Children.Add(createGroup);
+                collaboration.Children.Add(groupIdBox);
+                collaboration.Children.Add(connectGroup);
+                collaboration.Children.Add(inviteIdBox);
+                collaboration.Children.Add(assistantMode);
+                collaboration.Children.Add(inviteMember);
+                collaboration.Children.Add(_collaborationStatus);
+                page.Children.Add(Card("همکاری آنلاین و گروه‌ها",
+                    "ساخت گروه، دعوت با شناسه واقعی زروان و دریافت تغییرات مشترک. ورود به حساب Zurvan Desk الزامی است.",
+                    collaboration));
+                StartCollaborationPolling();
+
                 _ = LoadWeek();
                 break;
             }
