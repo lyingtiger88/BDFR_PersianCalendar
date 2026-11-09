@@ -302,7 +302,7 @@ fun ZurvanTeamPlanner(
                         val payload=JSONObject().put("title",sharedTaskTitle.trim()).put("mode","agenda").put("state","todo").put("timezone",java.util.TimeZone.getDefault().id);agendaRecurrence?.let{payload.put("recurrenceRule",it)}
                         runCatching { collaborationApi.replayCommand(sessionToken,remoteGroupId,commandId,"create_item",payload) }
                             .onSuccess { sharedTaskTitle="";status="کار مشترک ثبت شد." }
-                            .onFailure { store.enqueueCommand(remoteGroupId,commandId,"create_item",payload);sharedTaskTitle="";status="کار در صف آفلاین ذخیره شد و پس از اتصال ارسال می‌شود." }
+                            .onFailure { val message=it.message.orEmpty();if(message in listOf("version_conflict","command_denied","command_rejected"))status="سرور فرمان را رد کرد: $message" else { store.enqueueCommand(remoteGroupId,commandId,"create_item",payload);status="کار در صف آفلاین ذخیره شد و پس از اتصال ارسال می‌شود." };sharedTaskTitle="" }
                     }
                 }) { Text("ثبت کار مشترک آنلاین") }
                 OutlinedTextField(sharedMessage,{sharedMessage=it},label={Text("پیام گروه")},modifier=Modifier.fillMaxWidth())
@@ -313,7 +313,7 @@ fun ZurvanTeamPlanner(
                         val payload=JSONObject().put("body",sharedMessage.trim())
                         runCatching { collaborationApi.replayCommand(sessionToken,remoteGroupId,commandId,"send_message",payload) }
                             .onSuccess { sharedMessage="";status="پیام ارسال شد." }
-                            .onFailure { store.enqueueCommand(remoteGroupId,commandId,"send_message",payload);sharedMessage="";status="پیام در صف آفلاین ذخیره شد و پس از اتصال ارسال می‌شود." }
+                            .onFailure { val message=it.message.orEmpty();if(message in listOf("version_conflict","command_denied","command_rejected"))status="سرور پیام را رد کرد: $message" else { store.enqueueCommand(remoteGroupId,commandId,"send_message",payload);status="پیام در صف آفلاین ذخیره شد و پس از اتصال ارسال می‌شود." };sharedMessage="" }
                     }
                 }) { Text("ارسال پیام گروه") }
                 Button(onClick={
@@ -404,8 +404,12 @@ fun ZurvanTeamPlanner(
                                         val all=collaborationApi.items(sessionToken,remoteGroupId)
                                         kanbanCards=(0 until all.length()).map{all.getJSONObject(it)}.filter{it.optString("mode")=="kanban"}
                                     }.onFailure {
-                                        store.enqueueCommand(remoteGroupId,commandId,"update_item",payload)
-                                        status="انتقال کارت در صف آفلاین ذخیره شد؛ در صورت تعارض نسخه، نیاز به بازبینی دارد."
+                                        val message=it.message.orEmpty()
+                                        if(message in listOf("version_conflict","command_denied","command_rejected")) status="تعارض یا رد فرمان: $message"
+                                        else {
+                                            store.enqueueCommand(remoteGroupId,commandId,"update_item",payload)
+                                            status="انتقال کارت در صف آفلاین ذخیره شد."
+                                        }
                                     }
                             }
                         }) { Text("انتقال ←") }
