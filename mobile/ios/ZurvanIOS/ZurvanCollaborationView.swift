@@ -247,12 +247,10 @@ struct ZurvanCollaborationView: View {
                         try await loadKanban()
                         try await loadMembers()
                         let items = try await api.items(token: token, groupID: groupID)
-                        sharedItems = items.compactMap { item in
-                            guard let title = item["title"] as? String else { return nil }
-                            let rule = item["recurrence_rule"] as? String
-                            let occurrences = item["occurrences"] as? [[String: Any]]
-                            let next = occurrences?.first?["at"] as? String
-                            return rule.map { title + " • " + $0 + (next.map { " • " + $0 } ?? "") } ?? title
+                        sharedItems = items.map { item in
+                            let next = item.occurrences?.first?.at
+                            return item.title + " • " + item.state +
+                                (item.recurrence_rule.map { " • تکرار: " + $0 + (next.map { " • " + $0 } ?? "") } ?? "")
                         }
                         let messages = try await api.messages(token: token, groupID: groupID)
                         sharedMessages = messages.compactMap { $0["body"] as? String }
@@ -294,7 +292,8 @@ struct ZurvanCollaborationView: View {
         async let c = api.kanbanColumns(token: token, groupID: groupID)
         async let i = api.items(token: token, groupID: groupID)
         kanbanColumns = try await c
-        kanbanCards = try await i.filter { $0.mode == "kanban" }
+        let allItems = try await i
+        kanbanCards = allItems.filter { $0.mode == "kanban" }
     }
     private func queueEncryptionKey() throws -> SymmetricKey {
         if let encoded = try secureStore.get(ZurvanCloudSecureStoreIOS.collaborationQueueKey),
