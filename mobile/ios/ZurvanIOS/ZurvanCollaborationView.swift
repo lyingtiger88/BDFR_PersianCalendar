@@ -25,6 +25,9 @@ struct ZurvanCollaborationView: View {
     @State private var kanbanColumnName = ""
     @State private var kanbanTaskTitle = ""
     @State private var agendaTitle = ""
+    @State private var messageText = ""
+    @State private var sharedItems: [String] = []
+    @State private var sharedMessages: [String] = []
     @State private var recurrenceRule = "none"
     @State private var status = "برای استفاده از همکاری آنلاین وارد حساب Zurvan Desk شوید."
     @State private var isBusy = false
@@ -81,7 +84,8 @@ struct ZurvanCollaborationView: View {
                         run { try await api.createKanbanColumn(token: token, groupID: groupID, name: kanbanColumnName); kanbanColumnName = ""; try await loadKanban() }
                     }
                     Button("بارگذاری ستون‌ها") { run { try await loadKanban() } }
-                    ForEach(Array(kanbanColumns.enumerated()), id: \.element.id) { index, column in
+                    ForEach(kanbanColumns) { column in
+                        let index = kanbanColumns.firstIndex(where: { $0.id == column.id }) ?? 0
                         HStack {
                             Text(column.name)
                             Spacer()
@@ -140,6 +144,17 @@ struct ZurvanCollaborationView: View {
                     }
                 }
             }
+            Section("پیام‌های گروه") {
+                TextField("پیام جدید", text: $messageText, axis: .vertical)
+                Button("ارسال پیام") {
+                    let body = messageText.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !body.isEmpty else { status = "متن پیام را وارد کنید."; return }
+                    enqueueOrSend("send_message", payload: ["body": body])
+                    messageText = ""
+                }
+                ForEach(sharedMessages.suffix(12), id: \.self) { Text($0).font(.footnote) }
+                ForEach(sharedItems.suffix(12), id: \.self) { Text("• " + $0).font(.caption).foregroundStyle(.secondary) }
+            }
             Section("همگام‌سازی و صف آفلاین") {
                 Text(status).font(.footnote)
                 Text("فرمان‌های ذخیره‌شده روی دستگاه: \(queue.count)")
@@ -163,6 +178,10 @@ struct ZurvanCollaborationView: View {
                     if !feed.events.isEmpty {
                         try await loadSchool()
                         try await loadKanban()
+                        let items = try await api.items(token: token, groupID: groupID)
+                        sharedItems = items.compactMap { $0["title"] as? String }
+                        let messages = try await api.messages(token: token, groupID: groupID)
+                        sharedMessages = messages.compactMap { $0["body"] as? String }
                         status = "همگام‌سازی آنلاین: \(feed.events.count) تغییر جدید"
                     }
                 } catch {
