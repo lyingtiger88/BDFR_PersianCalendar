@@ -267,3 +267,10 @@ The draft PR initially triggered the repository's automatic GitHub Actions workf
 - FCM/APNs delivery remains dependent on credentials, app entitlements and device-token registration.
 - Native WebSocket is not implemented; the current synchronization transport is bounded long-polling.
 - No build or release was run. Pull-request workflows now require the explicit build-approved label in addition to a non-draft PR, preventing accidental build execution when a draft is marked ready.
+
+
+### Windows School workspace
+- Added authenticated Windows Desk client methods for subjects, timetable slots, homework, submissions and grading.
+- Added a School workspace to the Windows collaboration page: create/list subjects, create weekly timetable slots, create homework with optional ISO-8601 due date, submit answers, inspect permitted submissions and grade/leave feedback.
+- All permissions remain server-enforced; the UI does not grant teacher/manager rights locally.
+- This UI addition is source-reviewed only; no Windows build was run.
