@@ -523,13 +523,14 @@ public sealed partial class MainWindow
         };
         IReadOnlyList<WeatherPlace> cityMatches = Array.Empty<WeatherPlace>();
 
-        var findCityButton = SettingsActionButton("جستجوی موقعیت", () =>
+        Button? findCityButton = null;
+        findCityButton = SettingsActionButton("جستجوی موقعیت", () =>
         {
             _ = SearchWeatherCityAsync();
         });
         async Task SearchWeatherCityAsync()
         {
-            findCityButton.IsEnabled = false;
+            findCityButton!.IsEnabled = false;
             try
             {
                 cityMatches = await _weatherService.FindCitiesAsync(cityQuery.Text.Trim());
@@ -540,7 +541,7 @@ public sealed partial class MainWindow
                 weatherStatus.Text = cityMatches.Count + " نتیجه یافت شد؛ موقعیت درست را انتخاب و ذخیره کنید.";
             }
             catch (Exception ex) { weatherStatus.Text = "جستجو ناموفق بود: " + ex.Message; }
-            finally { findCityButton.IsEnabled = true; }
+            finally { findCityButton!.IsEnabled = true; }
         }
 
         var saveCityButton = SettingsActionButton("ذخیره موقعیت و واحد دما", () =>
@@ -572,7 +573,7 @@ public sealed partial class MainWindow
         });
         weatherSubmenu.Children.Add(weatherStatus);
         weatherSubmenu.Children.Add(cityQuery);
-        weatherSubmenu.Children.Add(findCityButton);
+        weatherSubmenu.Children.Add(findCityButton!);
         weatherSubmenu.Children.Add(cityResults);
         weatherSubmenu.Children.Add(unitPicker);
         weatherSubmenu.Children.Add(saveCityButton);
