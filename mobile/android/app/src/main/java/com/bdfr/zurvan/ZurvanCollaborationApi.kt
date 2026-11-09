@@ -54,6 +54,9 @@ class ZurvanCollaborationApi(private val baseUrl:String = BuildConfig.COLLAB_API
     suspend fun sendMessage(token:String,groupId:String,body:String){
         request(token,"POST","/groups/$groupId/messages",JSONObject().put("body",body))
     }
+    suspend fun removeMember(token:String,groupId:String,memberId:String){
+        request(token,"DELETE","/groups/$groupId/members/$memberId")
+    }
     suspend fun setPermissions(token:String,groupId:String,memberId:String,chat:Boolean,report:Boolean,edit:Boolean){
         request(token,"PUT","/groups/$groupId/members/$memberId/permissions",
             JSONObject().put("canChat",chat).put("canReport",report).put("canEdit",edit))
