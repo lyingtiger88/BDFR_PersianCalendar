@@ -190,9 +190,9 @@ fun ZurvanTeamPlanner(
                 var kanbanEnabled by remember { mutableStateOf(true) }
                 var schoolEnabled by remember { mutableStateOf(false) }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(agendaEnabled,{agendaEnabled=it},label={Text("Agenda")})
-                    FilterChip(kanbanEnabled,{kanbanEnabled=it},label={Text("Kanban")})
-                    FilterChip(schoolEnabled,{schoolEnabled=it},label={Text("مدرسه")})
+                    FilterChip(selected=agendaEnabled,onClick={agendaEnabled=!agendaEnabled},label={Text("Agenda")})
+                    FilterChip(selected=kanbanEnabled,onClick={kanbanEnabled=!kanbanEnabled},label={Text("Kanban")})
+                    FilterChip(selected=schoolEnabled,onClick={schoolEnabled=!schoolEnabled},label={Text("مدرسه")})
                 }
                 Button(onClick = {
                     if (sessionToken.isBlank()) status = "برای ساخت گروه ابتدا وارد حساب Zurvan Desk شوید."
@@ -233,7 +233,11 @@ fun ZurvanTeamPlanner(
                 if(sessionToken.isBlank()) Text("برای استفاده از گروه آنلاین، ورود به حساب Zurvan Desk الزامی است.",color=MaterialTheme.colorScheme.error)
                 LaunchedEffect(remoteGroupId,sessionToken,activeSection) {
                     if(remoteGroupId.isNotBlank() && sessionToken.isNotBlank() && activeSection==1) {
-                        while(true) {
+                        if(remoteGroupId.isBlank()) {
+                            runCatching { collaborationApi.groups(sessionToken) }
+                                .onSuccess { groups -> groups.firstOrNull()?.let { remoteGroupId=it.id;store.set("remote_group_id",it.id);groupName=it.name } }
+                        }
+                        while(remoteGroupId.isNotBlank()) {
                             runCatching {
                                 val (events,next)=collaborationApi.changes(sessionToken,remoteGroupId,remoteSequence)
                                 if(next>remoteSequence) {
