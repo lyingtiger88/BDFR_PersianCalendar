@@ -9,6 +9,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.nativeCanvas
@@ -78,13 +79,16 @@ fun ZurvanCalendarClock(modifier: Modifier = Modifier) {
                 val r = size.minDimension * .46f
 
                 // Twelve-petal radial body, kept independent from the hands and numerals.
+                val petal = Path().apply {
+                    moveTo(c.x, c.y - r * .12f)
+                    cubicTo(c.x - r * .19f, c.y - r * .32f, c.x - r * .20f, c.y - r * .70f, c.x, c.y - r * .96f)
+                    cubicTo(c.x + r * .20f, c.y - r * .70f, c.x + r * .19f, c.y - r * .32f, c.x, c.y - r * .12f)
+                    close()
+                }
                 repeat(12) { i ->
                     rotate(i * 30f, pivot = c) {
-                        drawOval(
-                            color = accent.copy(alpha = .15f),
-                            topLeft = Offset(c.x - r * .17f, c.y - r * .98f),
-                            size = Size(r * .34f, r * .72f)
-                        )
+                        drawPath(petal, color = accent.copy(alpha = .22f))
+                        drawPath(petal, color = foreground.copy(alpha = .55f), style = Stroke(width = 1.dp.toPx()))
                     }
                 }
                 drawCircle(foreground.copy(alpha = .62f), radius = r * .79f, center = c, style = Stroke(width = 1.4.dp.toPx()))
