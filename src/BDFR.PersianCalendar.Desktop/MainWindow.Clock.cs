@@ -12,6 +12,7 @@ public sealed partial class MainWindow
 {
     private DispatcherQueueTimer? _zurvanClockTimer;
     private Canvas? _zurvanClockFace;
+    private Image? _zurvanClockArtwork;
     private Line? _zurvanHourHand;
     private Line? _zurvanMinuteHand;
     private Line? _zurvanSecondHand;
@@ -37,6 +38,7 @@ public sealed partial class MainWindow
             Width = 172, Height = 172, Stretch = Stretch.Uniform,
             Source = new SvgImageSource { UriSource = new Uri("ms-appx:///picture/clock/zurvan-clock-face.svg") }
         };
+        _zurvanClockArtwork = faceArtwork;
         faceHost.Children.Add(faceArtwork);
         _zurvanClockFace = new Canvas { Width = 172, Height = 172 };
         faceHost.Children.Add(_zurvanClockFace);
@@ -118,6 +120,7 @@ public sealed partial class MainWindow
         if (_zurvanClockFace is null || _zurvanDigitalTime is null) return;
         var digital = _settings.CalendarClockMode == "digital";
         _zurvanClockFace.Visibility = digital ? Visibility.Collapsed : Visibility.Visible;
+        if (_zurvanClockArtwork is not null) _zurvanClockArtwork.Visibility = digital ? Visibility.Collapsed : Visibility.Visible;
         _zurvanDigitalTime.Visibility = digital ? Visibility.Visible : Visibility.Collapsed;
         UpdateZurvanClock();
     }
