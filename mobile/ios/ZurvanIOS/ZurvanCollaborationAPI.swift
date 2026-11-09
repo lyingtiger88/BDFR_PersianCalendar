@@ -208,6 +208,7 @@ struct ZurvanCollaborationAPI {
             let message=(try? JSONSerialization.jsonObject(with:data) as? [String:Any])?["error"] as? String ?? "درخواست ناموفق بود."
             throw ZurvanCollabAPIError.http(response.statusCode,message)
         }
+        if data.isEmpty { return NSNull() }
         return try JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed])
     }
 }
