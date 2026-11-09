@@ -715,6 +715,36 @@ public sealed partial class MainWindow
                     catch (Exception ex) { _collaborationStatus.Text = ex.Message; }
                     finally { inviteMember.IsEnabled = true; }
                 };
+                var loadMyGroups = MakeButton("نمایش گروه‌های من");
+                loadMyGroups.Click += async (_, _) =>
+                {
+                    try
+                    {
+                        using var groups = await _deskClient.ListCollaborationGroupsAsync();
+                        var rows = groups.RootElement.EnumerateArray().ToList();
+                        if (rows.Count == 0) { _collaborationStatus!.Text = "هنوز عضو هیچ گروهی نیستید."; return; }
+                        var choices = rows.Select(x => $"{x.GetProperty("name").GetString()} · {x.GetProperty("id").GetString()}").ToArray();
+                        var picker = new ComboBox { ItemsSource = choices, SelectedIndex = 0, MinWidth = 320 };
+                        var dialog = new ContentDialog
+                        {
+                            XamlRoot = _desktopModulePage!.XamlRoot,
+                            Title = "انتخاب گروه",
+                            Content = picker,
+                            PrimaryButtonText = "اتصال",
+                            CloseButtonText = "انصراف"
+                        };
+                        if (await dialog.ShowAsync() == ContentDialogResult.Primary && picker.SelectedIndex >= 0)
+                        {
+                            _collaborationGroupId = rows[picker.SelectedIndex].GetProperty("id").GetString() ?? "";
+                            groupIdBox.Text = _collaborationGroupId;
+                            _collaborationCursor = 0;
+                            StartCollaborationPolling();
+                            _collaborationStatus!.Text = "گروه انتخاب شد؛ همگام‌سازی آنلاین فعال است.";
+                        }
+                    }
+                    catch (Exception ex) { _collaborationStatus!.Text = ex.Message; }
+                };
+                collaboration.Children.Add(loadMyGroups);
                 var connectGroup = MakeButton("اتصال به گروه و شروع همگام‌سازی");
                 connectGroup.Click += async (_, _) =>
                 {
