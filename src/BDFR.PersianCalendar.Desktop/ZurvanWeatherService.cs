@@ -34,13 +34,13 @@ internal sealed class ZurvanWeatherService
     private WeatherSnapshot? _cached;
     private bool _cachedFahrenheit;
 
-    internal async Task<WeatherPlace> FindCityAsync(string city)
+    internal async Task<IReadOnlyList<WeatherPlace>> FindCitiesAsync(string city)
     {
         if (string.IsNullOrWhiteSpace(city) || city.Trim().Length < 2)
             throw new InvalidOperationException("نام شهر باید حداقل دو حرف داشته باشد.");
 
         var url = "https://geocoding-api.open-meteo.com/v1/search?name=" +
-                  Uri.EscapeDataString(city.Trim()) + "&count=5&language=en&format=json";
+                  Uri.EscapeDataString(city.Trim()) + "&count=10&language=en&format=json";
         using var response = await Client.GetAsync(url);
         response.EnsureSuccessStatusCode();
         await using var stream = await response.Content.ReadAsStreamAsync();
@@ -48,16 +48,17 @@ internal sealed class ZurvanWeatherService
         if (!document.RootElement.TryGetProperty("results", out var results) ||
             results.ValueKind != JsonValueKind.Array || results.GetArrayLength() == 0)
             throw new InvalidOperationException("شهری با این نام پیدا نشد. نام انگلیسی شهر را امتحان کنید.");
-
-        var place = results[0];
-        return new WeatherPlace(
+        return results.EnumerateArray().Select(place => new WeatherPlace(
             place.GetProperty("name").GetString() ?? city.Trim(),
             place.TryGetProperty("country_code", out var country) ? country.GetString() ?? "" : "",
             place.GetProperty("latitude").GetDouble(),
             place.GetProperty("longitude").GetDouble(),
             place.TryGetProperty("timezone", out var timeZone)
-                ? timeZone.GetString() ?? "auto" : "auto");
+                ? timeZone.GetString() ?? "auto" : "auto")).ToList();
     }
+
+    internal async Task<WeatherPlace> FindCityAsync(string city)
+        => (await FindCitiesAsync(city))[0];
 
     internal async Task<WeatherSnapshot> GetForecastAsync(WeatherPlace place, bool fahrenheit, bool force = false)
     {
