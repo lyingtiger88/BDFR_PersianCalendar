@@ -1017,11 +1017,12 @@ public sealed partial class MainWindow
             {
                 _settings.LanguageCode = code;
                 _settingsService.Save(_settings);
-                StatusText.Text = "زبان ترجیحی ذخیره شد. ترجمه کامل همه صفحات هنوز در حال تکمیل است.";
+                ApplyDesktopLocalization();
+                StatusText.Text = DesktopLocalization.Translate("زبان ترجیحی ذخیره شد.", code);
             }
         };
         contents.Children.Add(SettingsOptionRow("زبان برنامه",
-            "انتخاب زبان ترجیحی؛ ترجمهٔ بعضی صفحات هنوز تکمیل نشده است",
+            "انتخاب زبان رابط کاربری",
             combo, "\uE774"));
         _settingsContent!.Children.Add(SettingsCard(contents));
     }
