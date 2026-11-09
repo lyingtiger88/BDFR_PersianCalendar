@@ -172,3 +172,18 @@ Android/Windows build is being rerun.
 Final targeted build after the Windows invitation payload adjustment: rebuild
 Core, Windows desktop and Android from the latest main commit. This is the
 release candidate build for the collaboration client changes.
+
+## Release candidate build result
+
+Latest targeted workflow run: `42571164195` at commit
+`98422520b969d98d464706feeb64c82e14a87e16`.
+Core smoke/build, Windows WinUI compile/publish/installer, and Android
+Debug APK build all completed successfully. GitHub Actions run:
+https://github.com/lyingtiger88/BDFR_PersianCalendar/actions/runs/42571164195
+
+Artifacts:
+- `Zurvan-Android-debug`
+- `Zurvan-win-x64`
+- `Zurvan-Setup-x64`
+
+These are test artifacts, not a claim of a production-ready team system.
