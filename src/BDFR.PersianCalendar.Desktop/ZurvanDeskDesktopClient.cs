@@ -42,7 +42,7 @@ internal sealed class ZurvanDeskDesktopClient
         using var response = await Http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
         var raw = await response.Content.ReadAsStringAsync();
         if (!response.IsSuccessStatusCode)
-            throw new InvalidOperationException(ParseError(raw, (int)response.StatusCode));
+            throw new HttpRequestException(ParseError(raw, (int)response.StatusCode), null, response.StatusCode);
         return JsonDocument.Parse(string.IsNullOrWhiteSpace(raw) ? "{}" : raw);
     }
 
@@ -91,6 +91,12 @@ internal sealed class ZurvanDeskDesktopClient
     internal async Task<JsonDocument> SendCollaborationMessageAsync(string groupId, string body)
         => await SendCollaborationAsync(HttpMethod.Post,
             $"/groups/{Uri.EscapeDataString(groupId)}/messages", new { body });
+
+    internal async Task<JsonDocument> ReplayCollaborationCommandAsync(
+        string groupId, Guid commandId, string kind, JsonElement payload)
+        => await SendCollaborationAsync(HttpMethod.Post,
+            $"/groups/{Uri.EscapeDataString(groupId)}/commands",
+            new { commandId = commandId.ToString(), kind, payload });
 
 
 
