@@ -31,7 +31,12 @@ internal sealed class CollaborationOfflineQueue
                 return JsonSerializer.Deserialize<List<QueuedCollaborationCommand>>(clear)
                     ?? new List<QueuedCollaborationCommand>();
             }
-            catch { return Array.Empty<QueuedCollaborationCommand>(); }
+            catch (Exception ex)
+            {
+                // Never treat a decryption/IO failure as an empty queue: that could
+                // overwrite commands that are still recoverable.
+                throw new InvalidOperationException("صف آفلاین قابل خواندن نیست؛ فایل برای جلوگیری از حذف اطلاعات دست‌نخورده باقی ماند.", ex);
+            }
         }
     }
 
