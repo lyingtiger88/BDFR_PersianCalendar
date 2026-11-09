@@ -225,7 +225,13 @@ struct ZurvanCollaborationView: View {
                         try await loadKanban()
                         try await loadMembers()
                         let items = try await api.items(token: token, groupID: groupID)
-                        sharedItems = items.compactMap { $0["title"] as? String }
+                        sharedItems = items.compactMap { item in
+                            guard let title = item["title"] as? String else { return nil }
+                            let rule = item["recurrence_rule"] as? String
+                            let occurrences = item["occurrences"] as? [[String: Any]]
+                            let next = occurrences?.first?["at"] as? String
+                            return rule.map { title + " • " + $0 + (next.map { " • " + $0 } ?? "") } ?? title
+                        }
                         let messages = try await api.messages(token: token, groupID: groupID)
                         sharedMessages = messages.compactMap { $0["body"] as? String }
                         status = "همگام‌سازی آنلاین: \(feed.events.count) تغییر جدید"
