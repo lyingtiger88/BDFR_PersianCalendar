@@ -179,6 +179,20 @@ public sealed partial class MainWindow
             TextAlignment = TextAlignment.Center
         });
 
+        // Subtle star-field behind the data, matching the supplied nighttime preview.
+        var layers = new Grid();
+        layers.Children.Add(new TextBlock
+        {
+            Text = "·    ✦       ·       ·      ✧     ·       ✦      ·      ·",
+            FontSize = 10,
+            Opacity = 0.25,
+            Foreground = WeatherBrush(191, 219, 255),
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            VerticalAlignment = VerticalAlignment.Top,
+            IsHitTestVisible = false,
+            Margin = new Thickness(10, 35, 0, 0)
+        });
+        layers.Children.Add(panel);
         var card = new Border
         {
             Background = background,
@@ -186,7 +200,7 @@ public sealed partial class MainWindow
             BorderBrush = WeatherBrush(85, 125, 179, 95),
             BorderThickness = new Thickness(1),
             HorizontalAlignment = HorizontalAlignment.Stretch,
-            Child = panel
+            Child = layers
         };
         card.Loaded += (_, _) =>
         {
