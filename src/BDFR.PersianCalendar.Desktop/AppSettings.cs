@@ -62,6 +62,8 @@ public sealed class AppSettings
     public Dictionary<string, string> MonthlyWallpaperPaths { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public string? LastRandomWallpaperPath { get; set; }
     public int WallpaperChangeIntervalHours { get; set; } = 24;
+    // Target display for the in-app wallpaper surface: current window display or primary display.
+    public string WallpaperDisplayTarget { get; set; } = "current";
     public bool ShowOccasionPictures { get; set; } = true;
 
     // Zara Pastel optional Liquid Glass presentation.
