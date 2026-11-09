@@ -989,6 +989,8 @@ public sealed partial class MainWindow
     private void BuildSettingsCalendar()
     {
         var contents = SettingsGroup("تقویم و زمان", "روزها، مناسبت‌ها و ترتیب تقویم‌ها", "\uE787", "#FF288AF0");
+        contents.Children.Add(BuildClockSettingsPanel());
+        AddSettingsSeparator(contents);
         AddSettingsAction(contents, "به‌روزرسانی مناسبت‌ها",
             "همگام‌سازی داده‌های سال انتخاب‌شده با time.ir", "به‌روزرسانی",
             () => _ = SyncOccasionsFromSettingsAsync(), "\uE895");
