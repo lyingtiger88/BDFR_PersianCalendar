@@ -783,6 +783,64 @@ public sealed partial class MainWindow
                     }
                     catch (Exception ex) { _collaborationStatus.Text = ex.Message; }
                 };
+                var memberWorkspace = new StackPanel { Spacing = 6 };
+                var memberPicker = new ComboBox { Header = "عضو گروه", MinWidth = 260 };
+                var memberIds = new List<string>();
+                var memberChat = new CheckBox { Content = "اجازه گفت‌وگو", IsChecked = true };
+                var memberReport = new CheckBox { Content = "اجازه ثبت گزارش", IsChecked = true };
+                var memberEdit = new CheckBox { Content = "اجازه ویرایش", IsChecked = false };
+                var memberStatus = new TextBlock { TextWrapping = TextWrapping.Wrap };
+                async Task RefreshMembers()
+                {
+                    using var detail = await _deskClient.ReadCollaborationGroupAsync(_collaborationGroupId);
+                    var rows = detail.RootElement.GetProperty("members").EnumerateArray().ToList();
+                    memberIds = rows.Select(x => x.GetProperty("account_id").GetString() ?? "").ToList();
+                    memberPicker.ItemsSource = rows.Select(x =>
+                    {
+                        var account = x.TryGetProperty("account", out var a) ? a : default;
+                        var identifier = account.ValueKind == JsonValueKind.Object && account.TryGetProperty("identifier", out var ident)
+                            ? ident.GetString() : x.GetProperty("account_id").GetString();
+                        return $"{identifier} · {x.GetProperty("role").GetString()}";
+                    }).ToArray();
+                    memberPicker.SelectedIndex = rows.Count > 0 ? 0 : -1;
+                    memberStatus.Text = $"{rows.Count} عضو در گروه";
+                }
+                var refreshMembers = MakeButton("بارگذاری اعضا و مجوزها");
+                refreshMembers.Click += async (_, _) => { try { await RefreshMembers(); } catch (Exception ex) { memberStatus.Text = ex.Message; } };
+                var saveMemberPermissions = MakeButton("ذخیره مجوز عضو انتخابی");
+                saveMemberPermissions.Click += async (_, _) =>
+                {
+                    try
+                    {
+                        var i = memberPicker.SelectedIndex;
+                        if (i < 0 || i >= memberIds.Count) return;
+                        await _deskClient.UpdateCollaborationPermissionsAsync(_collaborationGroupId, memberIds[i],
+                            memberChat.IsChecked == true, memberReport.IsChecked == true, memberEdit.IsChecked == true);
+                        memberStatus.Text = "مجوزهای عضو ذخیره شد.";
+                    }
+                    catch (Exception ex) { memberStatus.Text = ex.Message; }
+                };
+                var removeMember = MakeButton("حذف عضو انتخابی");
+                removeMember.Click += async (_, _) =>
+                {
+                    try
+                    {
+                        var i = memberPicker.SelectedIndex;
+                        if (i < 0 || i >= memberIds.Count) return;
+                        await _deskClient.RemoveCollaborationMemberAsync(_collaborationGroupId, memberIds[i]);
+                        await RefreshMembers();
+                        memberStatus.Text = "عضو از گروه حذف شد.";
+                    }
+                    catch (Exception ex) { memberStatus.Text = ex.Message; }
+                };
+                memberWorkspace.Children.Add(refreshMembers);
+                memberWorkspace.Children.Add(memberPicker);
+                memberWorkspace.Children.Add(memberChat);
+                memberWorkspace.Children.Add(memberReport);
+                memberWorkspace.Children.Add(memberEdit);
+                memberWorkspace.Children.Add(saveMemberPermissions);
+                memberWorkspace.Children.Add(removeMember);
+                memberWorkspace.Children.Add(memberStatus);
                 var sharedTaskBox = new TextBox { Header = "عنوان کار مشترک", PlaceholderText = "کار جدید برای همه اعضا" };
                 var sharedTaskMode = new ComboBox { Header = "نوع برنامه", Items = { "Agenda", "Kanban", "School" }, SelectedIndex = 0 };
                 var sharedTaskRecurrence = new ComboBox { Header = "تکرار برنامه (Agenda)", Items = { "بدون تکرار", "روزانه", "روزهای کاری", "هفتگی", "ماهانه" }, SelectedIndex = 0 };
@@ -1068,6 +1126,7 @@ public sealed partial class MainWindow
                 collaboration.Children.Add(createGroup);
                 collaboration.Children.Add(groupIdBox);
                 collaboration.Children.Add(connectGroup);
+                collaboration.Children.Add(memberWorkspace);
                 collaboration.Children.Add(inviteIdBox);
                 collaboration.Children.Add(assistantMode);
                 collaboration.Children.Add(inviteMember);
