@@ -105,6 +105,7 @@ fun ZurvanTeamPlanner(
     var alertMinutes by remember { mutableStateOf(store.get("alert_minutes").ifBlank { "30" }) }
     var activeSection by remember { mutableStateOf(0) }
     var agendaRecurrence by remember { mutableStateOf<String?>(null) }
+    var kanbanCards by remember { mutableStateOf<List<JSONObject>>(emptyList()) }
     var status by remember { mutableStateOf("") }
     val avatar = remember(photoRevision) {
         val f = File(context.filesDir, "zurvan_profile_photo")
@@ -305,7 +306,13 @@ fun ZurvanTeamPlanner(
                 Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick={
                         scope.launch { runCatching { collaborationApi.kanbanColumns(sessionToken,remoteGroupId) }
-                            .onSuccess { a -> kanbanColumns=(0 until a.length()).map { val x=a.getJSONObject(it);x.getString("id") to x.getString("name") };if(selectedKanbanColumn==null)selectedKanbanColumn=kanbanColumns.firstOrNull()?.first }
+                            .onSuccess { a ->
+                                kanbanColumns=(0 until a.length()).map { val x=a.getJSONObject(it);x.getString("id") to x.getString("name") }
+                                if(selectedKanbanColumn==null)selectedKanbanColumn=kanbanColumns.firstOrNull()?.first
+                                scope.launch { runCatching { collaborationApi.items(sessionToken,remoteGroupId) }
+                                    .onSuccess { all -> kanbanCards=(0 until all.length()).map{all.getJSONObject(it)}.filter{it.optString("mode")=="kanban"} }
+                                    .onFailure { status=it.message ?: "بارگذاری کارت‌ها ناموفق بود." } }
+                            }
                             .onFailure { status=it.message ?: "بارگذاری ستون‌ها ناموفق بود." } }
                     }) { Text("بارگذاری ستون‌ها") }
                     Button(onClick={
@@ -330,6 +337,23 @@ fun ZurvanTeamPlanner(
                                     .onSuccess { val a=collaborationApi.kanbanColumns(sessionToken,remoteGroupId);kanbanColumns=(0 until a.length()).map { val x=a.getJSONObject(it);x.getString("id") to x.getString("name") } }
                                     .onFailure { status=it.message ?: "تغییر ترتیب ناموفق بود." } }
                         }) { Text("↓") }
+                    }
+                }
+                Text("کارت‌های برد",fontWeight=FontWeight.SemiBold)
+                kanbanCards.forEach { card ->
+                    val currentColumn=card.optString("column_id")
+                    val currentIndex=kanbanColumns.indexOfFirst{it.first==currentColumn}
+                    Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+                        Text(card.optString("title")+" • "+card.optString("state"),modifier=Modifier.weight(1f))
+                        if(currentIndex>=0&&currentIndex<kanbanColumns.lastIndex) TextButton(onClick={
+                            scope.launch { runCatching {
+                                collaborationApi.updatePlanningItem(sessionToken,remoteGroupId,card.getString("id"),
+                                    card.optInt("version",1),card.optString("title"),card.optString("details"),
+                                    card.optString("state","todo"),columnId=kanbanColumns[currentIndex+1].first)
+                                val all=collaborationApi.items(sessionToken,remoteGroupId)
+                                kanbanCards=(0 until all.length()).map{all.getJSONObject(it)}.filter{it.optString("mode")=="kanban"}
+                            }.onFailure { status=it.message ?: "انتقال کارت ناموفق بود." } }
+                        }) { Text("انتقال ←") }
                     }
                 }
                 OutlinedTextField(kanbanTaskTitle,{kanbanTaskTitle=it},label={Text("عنوان کارت جدید")},modifier=Modifier.fillMaxWidth())
