@@ -950,7 +950,7 @@ public sealed partial class MainWindow : Window
 
     private FrameworkElement BuildCalendarPanel()
     {
-        var panel = new Grid { Padding = new Thickness(24) };
+        var panel = new Grid { Padding = new Thickness(24, 10, 24, 12) };
         panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -959,7 +959,6 @@ public sealed partial class MainWindow : Window
         var header = new Grid();
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
         var next = MakeButton("‹");
@@ -1067,11 +1066,6 @@ public sealed partial class MainWindow : Window
             weekdays.Children.Add(label);
         }
 
-        var clock = BuildZurvanClockPanel();
-        Grid.SetColumn(clock, 3);
-        clock.HorizontalAlignment = HorizontalAlignment.Right;
-        header.Children.Add(clock);
-
         Grid.SetRow(weekdays, 2);
         panel.Children.Add(weekdays);
 
@@ -1147,11 +1141,13 @@ public sealed partial class MainWindow : Window
             Spacing = 6,
             Children =
             {
-                new FontIcon
+                new TextBlock
                 {
-                    Glyph = "\\uE74E",
-                    FontFamily = new FontFamily("Segoe MDL2 Assets"),
-                    FontSize = 14
+                    Text = "+",
+                    FontSize = 22,
+                    FontWeight = Microsoft.UI.Text.FontWeights.Bold,
+                    Foreground = ThemeService.Brush("#FF214BDB"),
+                    VerticalAlignment = VerticalAlignment.Center
                 },
                 new TextBlock { Text = "ذخیره یادداشت", VerticalAlignment = VerticalAlignment.Center }
             }
@@ -1171,11 +1167,13 @@ public sealed partial class MainWindow : Window
             Spacing = 6,
             Children =
             {
-                new FontIcon
+                new TextBlock
                 {
-                    Glyph = "\\uE74D",
-                    FontFamily = new FontFamily("Segoe MDL2 Assets"),
-                    FontSize = 14
+                    Text = "×",
+                    FontSize = 22,
+                    FontWeight = Microsoft.UI.Text.FontWeights.Bold,
+                    Foreground = ThemeService.Brush("#FFE22B4C"),
+                    VerticalAlignment = VerticalAlignment.Center
                 },
                 new TextBlock { Text = "حذف یادداشت روز", VerticalAlignment = VerticalAlignment.Center }
             }
