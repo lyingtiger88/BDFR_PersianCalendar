@@ -148,7 +148,8 @@ struct ZurvanTodayWeatherIOS: View {
                 Text(error ?? "در حال دریافت اطلاعات آب‌وهوا...")
                     .font(.caption).foregroundStyle(.secondary)
             }
-            Text("منبع: Open-Meteo").font(.caption2).foregroundStyle(.secondary)
+            Link("Weather data by Open-Meteo.com", destination: URL(string: "https://open-meteo.com/")!)
+                .font(.caption2).foregroundStyle(.secondary)
         }
         .foregroundStyle(.white)
         .padding(12)
