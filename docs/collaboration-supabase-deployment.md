@@ -204,3 +204,12 @@ records, which have no corresponding database trigger.
 Not yet complete: Android/Windows School screens, Kanban columns/order, full Agenda recurrence
 and timezone handling, persistent realtime transport, offline queue, push notifications, iOS
 parity and real two-account end-to-end authorization tests. No build is run.
+
+
+## Deployment and validation record — 2026-11-09
+
+- Applied migration `20261109_000002_collab_school_submission_events.sql` to Supabase project `yztithydgdvydaktuxlw`.
+- Deployed `zurvan-collaboration` Edge Function version 6 from this branch. The function remains protected by its own verified Desk-session check (`verify_jwt=false` is intentional for this custom session model).
+- SQL smoke test in a rolled-back transaction created a temporary Desk account, School group, subject, timetable slot, homework and submission; it verified exactly one metadata event for the submission and then rolled back all test data.
+- Live collaboration tables currently contain zero groups, members, messages, reports, timetable entries, homework and submissions; the Desk accounts table also contains zero accounts. Therefore, no real two-account authorization or device-to-device delivery test can yet be performed.
+- No Android, Windows or iOS build was run. Changes are held in draft PR for source review.
