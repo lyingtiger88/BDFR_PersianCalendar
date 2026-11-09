@@ -124,9 +124,9 @@ public sealed partial class MainWindow
         if (_zurvanDigitalTime is not null)
             _zurvanDigitalTime.Text = now.ToString("HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture);
         if (_zurvanClockFace is null || _zurvanHourHand is null || _zurvanMinuteHand is null || _zurvanSecondHand is null) return;
-        SetClockHand(_zurvanHourHand, (now.Hour % 12 + now.Minute / 60.0) * 30.0, 34);
-        SetClockHand(_zurvanMinuteHand, (now.Minute + now.Second / 60.0) * 6.0, 49);
-        SetClockHand(_zurvanSecondHand, now.Second * 6.0, 57);
+        SetClockHand(_zurvanHourHand, (now.Hour % 12 + now.Minute / 60.0) * 30.0, 66);
+        SetClockHand(_zurvanMinuteHand, (now.Minute + now.Second / 60.0) * 6.0, 94);
+        SetClockHand(_zurvanSecondHand, now.Second * 6.0, 112);
     }
 
     private static void SetClockHand(Line hand, double degrees, double length)
