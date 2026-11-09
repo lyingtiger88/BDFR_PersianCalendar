@@ -957,7 +957,7 @@ public sealed partial class MainWindow : Window
         panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // Month picker
         panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // Calendar actions
         panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // Weekdays
-        panel.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }); // Month
+        panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // Month
         var prayerHeader = BuildPrayerTimesAboveCalendar();
         Grid.SetRow(prayerHeader, 0);
         panel.Children.Add(prayerHeader);
@@ -1092,7 +1092,14 @@ public sealed partial class MainWindow : Window
         Grid.SetRow(CalendarGrid, 5);
         panel.Children.Add(CalendarGrid);
 
-        return panel;
+        // Both new information strips remain above the calendar without clipping
+        // any calendar row on shorter laptop displays.
+        return new ScrollViewer
+        {
+            Content = panel,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
+        };
     }
 
     private FrameworkElement BuildRightPanel()
