@@ -260,4 +260,72 @@ public sealed partial class MainWindow
             ("عشا", Convert(method.IshaMinutes > 0 ? evening + method.IshaMinutes/60.0 : noon + isha))
         ];
     }
+    private FrameworkElement BuildPrayerTimesAboveCalendar()
+    {
+        var panel = new StackPanel
+        {
+            Spacing = 7,
+            Padding = new Thickness(12, 9, 12, 9),
+            FlowDirection = FlowDirection.RightToLeft
+        };
+        panel.Children.Add(new TextBlock
+        {
+            Text = "🕌 اوقات شرعی امروز · " + _settings.PrayerCity,
+            FontSize = 13,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Foreground = ThemeService.Brush(_theme.PrimaryText)
+        });
+        try
+        {
+            var zone = TimeZoneInfo.FindSystemTimeZoneById(_settings.PrayerTimeZone);
+            var today = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, zone).DateTime.Date;
+            var times = CalculateDesktopPrayerTimes(today, _settings.PrayerLatitude,
+                _settings.PrayerLongitude, zone, _settings.PrayerSchool, _settings.PrayerMethod);
+            if (times is null || times.Count == 0)
+                throw new InvalidOperationException("محاسبه اوقات شرعی در این موقعیت ممکن نیست.");
+            var row = new Grid { ColumnSpacing = 5 };
+            foreach (var _ in times)
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            for (var index = 0; index < times.Count; index++)
+            {
+                var item = times[index];
+                var content = new StackPanel { Spacing = 3, HorizontalAlignment = HorizontalAlignment.Stretch };
+                content.Children.Add(new TextBlock
+                {
+                    Text = item.Name, FontSize = 10,
+                    TextAlignment = TextAlignment.Center,
+                    Foreground = ThemeService.Brush(_theme.SecondaryText)
+                });
+                content.Children.Add(new TextBlock
+                {
+                    Text = item.Time.ToString("HH:mm", CultureInfo.InvariantCulture),
+                    FontSize = 13,
+                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                    TextAlignment = TextAlignment.Center,
+                    Foreground = ThemeService.Brush(_theme.PrimaryText)
+                });
+                Grid.SetColumn(content, index);
+                row.Children.Add(content);
+            }
+            panel.Children.Add(row);
+        }
+        catch (Exception ex)
+        {
+            panel.Children.Add(new TextBlock
+            {
+                Text = "اوقات شرعی قابل محاسبه نیست: " + ex.Message,
+                FontSize = 11, TextWrapping = TextWrapping.Wrap
+            });
+        }
+        return new Border
+        {
+            Background = BrushWithAlpha(_theme.CardBackground, 0xC8),
+            BorderBrush = BrushWithAlpha(_theme.Accent, 0x56),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(12),
+            Child = panel
+        };
+    }
+
 }
