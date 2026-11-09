@@ -187,3 +187,20 @@ Artifacts:
 - `Zurvan-Setup-x64`
 
 These are test artifacts, not a claim of a production-ready team system.
+
+
+## School API implementation update (2026-11-09)
+
+The follow-up branch adds authenticated API routes for subjects, weekly timetable slots,
+homework, student submissions and manager grading. Subject/teacher references are checked
+against the same workspace; students can read and update only their own submissions, while
+owners, assistants and explicitly delegated editors can review/grade. A metadata-only
+submission event is added; submission text, grade and feedback are never broadcast.
+
+The API now relies on database triggers for item/message/report/member event records; manual
+duplicate writes were removed. Explicit event writes remain only for group and invitation
+records, which have no corresponding database trigger.
+
+Not yet complete: Android/Windows School screens, Kanban columns/order, full Agenda recurrence
+and timezone handling, persistent realtime transport, offline queue, push notifications, iOS
+parity and real two-account end-to-end authorization tests. No build is run.
