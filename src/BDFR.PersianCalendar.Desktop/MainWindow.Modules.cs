@@ -56,7 +56,16 @@ public sealed partial class MainWindow
                             queued.GroupId, queued.CommandId, queued.Kind, queued.Payload);
                         _collaborationOfflineQueue.Remove(queued.CommandId);
                     }
-                    catch { break; }
+                    catch (Exception replayError)
+                    {
+                        if (replayError.Message.Contains("version_conflict", StringComparison.OrdinalIgnoreCase))
+                            _desktopModulePage?.DispatcherQueue.TryEnqueue(() =>
+                            {
+                                if (_collaborationStatus is not null)
+                                    _collaborationStatus.Text = "تعارض نسخه در صف آفلاین؛ تغییر نیازمند بازبینی است.";
+                            });
+                        break;
+                    }
                 }
                 using var result = await _deskClient.ReadCollaborationChangesAsync(
                     _collaborationGroupId, _collaborationCursor);
@@ -1009,10 +1018,23 @@ public sealed partial class MainWindow
                         if (index < 0 || index >= kanbanCardIds.Count) return;
                         var current = kanbanColumnIds.IndexOf(kanbanCardColumns[index]);
                         if (current < 0 || current >= kanbanColumnIds.Count - 1) return;
-                        using var _ = await _deskClient.UpdatePlanningItemAsync(
-                            _collaborationGroupId, kanbanCardIds[index], kanbanCardVersions[index],
-                            kanbanCardTitles[index], "", "todo", columnId: kanbanColumnIds[current + 1]);
-                        await LoadKanbanData();
+                        var commandId = Guid.NewGuid();
+                        var payload = new { itemId = kanbanCardIds[index], expectedVersion = kanbanCardVersions[index],
+                            title = kanbanCardTitles[index], details = "", state = "todo",
+                            columnId = kanbanColumnIds[current + 1],
+                            timezone = TimeZoneInfo.TryConvertWindowsIdToIanaId(TimeZoneInfo.Local.Id, out var zone)
+                                ? zone : "Asia/Tehran" };
+                        try
+                        {
+                            using var _ = await _deskClient.ReplayCollaborationCommandAsync(
+                                _collaborationGroupId, commandId, "update_item", payload);
+                            await LoadKanbanData();
+                        }
+                        catch
+                        {
+                            _collaborationOfflineQueue.Enqueue(_collaborationGroupId, "update_item", payload, commandId);
+                            kanbanStatus.Text = "انتقال کارت در صف آفلاین ذخیره شد؛ در صورت تعارض نسخه نیاز به بازبینی دارد.";
+                        }
                     }
                     catch (Exception ex) { kanbanStatus.Text = ex.Message; }
                 };
