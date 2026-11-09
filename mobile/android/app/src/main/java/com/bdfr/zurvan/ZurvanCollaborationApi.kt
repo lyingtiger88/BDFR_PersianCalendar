@@ -81,7 +81,7 @@ class ZurvanCollaborationApi(private val baseUrl:String = BuildConfig.COLLAB_API
         val a=JSONArray();ids.forEach{a.put(it)}
         request(token,"PUT","/groups/$groupId/kanban/columns/reorder",JSONObject().put("columnIds",a))
     }
-    suspend fun createItemAdvanced(token:String,groupId:String,title:String,mode:String,details:String="",startsAt:String?=null,dueAt:String?=null,columnId:String?=null,recurrenceRule:String?=null,recurrenceUntil:String?=null,timezone:String="Asia/Tehran"):JSONObject{
+    suspend fun createItemAdvanced(token:String,groupId:String,title:String,mode:String,details:String="",startsAt:String?=null,dueAt:String?=null,columnId:String?=null,recurrenceRule:String?=null,recurrenceUntil:String?=null,timezone:String=java.util.TimeZone.getDefault().id):JSONObject{
         val p=JSONObject().put("title",title).put("mode",mode).put("details",details).put("state","todo").put("timezone",timezone)
         if(startsAt!=null)p.put("startsAt",startsAt);if(dueAt!=null)p.put("dueAt",dueAt)
         if(columnId!=null)p.put("columnId",columnId);if(recurrenceRule!=null)p.put("recurrenceRule",recurrenceRule)
