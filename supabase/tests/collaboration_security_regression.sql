@@ -43,7 +43,7 @@ begin
 
   v_first_result := public.collab_replay_command(v_owner_id,v_group_id,v_command_id,'create_item',
     jsonb_build_object('title','private regression title','details','private regression detail',
-      'mode','kanban','state','todo','timezone','Europe/Berlin'));
+      'mode','kanban','state','todo','assignedTo',v_member_id::text,'timezone','Europe/Berlin'));
   v_replay_result := public.collab_replay_command(v_owner_id,v_group_id,v_command_id,'create_item',
     jsonb_build_object('title','private regression title','details','private regression detail',
       'mode','kanban','state','todo','timezone','Europe/Berlin'));
@@ -62,6 +62,32 @@ begin
       where r.account_id=v_owner_id and r.command_id=v_command_id) then
     raise exception 'Command receipt retained private item text';
   end if;
+
+  if not exists(select 1 from public.collab_items i where i.id=v_item_id and i.assigned_to=v_member_id) then
+    raise exception 'Valid group member assignment was not persisted';
+  end if;
+
+  begin
+    perform public.collab_replay_command(v_owner_id,v_group_id,gen_random_uuid(),'create_item',
+      jsonb_build_object('title','invalid state','mode','agenda','state','hacked'));
+    raise exception 'Invalid item state was accepted by offline replay';
+  exception when invalid_parameter_value then null;
+  end;
+
+  begin
+    perform public.collab_replay_command(v_owner_id,v_group_id,gen_random_uuid(),'create_item',
+      jsonb_build_object('title','foreign assignee','mode','agenda','state','todo',
+        'assignedTo',gen_random_uuid()::text));
+    raise exception 'Non-member assignee was accepted by offline replay';
+  exception when invalid_parameter_value then null;
+  end;
+
+  begin
+    perform public.collab_replay_command(v_owner_id,v_group_id,gen_random_uuid(),'create_item',
+      jsonb_build_object('title','orphan recurrence','mode','agenda','state','todo','recurrenceRule','weekly'));
+    raise exception 'Recurrence without a base date was accepted';
+  exception when invalid_parameter_value then null;
+  end;
 
   begin
     perform public.collab_replay_command(v_member_id,v_group_id,gen_random_uuid(),'create_item',
