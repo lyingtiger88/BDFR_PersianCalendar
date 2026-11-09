@@ -25,19 +25,8 @@ public sealed partial class MainWindow
         var top = new Grid { ColumnSpacing = 7 };
         top.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         top.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        _weatherCityInput.PlaceholderText = "نام شهر (مثلاً زنجان)";
-        _weatherCityInput.Text = string.IsNullOrWhiteSpace(_settings.WeatherCity)
-            ? _settings.PrayerCity : _settings.WeatherCity;
-        _weatherCityInput.MinWidth = 0;
-        _weatherCityInput.FontSize = 12;
-        _weatherCityInput.KeyDown += (_, e) =>
-        {
-            if (e.Key == Windows.System.VirtualKey.Enter) _ = LoadWeatherAsync(true);
-        };
-        Grid.SetColumn(_weatherCityInput, 0);
-        top.Children.Add(_weatherCityInput);
         var refresh = new Button { Content = "↻", Padding = new Thickness(10, 4, 10, 4), MinWidth = 34 };
-        ToolTipService.SetToolTip(refresh, "دریافت آب‌وهوای شهر انتخابی");
+        ToolTipService.SetToolTip(refresh, "به‌روزرسانی آب‌وهوا");
         refresh.Click += (_, _) => _ = LoadWeatherAsync(true);
         Grid.SetColumn(refresh, 1);
         top.Children.Add(refresh);
@@ -83,15 +72,19 @@ public sealed partial class MainWindow
         _weatherLocation.Foreground = ThemeService.Brush("#FFFFFFFF");
         _weatherNow.Foreground = ThemeService.Brush("#FFFFFFFF");
         _weatherDescription.Foreground = ThemeService.Brush("#FFFFFFFF");
-        _weatherCityInput.FlowDirection = FlowDirection.RightToLeft;
-        _weatherCityInput.Foreground = ThemeService.Brush("#FF1F2638");
         _ = LoadWeatherAsync(false);
         return card;
     }
 
+    private async Task RefreshWeatherForSettingsAsync()
+    {
+        _weatherLastCity = "";
+        await LoadWeatherAsync(true);
+    }
+
     private async Task LoadWeatherAsync(bool force)
     {
-        var city = _weatherCityInput.Text?.Trim() ?? "";
+        var city = _settings.WeatherCity?.Trim() ?? "";
         if (string.IsNullOrWhiteSpace(city))
         {
             _weatherNow.Text = "شهر را وارد کنید";
@@ -122,7 +115,7 @@ public sealed partial class MainWindow
             {
                 using var geoResponse = await WeatherHttp.GetAsync(
                     "https://geocoding-api.open-meteo.com/v1/search?name=" +
-                    Uri.EscapeDataString(city) + "&count=1&language=en&format=json");
+                    Uri.EscapeDataString(city) + "&count=10&language=en&countryCode=" + Uri.EscapeDataString(_settings.WeatherCountryCode) + "&format=json");
                 geoResponse.EnsureSuccessStatusCode();
                 using var geo = JsonDocument.Parse(await geoResponse.Content.ReadAsStringAsync());
                 if (!geo.RootElement.TryGetProperty("results", out var matches) ||
@@ -152,7 +145,7 @@ public sealed partial class MainWindow
             var daytime = current.GetProperty("is_day").GetInt32() == 1;
             var humidity = current.GetProperty("relative_humidity_2m").GetInt32();
             var wind = current.GetProperty("wind_speed_10m").GetDouble();
-            _weatherLocation.Text = city + " • " + place;
+            _weatherLocation.Text = _settings.WeatherCountryName + " • " + city + " • " + place;
             _weatherNow.Text = WeatherSymbol(code, daytime) + "  " + temp.ToString("0", CultureInfo.InvariantCulture) + "°";
             _weatherDescription.Text = WeatherCondition(code) +
                 "  •  رطوبت " + humidity.ToString(CultureInfo.InvariantCulture) +
@@ -187,11 +180,7 @@ public sealed partial class MainWindow
             }
             _weatherLastCity = city;
             _weatherLastRequestUtc = DateTime.UtcNow;
-            if (!string.Equals(_settings.WeatherCity, city, StringComparison.Ordinal))
-            {
-                _settings.WeatherCity = city;
-                _settingsService.Save(_settings);
-            }
+
         }
         catch (Exception ex)
         {
