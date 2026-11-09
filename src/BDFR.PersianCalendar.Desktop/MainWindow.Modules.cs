@@ -1025,8 +1025,8 @@ public sealed partial class MainWindow
                 collaboration.Children.Add(sharedTaskBox);
                 collaboration.Children.Add(sharedTaskMode);
                 collaboration.Children.Add(sharedTaskRecurrence);
-                collaboration.Children.Add(kanbanWorkspace);
-                collaboration.Children.Add(schoolWorkspace);
+                if (kanbanMode.IsChecked == true) collaboration.Children.Add(kanbanWorkspace);
+                if (schoolMode.IsChecked == true) collaboration.Children.Add(schoolWorkspace);
                 collaboration.Children.Add(addSharedTask);
                 collaboration.Children.Add(sharedMessageBox);
                 collaboration.Children.Add(sendSharedMessage);
