@@ -368,7 +368,7 @@ public sealed partial class MainWindow
                 Foreground = color, Width = 20, TextAlignment = TextAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center
             };
-            Canvas.SetLeft(arrow, 11); Canvas.SetTop(7);
+            Canvas.SetLeft(arrow, 11); Canvas.SetTop(arrow, 7);
             canvas.Children.Add(arrow);
         }
         return canvas;
