@@ -326,6 +326,20 @@ jobs:
             -p:ZurvanLicensePublicKeyB64="$env:ZURVAN_PUBLIC_KEY_B64" `
             -o artifacts/Zurvan-win-x64
 
+      - name: Refresh packaged Zurvan clock face from repository and verify SHA256
+        shell: pwsh
+        run: |
+          $source = Join-Path $env:GITHUB_WORKSPACE "picture/clock/zurvan-clock-face.svg"
+          $target = Join-Path $env:GITHUB_WORKSPACE "artifacts/Zurvan-win-x64/picture/clock/zurvan-clock-face.svg"
+          if (-not (Test-Path $source -PathType Leaf)) { throw "Clock SVG is missing from repository" }
+          New-Item -ItemType Directory -Path (Split-Path $target -Parent) -Force | Out-Null
+          if (Test-Path $target) { Remove-Item $target -Force }
+          Copy-Item $source $target -Force
+          $sourceHash = (Get-FileHash $source -Algorithm SHA256).Hash
+          $targetHash = (Get-FileHash $target -Algorithm SHA256).Hash
+          if ($sourceHash -ne $targetHash) { throw "Clock SVG in publish output differs from repository" }
+          Write-Host "Clock SVG refreshed and verified SHA256: $targetHash"
+
       - name: Replace packaged zodiac PNG directory from repository
         shell: pwsh
         run: |
