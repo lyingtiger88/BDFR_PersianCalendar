@@ -48,7 +48,7 @@ public sealed partial class MainWindow
             if (System.Threading.Interlocked.Exchange(ref _collaborationPollBusy, 1) != 0) return;
             try
             {
-                foreach (var queued in _collaborationOfflineQueue.ReadAll().Where(x => x.GroupId == _collaborationGroupId).Take(20))
+                foreach (var queued in _collaborationOfflineQueue.ReadAll().Where(x => x.GroupId == _collaborationGroupId && x.BlockedReason is null).Take(20))
                 {
                     try
                     {
@@ -58,12 +58,17 @@ public sealed partial class MainWindow
                     }
                     catch (Exception replayError)
                     {
-                        if (replayError.Message.Contains("version_conflict", StringComparison.OrdinalIgnoreCase))
+                        if (replayError.Message.Contains("version_conflict", StringComparison.OrdinalIgnoreCase) ||
+                            replayError.Message.Contains("command_denied", StringComparison.OrdinalIgnoreCase) ||
+                            replayError.Message.Contains("command_rejected", StringComparison.OrdinalIgnoreCase))
+                        {
+                            _collaborationOfflineQueue.Block(queued.CommandId, replayError.Message);
                             _desktopModulePage?.DispatcherQueue.TryEnqueue(() =>
                             {
                                 if (_collaborationStatus is not null)
-                                    _collaborationStatus.Text = "تعارض نسخه در صف آفلاین؛ تغییر نیازمند بازبینی است.";
+                                    _collaborationStatus.Text = "فرمان آفلاین به دلیل تعارض نسخه یا مجوز متوقف شد و نیازمند بازبینی است.";
                             });
+                        }
                         break;
                     }
                 }
