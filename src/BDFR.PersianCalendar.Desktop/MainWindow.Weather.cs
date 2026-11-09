@@ -80,7 +80,9 @@ public sealed partial class MainWindow
             Child = layout
         };
         // Keep the weather module independently legible on the pale sidebar.
-        layout.Foreground = ThemeService.Brush("#FFFFFFFF");
+        _weatherLocation.Foreground = ThemeService.Brush("#FFFFFFFF");
+        _weatherNow.Foreground = ThemeService.Brush("#FFFFFFFF");
+        _weatherDescription.Foreground = ThemeService.Brush("#FFFFFFFF");
         _weatherCityInput.FlowDirection = FlowDirection.RightToLeft;
         _weatherCityInput.Foreground = ThemeService.Brush("#FF1F2638");
         _ = LoadWeatherAsync(false);
@@ -156,15 +158,15 @@ public sealed partial class MainWindow
                 var tile = new StackPanel { Spacing = 4, Width = 44, HorizontalAlignment = HorizontalAlignment.Center };
                 tile.Children.Add(new TextBlock {
                     Text = i == 0 ? "امروز" : date.ToString("ddd", new CultureInfo("fa-IR")),
-                    FontSize = 10, TextAlignment = TextAlignment.Center });
+                    FontSize = 10, Foreground = ThemeService.Brush("#FFFFFFFF"), TextAlignment = TextAlignment.Center });
                 tile.Children.Add(new TextBlock {
-                    Text = WeatherSymbol(codeDay, true), FontSize = 22, TextAlignment = TextAlignment.Center });
+                    Text = WeatherSymbol(codeDay, true), FontSize = 22, Foreground = ThemeService.Brush("#FFFFFFFF"), TextAlignment = TextAlignment.Center });
                 tile.Children.Add(new TextBlock {
                     Text = high.ToString("0", CultureInfo.InvariantCulture) + "°",
-                    FontSize = 11, TextAlignment = TextAlignment.Center });
+                    FontSize = 11, Foreground = ThemeService.Brush("#FFFFFFFF"), TextAlignment = TextAlignment.Center });
                 tile.Children.Add(new TextBlock {
                     Text = low.ToString("0", CultureInfo.InvariantCulture) + "°",
-                    FontSize = 10, Opacity = 0.75, TextAlignment = TextAlignment.Center });
+                    FontSize = 10, Opacity = 0.75, Foreground = ThemeService.Brush("#FFFFFFFF"), TextAlignment = TextAlignment.Center });
                 _weatherDays.Children.Add(new Border {
                     CornerRadius = new CornerRadius(7), Padding = new Thickness(3, 6, 3, 6),
                     Background = BrushWithAlpha("#FFFFFFFF", 0x20), Child = tile });
