@@ -42,6 +42,15 @@ struct ZurvanCollabSubmission: Decodable, Identifiable {
     let grade: Double?
     let feedback: String?
 }
+struct ZurvanCollabCard: Decodable, Identifiable {
+    let id: String
+    let title: String
+    let details: String
+    let mode: String
+    let state: String
+    let column_id: String?
+    let version: Int
+}
 struct ZurvanCollabColumn: Decodable, Identifiable {
     let id: String
     let name: String
@@ -160,8 +169,8 @@ struct ZurvanCollaborationAPI {
     func reorderKanban(token: String, groupID: String, ids: [String]) async throws {
         _ = try await raw("PUT", "groups/\(groupID)/kanban/columns/reorder", token: token, body: ["columnIds": ids])
     }
-    func items(token: String, groupID: String) async throws -> [[String: Any]] {
-        try await raw("GET", "groups/\(groupID)/items", token: token) as? [[String: Any]] ?? []
+    func items(token: String, groupID: String) async throws -> [ZurvanCollabCard] {
+        try await request("GET", "groups/\(groupID)/items", token: token, as: [ZurvanCollabCard].self)
     }
     func messages(token: String, groupID: String) async throws -> [[String: Any]] {
         try await raw("GET", "groups/\(groupID)/messages", token: token) as? [[String: Any]] ?? []
