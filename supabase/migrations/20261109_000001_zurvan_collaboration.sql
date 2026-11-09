@@ -130,6 +130,21 @@ drop trigger if exists collab_group_owner_insert on public.collab_groups;
 create trigger collab_group_owner_insert after insert on public.collab_groups
 for each row execute function public.collab_owner_after_group_insert();
 
+-- Group ownership must remain stable. Assistants can edit display fields only.
+create or replace function public.collab_protect_group_owner()
+returns trigger language plpgsql set search_path = ''
+as $
+begin
+  if new.owner_id <> old.owner_id then
+    raise exception 'Group ownership cannot be reassigned here' using errcode='42501';
+  end if;
+  return new;
+end;
+$;
+drop trigger if exists collab_group_owner_guard on public.collab_groups;
+create trigger collab_group_owner_guard before update on public.collab_groups
+for each row execute function public.collab_protect_group_owner();
+
 -- Invitation must target an authenticated Supabase user ID.
 -- Converting a public Zurvan display identifier to this UUID requires a verified identity mapping.
 create or replace function public.collab_invite_member(g uuid, target uuid, requested_role text default 'member')
@@ -307,8 +322,7 @@ with check (owner_id=auth.uid());
 drop policy if exists collab_group_update on public.collab_groups;
 create policy collab_group_update on public.collab_groups for update to authenticated
 using (public.collab_role(id) in ('owner','assistant'))
-with check (public.collab_role(id) in ('owner','assistant') and owner_id =
-  (select owner_id from public.collab_groups where id=collab_groups.id));
+with check (public.collab_role(id) in ('owner','assistant'));
 
 drop policy if exists collab_member_read on public.collab_members;
 create policy collab_member_read on public.collab_members for select to authenticated
@@ -335,7 +349,8 @@ with check (sender_id=auth.uid() and public.collab_allowed(group_id,'chat'));
 
 drop policy if exists collab_report_read on public.collab_reports;
 create policy collab_report_read on public.collab_reports for select to authenticated
-using (public.collab_role(group_id) in ('owner','assistant') or author_id=auth.uid());
+using (public.collab_is_member(group_id) and
+  (public.collab_role(group_id) in ('owner','assistant') or author_id=auth.uid()));
 drop policy if exists collab_report_insert on public.collab_reports;
 create policy collab_report_insert on public.collab_reports for insert to authenticated
 with check (author_id=auth.uid() and public.collab_allowed(group_id,'report'));
