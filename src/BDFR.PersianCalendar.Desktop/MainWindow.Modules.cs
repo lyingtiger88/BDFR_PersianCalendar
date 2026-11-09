@@ -984,8 +984,11 @@ public sealed partial class MainWindow
                         .Select(x => (x.GetProperty("id").GetString() ?? "",
                                       x.GetProperty("title").GetString() ?? "")).ToList();
                     schoolSubjectPicker.ItemsSource = schoolSubjects.Select(x => x.Name).ToArray();
+                    schoolSubjectPicker.SelectedIndex = schoolSubjects.Count > 0 ? 0 : -1;
                     schoolHomeworkPicker.ItemsSource = schoolHomeworkRows.Select(x => x.Title).ToArray();
+                    schoolHomeworkPicker.SelectedIndex = schoolHomeworkRows.Count > 0 ? 0 : -1;
                     schoolSubmissionPicker.ItemsSource = Array.Empty<string>();
+                    schoolSubmissionPicker.SelectedIndex = -1;
                     schoolSubmissionRows.Clear();
                     var timetableRows = timetable.RootElement.EnumerateArray().Select(x =>
                     {
