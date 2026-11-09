@@ -289,12 +289,17 @@ begin
   elsif tg_table_name='collab_reports' then
     group_ref := new.group_id; row_id := new.id; kind:='report';
   else
-    group_ref := coalesce(new.group_id,old.group_id);
-    row_id := coalesce(new.user_id,old.user_id); kind:='membership';
+    kind := 'membership';
+    if tg_op='DELETE' then
+      group_ref := old.group_id; row_id := old.user_id;
+    else
+      group_ref := new.group_id; row_id := new.user_id;
+    end if;
   end if;
   insert into public.collab_events(group_id,kind,resource_id,actor_id)
   values(group_ref,kind,row_id,auth.uid());
-  return coalesce(new,old);
+  if tg_op='DELETE' then return old; end if;
+  return new;
 end;
 $$;
 drop trigger if exists collab_item_event on public.collab_items;
