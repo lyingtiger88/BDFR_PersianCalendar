@@ -44,14 +44,25 @@
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </Content>
   </ItemGroup>
-  <Target Name="IncludeGeneratedZodiacPngAssets" BeforeTargets="AssignTargetPaths">
+  <!-- The picture/** wildcard above is the single canonical Content include.
+       Copy tracked zodiac PNGs after Build/Publish as a final overwrite so no
+       duplicate MSBuild item or generated fallback can replace original artwork. -->
+  <Target Name="CopyCanonicalZodiacPngAssetsToBuildOutput" AfterTargets="Build">
     <ItemGroup>
-      <Content Include="$(MSBuildThisFileDirectory)..\..\picture\zodiac\png\*.png"
-               >
-        <Link>picture\zodiac\png\%(Filename)%(Extension)</Link>
-        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
-      </Content>
+      <_CanonicalZodiacPng Include="$(MSBuildThisFileDirectory)..\..\picture\zodiac\png\*.png" />
     </ItemGroup>
+    <Error Condition="'@(_CanonicalZodiacPng)' == ''" Text="Canonical zodiac PNG assets are missing from picture/zodiac/png." />
+    <Copy SourceFiles="@(_CanonicalZodiacPng)"
+          DestinationFolder="$(TargetDir)picture\zodiac\png"
+          SkipUnchangedFiles="false" />
+  </Target>
+  <Target Name="CopyCanonicalZodiacPngAssetsToPublishOutput" AfterTargets="Publish">
+    <ItemGroup>
+      <_CanonicalZodiacPngPublish Include="$(MSBuildThisFileDirectory)..\..\picture\zodiac\png\*.png" />
+    </ItemGroup>
+    <Error Condition="'@(_CanonicalZodiacPngPublish)' == ''" Text="Canonical zodiac PNG assets are missing from picture/zodiac/png." />
+    <Copy SourceFiles="@(_CanonicalZodiacPngPublish)"
+          DestinationFolder="$(PublishDir)picture\zodiac\png"
+          SkipUnchangedFiles="false" />
   </Target>
 </Project>

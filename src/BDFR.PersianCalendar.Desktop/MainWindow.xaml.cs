@@ -218,6 +218,7 @@ public sealed partial class MainWindow : Window
             _inAppReminderTimer?.Stop();
             _seasonCarouselTimer?.Stop();
             _wallpaperRotationTimer?.Stop();
+            _weatherRefreshTimer?.Stop();
             StartupDiagnostics.Log("MainWindow Closed event fired.");
         };
         AppWindow.Changed += (_, e) =>
@@ -950,11 +951,19 @@ public sealed partial class MainWindow : Window
 
     private FrameworkElement BuildCalendarPanel()
     {
-        var panel = new Grid { Padding = new Thickness(24) };
-        panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        panel.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        var panel = new Grid { Padding = new Thickness(16), RowSpacing = 6 };
+        panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // Prayer times
+        panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // User-selected live clock
+        panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // Month picker
+        panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // Calendar actions
+        panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // Weekdays
+        panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // Month
+        var prayerHeader = BuildPrayerTimesAboveCalendar();
+        Grid.SetRow(prayerHeader, 0);
+        panel.Children.Add(prayerHeader);
+        var userClock = BuildCompactCalendarClock();
+        Grid.SetRow(userClock, 1);
+        panel.Children.Add(userClock);
 
         var header = new Grid();
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -993,9 +1002,26 @@ public sealed partial class MainWindow : Window
         decoratedMonthTitle.Children.Add(MonthLeftDecoration);
         decoratedMonthTitle.Children.Add(MonthTitle);
         decoratedMonthTitle.Children.Add(MonthRightDecoration);
+        decoratedMonthTitle.Children.Add(new TextBlock
+        {
+            Text = "⌄",
+            FontSize = 15,
+            Foreground = ThemeService.Brush(_theme.SecondaryText),
+            VerticalAlignment = VerticalAlignment.Center
+        });
 
-        Grid.SetColumn(decoratedMonthTitle, 1);
-        header.Children.Add(decoratedMonthTitle);
+        var monthPicker = new Button
+        {
+            Content = decoratedMonthTitle,
+            Background = BrushWithAlpha("#00FFFFFF", 0),
+            BorderThickness = new Thickness(0),
+            Padding = new Thickness(8, 2, 8, 2),
+            HorizontalAlignment = HorizontalAlignment.Center
+        };
+        ToolTipService.SetToolTip(monthPicker, "انتخاب ماه و سال");
+        monthPicker.Click += async (_, _) => await ShowDesktopMonthPickerAsync();
+        Grid.SetColumn(monthPicker, 1);
+        header.Children.Add(monthPicker);
 
         var prev = MakeButton("›");
         prev.FontSize = 22;
@@ -1003,7 +1029,7 @@ public sealed partial class MainWindow : Window
         Grid.SetColumn(prev, 2);
         header.Children.Add(prev);
 
-        Grid.SetRow(header, 0);
+        Grid.SetRow(header, 2);
         panel.Children.Add(header);
 
         var calendarTools = new StackPanel
@@ -1027,7 +1053,7 @@ public sealed partial class MainWindow : Window
         dateConverter.Click += DateConverter_Click;
         calendarTools.Children.Add(dateConverter);
 
-        Grid.SetRow(calendarTools, 1);
+        Grid.SetRow(calendarTools, 3);
         panel.Children.Add(calendarTools);
 
         var weekdays = new Grid { Margin = new Thickness(0, 10, 0, 10) };
@@ -1066,13 +1092,20 @@ public sealed partial class MainWindow : Window
             weekdays.Children.Add(label);
         }
 
-        Grid.SetRow(weekdays, 2);
+        Grid.SetRow(weekdays, 4);
         panel.Children.Add(weekdays);
 
-        Grid.SetRow(CalendarGrid, 3);
+        Grid.SetRow(CalendarGrid, 5);
         panel.Children.Add(CalendarGrid);
 
-        return panel;
+        // Both new information strips remain above the calendar without clipping
+        // any calendar row on shorter laptop displays.
+        return new ScrollViewer
+        {
+            Content = panel,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
+        };
     }
 
     private FrameworkElement BuildRightPanel()
@@ -1092,6 +1125,12 @@ public sealed partial class MainWindow : Window
         GregorianDateText.FlowDirection = FlowDirection.LeftToRight;
         GregorianDateText.FontFamily = new FontFamily("Segoe UI Variable");
         stack.Children.Add(GregorianDateText);
+
+        // Weather belongs to the LEFT details sidebar, immediately below the
+        // Gregorian date and before occasions. Never mount it over the calendar.
+        _weatherCalendarHost = BuildWeatherCard();
+        _weatherCalendarHost.Visibility = _settings.WeatherEnabled ? Visibility.Visible : Visibility.Collapsed;
+        stack.Children.Add(_weatherCalendarHost);
 
         HijriDateText.Opacity = 0.65;
         HijriDateText.FlowDirection = FlowDirection.RightToLeft;
@@ -5381,6 +5420,7 @@ public sealed partial class MainWindow : Window
         _calendarPrimaryDayLabels.Clear();
         _calendarMourningRibbons.Clear();
         _calendarCellButtons.Clear();
+        _weatherDayBadges.Clear();
         _calendarHolidayDates.Clear();
         _calendarHolidayOccasionLabels.Clear();
 
@@ -5524,6 +5564,21 @@ public sealed partial class MainWindow : Window
             physicalOverlay.Children.Add(tertiaryLabel);
             physicalOverlay.Children.Add(mourningRibbon);
             cellLayer.Children.Add(physicalOverlay);
+            var weatherBadge = new TextBlock
+            {
+                FontSize = 10,
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                TextAlignment = TextAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Bottom,
+                Foreground = ThemeService.Brush(_theme.PrimaryText),
+                Padding = new Thickness(3, 1, 3, 1),
+                Margin = new Thickness(0, 0, 1, 0),
+                Visibility = Visibility.Collapsed,
+                IsHitTestVisible = false
+            };
+            cellLayer.Children.Add(weatherBadge);
+            _weatherDayBadges[cell.Date.ToDateOnly()] = weatherBadge;
 
             var button = new Button
             {
@@ -5576,6 +5631,7 @@ public sealed partial class MainWindow : Window
             CalendarGrid.Children.Add(button);
         }
 
+        RenderWeatherDayBadges();
         ApplyUserFont(CalendarGrid);
         ApplyCalendarOrderTypography();
         ApplyCornerRadiusLive(CalendarGrid);

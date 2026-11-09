@@ -1,10 +1,14 @@
 package com.bdfr.zurvan
 
 import android.os.SystemClock
+import android.content.Context
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.border
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -13,11 +17,22 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import kotlin.math.cos
 import kotlin.math.sin
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
+import java.util.Locale
+import kotlinx.coroutines.delay
 
 /** Discreet trigger: 7 taps on the app title, with a short inactivity reset. */
 @Composable
@@ -71,34 +86,162 @@ fun ZurvanSecretTitle() {
     }
 }
 
-/** Original vector illustration rendered locally; no external image downloads. */
+/** Twelve-point Persian interlace emblem with a live three-hand analog clock. */
 @Composable
-private fun ZurvanTimeIllustration(modifier: Modifier = Modifier) {
+fun ZurvanTimeIllustration(modifier: Modifier = Modifier) {
+    val ink = Color(0xFF111111)
     val gold = Color(0xFFD6A64D)
-    val blue = Color(0xFF5D6BA6)
-    Canvas(modifier) {
-        val center = Offset(size.width / 2f, size.height / 2f)
-        val radius = minOf(size.width, size.height) * .39f
-        drawCircle(color = blue.copy(alpha = .09f), radius = radius * 1.15f, center = center)
-        drawCircle(color = gold, radius = radius, center = center, style = Stroke(width = 5f))
-        drawCircle(color = blue, radius = radius * .82f, center = center, style = Stroke(width = 2f))
-        for (index in 0 until 12) {
-            val angle = (index * 30.0 - 90.0) * Math.PI / 180.0
-            val inner = radius * .86f
-            val outer = radius * .96f
-            drawLine(
-                gold,
-                Offset(center.x + cos(angle).toFloat() * inner, center.y + sin(angle).toFloat() * inner),
-                Offset(center.x + cos(angle).toFloat() * outer, center.y + sin(angle).toFloat() * outer),
-                strokeWidth = 4f, cap = StrokeCap.Round
-            )
+    val secondsColor = Color(0xFFB63D35)
+    val context = LocalContext.current
+    val settings = remember(context) { context.getSharedPreferences("zurvan_clock", Context.MODE_PRIVATE) }
+    var clockMode by remember { mutableStateOf(settings.getString("mode", "analog") ?: "analog") }
+    var clockStyle by remember { mutableStateOf(settings.getString("digital_style", "classic") ?: "classic") }
+    var twentyFourHours by remember { mutableStateOf(settings.getBoolean("24_hour", true)) }
+    var showSeconds by remember { mutableStateOf(settings.getBoolean("show_seconds", true)) }
+    var analogNumerals by remember { mutableStateOf(settings.getString("analog_numerals", "zurvan") ?: "zurvan") }
+    DisposableEffect(settings) {
+        val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            when (key) {
+                "mode" -> clockMode = settings.getString("mode", "analog") ?: "analog"
+                "digital_style" -> clockStyle = settings.getString("digital_style", "classic") ?: "classic"
+                "24_hour" -> twentyFourHours = settings.getBoolean("24_hour", true)
+                "show_seconds" -> showSeconds = settings.getBoolean("show_seconds", true)
+                "analog_numerals" -> analogNumerals = settings.getString("analog_numerals", "zurvan") ?: "zurvan"
+            }
         }
-        drawLine(blue, center,
-            Offset(center.x + radius * .43f, center.y - radius * .39f), 7f, cap = StrokeCap.Round)
-        drawLine(gold, center,
-            Offset(center.x - radius * .15f, center.y - radius * .55f), 6f, cap = StrokeCap.Round)
-        drawCircle(gold, radius = 7f, center = center)
-        drawCircle(color = gold.copy(alpha = .6f), radius = radius * .13f,
-            center = Offset(center.x + radius * 1.12f, center.y - radius * .95f))
+        settings.registerOnSharedPreferenceChangeListener(listener)
+        onDispose { settings.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
+    var time by remember { mutableStateOf(LocalTime.now()) }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            time = LocalTime.now()
+            delay(1000L)
+        }
+    }
+
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        Image(
+            painter = painterResource(id = R.drawable.zurvan_clock_body),
+            contentDescription = "بدنه ساعت با نقش گره هندسی دوازده‌پر",
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Fit
+        )
+        if (clockMode == "digital") {
+            val formatter = remember(twentyFourHours, showSeconds) {
+                DateTimeFormatter.ofPattern(
+                    if (twentyFourHours) (if (showSeconds) "HH:mm:ss" else "HH:mm")
+                    else (if (showSeconds) "hh:mm:ss a" else "hh:mm a"),
+                    Locale.ENGLISH
+                )
+            }
+            val accent = when (clockStyle) {
+                "modern" -> Color(0xFF67E5F4)
+                "dots" -> Color(0xFFE8D8FB)
+                "flip" -> Color(0xFFFFFFFF)
+                else -> Color(0xFFF5D28D)
+            }
+            val background = when (clockStyle) {
+                "flip" -> Color(0xFF272B3A)
+                "modern" -> Color(0xFF092B3A)
+                "dots" -> Color(0xFF261E3D)
+                else -> Color(0xFF201A31)
+            }
+            Box(
+                Modifier.fillMaxWidth(.77f)
+                    .background(background, RoundedCornerShape(14.dp))
+                    .border(2.dp, gold.copy(alpha = .7f), RoundedCornerShape(14.dp))
+                    .padding(vertical = 10.dp, horizontal = 6.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                if (clockStyle == "flip") {
+                    Row(horizontalArrangement = Arrangement.spacedBy(2.dp),
+                        verticalAlignment = Alignment.CenterVertically) {
+                        time.format(formatter).forEach { character ->
+                            Text(
+                                character.toString(),
+                                color = Color.White,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = if (showSeconds) 16.sp else 22.sp,
+                                maxLines = 1,
+                                modifier = Modifier.background(
+                                    if (character.isDigit()) Color(0xFF404859) else Color.Transparent,
+                                    RoundedCornerShape(3.dp)
+                                ).padding(horizontal = 2.dp, vertical = 5.dp)
+                            )
+                        }
+                    }
+                } else {
+                    Text(
+                        time.format(formatter),
+                        fontSize = if (showSeconds) 23.sp else 29.sp,
+                        color = accent,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = if (clockStyle == "dots") FontFamily.Monospace else FontFamily.Default,
+                        letterSpacing = if (clockStyle == "dots") 1.sp else 0.sp,
+                        maxLines = 1,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        } else Canvas(Modifier.fillMaxSize()) {
+            val center = Offset(size.width / 2f, size.height / 2f)
+            val radius = minOf(size.width, size.height) * .47f
+
+            fun hand(angleDegrees: Float, length: Float, color: Color, width: Float,
+                     tail: Float = 0f) {
+                val angle = (angleDegrees - 90f) * Math.PI / 180.0
+                val directionX = cos(angle).toFloat()
+                val directionY = sin(angle).toFloat()
+                val from = Offset(
+                    center.x - directionX * radius * tail,
+                    center.y - directionY * radius * tail
+                )
+                val to = Offset(
+                    center.x + directionX * radius * length,
+                    center.y + directionY * radius * length
+                )
+                drawLine(color, from, to, strokeWidth = width, cap = StrokeCap.Round)
+            }
+
+            val hourAngle = ((time.hour % 12) * 30f) + time.minute * .5f + time.second / 120f
+            val minuteAngle = time.minute * 6f + time.second * .1f
+            val secondAngle = time.second * 6f
+
+            val roman = arrayOf("XII","I","II","III","IV","V","VI","VII","VIII","IX","X","XI")
+            val persian = arrayOf("۱۲","۱","۲","۳","۴","۵","۶","۷","۸","۹","۱۰","۱۱")
+            val ornament = when (analogNumerals) {
+                "khwarazmi" -> "◇"
+                "pahlavi" -> "✣"
+                "cuneiform" -> "◆"
+                else -> ""
+            }
+            val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                color = android.graphics.Color.BLACK
+                textAlign = android.graphics.Paint.Align.CENTER
+                textSize = radius * .14f
+                typeface = android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.BOLD)
+            }
+            drawIntoCanvas { canvas ->
+                for (index in 0 until 12) {
+                    val angle = (index * 30.0 - 90.0) * Math.PI / 180.0
+                    val x = center.x + cos(angle).toFloat() * radius * .61f
+                    val y = center.y + sin(angle).toFloat() * radius * .61f
+                    val label = if (ornament.isNotEmpty()) ornament
+                        else if (analogNumerals == "roman") roman[index] else persian[index]
+                    canvas.nativeCanvas.drawText(label, x, y - (paint.ascent() + paint.descent()) / 2, paint)
+                }
+            }
+
+            // Three distinct hands: short hour, long minute, fine red seconds.
+            hand(hourAngle, .27f, ink, 6.5f)
+            hand(minuteAngle, .39f, gold, 4.5f)
+            if (showSeconds) hand(secondAngle, .46f, secondsColor, 1.9f, tail = .09f)
+
+            drawCircle(Color.White, radius = 7.2f, center = center)
+            drawCircle(ink, radius = 5.3f, center = center)
+            drawCircle(gold, radius = 2.4f, center = center)
+        }
     }
 }

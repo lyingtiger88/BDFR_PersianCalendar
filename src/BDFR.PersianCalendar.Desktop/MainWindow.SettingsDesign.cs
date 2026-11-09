@@ -483,6 +483,117 @@ public sealed partial class MainWindow
         contents.Children.Add(SettingsOptionRow("رسانه‌های روز",
             "اجازه اتصال تصویر و فایل به روز انتخاب‌شده",
             SettingsToggle(_settings.DayMediaEnabled, SetDayMediaEnabled), "\uE8B7"));
+        AddSettingsSeparator(contents);
+
+        // Dedicated General > Weather submenu. Location controls are not visible
+        // until the master module toggle is switched on.
+        var weatherSubmenu = new StackPanel
+        {
+            Spacing = 11,
+            Padding = new Thickness(18, 6, 10, 12),
+            Visibility = _settings.WeatherEnabled ? Visibility.Visible : Visibility.Collapsed
+        };
+        var weatherStatus = new TextBlock
+        {
+            Text = "موقعیت فعلی: " + _settings.WeatherCity + ", " + _settings.WeatherCountryCode,
+            Foreground = ThemeService.Brush(SettingsSecondaryColor),
+            FontSize = 12,
+            TextWrapping = TextWrapping.Wrap
+        };
+        var cityQuery = new TextBox
+        {
+            Header = "جستجوی شهر / لوکیشن",
+            Text = _settings.WeatherCity,
+            PlaceholderText = "مثلاً Tehran, Frankfurt, Seattle",
+            FlowDirection = FlowDirection.LeftToRight,
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+        var cityResults = new ComboBox
+        {
+            Header = "نتایج جستجو — شهر دقیق را انتخاب کنید",
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            MinWidth = 220
+        };
+        var unitPicker = new ComboBox
+        {
+            Header = "واحد دما",
+            ItemsSource = new[] { "سانتی‌گراد (°C)", "فارنهایت (°F)" },
+            SelectedIndex = _settings.WeatherFahrenheit ? 1 : 0,
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+        IReadOnlyList<WeatherPlace> cityMatches = Array.Empty<WeatherPlace>();
+
+        Button? findCityButton = null;
+        findCityButton = SettingsActionButton("جستجوی موقعیت", () =>
+        {
+            _ = SearchWeatherCityAsync();
+        });
+        async Task SearchWeatherCityAsync()
+        {
+            findCityButton!.IsEnabled = false;
+            try
+            {
+                cityMatches = await _weatherService.FindCitiesAsync(cityQuery.Text.Trim());
+                cityResults.ItemsSource = cityMatches.Select(x =>
+                    x.DisplayName + " · " + x.Latitude.ToString("F3", CultureInfo.InvariantCulture) +
+                    ", " + x.Longitude.ToString("F3", CultureInfo.InvariantCulture)).ToArray();
+                cityResults.SelectedIndex = -1;
+                weatherStatus.Text = cityMatches.Count + " نتیجه یافت شد؛ موقعیت درست را انتخاب و ذخیره کنید.";
+            }
+            catch (Exception ex) { weatherStatus.Text = "جستجو ناموفق بود: " + ex.Message; }
+            finally { findCityButton!.IsEnabled = true; }
+        }
+
+        var saveCityButton = SettingsActionButton("ذخیره موقعیت و واحد دما", () =>
+        {
+            if (cityMatches.Count > 0 && cityResults.SelectedIndex < 0)
+            {
+                weatherStatus.Text = "یکی از موقعیت‌های یافته‌شده را انتخاب کنید.";
+                return;
+            }
+            if (cityResults.SelectedIndex >= 0 && cityResults.SelectedIndex < cityMatches.Count)
+            {
+                var chosen = cityMatches[cityResults.SelectedIndex];
+                _settings.WeatherCity = chosen.Name;
+                _settings.WeatherCountryCode = chosen.Country;
+                _settings.WeatherLatitude = chosen.Latitude;
+                _settings.WeatherLongitude = chosen.Longitude;
+            }
+            else if (!string.Equals(cityQuery.Text.Trim(), _settings.WeatherCity, StringComparison.OrdinalIgnoreCase))
+            {
+                weatherStatus.Text = "برای تغییر شهر، ابتدا جستجو و سپس موقعیت صحیح را انتخاب کنید.";
+                return;
+            }
+            _settings.WeatherFahrenheit = unitPicker.SelectedIndex == 1;
+            _settingsService.Save(_settings);
+            _weatherSnapshot = null;
+            RenderWeatherDayBadges();
+            weatherStatus.Text = "تنظیمات آب‌وهوا ذخیره شد: " + _settings.WeatherCity + ", " + _settings.WeatherCountryCode;
+            _ = RefreshWeatherAsync(force: true);
+        });
+        weatherSubmenu.Children.Add(weatherStatus);
+        weatherSubmenu.Children.Add(cityQuery);
+        weatherSubmenu.Children.Add(findCityButton!);
+        weatherSubmenu.Children.Add(cityResults);
+        weatherSubmenu.Children.Add(unitPicker);
+        weatherSubmenu.Children.Add(saveCityButton);
+        weatherSubmenu.Children.Add(SettingsHint("موقعیت به‌صورت دستی انتخاب می‌شود و دسترسی GPS درخواست نمی‌شود."));
+        contents.Children.Add(SettingsOptionRow(
+            "آب‌وهوا",
+            "نمایش ۲۴ ساعت گذشته در پنل چپ و ۷ روز گذشته و آینده در کارت روزها",
+            SettingsToggle(_settings.WeatherEnabled, enabled =>
+            {
+                _settings.WeatherEnabled = enabled;
+                _settings.WeatherOnCalendarCards = enabled;
+                _settingsService.Save(_settings);
+                weatherSubmenu.Visibility = enabled ? Visibility.Visible : Visibility.Collapsed;
+                if (_weatherCalendarHost is not null)
+                    _weatherCalendarHost.Visibility = enabled ? Visibility.Visible : Visibility.Collapsed;
+                RenderWeatherDayBadges();
+                if (enabled) _ = RefreshWeatherAsync(force: true);
+            }), "\uE753"));
+        contents.Children.Add(weatherSubmenu);
+
 
         // As in the approved Windows Settings mockup, use two independent card
         // columns rather than a long stack with large unused horizontal space.
@@ -651,16 +762,58 @@ public sealed partial class MainWindow
             var style = zodiacStyles[index];
             var selected = string.Equals(_settings.ZodiacThemeId, style.Id, StringComparison.OrdinalIgnoreCase) ||
                 (style.Id == "cute_1" && _settings.ZodiacThemeId == "cute");
-            var tileContent = new StackPanel { Spacing = 5, Padding = new Thickness(10), HorizontalAlignment = HorizontalAlignment.Center };
+            var tileContent = new StackPanel { Spacing = 6, Padding = new Thickness(9), HorizontalAlignment = HorizontalAlignment.Center };
+            var previewSurface = new Grid
+            {
+                Width = 126,
+                Height = 126,
+                Background = BrushWithAlpha("#13243A", 0xFF)
+            };
             var previewArt = new Image
             {
-                Width = 82, Height = 82,
+                Width = 116, Height = 116,
                 Stretch = Stretch.Uniform,
-                HorizontalAlignment = HorizontalAlignment.Center
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
             };
-            _ = ZodiacArtwork.PopulateAsync(previewArt, _selected.Month, style.Id);
-            tileContent.Children.Add(previewArt);
-            tileContent.Children.Add(new TextBlock { Text = style.Title, FontSize = 11, TextAlignment = TextAlignment.Center, TextWrapping = TextWrapping.Wrap, Foreground = ThemeService.Brush(_theme.PrimaryText) });
+            previewSurface.Children.Add(previewArt);
+            var imageMissing = new TextBlock
+            {
+                Text = "تصویر اصلی موجود نیست",
+                FontSize = 10,
+                Foreground = BrushWithAlpha("#FFF0F0", 0xFF),
+                TextAlignment = TextAlignment.Center,
+                TextWrapping = TextWrapping.Wrap,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(8),
+                Visibility = Visibility.Collapsed
+            };
+            previewSurface.Children.Add(imageMissing);
+            var previewMonth = _selected.Month;
+            _ = LoadStylePreviewAsync();
+            async Task LoadStylePreviewAsync()
+            {
+                var artwork = await ZodiacArtwork.LoadAsync(previewMonth, style.Id);
+                if (artwork is null)
+                {
+                    previewArt.Visibility = Visibility.Collapsed;
+                    imageMissing.Visibility = Visibility.Visible;
+                }
+                else
+                {
+                    previewArt.Source = artwork;
+                }
+            }
+            tileContent.Children.Add(new Border
+            {
+                CornerRadius = new CornerRadius(8),
+                Child = previewSurface
+            });
+            tileContent.Children.Add(new TextBlock
+            {
+                Text = style.Title, FontSize = 12, TextAlignment = TextAlignment.Center,
+                TextWrapping = TextWrapping.Wrap, Foreground = ThemeService.Brush(_theme.PrimaryText)
+            });
             var tile = new Button
             {
                 Content = new Border
@@ -836,6 +989,8 @@ public sealed partial class MainWindow
     private void BuildSettingsCalendar()
     {
         var contents = SettingsGroup("تقویم و زمان", "روزها، مناسبت‌ها و ترتیب تقویم‌ها", "\uE787", "#FF288AF0");
+        contents.Children.Add(BuildClockSettingsPanel());
+        AddSettingsSeparator(contents);
         AddSettingsAction(contents, "به‌روزرسانی مناسبت‌ها",
             "همگام‌سازی داده‌های سال انتخاب‌شده با time.ir", "به‌روزرسانی",
             () => _ = SyncOccasionsFromSettingsAsync(), "\uE895");

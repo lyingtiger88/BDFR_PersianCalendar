@@ -45,7 +45,7 @@ struct ContentView: View {
 
             NavigationStack {
                 if licensed {
-                    PlaceholderView(title: "برنامه‌ها")
+                    ZurvanCollaborationView()
                 } else {
                     ZurvanLockedView()
                 }
@@ -370,6 +370,7 @@ private struct ZurvanCloudShellView: View {
                         Button("خروج از حساب") {
                             run {
                                 try await api.logout(token: session.token)
+                                try? ZurvanCloudSecureStoreIOS().remove(ZurvanCloudSecureStoreIOS.deskSessionToken)
                                 self.session = nil
                                 files = []
                                 password = ""
@@ -431,6 +432,7 @@ private struct ZurvanCloudShellView: View {
                                 ? api.register(identifier: identifier, password: password, displayName: displayName)
                                 : api.login(identifier: identifier, password: password))
                             session = result
+                            try ZurvanCloudSecureStoreIOS().set(result.token, for: ZurvanCloudSecureStoreIOS.deskSessionToken)
                             password = ""
                             files = try await api.listFiles(token: result.token)
                         }
@@ -476,8 +478,18 @@ private struct ZurvanCloudShellView: View {
 
 private struct MobileSettingsView: View {
     @AppStorage("zurvan.appearance.theme") private var themeID = "windows-light"
+    @AppStorage("zurvan.weather.enabled") private var weatherEnabled = true
+    @AppStorage("zurvan.weather.city") private var weatherCity = "تهران"
+    @AppStorage("zurvan.weather.latitude") private var weatherLatitude = 35.6892
+    @AppStorage("zurvan.weather.longitude") private var weatherLongitude = 51.3890
+    @AppStorage("zurvan.weather.timezone") private var weatherTimeZone = "Asia/Tehran"
     @AppStorage("zurvan.language") private var language = "fa"
     @AppStorage("zurvan.zodiac.theme") private var zodiacTheme = "cosmic"
+    @AppStorage("zurvan.clock.mode") private var clockMode = "analog"
+    @AppStorage("zurvan.clock.digitalStyle") private var digitalClockStyle = "classic"
+    @AppStorage("zurvan.clock.analogNumerals") private var analogNumeralStyle = "zurvan"
+    @AppStorage("zurvan.clock.twentyFourHours") private var clockTwentyFour = true
+    @AppStorage("zurvan.clock.showSeconds") private var clockSeconds = true
     private let zodiacStyles: [(String, String, String)] = [
         ("cosmic", "کیهانی کلاسیک", "Classic Cosmic"),
         ("neon", "فانتزی نورانی", "Luminous Fantasy"),
@@ -518,6 +530,67 @@ private struct MobileSettingsView: View {
                     }
                     .pickerStyle(.menu)
                     Text("تم‌های متناظر با ویندوز و اندروید؛ انتخاب در دستگاه ذخیره می‌شود.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
+                .padding()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
+
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("ساعت زروان").font(.headline)
+                    Picker("نوع ساعت", selection: $clockMode) {
+                        Text("آنالوگ").tag("analog")
+                        Text("دیجیتال").tag("digital")
+                    }
+                    .pickerStyle(.segmented)
+                    ZurvanClockViewIOS()
+                        .frame(maxWidth: .infinity)
+                    if clockMode == "analog" {
+                        Picker("شمارگان ساعت", selection: $analogNumeralStyle) {
+                            Text("زروان (فارسی)").tag("zurvan")
+                            Text("خوارزمی (نشانگر تزئینی)").tag("khwarazmi")
+                            Text("پهلوی (نشانگر تزئینی)").tag("pahlavi")
+                            Text("میخی (نشانگر تزئینی)").tag("cuneiform")
+                            Text("رومی (I–XII)").tag("roman")
+                        }
+                        .pickerStyle(.menu)
+                        Text("تا زمان اعتبارسنجی تاریخی، گزینه‌های خوارزمی، پهلوی و میخی با نشانگر گرافیکی موقت نمایش داده می‌شوند.")
+                            .font(.footnote).foregroundStyle(.secondary)
+                    } else {
+                        Picker("طرح دیجیتال", selection: $digitalClockStyle) {
+                            Text("کلاسیک طلایی").tag("classic")
+                            Text("مدرن فیروزه‌ای").tag("modern")
+                            Text("نقطه‌ای بنفش").tag("dots")
+                            Text("فلیپ").tag("flip")
+                        }
+                        .pickerStyle(.menu)
+                        Toggle("نمایش ۲۴ ساعته", isOn: $clockTwentyFour)
+                    }
+                    Toggle("نمایش ثانیه", isOn: $clockSeconds)
+                }
+                .padding()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
+
+                VStack(alignment: .leading, spacing: 9) {
+                    Text("آب‌وهوا در تقویم").font(.headline)
+                    Toggle("نمایش ۲۴ ساعت گذشته و وضعیت ۷ روز قبل و بعد", isOn: $weatherEnabled)
+                    Picker("شهر آب‌وهوا و اوقات شرعی", selection: $weatherCity) {
+                        Text("تهران").tag("تهران")
+                        Text("زنجان").tag("زنجان")
+                        Text("فرانکفورت").tag("فرانکفورت")
+                        Text("سیاتل").tag("سیاتل")
+                    }
+                    .pickerStyle(.menu)
+                    .onChange(of: weatherCity) { _, city in
+                        switch city {
+                        case "زنجان": weatherLatitude = 36.6736; weatherLongitude = 48.4787; weatherTimeZone = "Asia/Tehran"
+                        case "فرانکفورت": weatherLatitude = 50.1109; weatherLongitude = 8.6821; weatherTimeZone = "Europe/Berlin"
+                        case "سیاتل": weatherLatitude = 47.6062; weatherLongitude = -122.3321; weatherTimeZone = "America/Los_Angeles"
+                        default: weatherLatitude = 35.6892; weatherLongitude = 51.3890; weatherTimeZone = "Asia/Tehran"
+                        }
+                    }
+                    Text("داده‌های هواشناسی: Open-Meteo؛ اوقات شرعی محاسباتی هستند.")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
                 .padding()

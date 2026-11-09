@@ -187,3 +187,97 @@ Artifacts:
 - `Zurvan-Setup-x64`
 
 These are test artifacts, not a claim of a production-ready team system.
+
+
+## School API implementation update (2026-11-09)
+
+The follow-up branch adds authenticated API routes for subjects, weekly timetable slots,
+homework, student submissions and manager grading. Subject/teacher references are checked
+against the same workspace; students can read and update only their own submissions, while
+owners, assistants and explicitly delegated editors can review/grade. A metadata-only
+submission event is added; submission text, grade and feedback are never broadcast.
+
+The API now relies on database triggers for item/message/report/member event records; manual
+duplicate writes were removed. Explicit event writes remain only for group and invitation
+records, which have no corresponding database trigger.
+
+Not yet complete: Android/Windows School screens, Kanban columns/order, full Agenda recurrence
+and timezone handling, persistent realtime transport, offline queue, push notifications, iOS
+parity and real two-account end-to-end authorization tests. No build is run.
+
+
+## Deployment and validation record — 2026-11-09
+
+- Applied migration `20261109_000002_collab_school_submission_events.sql` to Supabase project `yztithydgdvydaktuxlw`.
+- Deployed `zurvan-collaboration` Edge Function version 7 from this branch. The function remains protected by its own verified Desk-session check (`verify_jwt=false` is intentional for this custom session model).
+- SQL smoke test in a rolled-back transaction created a temporary Desk account, School group, subject, timetable slot, homework and submission; it verified exactly one metadata event for the submission and then rolled back all test data.
+- Live collaboration tables currently contain zero groups, members, messages, reports, timetable entries, homework and submissions; the Desk accounts table also contains zero accounts. Therefore, no real two-account authorization or device-to-device delivery test can yet be performed.
+- No Android, Windows or iOS build was run. Changes are held in draft PR for source review.
+
+- Final hardening: School submission events are visible only to the submitting member and group managers; timetable validation compares normalized time values and blank homework submissions are rejected.
+
+
+## Latest completion pass — 2026-11-09
+
+This section supersedes the earlier "not yet complete" lists above for the features explicitly completed in this pass.
+
+### Backend and database
+- Applied migrations 000002 through 000007 to the live Supabase project. Migrations 000004–000006 are already present on the repository base branch; migrations 000002, 000003 and 000007 are carried in the collaboration branch.
+- Edge Function `zurvan-collaboration` is active at version 14.
+- Added School subjects, timetable, homework, student submissions and grading APIs with group-membership, same-group reference, School-mode and permission checks.
+- Added three default Kanban columns per Kanban-enabled group, atomic column ordering, versioned card movement and column membership checks.
+- Added Agenda recurrence rules (daily, weekdays, weekly, monthly), IANA time-zone validation and bounded occurrence expansion. Occurrences preserve local wall-clock time across time-zone offset changes; the default query window is 90 days and is bounded to 366 days.
+- Added a 20-second authenticated long-poll event feed. This is reconnect-friendly near-live synchronization, not a WebSocket channel or APNs/FCM push.
+- Added atomic idempotent offline replay for create-item, update-item and send-message commands. Rejected/conflicting updates are quarantined instead of being retried indefinitely. Receipt rows retain only item/message IDs, version and command kind, not message bodies.
+- Offline queues are encrypted at rest: Android Keystore AES-GCM, Windows Credential Locker AES-GCM, and iOS Keychain AES-GCM.
+- Added permission-aware member editing/removal controls and School/Kanban/Agenda UI surfaces across Windows, Android and iOS.
+
+### Validation
+- Live SQL regression test passed inside a rolled-back transaction: default Kanban column seeding, atomic reorder, idempotent create and update replay, single version increment, School submission event and offline message replay.
+- No real two-account/device test is possible yet: the live Desk account table still contains zero accounts.
+- Push delivery remains blocked until APNs/FCM credentials, app entitlements/configuration and device-token registration are supplied.
+- Native WebSocket transport is not implemented; the current transport is bounded long-polling.
+- No manual build command was run in this pass.
+
+### Build workflow safeguard and incident record
+The draft PR initially triggered the repository's automatic GitHub Actions workflow. This was unintended given the no-build instruction. One automatic run completed successfully and produced Windows, Android and iOS test artifacts (workflow run `42588103550`); the Windows Theme Studio and core jobs also completed. This was not manually initiated from the development session. The workflow has since been changed so draft PRs skip build jobs and commits marked `[no-build]` skip all build jobs. The latest safeguard run `42588763193` completed with conclusion `skipped`. Do not interpret the automatic artifacts as user-approved release builds.
+
+
+## Follow-up completion pass — 2026-11-09
+
+### Windows offline queue integration
+- Connected the WinUI collaboration create-item and send-message actions to the encrypted CollaborationOfflineQueue.
+- Added stable-UUID command replay through the authenticated /groups/{id}/commands endpoint.
+- The 3-second collaboration poll now attempts to flush up to 20 queued commands for the active group, oldest first.
+- Transient network, timeout, rate-limit and server failures remain queued. Validation, membership, permission, missing-resource and version-conflict responses are quarantined with a reason instead of being retried indefinitely.
+- The UI reports the pending queue count and how many commands were replayed.
+- An unreadable/decryption-failed Windows queue now raises a visible error and leaves its encrypted file untouched; it is no longer silently treated as an empty queue.
+
+### Mobile retry classification
+- Android API errors now retain their HTTP status. The app quarantines terminal 400/403/404/409/422 responses and queues transient failures; queue-write failures are surfaced rather than reported as successful persistence.
+- iOS uses the same terminal-response classification and no longer reports that a command was queued if encryption/persistence fails.
+
+### Repeatable regression test
+- Added supabase/tests/collaboration_security_regression.sql.
+- Executed it against the live Supabase project inside a rollback-only transaction. It passed: default Kanban columns, two-account membership, idempotent create, receipt minimization, member chat permission, denial of unauthorized create/update, and exactly-once School submission event.
+- The test transaction was rolled back; no fixture accounts or records remain.
+
+### Remaining release gates
+- The live Desk account table still has zero real accounts, so authenticated HTTP/device integration with two real users cannot yet be exercised.
+- FCM/APNs delivery remains dependent on credentials, app entitlements and device-token registration.
+- Native WebSocket is not implemented; the current synchronization transport is bounded long-polling.
+- No build or release was run. Pull-request workflows now require the explicit build-approved label in addition to a non-draft PR, preventing accidental build execution when a draft is marked ready.
+
+
+### Windows School workspace
+- Added authenticated Windows Desk client methods for subjects, timetable slots, homework, submissions and grading.
+- Added a School workspace to the Windows collaboration page: create/list subjects, create weekly timetable slots, create homework with optional ISO-8601 due date, submit answers, inspect permitted submissions and grade/leave feedback.
+- All permissions remain server-enforced; the UI does not grant teacher/manager rights locally.
+- This UI addition is source-reviewed only; no Windows build was run.
+
+
+### Offline replay integrity hardening
+- Added and applied migration 000008 to align offline create/update replay validation with the direct planning API.
+- Offline create now validates state values, confirms assignees belong to the same group, requires a base timestamp for recurring items, validates recurrence end ordering, and persists assigned_to.
+- Offline update now rejects recurrence metadata without a valid base date or with an end date before the base date.
+- Re-ran the rollback-only security regression against the live database after migration 000008. It passed, including valid same-group assignment and rejection of invalid state, non-member assignee and recurrence without a base date.

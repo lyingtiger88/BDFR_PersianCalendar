@@ -16,7 +16,7 @@ concurrency:
 jobs:
   # [pc-android-only] builds Core, Windows desktop and Android.\n  # [windows-debug-only] builds a Windows Debug portable ZIP only.
   core:
-    if: ${{ !contains(github.event.head_commit.message, '[no-build]') && (github.event_name != 'push' || (!contains(github.event.head_commit.message, '[theme-studio-only]') && !contains(github.event.head_commit.message, '[windows-only]')) && !contains(github.event.head_commit.message, '[windows-debug-only]')) }}
+    if: ${{ (github.event_name != 'pull_request' || (!github.event.pull_request.draft && contains(github.event.pull_request.labels.*.name, 'build-approved'))) && (!contains(github.event.head_commit.message, '[no-build]') && (github.event_name != 'push' || (!contains(github.event.head_commit.message, '[theme-studio-only]') && !contains(github.event.head_commit.message, '[windows-only]')) && !contains(github.event.head_commit.message, '[windows-debug-only]'))) }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -36,7 +36,7 @@ jobs:
 
 
   theme-studio:
-    if: ${{ !contains(github.event.head_commit.message, '[no-build]') && (github.event_name != 'push' || (!contains(github.event.head_commit.message, '[pc-android-only]') && !contains(github.event.head_commit.message, '[windows-only]')) && !contains(github.event.head_commit.message, '[windows-debug-only]')) }}
+    if: ${{ (github.event_name != 'pull_request' || (!github.event.pull_request.draft && contains(github.event.pull_request.labels.*.name, 'build-approved'))) && (!contains(github.event.head_commit.message, '[no-build]') && (github.event_name != 'push' || (!contains(github.event.head_commit.message, '[pc-android-only]') && !contains(github.event.head_commit.message, '[windows-only]')) && !contains(github.event.head_commit.message, '[windows-debug-only]'))) }}
     name: Build Windows Theme Studio
     runs-on: windows-latest
     steps:
@@ -94,7 +94,7 @@ jobs:
           if-no-files-found: error
 
   android:
-    if: ${{ !contains(github.event.head_commit.message, '[no-build]') && (github.event_name != 'push' || (!contains(github.event.head_commit.message, '[theme-studio-only]') && !contains(github.event.head_commit.message, '[windows-only]')) && !contains(github.event.head_commit.message, '[windows-debug-only]')) }}
+    if: ${{ (github.event_name != 'pull_request' || (!github.event.pull_request.draft && contains(github.event.pull_request.labels.*.name, 'build-approved'))) && (!contains(github.event.head_commit.message, '[no-build]') && (github.event_name != 'push' || (!contains(github.event.head_commit.message, '[theme-studio-only]') && !contains(github.event.head_commit.message, '[windows-only]')) && !contains(github.event.head_commit.message, '[windows-debug-only]'))) }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -128,7 +128,7 @@ jobs:
           unzip -l mobile/android/app/build/outputs/apk/debug/app-debug.apk | grep -E 'resources.arsc|AndroidManifest.xml'
 
       - name: Upload Android debug APK
-        if: github.event_name == 'push'
+        if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && !github.event.pull_request.draft && contains(github.event.pull_request.labels.*.name, 'build-approved')) }}
         uses: actions/upload-artifact@v4
         with:
           name: Zurvan-Android-debug
@@ -137,7 +137,7 @@ jobs:
           retention-days: 14
 
   ios:
-    if: ${{ !contains(github.event.head_commit.message, '[no-build]') && (github.event_name != 'push' || (!contains(github.event.head_commit.message, '[pc-android-only]') && !contains(github.event.head_commit.message, '[theme-studio-only]') && !contains(github.event.head_commit.message, '[windows-only]')) && !contains(github.event.head_commit.message, '[windows-debug-only]')) }}
+    if: ${{ (github.event_name != 'pull_request' || (!github.event.pull_request.draft && contains(github.event.pull_request.labels.*.name, 'build-approved'))) && (!contains(github.event.head_commit.message, '[no-build]') && (github.event_name != 'push' || (!contains(github.event.head_commit.message, '[pc-android-only]') && !contains(github.event.head_commit.message, '[theme-studio-only]') && !contains(github.event.head_commit.message, '[windows-only]')) && !contains(github.event.head_commit.message, '[windows-debug-only]'))) }}
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -154,7 +154,7 @@ jobs:
           xcodebuild             -project mobile/ios/ZurvanIOS.xcodeproj             -scheme ZurvanIOS             -sdk iphonesimulator             -configuration Debug             CODE_SIGNING_ALLOWED=NO             -derivedDataPath mobile/ios/DerivedData             build
 
       - name: Package iOS simulator test app
-        if: github.event_name == 'push'
+        if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && !github.event.pull_request.draft && contains(github.event.pull_request.labels.*.name, 'build-approved')) }}
         shell: bash
         run: |
           set -euo pipefail
@@ -163,7 +163,7 @@ jobs:
           ditto -c -k --sequesterRsrc --keepParent "$app" Zurvan-iOS-simulator.zip
 
       - name: Upload iOS simulator artifact
-        if: github.event_name == 'push'
+        if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && !github.event.pull_request.draft && contains(github.event.pull_request.labels.*.name, 'build-approved')) }}
         uses: actions/upload-artifact@v4
         with:
           name: Zurvan-iOS-simulator
@@ -173,7 +173,7 @@ jobs:
 
   mobile-release:
     name: Publish mobile test downloads
-    if: ${{ !contains(github.event.head_commit.message, '[no-build]') && (github.event_name == 'push' && !contains(github.event.head_commit.message, '[theme-studio-only]') && !contains(github.event.head_commit.message, '[pc-android-only]') && !contains(github.event.head_commit.message, '[windows-only]') && !contains(github.event.head_commit.message, '[windows-debug-only]')) }}
+    if: ${{ (github.event_name != 'pull_request' || (!github.event.pull_request.draft && contains(github.event.pull_request.labels.*.name, 'build-approved'))) && (!contains(github.event.head_commit.message, '[no-build]') && (github.event_name == 'push' && !contains(github.event.head_commit.message, '[theme-studio-only]') && !contains(github.event.head_commit.message, '[pc-android-only]') && !contains(github.event.head_commit.message, '[windows-only]') && !contains(github.event.head_commit.message, '[windows-debug-only]'))) }}
     needs: [android, ios, windows]
     runs-on: ubuntu-latest
     steps:
@@ -210,7 +210,7 @@ jobs:
           All downloads are test builds, not production releases."
 
   windows:
-    if: ${{ !contains(github.event.head_commit.message, '[no-build]') && (github.event_name != 'push' || !contains(github.event.head_commit.message, '[theme-studio-only]') && !contains(github.event.head_commit.message, '[windows-debug-only]')) }}
+    if: ${{ (github.event_name != 'pull_request' || (!github.event.pull_request.draft && contains(github.event.pull_request.labels.*.name, 'build-approved'))) && (!contains(github.event.head_commit.message, '[no-build]') && (github.event_name != 'push' || !contains(github.event.head_commit.message, '[theme-studio-only]') && !contains(github.event.head_commit.message, '[windows-debug-only]'))) }}
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -268,31 +268,6 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Generate seven zodiac PNG themes
-        shell: pwsh
-        run: |
-          python -m pip install --disable-pip-version-check pillow
-          if ($LASTEXITCODE -ne 0) { throw "Pillow installation failed." }
-          python -m pip install --disable-pip-version-check cairosvg
-          if ($LASTEXITCODE -ne 0) { Write-Warning "CairoSVG unavailable; portable PNG fallback will be used." }
-          python tools/GenerateZodiacPngs.py
-          if ($LASTEXITCODE -ne 0) { throw "Zodiac PNG generation failed." }
-
-      - name: Commit generated zodiac artwork to repository
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        shell: pwsh
-        run: |
-          git add picture/zodiac/png
-          $changes = git diff --cached --name-only
-          if ($changes) {
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git commit -m "Add generated zodiac PNG artwork"
-            git push origin HEAD:main
-          } else {
-            Write-Host "Zodiac PNG artwork is already up to date in the repository."
-          }
-
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
@@ -325,6 +300,12 @@ jobs:
             -p:AnahitaBuildNumber="${{ github.run_number }}" `
             -p:ZurvanLicensePublicKeyB64="$env:ZURVAN_PUBLIC_KEY_B64" `
             -o artifacts/Zurvan-win-x64
+
+      - name: Verify canonical zodiac PNG package integrity
+        shell: pwsh
+        run: |
+          python tools/VerifyZodiacAssets.py --source picture/zodiac/png --output artifacts/Zurvan-win-x64/picture/zodiac/png
+          if ($LASTEXITCODE -ne 0) { throw "Zodiac PNG package integrity verification failed." }
 
       - name: Package portable test ZIP
         shell: pwsh
@@ -399,7 +380,7 @@ jobs:
 
   windows-debug:
     name: Windows x64 Debug ZIP (Zodiac diagnostics)
-    if: ${{ !contains(github.event.head_commit.message, '[no-build]') && (github.event_name == 'push' && contains(github.event.head_commit.message, '[windows-debug-only]')) }}
+    if: ${{ (github.event_name != 'pull_request' || (!github.event.pull_request.draft && contains(github.event.pull_request.labels.*.name, 'build-approved'))) && (!contains(github.event.head_commit.message, '[no-build]') && (github.event_name == 'push' && contains(github.event.head_commit.message, '[windows-debug-only]'))) }}
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4

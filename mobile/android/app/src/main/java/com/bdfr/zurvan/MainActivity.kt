@@ -53,6 +53,8 @@ import java.security.SecureRandom
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
@@ -692,6 +694,8 @@ private fun CalendarScreen(
             }
         }
 
+        ZurvanTimeIllustration(Modifier.fillMaxWidth().height(142.dp))
+
         val prayerContext = LocalContext.current
         val prayerSettings = remember { ZurvanPrayerTimes.settings(prayerContext) }
         val todayPrayers = remember(prayerSettings) {
@@ -719,6 +723,65 @@ private fun CalendarScreen(
                                 }
                             }
                     }
+                }
+            }
+        }
+
+        val weatherContext = LocalContext.current
+        val weatherLink = androidx.compose.ui.platform.LocalUriHandler.current
+        val weatherPrefs = remember(weatherContext) {
+            weatherContext.getSharedPreferences("zurvan_weather", Context.MODE_PRIVATE)
+        }
+        var weatherEnabled by remember { mutableStateOf(weatherPrefs.getBoolean("enabled", true)) }
+        DisposableEffect(weatherPrefs) {
+            val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+                if (key == "enabled") weatherEnabled = weatherPrefs.getBoolean("enabled", true)
+            }
+            weatherPrefs.registerOnSharedPreferenceChangeListener(listener)
+            onDispose { weatherPrefs.unregisterOnSharedPreferenceChangeListener(listener) }
+        }
+        var weatherToday by remember { mutableStateOf<ZurvanWeatherData?>(null) }
+        var weatherError by remember { mutableStateOf<String?>(null) }
+        LaunchedEffect(weatherEnabled) {
+            while (weatherEnabled && kotlin.coroutines.coroutineContext.isActive) {
+                runCatching { ZurvanWeather.load(weatherContext) }
+                    .onSuccess { weatherToday = it; weatherError = null }
+                    .onFailure { weatherError = "آب‌وهوا در دسترس نیست" }
+                delay(30 * 60 * 1000L)
+            }
+        }
+        if (weatherEnabled) {
+            Card(modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF102543))) {
+                Column(Modifier.fillMaxWidth().padding(9.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Text("🌤️ آب‌وهوای امروز · ${weatherToday?.city ?: prayerSettings.city}",
+                        color = Color.White, fontWeight = FontWeight.SemiBold)
+                    if (weatherToday != null) {
+                        val forecast = weatherToday!!
+                        Text("${ZurvanWeather.icon(forecast.nowCode)}  ${forecast.nowTemperature.toInt()}°C",
+                            color = Color.White, style = MaterialTheme.typography.titleMedium)
+                        Text("دما و وضعیت آسمان در ۲۴ ساعت گذشته", color = Color(0xFFCCDEF2),
+                            style = MaterialTheme.typography.labelSmall)
+                        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                            forecast.hours.forEach { hour ->
+                                Column(Modifier.width(46.dp).background(Color.White.copy(alpha=0.09f),
+                                    RoundedCornerShape(6.dp)).padding(3.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(hour.time.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm")),
+                                        color = Color.White, fontSize = 9.sp)
+                                    Text(ZurvanWeather.icon(hour.code), fontSize = 17.sp)
+                                    Text("${hour.temp.toInt()}°", color = Color.White, fontSize = 11.sp)
+                                }
+                            }
+                        }
+                    } else {
+                        Text(weatherError ?: "در حال دریافت آب‌وهوا...", color = Color(0xFFCEDCF2),
+                            style = MaterialTheme.typography.bodySmall)
+                    }
+                    Text("Weather data by Open-Meteo.com",
+                        modifier = Modifier.clickable { weatherLink.openUri("https://open-meteo.com/") },
+                        color = Color(0xFFAADBF2), fontSize = 9.sp)
                 }
             }
         }
@@ -796,6 +859,9 @@ private fun CalendarScreen(
                         dayHasContent,
                     hasNote = notes.any { it.dateKey == day.persianKey },
                     hasMedia = preferences.dayMediaEnabled && mediaTags.any { it.dateKey == day.persianKey },
+                    weatherForecast = if (weatherEnabled) weatherToday?.days?.get(
+                        java.time.LocalDate.of(day.gregorianYear, day.gregorianMonth, day.gregorianDay)
+                    ) else null,
                     onClick = {
                         selectedDay = day
                     }
@@ -1022,6 +1088,7 @@ private fun CalendarDayCard(
     hasNote: Boolean,
     hasMedia: Boolean,
     planIcons: List<String>,
+    weatherForecast: ZurvanWeatherDay? = null,
     onClick: () -> Unit
 ) {
     val weekdayColors = ZurvanThemes.weekdayColors.current
@@ -1135,6 +1202,20 @@ private fun CalendarDayCard(
                         .labelSmall
             )
 
+            if (weatherForecast != null) {
+                Text(
+                    ZurvanWeather.icon(weatherForecast.code) + "\n" +
+                        weatherForecast.high.toInt() + "°/" + weatherForecast.low.toInt() + "°",
+                    modifier = Modifier.align(Alignment.CenterEnd)
+                        .background(Color.White.copy(alpha = 0.55f), RoundedCornerShape(4.dp))
+                        .padding(horizontal = 2.dp),
+                    fontSize = 7.sp,
+                    lineHeight = 8.sp,
+                    maxLines = 2,
+                    textAlign = TextAlign.Center,
+                    color = Color(0xFF172F4A)
+                )
+            }
             if (occasionIcons.isNotEmpty()) {
                 Row(
                     modifier = Modifier.align(Alignment.TopStart),
@@ -2829,6 +2910,99 @@ private fun SettingsScreen(
             }
         }
         if (settingsCategory == "appearance") item {
+            val clockPreferences = remember(context) {
+                context.getSharedPreferences("zurvan_clock", Context.MODE_PRIVATE)
+            }
+            var clockMode by remember { mutableStateOf(clockPreferences.getString("mode", "analog") ?: "analog") }
+            var analogNumerals by remember {
+                mutableStateOf(clockPreferences.getString("analog_numerals", "zurvan") ?: "zurvan")
+            }
+            var digitalStyle by remember { mutableStateOf(clockPreferences.getString("digital_style", "classic") ?: "classic") }
+            var use24Hour by remember { mutableStateOf(clockPreferences.getBoolean("24_hour", true)) }
+            var showClockSeconds by remember { mutableStateOf(clockPreferences.getBoolean("show_seconds", true)) }
+            val digitalStyles = listOf(
+                "classic" to "کلاسیک طلایی",
+                "modern" to "مدرن فیروزه‌ای",
+                "dots" to "نقطه‌ای بنفش",
+                "flip" to "فلیپ"
+            )
+            SettingsCard(title = "ساعت زروان") {
+                Text("نوع نمایش ساعت را انتخاب کنید. انتخاب شما ذخیره شده و در ساعت زروان اعمال می‌شود.")
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(selected = clockMode == "analog", onClick = {
+                        clockMode = "analog"
+                        clockPreferences.edit().putString("mode", clockMode).apply()
+                    })
+                    Text("آنالوگ", modifier = Modifier.clickable {
+                        clockMode = "analog"
+                        clockPreferences.edit().putString("mode", clockMode).apply()
+                    })
+                    Spacer(Modifier.width(16.dp))
+                    RadioButton(selected = clockMode == "digital", onClick = {
+                        clockMode = "digital"
+                        clockPreferences.edit().putString("mode", clockMode).apply()
+                    })
+                    Text("دیجیتال", modifier = Modifier.clickable {
+                        clockMode = "digital"
+                        clockPreferences.edit().putString("mode", clockMode).apply()
+                    })
+                }
+                ZurvanTimeIllustration(Modifier.fillMaxWidth().height(170.dp))
+                if (clockMode == "analog") {
+                    Text("سبک شمارگان ساعت آنالوگ", fontWeight = FontWeight.SemiBold)
+                    listOf(
+                        "zurvan" to "زروان (ارقام فارسی)",
+                        "khwarazmi" to "خوارزمی (نشانگر تزئینی)",
+                        "pahlavi" to "پهلوی (نشانگر تزئینی)",
+                        "cuneiform" to "میخی (نشانگر تزئینی)",
+                        "roman" to "رومی (I–XII)"
+                    ).forEach { (key, label) ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(selected = analogNumerals == key, onClick = {
+                                analogNumerals = key
+                                clockPreferences.edit().putString("analog_numerals", key).apply()
+                            })
+                            Text(label, modifier = Modifier.clickable {
+                                analogNumerals = key
+                                clockPreferences.edit().putString("analog_numerals", key).apply()
+                            })
+                        }
+                    }
+                    Text("نشانه‌های خوارزمی، پهلوی و میخی فعلاً تزئینی‌اند؛ به‌عنوان شمارگان تاریخی تأییدشده معرفی نمی‌شوند.",
+                        style = MaterialTheme.typography.bodySmall)
+                }
+                if (clockMode == "digital") {
+                    Text("طرح ساعت دیجیتال", fontWeight = FontWeight.SemiBold)
+                    digitalStyles.forEach { (id, title) ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(selected = digitalStyle == id, onClick = {
+                                digitalStyle = id
+                                clockPreferences.edit().putString("digital_style", id).apply()
+                            })
+                            Text(title, modifier = Modifier.clickable {
+                                digitalStyle = id
+                                clockPreferences.edit().putString("digital_style", id).apply()
+                            })
+                        }
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("قالب ۲۴ ساعته", modifier = Modifier.weight(1f))
+                        Switch(checked = use24Hour, onCheckedChange = {
+                            use24Hour = it
+                            clockPreferences.edit().putBoolean("24_hour", it).apply()
+                        })
+                    }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("نمایش ثانیه", modifier = Modifier.weight(1f))
+                    Switch(checked = showClockSeconds, onCheckedChange = {
+                        showClockSeconds = it
+                        clockPreferences.edit().putBoolean("show_seconds", it).apply()
+                    })
+                }
+            }
+        }
+        if (settingsCategory == "appearance") item {
             SettingsCard(title = "جهت نمایش تقویم") {
                 val weekRtl = ZurvanThemes.weekRightToLeft.current
                 val setWeekRtl = ZurvanThemes.setWeekRightToLeft.current
@@ -2844,6 +3018,24 @@ private fun SettingsScreen(
                         modifier = Modifier.clickable { setWeekRtl(false) })
                 }
                 Text("تغییر بلافاصله روی تقویم اعمال و برای اجرای بعدی ذخیره می‌شود.",
+                    style = MaterialTheme.typography.bodySmall)
+            }
+        }
+        if (settingsCategory == "appearance") item {
+            val weatherPrefs = remember(context) {
+                context.getSharedPreferences("zurvan_weather", Context.MODE_PRIVATE)
+            }
+            var showWeather by remember { mutableStateOf(weatherPrefs.getBoolean("enabled", true)) }
+            SettingsCard(title = "آب‌وهوا در تقویم") {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text("نمایش دمای امروز، روند ۲۴ ساعت و پیش‌بینی هفت‌روزه",
+                        modifier = Modifier.weight(1f))
+                    Switch(checked = showWeather, onCheckedChange = { enabled ->
+                        showWeather = enabled
+                        weatherPrefs.edit().putBoolean("enabled", enabled).apply()
+                    })
+                }
+                Text("موقعیت آب‌وهوا از شهر تنظیم‌شده در اوقات شرعی گرفته می‌شود.",
                     style = MaterialTheme.typography.bodySmall)
             }
         }

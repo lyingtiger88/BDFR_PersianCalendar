@@ -87,12 +87,29 @@ public sealed class AppSettings
     public string CloudPrefix { get; set; } = "zurvan";
     public string CloudVaultId { get; set; } = "";
 
+    // Weather sidebar: defaults mirror the requested Seattle preview. The user can change city and units.
+    // No GPS permission or automatic location tracking is used.
+    public bool WeatherEnabled { get; set; } = true;
+    public string WeatherCity { get; set; } = "Seattle";
+    public string WeatherCountryCode { get; set; } = "US";
+    public double WeatherLatitude { get; set; } = 47.6062;
+    public double WeatherLongitude { get; set; } = -122.3321;
+    public bool WeatherFahrenheit { get; set; } = true;
+    public bool WeatherOnCalendarCards { get; set; } = true;
+
     // Workspace layout / side navigation.
     // These values describe the physical left/right sidebars.
     public double LeftSidebarWidth { get; set; } = 390.0;
     public double RightSidebarWidth { get; set; } = 300.0;
     public double NavigationRailWidth { get; set; } = 138.0;
     public string NavigationRailSide { get; set; } = "left";
+
+    // Zurvan clock: selectable analog or digital presentation.
+    public string ClockDisplayMode { get; set; } = "analog";
+    public string DigitalClockStyle { get; set; } = "classic";
+    public bool DigitalClockTwentyFourHours { get; set; } = true;
+    public bool ClockShowSeconds { get; set; } = true;
+    public string AnalogClockNumeralStyle { get; set; } = "zurvan";
 
     // Independent visual style for zodiac artwork in the Occasions module.
     public string ZodiacThemeId { get; set; } = "cosmic";

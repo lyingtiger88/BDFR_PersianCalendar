@@ -1,6 +1,14 @@
 package com.bdfr.zurvan
 
 import android.content.Context
+import android.security.keystore.KeyGenParameterSpec
+import android.security.keystore.KeyProperties
+import android.util.Base64
+import java.security.KeyStore
+import javax.crypto.Cipher
+import javax.crypto.KeyGenerator
+import javax.crypto.SecretKey
+import javax.crypto.spec.GCMParameterSpec
 import android.graphics.BitmapFactory
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -53,6 +61,66 @@ private class TeamStore(private val context: Context) {
         rows.forEach { (id, role) -> a.put(JSONObject().put("id", id).put("role", role)) }
         set("members", a.toString())
     }
+    private fun offlineQueueSecret(): SecretKey {
+        val alias = "zurvan.collaboration.offline.v1"
+        val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+        (store.getKey(alias, null) as? SecretKey)?.let { return it }
+        val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
+        generator.init(KeyGenParameterSpec.Builder(alias,
+            KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
+            .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+            .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+            .setRandomizedEncryptionRequired(true).build())
+        return generator.generateKey()
+    }
+    private fun encryptQueue(value:String):String {
+        val cipher=Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.ENCRYPT_MODE,offlineQueueSecret())
+        val encrypted=cipher.doFinal(value.toByteArray(Charsets.UTF_8))
+        return Base64.encodeToString(cipher.iv+encrypted,Base64.NO_WRAP)
+    }
+    private fun decryptQueue(value:String):String {
+        val raw=Base64.decode(value,Base64.NO_WRAP)
+        require(raw.size>12) { "صف آفلاین رمزگذاری‌شده معتبر نیست." }
+        val cipher=Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.DECRYPT_MODE,offlineQueueSecret(),GCMParameterSpec(128,raw.copyOfRange(0,12)))
+        return String(cipher.doFinal(raw.copyOfRange(12,raw.size)),Charsets.UTF_8)
+    }
+    private fun offlineQueueText():String {
+        val stored=prefs.getString("offline_commands","")?.takeIf{it.isNotBlank()} ?: return "[]"
+        return try { decryptQueue(stored) } catch (e:Exception) {
+            if(stored.trimStart().startsWith("[")) {
+                prefs.edit().putString("offline_commands",encryptQueue(stored)).apply()
+                stored
+            } else throw e
+        }
+    }
+    fun enqueueCommand(groupId:String,commandId:String,kind:String,payload:JSONObject) {
+        val rows=JSONArray(offlineQueueText())
+        if((0 until rows.length()).any { rows.getJSONObject(it).optString("commandId")==commandId }) return
+        rows.put(JSONObject().put("groupId",groupId).put("commandId",commandId)
+            .put("kind",kind).put("payload",payload).put("createdAt",System.currentTimeMillis()))
+        prefs.edit().putString("offline_commands",encryptQueue(rows.toString())).apply()
+    }
+    fun queuedCommands():List<JSONObject> {
+        val rows=JSONArray(prefs.getString("offline_commands","")?.takeIf{it.isNotBlank()}?.let(::decryptQueue) ?: "[]")
+        return (0 until rows.length()).map { rows.getJSONObject(it) }
+    }
+    fun blockQueuedCommand(commandId:String,reason:String) {
+        val rows=queuedCommands();val out=JSONArray()
+        rows.forEach { row -> if(row.optString("commandId")==commandId)row.put("blockedReason",reason);out.put(row) }
+        prefs.edit().putString("offline_commands",encryptQueue(out.toString())).apply()
+    }
+    fun unblockQueuedCommands() {
+        val out=JSONArray()
+        queuedCommands().forEach { row -> row.remove("blockedReason");out.put(row) }
+        prefs.edit().putString("offline_commands",encryptQueue(out.toString())).apply()
+    }
+    fun removeQueuedCommand(commandId:String) {
+        val old=queuedCommands().filterNot { it.optString("commandId")==commandId }
+        val rows=JSONArray();old.forEach{rows.put(it)}
+        prefs.edit().putString("offline_commands",encryptQueue(rows.toString())).apply()
+    }
 }
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -88,7 +156,20 @@ fun ZurvanTeamPlanner(
     var expandedDay by remember { mutableStateOf<String?>(null) }
     var alertMinutes by remember { mutableStateOf(store.get("alert_minutes").ifBlank { "30" }) }
     var activeSection by remember { mutableStateOf(0) }
+    var agendaRecurrence by remember { mutableStateOf<String?>(null) }
+    var permissionMemberId by remember { mutableStateOf<String?>(null) }
+    var permissionChat by remember { mutableStateOf(true) }
+    var permissionReport by remember { mutableStateOf(true) }
+    var permissionEdit by remember { mutableStateOf(false) }
+    var kanbanCards by remember { mutableStateOf<List<JSONObject>>(emptyList()) }
     var status by remember { mutableStateOf("") }
+    LaunchedEffect(remoteGroupId) {
+        if(remoteGroupId.isNotBlank() && store.get("last_group_id")!=remoteGroupId) {
+            remoteSequence=0L
+            store.set("remote_sequence","0")
+            store.set("last_group_id",remoteGroupId)
+        }
+    }
     val avatar = remember(photoRevision) {
         val f = File(context.filesDir, "zurvan_profile_photo")
         if (f.exists()) BitmapFactory.decodeFile(f.absolutePath)?.asImageBitmap() else null
@@ -234,18 +315,42 @@ fun ZurvanTeamPlanner(
                 Button(onClick={
                     if(sessionToken.isBlank()||remoteGroupId.isBlank()||sharedTaskTitle.isBlank())status="ابتدا وارد حساب شوید، گروه را انتخاب کنید و عنوان کار را بنویسید."
                     else scope.launch {
-                        runCatching { collaborationApi.createItem(sessionToken,remoteGroupId,sharedTaskTitle.trim()) }
+                        val commandId=UUID.randomUUID().toString()
+                        val payload=JSONObject().put("title",sharedTaskTitle.trim()).put("mode","agenda").put("state","todo").put("timezone",java.util.TimeZone.getDefault().id);agendaRecurrence?.let{payload.put("recurrenceRule",it)}
+                        runCatching { collaborationApi.replayCommand(sessionToken,remoteGroupId,commandId,"create_item",payload) }
                             .onSuccess { sharedTaskTitle="";status="کار مشترک ثبت شد." }
-                            .onFailure { status=it.message ?: "ثبت کار انجام نشد." }
+                            .onFailure { error ->
+                                val message=error.message.orEmpty()
+                                val code=(error as? CollaborationApiException)?.statusCode
+                                if(code != null && code in listOf(400,403,404,409,422)) status="سرور فرمان را رد کرد: $message"
+                                else {
+                                    runCatching { store.enqueueCommand(remoteGroupId,commandId,"create_item",payload) }
+                                        .onSuccess { status="کار در صف آفلاین رمزگذاری‌شده ذخیره شد و پس از اتصال ارسال می‌شود." }
+                                        .onFailure { status="ذخیره امن فرمان آفلاین ناموفق بود: ${it.message}" }
+                                }
+                                sharedTaskTitle=""
+                            }
                     }
                 }) { Text("ثبت کار مشترک آنلاین") }
                 OutlinedTextField(sharedMessage,{sharedMessage=it},label={Text("پیام گروه")},modifier=Modifier.fillMaxWidth())
                 Button(onClick={
                     if(sessionToken.isBlank()||remoteGroupId.isBlank()||sharedMessage.isBlank())status="متن پیام را وارد کنید."
                     else scope.launch {
-                        runCatching { collaborationApi.sendMessage(sessionToken,remoteGroupId,sharedMessage.trim()) }
+                        val commandId=UUID.randomUUID().toString()
+                        val payload=JSONObject().put("body",sharedMessage.trim())
+                        runCatching { collaborationApi.replayCommand(sessionToken,remoteGroupId,commandId,"send_message",payload) }
                             .onSuccess { sharedMessage="";status="پیام ارسال شد." }
-                            .onFailure { status=it.message ?: "ارسال پیام انجام نشد." }
+                            .onFailure { error ->
+                                val message=error.message.orEmpty()
+                                val code=(error as? CollaborationApiException)?.statusCode
+                                if(code != null && code in listOf(400,403,404,409,422)) status="سرور پیام را رد کرد: $message"
+                                else {
+                                    runCatching { store.enqueueCommand(remoteGroupId,commandId,"send_message",payload) }
+                                        .onSuccess { status="پیام در صف آفلاین رمزگذاری‌شده ذخیره شد و پس از اتصال ارسال می‌شود." }
+                                        .onFailure { status="ذخیره امن پیام آفلاین ناموفق بود: ${it.message}" }
+                                }
+                                sharedMessage=""
+                            }
                     }
                 }) { Text("ارسال پیام گروه") }
                 Button(onClick={
@@ -268,14 +373,198 @@ fun ZurvanTeamPlanner(
                         }) { Text("پذیرش") }
                     }
                 }
+
+                Text("تکرار برنامه‌های Agenda",fontWeight=FontWeight.SemiBold)
+                Row(horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+                    listOf("بدون تکرار" to null,"روزانه" to "daily","روزهای کاری" to "weekdays","هفتگی" to "weekly","ماهانه" to "monthly").forEach { (label,value) ->
+                        FilterChip(selected=agendaRecurrence==value,onClick={agendaRecurrence=value},label={Text(label)})
+                    }
+                }
+                var kanbanColumns by remember { mutableStateOf<List<Pair<String,String>>>(emptyList()) }
+                var kanbanColumnName by remember { mutableStateOf("") }
+                var kanbanTaskTitle by remember { mutableStateOf("") }
+                var selectedKanbanColumn by remember { mutableStateOf<String?>(null) }
+                Text("برد Kanban",fontWeight=FontWeight.SemiBold)
+                OutlinedTextField(kanbanColumnName,{kanbanColumnName=it},label={Text("نام ستون جدید")},modifier=Modifier.fillMaxWidth())
+                Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick={
+                        scope.launch { runCatching { collaborationApi.kanbanColumns(sessionToken,remoteGroupId) }
+                            .onSuccess { a ->
+                                kanbanColumns=(0 until a.length()).map { val x=a.getJSONObject(it);x.getString("id") to x.getString("name") }
+                                if(selectedKanbanColumn==null)selectedKanbanColumn=kanbanColumns.firstOrNull()?.first
+                                scope.launch { runCatching { collaborationApi.items(sessionToken,remoteGroupId) }
+                                    .onSuccess { all -> kanbanCards=(0 until all.length()).map{all.getJSONObject(it)}.filter{it.optString("mode")=="kanban"} }
+                                    .onFailure { status=it.message ?: "بارگذاری کارت‌ها ناموفق بود." } }
+                            }
+                            .onFailure { status=it.message ?: "بارگذاری ستون‌ها ناموفق بود." } }
+                    }) { Text("بارگذاری ستون‌ها") }
+                    Button(onClick={
+                        if(kanbanColumnName.isBlank())status="نام ستون را وارد کنید."
+                        else scope.launch { runCatching { collaborationApi.createKanbanColumn(sessionToken,remoteGroupId,kanbanColumnName.trim()) }
+                            .onSuccess { kanbanColumnName="";val a=collaborationApi.kanbanColumns(sessionToken,remoteGroupId);kanbanColumns=(0 until a.length()).map { val x=a.getJSONObject(it);x.getString("id") to x.getString("name") };status="ستون ایجاد شد." }
+                            .onFailure { status=it.message ?: "ایجاد ستون ناموفق بود." } }
+                    }) { Text("افزودن ستون") }
+                }
+                kanbanColumns.forEachIndexed { index, column ->
+                    Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+                        FilterChip(selected=selectedKanbanColumn==column.first,onClick={selectedKanbanColumn=column.first},label={Text(column.second)})
+                        if(index>0) TextButton(onClick={
+                            scope.launch { val ids=kanbanColumns.map{it.first}.toMutableList();val v=ids.removeAt(index);ids.add(index-1,v)
+                                runCatching { collaborationApi.reorderKanbanColumns(sessionToken,remoteGroupId,ids) }
+                                    .onSuccess { val a=collaborationApi.kanbanColumns(sessionToken,remoteGroupId);kanbanColumns=(0 until a.length()).map { val x=a.getJSONObject(it);x.getString("id") to x.getString("name") } }
+                                    .onFailure { status=it.message ?: "تغییر ترتیب ناموفق بود." } }
+                        }) { Text("↑") }
+                        if(index<kanbanColumns.lastIndex) TextButton(onClick={
+                            scope.launch { val ids=kanbanColumns.map{it.first}.toMutableList();val v=ids.removeAt(index);ids.add(index+1,v)
+                                runCatching { collaborationApi.reorderKanbanColumns(sessionToken,remoteGroupId,ids) }
+                                    .onSuccess { val a=collaborationApi.kanbanColumns(sessionToken,remoteGroupId);kanbanColumns=(0 until a.length()).map { val x=a.getJSONObject(it);x.getString("id") to x.getString("name") } }
+                                    .onFailure { status=it.message ?: "تغییر ترتیب ناموفق بود." } }
+                        }) { Text("↓") }
+                    }
+                }
+                Text("کارت‌های برد",fontWeight=FontWeight.SemiBold)
+                kanbanCards.forEach { card ->
+                    val currentColumn=card.optString("column_id")
+                    val currentIndex=kanbanColumns.indexOfFirst{it.first==currentColumn}
+                    Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+                        Text(card.optString("title")+" • "+card.optString("state"),modifier=Modifier.weight(1f))
+                        if(currentIndex>=0&&currentIndex<kanbanColumns.lastIndex) TextButton(onClick={
+                            scope.launch {
+                                val commandId=UUID.randomUUID().toString()
+                                val payload=JSONObject().put("itemId",card.optString("id"))
+                                    .put("expectedVersion",card.optInt("version",1)).put("title",card.optString("title"))
+                                    .put("details",card.optString("details")).put("state",card.optString("state","todo"))
+                                    .put("columnId",kanbanColumns[currentIndex+1].first)
+                                    .put("timezone",java.util.TimeZone.getDefault().id)
+                                runCatching { collaborationApi.replayCommand(sessionToken,remoteGroupId,commandId,"update_item",payload) }
+                                    .onSuccess {
+                                        val all=collaborationApi.items(sessionToken,remoteGroupId)
+                                        kanbanCards=(0 until all.length()).map{all.getJSONObject(it)}.filter{it.optString("mode")=="kanban"}
+                                    }.onFailure {
+                                        val message=it.message.orEmpty()
+                                        if(message in listOf("version_conflict","command_denied","command_rejected")) status="تعارض یا رد فرمان: $message"
+                                        else {
+                                            store.enqueueCommand(remoteGroupId,commandId,"update_item",payload)
+                                            status="انتقال کارت در صف آفلاین ذخیره شد."
+                                        }
+                                    }
+                            }
+                        }) { Text("انتقال ←") }
+                    }
+                }
+                OutlinedTextField(kanbanTaskTitle,{kanbanTaskTitle=it},label={Text("عنوان کارت جدید")},modifier=Modifier.fillMaxWidth())
+                Button(onClick={
+                    if(selectedKanbanColumn==null||kanbanTaskTitle.isBlank())status="ستون و عنوان کارت را انتخاب کنید."
+                    else scope.launch { runCatching { collaborationApi.createItemAdvanced(sessionToken,remoteGroupId,kanbanTaskTitle.trim(),"kanban",columnId=selectedKanbanColumn) }
+                        .onSuccess { kanbanTaskTitle="";status="کارت به برد اضافه شد." }
+                        .onFailure { status=it.message ?: "ثبت کارت ناموفق بود." } }
+                }) { Text("افزودن کارت به ستون") }
+                var subjectName by remember { mutableStateOf("") }
+                var schoolSubjects by remember { mutableStateOf<List<Pair<String,String>>>(emptyList()) }
+                var homeworkTitle by remember { mutableStateOf("") }
+                var homeworkInstructions by remember { mutableStateOf("") }
+                var schoolHomework by remember { mutableStateOf<List<Pair<String,String>>>(emptyList()) }
+                var schoolTimetable by remember { mutableStateOf<List<JSONObject>>(emptyList()) }
+                var gradeValue by remember { mutableStateOf("0") }
+                var gradeFeedback by remember { mutableStateOf("") }
+                var submissionText by remember { mutableStateOf("") }
+                Text("محیط مدرسه",fontWeight=FontWeight.SemiBold)
+                OutlinedTextField(subjectName,{subjectName=it},label={Text("نام درس")},modifier=Modifier.fillMaxWidth())
+                Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                    Button(onClick={
+                        if(subjectName.isBlank())status="نام درس را وارد کنید."
+                        else scope.launch { runCatching { collaborationApi.createSubject(sessionToken,remoteGroupId,subjectName.trim()) }
+                            .onSuccess { subjectName="";status="درس ثبت شد." }
+                            .onFailure { status=it.message ?: "ثبت درس ناموفق بود." } }
+                    }) { Text("افزودن درس") }
+                    OutlinedButton(onClick={
+                        scope.launch { runCatching {
+                            val a=collaborationApi.subjects(sessionToken,remoteGroupId)
+                            schoolSubjects=(0 until a.length()).map { val x=a.getJSONObject(it);x.getString("id") to x.getString("name") }
+                            val h=collaborationApi.homework(sessionToken,remoteGroupId)
+                            schoolHomework=(0 until h.length()).map { val x=h.getJSONObject(it);x.getString("id") to x.getString("title") }
+                            val t=collaborationApi.timetable(sessionToken,remoteGroupId)
+                            schoolTimetable=(0 until t.length()).map{t.getJSONObject(it)}
+                        }.onFailure { status=it.message ?: "بارگذاری مدرسه ناموفق بود." } }
+                    }) { Text("بارگذاری مدرسه") }
+                }
+                schoolSubjects.forEach { (_,name) -> Text("درس: $name") }
+                schoolSubjects.firstOrNull()?.let { (subjectId,subjectTitle) ->
+                    Text("برنامه هفتگی • $subjectTitle",fontWeight=FontWeight.Medium)
+                    Button(onClick={
+                        scope.launch { runCatching { collaborationApi.createTimetableSlot(sessionToken,remoteGroupId,subjectId,0,"08:00","09:00") }
+                            .onSuccess { status="جلسه هفتگی ثبت شد.";val t=collaborationApi.timetable(sessionToken,remoteGroupId);schoolTimetable=(0 until t.length()).map{t.getJSONObject(it)} }
+                            .onFailure { status=it.message ?: "ثبت جلسه ناموفق بود." } }
+                    }) { Text("افزودن جلسه دوشنبه ۸ تا ۹") }
+                }
+                schoolTimetable.forEach { slot -> Text("روز "+slot.optInt("weekday")+" • "+slot.optString("start_time")+" تا "+slot.optString("end_time")) }
+                OutlinedTextField(homeworkTitle,{homeworkTitle=it},label={Text("عنوان تکلیف")},modifier=Modifier.fillMaxWidth())
+                OutlinedTextField(homeworkInstructions,{homeworkInstructions=it},label={Text("شرح تکلیف")},modifier=Modifier.fillMaxWidth())
+                Button(onClick={
+                    val subject=schoolSubjects.firstOrNull()?.first
+                    if(subject==null||homeworkTitle.isBlank())status="ابتدا درس بسازید/بارگذاری کنید و عنوان تکلیف را بنویسید."
+                    else scope.launch { runCatching { collaborationApi.createHomework(sessionToken,remoteGroupId,subject,homeworkTitle.trim(),homeworkInstructions) }
+                        .onSuccess { homeworkTitle="";homeworkInstructions="";status="تکلیف ثبت شد." }
+                        .onFailure { status=it.message ?: "ثبت تکلیف ناموفق بود." } }
+                }) { Text("ثبت تکلیف برای اولین درس") }
+                schoolHomework.forEach { (id,title) ->
+                    Text(title,fontWeight=FontWeight.Medium)
+                    OutlinedTextField(submissionText,{submissionText=it},label={Text("پاسخ این تکلیف")},modifier=Modifier.fillMaxWidth())
+                    Button(onClick={
+                        if(submissionText.isBlank())status="متن پاسخ را وارد کنید."
+                        else scope.launch { runCatching { collaborationApi.submitHomework(sessionToken,id,submissionText) }
+                            .onSuccess { submissionText="";status="پاسخ ارسال شد." }
+                            .onFailure { status=it.message ?: "ارسال پاسخ ناموفق بود." } }
+                    }) { Text("ارسال پاسخ") }
+                }
                 Text("اعضای گروه",fontWeight=FontWeight.SemiBold)
                 remoteMembers.forEach { member ->
-                    ListItem(headlineContent={Text(member.identifier)},supportingContent={Text(member.role)})
+                    ListItem(headlineContent={Text(member.identifier)},supportingContent={Text(member.role)},
+                        trailingContent={
+                            Row {
+                                TextButton(onClick={
+                                    permissionMemberId=member.accountId
+                                    permissionChat=member.canChat;permissionReport=member.canReport;permissionEdit=member.canEdit
+                                }) { Text("مجوزها") }
+                                if(member.role!="owner") TextButton(onClick={
+                                    scope.launch { runCatching { collaborationApi.removeMember(sessionToken,remoteGroupId,member.accountId);remoteMembers=collaborationApi.members(sessionToken,remoteGroupId);status="عضو از گروه حذف شد." }
+                                        .onFailure { status=it.message ?: "حذف عضو ناموفق بود." } }
+                                }) { Text("حذف") }
+                            }
+                        })
+                }
+                if(permissionMemberId!=null) {
+                    Text("تنظیم مجوز عضو",fontWeight=FontWeight.SemiBold)
+                    Row(verticalAlignment=Alignment.CenterVertically) { Checkbox(permissionChat,{permissionChat=it});Text("گفت‌وگو") }
+                    Row(verticalAlignment=Alignment.CenterVertically) { Checkbox(permissionReport,{permissionReport=it});Text("گزارش") }
+                    Row(verticalAlignment=Alignment.CenterVertically) { Checkbox(permissionEdit,{permissionEdit=it});Text("ویرایش") }
+                    Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                        Button(onClick={
+                            val id=permissionMemberId ?: return@Button
+                            scope.launch { runCatching { collaborationApi.setPermissions(sessionToken,remoteGroupId,id,permissionChat,permissionReport,permissionEdit);remoteMembers=collaborationApi.members(sessionToken,remoteGroupId);permissionMemberId=null;status="مجوزها ذخیره شد." }
+                                .onFailure { status=it.message ?: "ذخیره مجوزها ناموفق بود." } }
+                        }) { Text("ذخیره مجوزها") }
+                        TextButton(onClick={permissionMemberId=null}) { Text("انصراف") }
+                    }
                 }
                 Text("کارهای مشترک",fontWeight=FontWeight.SemiBold)
                 sharedItems.forEach { Text("• $it",style=MaterialTheme.typography.bodySmall) }
                 Text("گفت‌وگوی گروه",fontWeight=FontWeight.SemiBold)
                 sharedMessages.takeLast(8).forEach { Text(it,style=MaterialTheme.typography.bodySmall) }
+                OutlinedTextField(gradeValue,{gradeValue=it},label={Text("نمره ۰ تا ۱۰۰")},modifier=Modifier.fillMaxWidth())
+                OutlinedTextField(gradeFeedback,{gradeFeedback=it},label={Text("بازخورد معلم")},modifier=Modifier.fillMaxWidth())
+                Button(onClick={
+                    val homeworkId=schoolHomework.firstOrNull()?.first
+                    val grade=gradeValue.toDoubleOrNull()
+                    if(homeworkId==null||grade==null||grade !in 0.0..100.0)status="تکلیف و نمره معتبر انتخاب کنید."
+                    else scope.launch { runCatching {
+                        val a=collaborationApi.submissions(sessionToken,homeworkId)
+                        if(a.length()==0)error("هنوز پاسخی ثبت نشده است.")
+                        val sub=a.getJSONObject(0)
+                        collaborationApi.gradeSubmission(sessionToken,homeworkId,sub.getString("id"),grade,gradeFeedback)
+                    }.onSuccess { status="نمره و بازخورد ثبت شد." }
+                        .onFailure { status=it.message ?: "ثبت نمره ناموفق بود." } }
+                }) { Text("تصحیح اولین پاسخ تکلیف") }
                 Text(remoteSyncStatus,style=MaterialTheme.typography.bodySmall)
                 if(sessionToken.isBlank()) Text("برای استفاده از گروه آنلاین، ورود به حساب Zurvan Desk الزامی است.",color=MaterialTheme.colorScheme.error)
                 LaunchedEffect(remoteGroupId,sessionToken,activeSection) {
@@ -285,19 +574,35 @@ fun ZurvanTeamPlanner(
                                 .onSuccess { groups -> groups.firstOrNull()?.let { remoteGroupId=it.id;store.set("remote_group_id",it.id);groupName=it.name } }
                         }
                         while(remoteGroupId.isNotBlank()) {
+                            for (queued in store.queuedCommands().filter { it.optString("groupId")==remoteGroupId && it.optString("blockedReason").isBlank() }.take(20)) {
+                                val replay=runCatching {
+                                    collaborationApi.replayCommand(sessionToken,remoteGroupId,queued.getString("commandId"),
+                                        queued.getString("kind"),queued.getJSONObject("payload"))
+                                }
+                                if(replay.isSuccess) store.removeQueuedCommand(queued.getString("commandId")) else {
+                                    val error=replay.exceptionOrNull()
+                                    val message=error?.message.orEmpty()
+                                    val code=(error as? CollaborationApiException)?.statusCode
+                                    if(code != null && code in listOf(400,403,404,409,422)) {
+                                        store.blockQueuedCommand(queued.getString("commandId"),message)
+                                        remoteSyncStatus="فرمان آفلاین نیازمند بازبینی است: $message"
+                                    }
+                                    break
+                                }
+                            }
                             runCatching {
                                 val (events,next)=collaborationApi.changes(sessionToken,remoteGroupId,remoteSequence)
                                 if(next>remoteSequence) {
                                     remoteSequence=next;store.set("remote_sequence",next.toString())
                                     remoteMembers=collaborationApi.members(sessionToken,remoteGroupId)
                                     val items=collaborationApi.items(sessionToken,remoteGroupId)
-                                    sharedItems=(0 until items.length()).map { val x=items.getJSONObject(it); x.optString("title")+" • "+x.optString("state") }
+                                    sharedItems=(0 until items.length()).map { val x=items.getJSONObject(it); val rule=x.optString("recurrence_rule"); val occurrences=x.optJSONArray("occurrences"); val next=occurrences?.optJSONObject(0)?.optString("at").orEmpty(); x.optString("title")+" • "+x.optString("state")+(if(rule.isNotBlank()&&rule!="null")" • تکرار: $rule"+(if(next.isNotBlank())" • $next" else "") else "") }
                                     val messages=collaborationApi.messages(sessionToken,remoteGroupId)
                                     sharedMessages=(0 until messages.length()).map { val x=messages.getJSONObject(it); x.optString("body") }
                                     remoteSyncStatus="همگام‌سازی آنلاین فعال • آخرین تغییر: ${events.size}"
                                 } else remoteSyncStatus="متصل • بدون تغییر جدید"
                             }.onFailure { remoteSyncStatus="اتصال موقتاً قطع است؛ تلاش مجدد انجام می‌شود." }
-                            delay(3000)
+                            delay(250)
                         }
                     }
                 }
