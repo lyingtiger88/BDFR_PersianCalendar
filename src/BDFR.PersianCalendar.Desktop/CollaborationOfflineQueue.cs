@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Security.Cryptography;
 
 namespace BDFR.PersianCalendar.Desktop;
 
@@ -20,7 +21,9 @@ internal sealed class CollaborationOfflineQueue
             try
             {
                 if (!File.Exists(QueuePath)) return Array.Empty<QueuedCollaborationCommand>();
-                return JsonSerializer.Deserialize<List<QueuedCollaborationCommand>>(File.ReadAllText(QueuePath))
+                var encrypted = File.ReadAllBytes(QueuePath);
+                var clear = ProtectedData.Unprotect(encrypted, null, DataProtectionScope.CurrentUser);
+                return JsonSerializer.Deserialize<List<QueuedCollaborationCommand>>(clear)
                     ?? new List<QueuedCollaborationCommand>();
             }
             catch { return Array.Empty<QueuedCollaborationCommand>(); }
@@ -49,7 +52,9 @@ internal sealed class CollaborationOfflineQueue
     {
         Directory.CreateDirectory(Path.GetDirectoryName(QueuePath)!);
         var temp = QueuePath + ".tmp";
-        File.WriteAllText(temp, JsonSerializer.Serialize(rows));
+        var clear = JsonSerializer.SerializeToUtf8Bytes(rows);
+        var encrypted = ProtectedData.Protect(clear, null, DataProtectionScope.CurrentUser);
+        File.WriteAllBytes(temp, encrypted);
         File.Move(temp, QueuePath, true);
     }
 }
