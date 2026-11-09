@@ -81,9 +81,9 @@ def main():
     for style in data["styles"]:
         for sign in data["signs"]:
             target = OUTPUT / f'{style["id"]}_{sign["id"]}.png'
-            # The user will provide independent artwork for Cute 2 and 3.
-            # Do not synthesize lookalike files or overwrite manually cropped PNGs.
-            if target.exists() or style["id"] in {"cute_1", "cute_2", "cute_3"}:
+            # Preserve the approved, manually cropped Cute artwork.
+            # Always regenerate all six non-Cute styles to replace stale assets.
+            if style["id"] in {"cute_1", "cute_2", "cute_3"}:
                 continue
             if cairosvg is not None:
                 try:
@@ -94,7 +94,7 @@ def main():
             else:
                 pillow_fallback(sign, style, target)
             count += 1
-    print(f"Generated {count} missing base zodiac PNG files (existing custom art preserved) in {OUTPUT}")
+    print(f"Regenerated {count} non-Cute zodiac PNG files (approved Cute artwork preserved) in {OUTPUT}")
 
 if __name__ == "__main__":
     main()
