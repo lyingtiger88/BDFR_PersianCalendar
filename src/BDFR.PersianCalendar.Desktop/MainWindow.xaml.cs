@@ -5567,7 +5567,6 @@ public sealed partial class MainWindow : Window
                 HorizontalAlignment = HorizontalAlignment.Right,
                 VerticalAlignment = VerticalAlignment.Bottom,
                 Foreground = ThemeService.Brush(_theme.PrimaryText),
-                Background = BrushWithAlpha(_theme.CardBackground, 0xC0),
                 Padding = new Thickness(3, 1, 3, 1),
                 Margin = new Thickness(0, 0, 1, 0),
                 Visibility = Visibility.Collapsed,
