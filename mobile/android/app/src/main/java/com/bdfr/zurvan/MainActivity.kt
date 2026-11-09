@@ -2992,13 +2992,13 @@ private fun SettingsScreen(
                             clockPreferences.edit().putBoolean("24_hour", it).apply()
                         })
                     }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("نمایش ثانیه", modifier = Modifier.weight(1f))
-                        Switch(checked = showClockSeconds, onCheckedChange = {
-                            showClockSeconds = it
-                            clockPreferences.edit().putBoolean("show_seconds", it).apply()
-                        })
-                    }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("نمایش ثانیه", modifier = Modifier.weight(1f))
+                    Switch(checked = showClockSeconds, onCheckedChange = {
+                        showClockSeconds = it
+                        clockPreferences.edit().putBoolean("show_seconds", it).apply()
+                    })
                 }
             }
         }
