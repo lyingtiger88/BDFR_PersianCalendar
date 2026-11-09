@@ -92,6 +92,56 @@ internal sealed class ZurvanDeskDesktopClient
         => await SendCollaborationAsync(HttpMethod.Post,
             $"/groups/{Uri.EscapeDataString(groupId)}/messages", new { body });
 
+    internal async Task<JsonDocument> ReadCollaborationSubjectsAsync(string groupId)
+        => await SendCollaborationAsync(HttpMethod.Get, $"/groups/{Uri.EscapeDataString(groupId)}/subjects");
+
+    internal async Task<JsonDocument> CreateCollaborationSubjectAsync(string groupId, string name)
+        => await SendCollaborationAsync(HttpMethod.Post, $"/groups/{Uri.EscapeDataString(groupId)}/subjects", new { name });
+
+    internal async Task<JsonDocument> ReadCollaborationTimetableAsync(string groupId)
+        => await SendCollaborationAsync(HttpMethod.Get, $"/groups/{Uri.EscapeDataString(groupId)}/timetable");
+
+    internal async Task<JsonDocument> CreateCollaborationTimetableSlotAsync(
+        string groupId, string subjectId, int weekday, string startTime, string endTime,
+        string? room = null, string? teacherId = null)
+        => await SendCollaborationAsync(HttpMethod.Post, $"/groups/{Uri.EscapeDataString(groupId)}/timetable",
+            new { subjectId, weekday, startTime, endTime, room, teacherId });
+
+    internal async Task<JsonDocument> ReadCollaborationHomeworkAsync(string groupId)
+        => await SendCollaborationAsync(HttpMethod.Get, $"/groups/{Uri.EscapeDataString(groupId)}/homework");
+
+    internal async Task<JsonDocument> CreateCollaborationHomeworkAsync(
+        string groupId, string subjectId, string title, string instructions, DateTimeOffset? dueAt = null)
+        => await SendCollaborationAsync(HttpMethod.Post, $"/groups/{Uri.EscapeDataString(groupId)}/homework",
+            new { subjectId, title, instructions, dueAt });
+
+    internal async Task<JsonDocument> ReadHomeworkSubmissionsAsync(string homeworkId)
+        => await SendCollaborationAsync(HttpMethod.Get, $"/homework/{Uri.EscapeDataString(homeworkId)}/submissions");
+
+    internal async Task<JsonDocument> SubmitHomeworkAsync(string homeworkId, string body)
+        => await SendCollaborationAsync(HttpMethod.Post, $"/homework/{Uri.EscapeDataString(homeworkId)}/submissions",
+            new { body });
+
+    internal async Task<JsonDocument> GradeHomeworkSubmissionAsync(
+        string homeworkId, string submissionId, decimal grade, string feedback)
+        => await SendCollaborationAsync(HttpMethod.Put,
+            $"/homework/{Uri.EscapeDataString(homeworkId)}/submissions/{Uri.EscapeDataString(submissionId)}/grade",
+            new { grade, feedback });
+
+    internal async Task UpdateCollaborationPermissionsAsync(
+        string groupId, string memberId, bool canChat, bool canReport, bool canEdit)
+    {
+        using var _ = await SendCollaborationAsync(HttpMethod.Put,
+            $"/groups/{Uri.EscapeDataString(groupId)}/members/{Uri.EscapeDataString(memberId)}/permissions",
+            new { canChat, canReport, canEdit });
+    }
+
+    internal async Task RemoveCollaborationMemberAsync(string groupId, string memberId)
+    {
+        using var _ = await SendCollaborationAsync(HttpMethod.Delete,
+            $"/groups/{Uri.EscapeDataString(groupId)}/members/{Uri.EscapeDataString(memberId)}");
+    }
+
 
 
     private PasswordCredential? ReadSessionCredential()
