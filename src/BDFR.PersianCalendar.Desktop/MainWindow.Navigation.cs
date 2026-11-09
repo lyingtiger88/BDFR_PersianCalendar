@@ -17,33 +17,28 @@ public sealed partial class MainWindow
         var shell = new Grid
         {
             FlowDirection = FlowDirection.RightToLeft,
-            Padding = new Thickness(16, 20, 16, 22),
-            RowSpacing = 18
+            Padding = new Thickness(12, 12, 12, 18),
+            RowSpacing = 10
         };
         shell.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         shell.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         shell.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-        var brand = new StackPanel { Spacing = 3, Margin = new Thickness(9, 8, 9, 24), HorizontalAlignment = HorizontalAlignment.Right };
-        var brandMark = new Button
+        // The Zurvan clock replaces the former brand/easter-egg mark in the
+        // navigation rail, rather than consuming height in the calendar header.
+        // The dial itself uses physical LTR coordinates, independently of this RTL rail.
+        var clockInRail = new Viewbox
         {
-            Content = BuildZurvanBrandMark(),
-            Background = BrushWithAlpha("#00FFFFFF", 0),
-            BorderThickness = new Thickness(0),
-            Padding = new Thickness(10, 2, 10, 2),
-            HorizontalAlignment = HorizontalAlignment.Center
+            Width = 232,
+            Height = 232,
+            Stretch = Stretch.Uniform,
+            FlowDirection = FlowDirection.LeftToRight,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Top,
+            Child = BuildZurvanClockPanel()
         };
-        brandMark.Click += (_, _) => HandleZurvanLogoTap(brandMark);
-        brand.Children.Add(brandMark);
-        brand.Children.Add(new TextBlock
-        {
-            Text = "زروان",
-            FontSize = 21,
-            HorizontalAlignment = HorizontalAlignment.Right,
-            Foreground = ThemeService.Brush(_theme.PrimaryText)
-        });
-        Grid.SetRow(brand, 0);
-        shell.Children.Add(brand);
+        Grid.SetRow(clockInRail, 0);
+        shell.Children.Add(clockInRail);
 
         var navItems = new StackPanel { Spacing = 5, HorizontalAlignment = HorizontalAlignment.Stretch };
         AddNavigationEntry(navItems, "⌂", "تقویم", () =>
