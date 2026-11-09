@@ -792,6 +792,7 @@ public sealed partial class MainWindow
                     try
                     {
                         using var group = await _deskClient.ReadCollaborationGroupAsync(_collaborationGroupId);
+                        _collaborationCursor = 0;
                         _collaborationStatus.Text = "اتصال گروه تأیید شد؛ همگام‌سازی آنلاین فعال است.";
                         StartCollaborationPolling();
                     }
