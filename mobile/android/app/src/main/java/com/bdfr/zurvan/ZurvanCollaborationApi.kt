@@ -47,6 +47,17 @@ class ZurvanCollaborationApi(private val baseUrl:String = BuildConfig.COLLAB_API
         request(token,"POST","/groups/$groupId/invites",JSONObject().put("identifier",identifier).put("role",if(assistant)"assistant" else "member"))
     }
     suspend fun accept(token:String,inviteId:String){request(token,"POST","/invitations/$inviteId/accept",JSONObject())}
+    suspend fun invitations(token:String):JSONArray=JSONArray(request(token,"GET","/invitations"))
+    suspend fun createItem(token:String,groupId:String,title:String,mode:String="agenda"){
+        request(token,"POST","/groups/$groupId/items",JSONObject().put("title",title).put("mode",mode).put("state","todo"))
+    }
+    suspend fun sendMessage(token:String,groupId:String,body:String){
+        request(token,"POST","/groups/$groupId/messages",JSONObject().put("body",body))
+    }
+    suspend fun setPermissions(token:String,groupId:String,memberId:String,chat:Boolean,report:Boolean,edit:Boolean){
+        request(token,"PUT","/groups/$groupId/members/$memberId/permissions",
+            JSONObject().put("canChat",chat).put("canReport",report).put("canEdit",edit))
+    }
     suspend fun members(token:String,groupId:String):List<CollabMember>{
         val o=JSONObject(request(token,"GET","/groups/$groupId"))
         val a=o.optJSONArray("members")?:JSONArray()
