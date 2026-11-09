@@ -94,6 +94,10 @@ public sealed class AppSettings
     public double NavigationRailWidth { get; set; } = 138.0;
     public string NavigationRailSide { get; set; } = "left";
 
+    // Calendar clock presentation. Values: analog/digital and khwarazmi/pahlavi/cuneiform/roman.
+    public string CalendarClockMode { get; set; } = "analog";
+    public string CalendarClockNumeralStyle { get; set; } = "khwarazmi";
+
     // Independent visual style for zodiac artwork in the Occasions module.
     public string ZodiacThemeId { get; set; } = "cosmic";
 
