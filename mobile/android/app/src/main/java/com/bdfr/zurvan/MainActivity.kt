@@ -726,6 +726,7 @@ private fun CalendarScreen(
         }
 
         val weatherContext = LocalContext.current
+        val weatherLink = androidx.compose.ui.platform.LocalUriHandler.current
         val weatherPrefs = remember(weatherContext) {
             weatherContext.getSharedPreferences("zurvan_weather", Context.MODE_PRIVATE)
         }
@@ -776,6 +777,9 @@ private fun CalendarScreen(
                         Text(weatherError ?: "در حال دریافت آب‌وهوا...", color = Color(0xFFCEDCF2),
                             style = MaterialTheme.typography.bodySmall)
                     }
+                    Text("Weather data by Open-Meteo.com",
+                        modifier = Modifier.clickable { weatherLink.openUri("https://open-meteo.com/") },
+                        color = Color(0xFFAADBF2), fontSize = 9.sp)
                 }
             }
         }
