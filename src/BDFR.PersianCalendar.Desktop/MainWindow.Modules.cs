@@ -242,49 +242,99 @@ public sealed partial class MainWindow
         string? selectedGalleryPath = null;
         var selectedPreview = new Image { Stretch = Stretch.Uniform, HorizontalAlignment = HorizontalAlignment.Stretch, VerticalAlignment = VerticalAlignment.Stretch };
         var selectedFileLabel = new TextBlock { Text = "برای پیش‌نمایش، تصویری از گالری انتخاب کنید.", TextWrapping = TextWrapping.Wrap, Foreground = ThemeService.Brush(_theme.SecondaryText) };
-        var displayTargetPicker = new ComboBox { Header = "نمایشگر مقصد", HorizontalAlignment = HorizontalAlignment.Stretch };
-        displayTargetPicker.Items.Add(new ComboBoxItem { Content = "نمایشگر فعلی زروان", Tag = "current" });
-        displayTargetPicker.Items.Add(new ComboBoxItem { Content = "نمایشگر اصلی", Tag = "primary" });
-        displayTargetPicker.SelectedIndex = string.Equals(_settings.WallpaperDisplayTarget, "primary", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
-        displayTargetPicker.SelectionChanged += (_, _) =>
-        {
-            if (displayTargetPicker.SelectedItem is ComboBoxItem target && target.Tag is string id)
-            {
-                _settings.WallpaperDisplayTarget = id;
-                _settingsService.Save(_settings);
-            }
-        };
         var applySelected = MakeButton("اعمال تصویر انتخاب‌شده");
         applySelected.HorizontalAlignment = HorizontalAlignment.Stretch;
         applySelected.MinHeight = 40;
         applySelected.IsEnabled = false;
-        applySelected.Click += async (_, _) =>
+        var applyMenu = new MenuFlyout();
+        applySelected.Click += (_, _) =>
         {
             if (string.IsNullOrWhiteSpace(selectedGalleryPath) || !File.Exists(selectedGalleryPath))
             {
                 StatusText.Text = "ابتدا یک تصویر معتبر از گالری انتخاب کنید.";
                 return;
             }
-            applySelected.IsEnabled = false;
+
+            applyMenu.Items.Clear();
+            var calendarItem = new MenuFlyoutItem { Text = "اعمال روی زمینه تقویم زروان" };
+            calendarItem.Click += async (_, _) =>
+            {
+                applySelected.IsEnabled = false;
+                try
+                {
+                    _settings.CustomBackgroundPath = selectedGalleryPath;
+                    _settings.BackgroundMode = "custom";
+                    _settings.WallpaperMode = "manual";
+                    _settings.AppearanceMode = "theme";
+                    _settings.UseSeasonalBackground = false;
+                    _settingsService.Save(_settings);
+                    await ApplyBackgroundAsync();
+                    if (_backgroundImage.Source is null)
+                        throw new InvalidOperationException("تصویر برای زمینه تقویم بارگذاری نشد؛ مسیر یا قالب فایل را بررسی کنید.");
+                    StatusText.Text = $"تصویر روی زمینه تقویم زروان اعمال شد · {Path.GetFileName(selectedGalleryPath)}";
+                }
+                catch (Exception ex)
+                {
+                    StatusText.Text = "اعمال روی زمینه تقویم انجام نشد: " + ex.Message;
+                    StartupDiagnostics.Log("Wallpaper calendar background apply failed: " + ex);
+                }
+                finally { applySelected.IsEnabled = !string.IsNullOrWhiteSpace(selectedGalleryPath) && File.Exists(selectedGalleryPath); }
+            };
+            applyMenu.Items.Add(calendarItem);
+            applyMenu.Items.Add(new MenuFlyoutSeparator());
+
             try
             {
-                _settings.CustomBackgroundPath = selectedGalleryPath;
-                _settings.BackgroundMode = "custom";
-                _settings.WallpaperMode = "manual";
-                _settings.AppearanceMode = "theme";
-                _settings.UseSeasonalBackground = false;
-                _settingsService.Save(_settings);
-                await ApplyBackgroundAsync();
-                if (_backgroundImage.Source is null)
-                    throw new InvalidOperationException("تصویر بارگذاری نشد؛ مسیر یا قالب فایل را بررسی کنید.");
-                StatusText.Text = $"تصویر روی پس‌زمینه زروان اعمال شد · {Path.GetFileName(selectedGalleryPath)}";
+                var displays = WallpaperDisplayService.GetDisplays();
+                if (displays.Count == 0)
+                {
+                    applyMenu.Items.Add(new MenuFlyoutItem { Text = "نمایشگری شناسایی نشد", IsEnabled = false });
+                }
+                else
+                {
+                    var allDisplays = new MenuFlyoutItem { Text = $"اعمال روی همه نمایشگرها ({displays.Count})" };
+                    allDisplays.Click += (_, _) =>
+                    {
+                        try
+                        {
+                            foreach (var display in displays)
+                                WallpaperDisplayService.SetWallpaper(display.DevicePath, selectedGalleryPath);
+                            StatusText.Text = $"تصویر روی هر {displays.Count} نمایشگر اعمال شد.";
+                        }
+                        catch (Exception ex)
+                        {
+                            StatusText.Text = "اعمال روی همه نمایشگرها کامل نشد: " + ex.Message;
+                            StartupDiagnostics.Log("Apply wallpaper to all displays failed: " + ex);
+                        }
+                    };
+                    applyMenu.Items.Add(allDisplays);
+                    foreach (var display in displays)
+                    {
+                        var displayItem = new MenuFlyoutItem { Text = display.Label };
+                        displayItem.Click += (_, _) =>
+                        {
+                            try
+                            {
+                                WallpaperDisplayService.SetWallpaper(display.DevicePath, selectedGalleryPath);
+                                StatusText.Text = $"تصویر روی {display.Label} اعمال شد.";
+                            }
+                            catch (Exception ex)
+                            {
+                                StatusText.Text = $"اعمال تصویر روی {display.Label} انجام نشد: " + ex.Message;
+                                StartupDiagnostics.Log($"Apply wallpaper to display {display.Index} failed: {ex}");
+                            }
+                        };
+                        applyMenu.Items.Add(displayItem);
+                    }
+                }
             }
             catch (Exception ex)
             {
-                StatusText.Text = "اعمال تصویر انجام نشد: " + ex.Message;
-                StartupDiagnostics.Log("Wallpaper gallery apply failed: " + ex);
+                applyMenu.Items.Add(new MenuFlyoutItem { Text = "خواندن فهرست نمایشگرها ناموفق بود", IsEnabled = false });
+                StatusText.Text = "شناسایی نمایشگرها انجام نشد: " + ex.Message;
+                StartupDiagnostics.Log("Enumerate wallpaper displays failed: " + ex);
             }
-            finally { applySelected.IsEnabled = !string.IsNullOrWhiteSpace(selectedGalleryPath) && File.Exists(selectedGalleryPath); }
+            applyMenu.ShowAt(applySelected);
         };
         var galleryLayout = new Grid { ColumnSpacing = 16, FlowDirection = FlowDirection.LeftToRight };
         galleryLayout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.05, GridUnitType.Star) });
@@ -298,7 +348,6 @@ public sealed partial class MainWindow
         };
         previewPanel.Children.Add(previewFrame);
         previewPanel.Children.Add(selectedFileLabel);
-        previewPanel.Children.Add(displayTargetPicker);
         previewPanel.Children.Add(applySelected);
         Grid.SetColumn(previewPanel, 0);
         galleryLayout.Children.Add(previewPanel);
