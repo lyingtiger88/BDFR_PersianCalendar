@@ -59,11 +59,13 @@ internal class ZurvanKanbanStore(context: Context) {
         val b = root.optJSONArray("boards") ?: JSONArray()
         val l = root.optJSONArray("lanes") ?: JSONArray()
         val c = root.optJSONArray("cards") ?: JSONArray()
-        boards = (0 until b.length()).map { b.getJSONObject(it).let { o -> ZBoard(o.getString("id"), o.getString("name")) } }
-        lanes = (0 until l.length()).map { l.getJSONObject(it).let { o ->
+        val newBoards = (0 until b.length()).map { b.getJSONObject(it).let { o ->
+            ZBoard(o.getString("id"), o.getString("name"))
+        } }
+        val newLanes = (0 until l.length()).map { l.getJSONObject(it).let { o ->
             ZLane(o.getString("id"), o.getString("board"), o.getString("name"), o.optInt("order"))
         } }
-        cards = (0 until c.length()).map { c.getJSONObject(it).let { o ->
+        val newCards = (0 until c.length()).map { c.getJSONObject(it).let { o ->
             val tasks = o.optJSONArray("tasks") ?: JSONArray()
             val comments = o.optJSONArray("comments") ?: JSONArray()
             ZCard(o.getString("id"), o.getString("lane"), o.getString("title"),
@@ -72,16 +74,51 @@ internal class ZurvanKanbanStore(context: Context) {
                     ZTask(t.getString("text"), t.optBoolean("done"))
                 } }, (0 until comments.length()).map { j -> comments.getString(j) },
                 o.optBoolean("archived"), o.optInt("order"),
-                (o.optJSONArray("labels") ?: JSONArray()).let { arr -> (0 until arr.length()).map { j -> arr.getString(j) } },
+                (o.optJSONArray("labels") ?: JSONArray()).let { arr ->
+                    (0 until arr.length()).map { j -> arr.getString(j) } },
                 o.optString("priority", "normal"),
                 (o.optJSONArray("attachments") ?: JSONArray()).let { arr ->
                     (0 until arr.length()).map { j -> arr.getJSONObject(j).let { x ->
-                        ZAttachment(x.getString("id"), x.getString("name"), x.getString("path"), x.optLong("bytes")) } } },
+                        ZAttachment(x.getString("id"), x.getString("name"), x.getString("path"), x.optLong("bytes"))
+                    } } },
                 (o.optJSONArray("activity") ?: JSONArray()).let { arr ->
                     (0 until arr.length()).map { j -> arr.getJSONObject(j).let { x ->
-                        ZActivity(x.optString("at"), x.optString("action"), x.optString("detail")) } } })
+                        ZActivity(x.optString("at"), x.optString("action"), x.optString("detail"))
+                    } } })
         } }
+        require(newBoards.map { it.id }.distinct().size == newBoards.size) { "شناسه پروژه تکراری است." }
+        require(newLanes.map { it.id }.distinct().size == newLanes.size) { "شناسه ستون تکراری است." }
+        require(newCards.map { it.id }.distinct().size == newCards.size) { "شناسه کارت تکراری است." }
+        val boardIds = newBoards.map { it.id }.toSet()
+        val laneIds = newLanes.map { it.id }.toSet()
+        require(newLanes.all { it.board in boardIds }) { "ستون فاقد پروژه معتبر است." }
+        require(newCards.all { it.lane in laneIds }) { "کارت فاقد ستون معتبر است." }
+        require(newCards.all { it.priority in validPriority }) { "اولویت نامعتبر است." }
+        boards = newBoards
+        lanes = newLanes
+        cards = newCards
     }
+
+    /** Replace the private Kanban workspace with a validated export; existing data is backed up. */
+    fun importMetadata(payload: String) {
+        require(payload.length <= 8_000_000) { "حجم اطلاعات کانبان بیش از حد مجاز است." }
+        val previousBoards = boards
+        val previousLanes = lanes
+        val previousCards = cards
+        val previousWarning = loadWarning
+        try {
+            decode(payload)
+            loadWarning = ""
+            persist()
+        } catch (cause: Exception) {
+            boards = previousBoards
+            lanes = previousLanes
+            cards = previousCards
+            loadWarning = previousWarning
+            throw cause
+        }
+    }
+
     private fun cleanupAttachments(deleted: List<ZCard>) {
         val root = attachmentDirectory.canonicalFile
         deleted.flatMap { it.attachments }.forEach { attachment ->
