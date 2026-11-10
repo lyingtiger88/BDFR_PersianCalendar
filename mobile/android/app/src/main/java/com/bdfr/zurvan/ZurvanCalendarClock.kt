@@ -45,6 +45,14 @@ fun ZurvanCalendarClock(modifier: Modifier = Modifier) {
                 ?: ZurvanNumeralStyle.KHWARAZMI
         )
     }
+    var digitalTheme by rememberSaveable {
+        mutableStateOf(
+            ZurvanDigitalClockTheme.entries.firstOrNull {
+                it.name == clockPrefs.getString("digital_theme", "COSMIC_GOLD")
+            } ?: ZurvanDigitalClockTheme.COSMIC_GOLD
+        )
+    }
+    var digitalThemeMenu by remember { mutableStateOf(false) }
     var styleMenu by remember { mutableStateOf(false) }
     var now by remember { mutableStateOf(LocalTime.now()) }
 
@@ -82,11 +90,27 @@ fun ZurvanCalendarClock(modifier: Modifier = Modifier) {
             }
         }
         if (digital) {
-            Text(
-                text = "%02d:%02d:%02d".format(now.hour, now.minute, now.second),
-                style = MaterialTheme.typography.headlineMedium,
-                color = foreground,
-                modifier = Modifier.padding(vertical = 18.dp)
+            Box {
+                TextButton(onClick = { digitalThemeMenu = true }) {
+                    Text("تم دیجیتال: " + digitalTheme.title + " ▾")
+                }
+                DropdownMenu(expanded = digitalThemeMenu, onDismissRequest = { digitalThemeMenu = false }) {
+                    ZurvanDigitalClockTheme.entries.forEach { theme ->
+                        DropdownMenuItem(
+                            text = { Text(theme.title) },
+                            onClick = {
+                                digitalTheme = theme
+                                clockPrefs.edit().putString("digital_theme", theme.name).apply()
+                                digitalThemeMenu = false
+                            }
+                        )
+                    }
+                }
+            }
+            ZurvanDigitalClockFace(
+                theme = digitalTheme,
+                now = now,
+                modifier = Modifier.size(270.dp)
             )
         } else {
             Canvas(Modifier.size(204.dp)) {
