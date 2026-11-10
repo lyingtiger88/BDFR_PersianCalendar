@@ -65,6 +65,21 @@ public sealed partial class MainWindow
         }
         catch (Exception ex)
         {
+            try
+            {
+                var backup = path + ".bak";
+                if (File.Exists(backup))
+                {
+                    var restored = JsonSerializer.Deserialize<DesktopKanbanData>(File.ReadAllText(backup));
+                    if (restored is not null)
+                    {
+                        File.Copy(backup, path, overwrite: true);
+                        StatusText.Text = "داده‌های کانبان از نسخه سالم قبلی بازیابی شدند.";
+                        return _personalKanbanData = restored;
+                    }
+                }
+            }
+            catch { /* Preserve the damaged file so it can be recovered manually. */ }
             _kanbanLoadError = "فایل کانبان قابل خواندن نیست. اطلاعات موجود حذف نشده‌اند: " + ex.Message;
             return _personalKanbanData = new DesktopKanbanData();
         }
@@ -73,14 +88,25 @@ public sealed partial class MainWindow
     private void SaveDesktopKanban()
     {
         if (!string.IsNullOrEmpty(_kanbanLoadError))
-            throw new InvalidOperationException(_kanbanLoadError);
-        var path = DesktopKanbanPath;
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        var tmp = path + ".tmp";
-        var data = JsonSerializer.Serialize(LoadDesktopKanban(), new JsonSerializerOptions { WriteIndented = true });
-        File.WriteAllText(tmp, data);
-        if (File.Exists(path)) File.Copy(path, path + ".bak", overwrite: true);
-        File.Move(tmp, path, overwrite: true);
+        {
+            StatusText.Text = _kanbanLoadError;
+            return;
+        }
+        try
+        {
+            var path = DesktopKanbanPath;
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            var tmp = path + ".tmp";
+            var data = JsonSerializer.Serialize(LoadDesktopKanban(),
+                new JsonSerializerOptions { WriteIndented = true });
+            File.WriteAllText(tmp, data);
+            if (File.Exists(path)) File.Copy(path, path + ".bak", overwrite: true);
+            File.Move(tmp, path, overwrite: true);
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = "ذخیره کانبان ناموفق بود؛ تغییرات فعلی هنوز روی دیسک ثبت نشده‌اند: " + ex.Message;
+        }
     }
 
     private async Task<string?> AskKanbanTextAsync(string title, string label, string initial = "", bool multiline = false)
