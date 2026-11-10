@@ -102,12 +102,12 @@ public sealed partial class MainWindow
         }
     }
 
-    private void SaveDesktopKanban()
+    private bool SaveDesktopKanban()
     {
         if (!string.IsNullOrEmpty(_kanbanLoadError))
         {
             StatusText.Text = _kanbanLoadError;
-            return;
+            return false;
         }
         try
         {
@@ -119,10 +119,12 @@ public sealed partial class MainWindow
             File.WriteAllText(tmp, data);
             if (File.Exists(path)) File.Copy(path, path + ".bak", overwrite: true);
             File.Move(tmp, path, overwrite: true);
+            return true;
         }
         catch (Exception ex)
         {
             StatusText.Text = "ذخیره کانبان ناموفق بود؛ تغییرات فعلی هنوز روی دیسک ثبت نشده‌اند: " + ex.Message;
+            return false;
         }
     }
 
@@ -253,11 +255,12 @@ public sealed partial class MainWindow
             {
                 if (!await ConfirmKanbanAsync("پروژه و تمام ستون‌ها و کارت‌های آن حذف شوند؟")) return;
                 var laneIds = data.Lanes.Where(x => x.BoardId == board.Id).Select(x => x.Id).ToHashSet();
-                DeleteDesktopKanbanFiles(data.Cards.Where(x => laneIds.Contains(x.LaneId)));
+                var removedCards = data.Cards.Where(x => laneIds.Contains(x.LaneId)).ToList();
                 data.Cards.RemoveAll(x => laneIds.Contains(x.LaneId));
                 data.Lanes.RemoveAll(x => x.BoardId == board.Id);
                 data.Boards.Remove(board);
-                SaveDesktopKanban(); _activeKanbanBoard = null; Refresh();
+                if (SaveDesktopKanban()) DeleteDesktopKanbanFiles(removedCards);
+                _activeKanbanBoard = null; Refresh();
             };
             header.Children.Add(delete);
             root.Children.Add(header);
@@ -320,9 +323,12 @@ public sealed partial class MainWindow
                     }
                     else if (await ConfirmKanbanAsync("ستون و کارت‌های آن حذف شوند؟"))
                     {
-                        DeleteDesktopKanbanFiles(data.Cards.Where(x => x.LaneId == lane.Id));
+                        var removedCards = data.Cards.Where(x => x.LaneId == lane.Id).ToList();
                         data.Cards.RemoveAll(x => x.LaneId == lane.Id);
                         data.Lanes.Remove(lane);
+                        if (SaveDesktopKanban()) DeleteDesktopKanbanFiles(removedCards);
+                        Refresh();
+                        return;
                     }
                     SaveDesktopKanban(); Refresh();
                 };
@@ -557,11 +563,13 @@ public sealed partial class MainWindow
                     {
                         At = DateTime.UtcNow, Action = "attachment_removed", Detail = item.Name
                     });
-                    SaveDesktopKanban();
-                    var root = Path.GetFullPath(DesktopKanbanFilesDirectory);
-                    if (string.Equals(Path.GetDirectoryName(Path.GetFullPath(item.Path)), root,
-                        StringComparison.OrdinalIgnoreCase) && File.Exists(item.Path))
-                        File.Delete(item.Path);
+                    if (SaveDesktopKanban())
+                    {
+                        var root = Path.GetFullPath(DesktopKanbanFilesDirectory);
+                        if (string.Equals(Path.GetDirectoryName(Path.GetFullPath(item.Path)), root,
+                            StringComparison.OrdinalIgnoreCase) && File.Exists(item.Path))
+                            File.Delete(item.Path);
+                    }
                     RenderAttachments();
                 };
                 row.Children.Add(remove);
@@ -612,8 +620,9 @@ public sealed partial class MainWindow
         if (result == ContentDialogResult.Secondary)
         {
             if (!await ConfirmKanbanAsync("این کارت حذف شود؟")) return;
-            DeleteDesktopKanbanFiles(new[] { card });
-            data.Cards.Remove(card); SaveDesktopKanban(); return;
+            data.Cards.Remove(card);
+            if (SaveDesktopKanban()) DeleteDesktopKanbanFiles(new[] { card });
+            return;
         }
         if (result != ContentDialogResult.Primary || string.IsNullOrWhiteSpace(title.Text)) return;
         if (!string.IsNullOrWhiteSpace(due.Text) &&
