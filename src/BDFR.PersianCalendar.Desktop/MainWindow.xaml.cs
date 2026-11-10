@@ -7311,7 +7311,30 @@ public sealed partial class MainWindow : Window
         Grid.SetColumn(privacyBadge, 1);
         header.Children.Add(privacyBadge);
 
-        var acknowledge = MakeButton("✓ متوجه شدم");
+        var acknowledge = MakeButton("۱. دیدم");
+        var snooze = MakeButton("۲. بعداً یادآوری شود");
+        var cancelReminder = MakeButton("۳. لغو");
+        var snoozePanel = new StackPanel { Spacing = 6, Visibility = Visibility.Collapsed };
+        var snoozeAmount = new NumberBox
+        {
+            Header = "زمان یادآوری مجدد",
+            Value = 10,
+            Minimum = 1,
+            Maximum = 1440,
+            SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Inline
+        };
+        var snoozeUnit = new ComboBox { HorizontalAlignment = HorizontalAlignment.Stretch };
+        snoozeUnit.Items.Add("دقیقه");
+        snoozeUnit.Items.Add("ساعت");
+        snoozeUnit.SelectedIndex = 0;
+        var confirmSnooze = MakeButton("ثبت زمان یادآوری");
+        snoozePanel.Children.Add(snoozeAmount);
+        snoozePanel.Children.Add(snoozeUnit);
+        snoozePanel.Children.Add(confirmSnooze);
+        var actionRow = new StackPanel { Spacing = 6 };
+        actionRow.Children.Add(acknowledge);
+        actionRow.Children.Add(snooze);
+        actionRow.Children.Add(cancelReminder);
 
         var body = new StackPanel
         {
@@ -7334,7 +7357,8 @@ public sealed partial class MainWindow : Window
             FontSize = 11,
             Opacity = 0.7
         });
-        body.Children.Add(acknowledge);
+        body.Children.Add(actionRow);
+        body.Children.Add(snoozePanel);
 
         var card = new Border
         {
@@ -7378,6 +7402,45 @@ public sealed partial class MainWindow : Window
             {
                 StartupDiagnostics.Log($"Reminder acknowledgement failed: {ex}");
             }
+        };
+
+        snooze.Click += (_, _) =>
+        {
+            snoozePanel.Visibility = Visibility.Visible;
+            snoozeAmount.Focus(FocusState.Programmatic);
+        };
+
+        confirmSnooze.Click += async (_, _) =>
+        {
+            var amount = (int)Math.Clamp(snoozeAmount.Value, 1, 1440);
+            var multiplier = snoozeUnit.SelectedIndex == 1 ? 60 : 1;
+            var delayMinutes = Math.Clamp(amount * multiplier, 1, 10080);
+            var next = DateTimeOffset.UtcNow.AddMinutes(delayMinutes);
+            await _repository.UpdateReminderDeliveryAsync(
+                reminder.Id, ReminderState.Pending, attempt, next);
+            _inAppReminderHost?.Children.Remove(card);
+            _visibleReminderCards.Remove(reminder.Id);
+            await _repository.AddActivityAsync(new ActivityLogEntry(
+                Guid.NewGuid().ToString("N"), DateTimeOffset.UtcNow,
+                "reminder-snoozed", reminder.ItemKind, reminder.ItemId,
+                reminder.Title + " — " + delayMinutes + " دقیقه بعد"));
+            StatusText.Text = "یادآوری برای " + ToPersianDigits(amount.ToString()) +
+                (multiplier == 60 ? " ساعت بعد تنظیم شد." : " دقیقه بعد تنظیم شد.");
+            await LoadActivitiesAsync();
+        };
+
+        cancelReminder.Click += async (_, _) =>
+        {
+            await _repository.UpdateReminderDeliveryAsync(
+                reminder.Id, ReminderState.Dismissed, attempt);
+            _inAppReminderHost?.Children.Remove(card);
+            _visibleReminderCards.Remove(reminder.Id);
+            await _repository.AddActivityAsync(new ActivityLogEntry(
+                Guid.NewGuid().ToString("N"), DateTimeOffset.UtcNow,
+                "reminder-dismissed", reminder.ItemKind, reminder.ItemId,
+                reminder.Title + " — لغو شد"));
+            StatusText.Text = "یادآور لغو شد.";
+            await LoadActivitiesAsync();
         };
 
         _visibleReminderCards[reminder.Id] = card;
