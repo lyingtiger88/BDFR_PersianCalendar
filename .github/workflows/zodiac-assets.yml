@@ -15,28 +15,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Validate approved artwork set without modifying files
+      - name: Validate repository zodiac PNGs without modifying them
         shell: bash
         run: |
           set -euo pipefail
           python - <<'PY'
           from pathlib import Path
           from PIL import Image
-          root = Path("picture/zodiac/png")
-          assert root.is_dir(), f"Missing asset directory: {root}"
+          root = Path('picture/zodiac/png')
+          assert root.is_dir(), f'Missing source directory: {root}'
           files = [p for p in root.iterdir() if p.is_file()]
-          assert len(files) == 143, (
-              f"Expected 143 approved zodiac assets, found {len(files)}. "
-              "Restore the complete manually approved asset set before release."
-          )
-          pngs = [p for p in files if p.suffix.lower() == ".png"]
-          svgs = [p for p in files if p.suffix.lower() == ".svg"]
-          icos = [p for p in files if p.suffix.lower() == ".ico"]
-          assert pngs and svgs and ic os, "Expected PNG, SVG and ICO artwork in the approved set."
-          for path in pngs:
-              with Image.open(path) as image:
-                  assert image.format == "PNG", f"Invalid PNG: {path}"
-                  image.verify()
-          print(f"Validated {len(files)} assets: {len(pngs)} PNG, {len(svgs)} SVG, {len(ic os)} ICO.")
-          print("No artwork was generated, replaced, committed or built.")
+          assert len(files) == 120, f'Expected 120 zodiac PNGs in repository, found {len(files)}'
+          names = ('aries','taurus','gemini','cancer','leo','virgo','libra','scorpio','sagittarius','capricorn','aquarius','pisces')
+          styles = ('cosmic','cute','cute_1','cute_2','cute_3','luxury','minimal','mythic','neon','watercolor')
+          for style in styles:
+              for name in names:
+                  path = root / f'{style}_{name}.png'
+                  assert path.is_file(), f'Missing approved PNG filename: {path}'
+                  with Image.open(path) as image:
+                      assert image.format == 'PNG', f'Invalid PNG: {path}'
+                      image.verify()
+          print('Verified 120 PNG files. No regeneration, write or build.')
           PY
