@@ -5,15 +5,20 @@ import androidx.compose.runtime.*
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
+import java.time.Instant
 
 // Independently developed Zurvan Kanban data model; no PLANKA code is embedded.
 internal data class ZBoard(val id: String, val name: String)
 internal data class ZLane(val id: String, val board: String, val name: String, val order: Int)
 internal data class ZTask(val text: String, val done: Boolean)
+internal data class ZAttachment(val id: String, val name: String, val path: String, val bytes: Long)
+internal data class ZActivity(val at: String, val action: String, val detail: String)
 internal data class ZCard(
     val id: String, val lane: String, val title: String, val description: String = "",
     val label: String = "", val due: String = "", val tasks: List<ZTask> = emptyList(),
-    val comments: List<String> = emptyList(), val archived: Boolean = false, val order: Int = 0
+    val comments: List<String> = emptyList(), val archived: Boolean = false, val order: Int = 0,
+    val labels: List<String> = emptyList(), val priority: String = "normal",
+    val attachments: List<ZAttachment> = emptyList(), val activity: List<ZActivity> = emptyList()
 )
 
 internal class ZurvanKanbanStore(context: Context) {
@@ -25,6 +30,10 @@ internal class ZurvanKanbanStore(context: Context) {
     var cards by mutableStateOf<List<ZCard>>(emptyList())
         private set
     init { load() }
+    private val validPriority = setOf("low", "normal", "high", "urgent")
+    private fun normalizeName(value: String) = value.trim().take(200)
+    private fun activity(old: ZCard, action: String, detail: String) = old.copy(
+        activity = (old.activity + ZActivity(Instant.now().toString(), action, detail.take(400))).takeLast(250))
     private fun load() = runCatching {
         val root = JSONObject(prefs.getString("data", "{}") ?: "{}")
         val b = root.optJSONArray("boards") ?: JSONArray()
@@ -42,7 +51,15 @@ internal class ZurvanKanbanStore(context: Context) {
                 (0 until tasks.length()).map { j -> tasks.getJSONObject(j).let { t ->
                     ZTask(t.getString("text"), t.optBoolean("done"))
                 } }, (0 until comments.length()).map { j -> comments.getString(j) },
-                o.optBoolean("archived"), o.optInt("order"))
+                o.optBoolean("archived"), o.optInt("order"),
+                (o.optJSONArray("labels") ?: JSONArray()).let { arr -> (0 until arr.length()).map { j -> arr.getString(j) } },
+                o.optString("priority", "normal"),
+                (o.optJSONArray("attachments") ?: JSONArray()).let { arr ->
+                    (0 until arr.length()).map { j -> arr.getJSONObject(j).let { x ->
+                        ZAttachment(x.getString("id"), x.getString("name"), x.getString("path"), x.optLong("bytes")) } } },
+                (o.optJSONArray("activity") ?: JSONArray()).let { arr ->
+                    (0 until arr.length()).map { j -> arr.getJSONObject(j).let { x ->
+                        ZActivity(x.optString("at"), x.optString("action"), x.optString("detail")) } } })
         } }
     }
     private fun persist() {
@@ -61,17 +78,23 @@ internal class ZurvanKanbanStore(context: Context) {
                 .put("title", card.title).put("description", card.description)
                 .put("label", card.label).put("due", card.due)
                 .put("archived", card.archived).put("order", card.order)
-                .put("tasks", tasks).put("comments", comments))
+                .put("tasks", tasks).put("comments", comments)
+                .put("labels", JSONArray().apply { card.labels.forEach { put(it) } })
+                .put("priority", card.priority)
+                .put("attachments", JSONArray().apply { card.attachments.forEach {
+                    put(JSONObject().put("id", it.id).put("name", it.name).put("path", it.path).put("bytes", it.bytes)) } })
+                .put("activity", JSONArray().apply { card.activity.forEach {
+                    put(JSONObject().put("at", it.at).put("action", it.action).put("detail", it.detail)) } }))
         }
         check(prefs.edit().putString("data",
             JSONObject().put("boards", b).put("lanes", l).put("cards", c).toString()).commit())
     }
     fun newBoard(title: String): String {
         val id = UUID.randomUUID().toString()
-        boards = boards + ZBoard(id, title.trim()); persist(); return id
+        boards = boards + ZBoard(id, normalizeName(title)); persist(); return id
     }
     fun renameBoard(id: String, title: String) {
-        boards = boards.map { if (it.id == id) it.copy(name = title.trim()) else it }; persist()
+        boards = boards.map { if (it.id == id) it.copy(name = normalizeName(title)) else it }; persist()
     }
     fun removeBoard(id: String) {
         val ids = lanes.filter { it.board == id }.map { it.id }.toSet()
@@ -81,7 +104,7 @@ internal class ZurvanKanbanStore(context: Context) {
         persist()
     }
     fun newLane(board: String, title: String) {
-        lanes = lanes + ZLane(UUID.randomUUID().toString(), board, title.trim(),
+        lanes = lanes + ZLane(UUID.randomUUID().toString(), board, normalizeName(title),
             (lanes.filter { it.board == board }.maxOfOrNull { it.order } ?: -1) + 1)
         persist()
     }
@@ -93,18 +116,49 @@ internal class ZurvanKanbanStore(context: Context) {
         cards = cards.filterNot { it.lane == id }; persist()
     }
     fun newCard(lane: String, title: String) {
-        cards = cards + ZCard(UUID.randomUUID().toString(), lane, title.trim(),
+        cards = cards + ZCard(UUID.randomUUID().toString(), lane, normalizeName(title),
             order = (cards.filter { it.lane == lane }.maxOfOrNull { it.order } ?: -1) + 1)
         persist()
     }
     fun updateCard(card: ZCard) {
-        cards = cards.map { if (it.id == card.id) card else it }; persist()
+        require(card.priority in validPriority) { "Invalid priority" }
+        cards = cards.map { if (it.id == card.id) {
+            val updated = card.copy(title = normalizeName(card.title),
+                labels = card.labels.map { x -> x.trim() }.filter { x -> x.isNotBlank() }.distinct().take(12))
+            activity(updated, "updated", "کارت ویرایش شد")
+        } else it }; persist()
     }
     fun removeCard(id: String) { cards = cards.filterNot { it.id == id }; persist() }
     fun moveCard(id: String, lane: String) {
         val last = (cards.filter { it.lane == lane }.maxOfOrNull { it.order } ?: -1) + 1
-        cards = cards.map { if (it.id == id) it.copy(lane = lane, order = last) else it }
+        cards = cards.map { if (it.id == id) activity(it.copy(lane = lane, order = last), "moved", "انتقال به ستون") else it }
         persist()
+    }
+    fun reorderLane(board: String, id: String, delta: Int) {
+        val ordered = lanes.filter { it.board == board }.sortedBy { it.order }.toMutableList()
+        val old = ordered.indexOfFirst { it.id == id }
+        if (old < 0) return
+        val target = (old + delta).coerceIn(0, ordered.lastIndex)
+        if (old == target) return
+        ordered.add(target, ordered.removeAt(old))
+        val positions = ordered.mapIndexed { index, row -> row.id to index }.toMap()
+        lanes = lanes.map { if (it.id in positions) it.copy(order = positions.getValue(it.id)) else it }
+        persist()
+    }
+    fun addAttachment(cardId: String, attachment: ZAttachment) {
+        require(attachment.bytes in 1..15_000_000) { "Attachment must be between 1 byte and 15MB" }
+        cards = cards.map { if (it.id == cardId) activity(
+            it.copy(attachments = it.attachments + attachment), "attachment", attachment.name) else it }
+        persist()
+    }
+    fun removeAttachment(cardId: String, attachmentId: String): ZAttachment? {
+        val attachment = cards.firstOrNull { it.id == cardId }?.attachments?.firstOrNull { it.id == attachmentId }
+            ?: return null
+        cards = cards.map { if (it.id == cardId) activity(it.copy(
+            attachments = it.attachments.filterNot { row -> row.id == attachmentId }),
+            "attachment_removed", attachment.name) else it }
+        persist()
+        return attachment
     }
     fun reorderCard(id: String, delta: Int) {
         val card = cards.firstOrNull { it.id == id } ?: return
