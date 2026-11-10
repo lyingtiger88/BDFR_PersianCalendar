@@ -8,6 +8,8 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Windows.ApplicationModel.DataTransfer;
+using System.Diagnostics;
+using Windows.Storage.Pickers;
 
 namespace BDFR.PersianCalendar.Desktop;
 
@@ -42,6 +44,14 @@ public sealed partial class MainWindow
         public List<DesktopKanbanTask> Checklist { get; set; } = new();
         public List<string> Comments { get; set; } = new();
         public List<DesktopKanbanActivity> Activity { get; set; } = new();
+        public List<DesktopKanbanAttachment> Attachments { get; set; } = new();
+    }
+    private sealed class DesktopKanbanAttachment
+    {
+        public string Id { get; set; } = "";
+        public string Name { get; set; } = "";
+        public string Path { get; set; } = "";
+        public long Bytes { get; set; }
     }
     private sealed class DesktopKanbanActivity
     {
@@ -243,6 +253,7 @@ public sealed partial class MainWindow
             {
                 if (!await ConfirmKanbanAsync("پروژه و تمام ستون‌ها و کارت‌های آن حذف شوند؟")) return;
                 var laneIds = data.Lanes.Where(x => x.BoardId == board.Id).Select(x => x.Id).ToHashSet();
+                DeleteDesktopKanbanFiles(data.Cards.Where(x => laneIds.Contains(x.LaneId)));
                 data.Cards.RemoveAll(x => laneIds.Contains(x.LaneId));
                 data.Lanes.RemoveAll(x => x.BoardId == board.Id);
                 data.Boards.Remove(board);
@@ -309,6 +320,7 @@ public sealed partial class MainWindow
                     }
                     else if (await ConfirmKanbanAsync("ستون و کارت‌های آن حذف شوند؟"))
                     {
+                        DeleteDesktopKanbanFiles(data.Cards.Where(x => x.LaneId == lane.Id));
                         data.Cards.RemoveAll(x => x.LaneId == lane.Id);
                         data.Lanes.Remove(lane);
                     }
@@ -436,6 +448,50 @@ public sealed partial class MainWindow
         return root;
     }
 
+    private string DesktopKanbanFilesDirectory => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "Zurvan", "KanbanFiles");
+
+    private void DeleteDesktopKanbanFiles(IEnumerable<DesktopKanbanCard> removed)
+    {
+        var root = Path.GetFullPath(DesktopKanbanFilesDirectory);
+        foreach (var attachment in removed.SelectMany(x => x.Attachments))
+        {
+            try
+            {
+                var path = Path.GetFullPath(attachment.Path);
+                if (string.Equals(Path.GetDirectoryName(path), root, StringComparison.OrdinalIgnoreCase)
+                    && File.Exists(path)) File.Delete(path);
+            }
+            catch { /* Metadata removal must not delete files outside Zurvan's private directory. */ }
+        }
+    }
+
+    private async Task<DesktopKanbanAttachment?> PickDesktopKanbanAttachmentAsync()
+    {
+        var picker = new FileOpenPicker();
+        picker.FileTypeFilter.Add("*");
+        WinRT.Interop.InitializeWithWindow.Initialize(picker,
+            WinRT.Interop.WindowNative.GetWindowHandle(this));
+        var file = await picker.PickSingleFileAsync();
+        if (file is null) return null;
+        var info = new FileInfo(file.Path);
+        if (!info.Exists || info.Length == 0 || info.Length > 15_000_000)
+            throw new InvalidOperationException("فایل باید موجود و کوچک‌تر از ۱۵ مگابایت باشد.");
+        Directory.CreateDirectory(DesktopKanbanFilesDirectory);
+        var extension = Path.GetExtension(file.Name);
+        if (extension.Length > 12 || extension.Skip(1).Any(x => !char.IsLetterOrDigit(x)))
+            extension = "";
+        var target = Path.Combine(DesktopKanbanFilesDirectory, Guid.NewGuid().ToString("N") + extension);
+        File.Copy(file.Path, target);
+        return new DesktopKanbanAttachment
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            Name = file.Name,
+            Path = target, Bytes = info.Length
+        };
+    }
+
     private async Task<bool> ConfirmKanbanAsync(string message)
     {
         var dialog = new ContentDialog
@@ -470,6 +526,68 @@ public sealed partial class MainWindow
             AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, MinHeight = 70 };
         foreach (var control in new Control[] { title, description, labels, due, priority, lane, checklist, comments })
             form.Children.Add(control);
+        form.Children.Add(new TextBlock
+        {
+            Text = "پیوست‌های فایل", FontSize = 16,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
+        });
+        var attachmentList = new StackPanel { Spacing = 5 };
+        void RenderAttachments()
+        {
+            attachmentList.Children.Clear();
+            foreach (var item in card.Attachments.ToList())
+            {
+                var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 7 };
+                var open = MakeButton(item.Name);
+                open.Click += (_, _) =>
+                {
+                    try
+                    {
+                        if (!File.Exists(item.Path)) throw new FileNotFoundException();
+                        Process.Start(new ProcessStartInfo(item.Path) { UseShellExecute = true });
+                    }
+                    catch (Exception ex) { StatusText.Text = "فایل پیوست قابل باز کردن نیست: " + ex.Message; }
+                };
+                row.Children.Add(open);
+                var remove = MakeButton("حذف");
+                remove.Click += (_, _) =>
+                {
+                    card.Attachments.Remove(item);
+                    card.Activity.Add(new DesktopKanbanActivity
+                    {
+                        At = DateTime.UtcNow, Action = "attachment_removed", Detail = item.Name
+                    });
+                    SaveDesktopKanban();
+                    var root = Path.GetFullPath(DesktopKanbanFilesDirectory);
+                    if (string.Equals(Path.GetDirectoryName(Path.GetFullPath(item.Path)), root,
+                        StringComparison.OrdinalIgnoreCase) && File.Exists(item.Path))
+                        File.Delete(item.Path);
+                    RenderAttachments();
+                };
+                row.Children.Add(remove);
+                attachmentList.Children.Add(row);
+            }
+        }
+        var addAttachment = MakeButton("＋ افزودن فایل (تا ۱۵ مگابایت)");
+        addAttachment.Click += async (_, _) =>
+        {
+            try
+            {
+                var attachment = await PickDesktopKanbanAttachmentAsync();
+                if (attachment is null) return;
+                card.Attachments.Add(attachment);
+                card.Activity.Add(new DesktopKanbanActivity
+                {
+                    At = DateTime.UtcNow, Action = "attachment_added", Detail = attachment.Name
+                });
+                SaveDesktopKanban();
+                RenderAttachments();
+            }
+            catch (Exception ex) { StatusText.Text = "افزودن فایل ناموفق بود: " + ex.Message; }
+        };
+        form.Children.Add(addAttachment);
+        form.Children.Add(attachmentList);
+        RenderAttachments();
         form.Children.Add(new TextBlock { Text = "تاریخچه فعالیت",
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, FontSize = 16 });
         foreach (var activity in card.Activity.TakeLast(15).Reverse())
@@ -494,6 +612,7 @@ public sealed partial class MainWindow
         if (result == ContentDialogResult.Secondary)
         {
             if (!await ConfirmKanbanAsync("این کارت حذف شود؟")) return;
+            DeleteDesktopKanbanFiles(new[] { card });
             data.Cards.Remove(card); SaveDesktopKanban(); return;
         }
         if (result != ContentDialogResult.Primary || string.IsNullOrWhiteSpace(title.Text)) return;
