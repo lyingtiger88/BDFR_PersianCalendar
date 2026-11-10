@@ -175,10 +175,13 @@ internal class ZurvanKanbanStore(context: Context) {
     fun exportMetadata(): String = prefs.getString("data", "{}") ?: "{}"
 
     fun newBoard(title: String): String {
+        require(title.isNotBlank()) { "نام پروژه نمی‌تواند خالی باشد." }
         val id = UUID.randomUUID().toString()
         boards = boards + ZBoard(id, normalizeName(title)); persist(); return id
     }
     fun renameBoard(id: String, title: String) {
+        require(boards.any { it.id == id }) { "پروژه پیدا نشد." }
+        require(title.isNotBlank()) { "نام پروژه نمی‌تواند خالی باشد." }
         boards = boards.map { if (it.id == id) it.copy(name = normalizeName(title)) else it }; persist()
     }
     fun removeBoard(id: String) {
@@ -191,12 +194,16 @@ internal class ZurvanKanbanStore(context: Context) {
         cleanupAttachments(deleted)
     }
     fun newLane(board: String, title: String) {
+        require(boards.any { it.id == board }) { "پروژه پیدا نشد." }
+        require(title.isNotBlank()) { "نام ستون نمی‌تواند خالی باشد." }
         lanes = lanes + ZLane(UUID.randomUUID().toString(), board, normalizeName(title),
             (lanes.filter { it.board == board }.maxOfOrNull { it.order } ?: -1) + 1)
         persist()
     }
     fun renameLane(id: String, title: String) {
-        lanes = lanes.map { if (it.id == id) it.copy(name = title.trim()) else it }; persist()
+        require(lanes.any { it.id == id }) { "ستون پیدا نشد." }
+        require(title.isNotBlank()) { "نام ستون نمی‌تواند خالی باشد." }
+        lanes = lanes.map { if (it.id == id) it.copy(name = normalizeName(title)) else it }; persist()
     }
     fun removeLane(id: String) {
         lanes = lanes.filterNot { it.id == id }
@@ -205,11 +212,16 @@ internal class ZurvanKanbanStore(context: Context) {
         cleanupAttachments(deleted)
     }
     fun newCard(lane: String, title: String) {
+        require(lanes.any { it.id == lane }) { "ستون پیدا نشد." }
+        require(title.isNotBlank()) { "عنوان کارت نمی‌تواند خالی باشد." }
         cards = cards + ZCard(UUID.randomUUID().toString(), lane, normalizeName(title),
             order = (cards.filter { it.lane == lane }.maxOfOrNull { it.order } ?: -1) + 1)
         persist()
     }
     fun updateCard(card: ZCard) {
+        require(cards.any { it.id == card.id }) { "کارت پیدا نشد." }
+        require(lanes.any { it.id == card.lane }) { "ستون مقصد پیدا نشد." }
+        require(card.title.isNotBlank()) { "عنوان کارت نمی‌تواند خالی باشد." }
         require(card.priority in validPriority) { "Invalid priority" }
         require(card.cardType in setOf("task", "story", "project")) { "Invalid card type" }
         cards = cards.map { if (it.id == card.id) {
@@ -225,6 +237,8 @@ internal class ZurvanKanbanStore(context: Context) {
         cleanupAttachments(deleted)
     }
     fun moveCard(id: String, lane: String) {
+        require(cards.any { it.id == id }) { "کارت پیدا نشد." }
+        require(lanes.any { it.id == lane }) { "ستون مقصد پیدا نشد." }
         val last = (cards.filter { it.lane == lane }.maxOfOrNull { it.order } ?: -1) + 1
         cards = cards.map { if (it.id == id) activity(it.copy(lane = lane, order = last), "moved", "انتقال به ستون") else it }
         persist()
@@ -241,6 +255,7 @@ internal class ZurvanKanbanStore(context: Context) {
         persist()
     }
     fun addAttachment(cardId: String, attachment: ZAttachment) {
+        require(cards.any { it.id == cardId }) { "کارت پیدا نشد." }
         require(attachment.bytes in 1..15_000_000) { "Attachment must be between 1 byte and 15MB" }
         cards = cards.map { if (it.id == cardId) activity(
             it.copy(attachments = it.attachments + attachment), "attachment", attachment.name) else it }
