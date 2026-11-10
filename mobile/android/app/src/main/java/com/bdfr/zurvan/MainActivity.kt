@@ -478,6 +478,15 @@ private fun CalendarScreen(
     viewModel: ZurvanViewModel,
     modifier: Modifier = Modifier
 ) {
+    ZurvanCalendarPanels(viewModel = viewModel, modifier = modifier)
+}
+
+@Composable
+internal fun CalendarMonthPage(
+    viewModel: ZurvanViewModel,
+    modifier: Modifier = Modifier,
+    scrollMode: Boolean = false
+) {
     val plans by viewModel.plans
         .collectAsStateWithLifecycle()
 
@@ -665,8 +674,6 @@ private fun CalendarScreen(
             }
         }
 
-        ZurvanCalendarClock(modifier = Modifier.fillMaxWidth())
-
         Row(
             modifier =
                 Modifier.fillMaxWidth(),
@@ -704,37 +711,6 @@ private fun CalendarScreen(
             }
         }
 
-        val prayerContext = LocalContext.current
-        val prayerSettings = remember { ZurvanPrayerTimes.settings(prayerContext) }
-        val todayPrayers = remember(prayerSettings) {
-            runCatching {
-                ZurvanPrayerTimes.calculate(
-                    java.time.LocalDate.now(java.time.ZoneId.of(prayerSettings.zone)), prayerSettings
-                )
-            }.getOrDefault(emptyList())
-        }
-        if (todayPrayers.isNotEmpty()) {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = if (ZurvanThemes.active.current.id == "liquid-glass")
-                    Color.White.copy(alpha = 0.22f) else MaterialTheme.colorScheme.surfaceVariant),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(Modifier.fillMaxWidth().padding(8.dp)) {
-                    Text("اوقات شرعی امروز · ${prayerSettings.city}",
-                        style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        todayPrayers.filter { it.key in listOf("fajr","sunrise","dhuhr","maghrib","isha") }
-                            .forEach { entry ->
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text(entry.label, style = MaterialTheme.typography.labelSmall)
-                                    Text(entry.time.toString(), style = MaterialTheme.typography.labelSmall)
-                                }
-                            }
-                    }
-                }
-            }
-        }
-
         val weekRightToLeft = ZurvanThemes.weekRightToLeft.current
         CompositionLocalProvider(LocalLayoutDirection provides
             if (weekRightToLeft) LayoutDirection.Rtl else LayoutDirection.Ltr) {
@@ -742,7 +718,10 @@ private fun CalendarScreen(
 
         LazyVerticalGrid(
             columns = GridCells.Fixed(7),
-            modifier = Modifier
+            modifier = if (scrollMode) Modifier
+                .fillMaxWidth()
+                .height(((model.days.size + model.leadingBlankCount + 6) / 7 * 86).dp)
+            else Modifier
                 .weight(1f)
                 .fillMaxWidth(),
             contentPadding =
@@ -2857,6 +2836,35 @@ private fun SettingsScreen(
                 }
                 Text("تغییر بلافاصله روی تقویم اعمال و برای اجرای بعدی ذخیره می‌شود.",
                     style = MaterialTheme.typography.bodySmall)
+            }
+        }
+        if (settingsCategory == "appearance") item {
+            SettingsCard(title = "نحوه جابه‌جایی پنل‌های تقویم") {
+                var panelMode by remember(context) {
+                    mutableStateOf(ZurvanCalendarPanelPreferences.mode(context))
+                }
+                Text("نمای تقویم، ساعت و اوقات شرعی، و آب‌وهوا را به یکی از دو روش مرور کن.")
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(selected = panelMode == ZurvanCalendarPanelPreferences.SWIPE, onClick = {
+                        panelMode = ZurvanCalendarPanelPreferences.SWIPE
+                        ZurvanCalendarPanelPreferences.save(context, panelMode)
+                    })
+                    Column(Modifier.weight(1f)) {
+                        Text("جابجایی با Swipe")
+                        Text("با کشیدن صفحه به بالا و پایین بین سه پنل جابه‌جا شو.", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(selected = panelMode == ZurvanCalendarPanelPreferences.SMOOTH_SCROLL, onClick = {
+                        panelMode = ZurvanCalendarPanelPreferences.SMOOTH_SCROLL
+                        ZurvanCalendarPanelPreferences.save(context, panelMode)
+                    })
+                    Column(Modifier.weight(1f)) {
+                        Text("اسکرول پیوسته و روان")
+                        Text("هر سه پنل پشت سر هم در یک صفحه عمودی پیمایش می‌شوند.", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+                Text("پس از انتخاب، به صفحه تقویم برگرد تا حالت جدید اعمال شود.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         if (settingsCategory == "appearance") item {
