@@ -5,6 +5,9 @@ package com.bdfr.zurvan
 import androidx.compose.foundation.*
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.content.Intent
@@ -39,7 +42,49 @@ fun ZurvanPersonalKanban(modifier: Modifier = Modifier) {
     var modelPicker by remember { mutableStateOf<String?>(null) }
     var createBoard by remember { mutableStateOf(false) }
     var newName by remember { mutableStateOf("") }
+    var backupStatus by remember { mutableStateOf("") }
+    val scope = rememberCoroutineScope()
+    val exportPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/zip")) { uri ->
+        if (uri != null) {
+            val snapshot = store.exportMetadata()
+            scope.launch {
+                val result = withContext(Dispatchers.IO) {
+                    runCatching { ZurvanKanbanBackup.export(context, uri, snapshot) }
+                }
+                backupStatus = result.fold(
+                    onSuccess = { "نسخه پشتیبان کامل همراه پیوست‌ها ذخیره شد." },
+                    onFailure = { "خطا در ذخیره پشتیبان: " + (it.message ?: "ناشناخته") }
+                )
+            }
+        }
+    }
+    val importPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            scope.launch {
+                val result = withContext(Dispatchers.IO) {
+                    runCatching { ZurvanKanbanBackup.prepareImport(context, uri) }
+                }
+                result.onSuccess { prepared ->
+                    try {
+                        store.importMetadata(prepared.snapshot)
+                        selectedId = null
+                        backupStatus = "پروژه‌ها و پیوست‌ها با موفقیت از فایل پشتیبان بازیابی شدند."
+                    } catch (cause: Exception) {
+                        prepared.discardIfNotImported()
+                        backupStatus = "بازیابی اطلاعات ناموفق بود: " + (cause.message ?: "ناشناخته")
+                    }
+                }.onFailure { cause ->
+                    backupStatus = "خواندن فایل پشتیبان ناموفق بود: " + (cause.message ?: "ناشناخته")
+                }
+            }
+        }
+    }
     Column(modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        if (store.loadWarning.isNotBlank()) {
+            Text(store.loadWarning, color = MaterialTheme.colorScheme.error)
+        }
         val selected = store.boards.firstOrNull { it.id == selectedId }
         if (selected != null) {
             PersonalKanbanBoard(store, selected, onBack = { selectedId = null })
@@ -66,6 +111,21 @@ fun ZurvanPersonalKanban(modifier: Modifier = Modifier) {
             KanbanSection("برنامه مشارکتی و گروهی", "تیمی و مشترک",
                 onAdd = { modelPicker = "team" }) {}
         }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = { exportPicker.launch("Zurvan-personal-kanban.zip") }) {
+                Icon(Icons.Outlined.FileDownload, null)
+                Spacer(Modifier.width(5.dp))
+                Text("پشتیبان‌گیری")
+            }
+            OutlinedButton(onClick = { importPicker.launch(arrayOf("application/zip", "application/octet-stream")) }) {
+                Icon(Icons.Outlined.FileUpload, null)
+                Spacer(Modifier.width(5.dp))
+                Text("بازیابی")
+            }
+        }
+        if (backupStatus.isNotBlank())
+            Text(backupStatus, style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
     if (modelPicker != null) {
         AlertDialog(onDismissRequest = { modelPicker = null },
