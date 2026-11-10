@@ -7591,6 +7591,58 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    public async Task PromptReminderSnoozeAsync(string reminderId)
+    {
+        var reminder = await _repository.GetReminderAsync(reminderId);
+        if (reminder is null)
+        {
+            StatusText.Text = "یادآور پیدا نشد.";
+            return;
+        }
+
+        var amount = new NumberBox
+        {
+            Header = "مدت یادآوری مجدد",
+            Value = 10,
+            Minimum = 1,
+            Maximum = 1440,
+            SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Inline
+        };
+        var unit = new ComboBox { HorizontalAlignment = HorizontalAlignment.Stretch };
+        unit.Items.Add("دقیقه");
+        unit.Items.Add("ساعت");
+        unit.SelectedIndex = 0;
+        var content = new StackPanel { Spacing = 8, Width = 280 };
+        content.Children.Add(new TextBlock { Text = "زمانی را که می‌خواهید دوباره یادآوری شود مشخص کنید." });
+        content.Children.Add(amount);
+        content.Children.Add(unit);
+        var dialog = new ContentDialog
+        {
+            Title = "بعداً یادآوری شود",
+            Content = content,
+            PrimaryButtonText = "ثبت",
+            CloseButtonText = "انصراف",
+            DefaultButton = ContentDialogButton.Primary,
+            XamlRoot = Content is FrameworkElement element ? element.XamlRoot : null
+        };
+        dialog.XamlRoot ??= (this.Content as FrameworkElement)?.XamlRoot;
+        if (dialog.XamlRoot is null || await dialog.ShowAsync() != ContentDialogResult.Primary)
+            return;
+
+        var value = (int)Math.Clamp(amount.Value, 1, 1440);
+        var minutes = Math.Clamp(value * (unit.SelectedIndex == 1 ? 60 : 1), 1, 10080);
+        var next = DateTimeOffset.UtcNow.AddMinutes(minutes);
+        await _repository.UpdateReminderDeliveryAsync(
+            reminder.Id, ReminderState.Pending, reminder.Attempt, next);
+        await _repository.AddActivityAsync(new ActivityLogEntry(
+            Guid.NewGuid().ToString("N"), DateTimeOffset.UtcNow,
+            "reminder-snoozed", reminder.ItemKind, reminder.ItemId,
+            reminder.Title + " — " + minutes + " دقیقه بعد"));
+        StatusText.Text = "یادآوری برای " + ToPersianDigits(value.ToString()) +
+            (unit.SelectedIndex == 1 ? " ساعت بعد تنظیم شد." : " دقیقه بعد تنظیم شد.");
+        await LoadActivitiesAsync();
+    }
+
     public void NotifyExternalChange(string message)
     {
         StatusText.Text = message;
