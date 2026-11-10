@@ -920,6 +920,31 @@ public sealed partial class MainWindow
         clockGroup.Children.Add(SettingsOptionRow("نوع نمایش ساعت", "انتخاب ساعت عقربه‌ای یا دیجیتال", clockMode, "\uE823"));
         AddSettingsSeparator(clockGroup);
 
+        var digitalTheme = new ComboBox { HorizontalAlignment = HorizontalAlignment.Stretch };
+        var digitalThemes = new (string Id, string Name)[]
+        {
+            ("wooden_amber", "چوبی کهربایی"),
+            ("minimal_silver", "مینیمال نقره‌ای"),
+            ("art_deco_emerald", "آرت‌دکو زمردی"),
+            ("cosmic_gold", "کیهانی طلایی"),
+            ("neon_glass", "نئون شیشه‌ای"),
+            ("persian_geometric", "هندسی ایرانی")
+        };
+        foreach (var theme in digitalThemes)
+            digitalTheme.Items.Add(new ComboBoxItem { Content = theme.Name, Tag = theme.Id });
+        digitalTheme.SelectedIndex = Math.Max(0, Array.FindIndex(digitalThemes, x => x.Id == _settings.CalendarDigitalClockTheme));
+        digitalTheme.SelectionChanged += (_, _) =>
+        {
+            if (digitalTheme.SelectedItem is ComboBoxItem choice && choice.Tag is string theme)
+            {
+                _settings.CalendarDigitalClockTheme = theme;
+                _settingsService.Save(_settings);
+                ApplyDigitalClockTheme();
+            }
+        };
+        clockGroup.Children.Add(SettingsOptionRow("تم ساعت دیجیتال", "شش تم مستقل با رنگ‌بندی و طراحی مخصوص ساعت دیجیتال", digitalTheme, "\uE823"));
+        AddSettingsSeparator(clockGroup);
+
         var numeralStyle = new ComboBox { HorizontalAlignment = HorizontalAlignment.Stretch };
         numeralStyle.Items.Add(new ComboBoxItem { Content = "خوارزمی", Tag = "khwarazmi" });
         numeralStyle.Items.Add(new ComboBoxItem { Content = "پهلوی", Tag = "pahlavi" });
