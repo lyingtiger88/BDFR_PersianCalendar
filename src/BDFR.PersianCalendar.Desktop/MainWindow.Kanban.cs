@@ -221,8 +221,13 @@ public sealed partial class MainWindow
             var filter = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
             var search = new TextBox { Header = "جستجوی کارت", PlaceholderText = "عنوان، برچسب، توضیحات",
                 Width = 270, Text = _kanbanSearch };
-            search.TextChanged += (_, _) => { _kanbanSearch = search.Text; Refresh(); };
             filter.Children.Add(search);
+            var applySearch = MakeButton("جستجو");
+            applySearch.Click += (_, _) => { _kanbanSearch = search.Text.Trim(); Refresh(); };
+            filter.Children.Add(applySearch);
+            var resetSearch = MakeButton("پاک‌کردن");
+            resetSearch.Click += (_, _) => { _kanbanSearch = ""; Refresh(); };
+            filter.Children.Add(resetSearch);
             var archived = new CheckBox { Content = "کارت‌های بایگانی‌شده", IsChecked = _kanbanShowArchive,
                 VerticalAlignment = VerticalAlignment.Bottom };
             archived.Checked += (_, _) => { _kanbanShowArchive = true; Refresh(); };
