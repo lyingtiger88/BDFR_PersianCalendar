@@ -648,7 +648,7 @@ public sealed partial class MainWindow
         card.DueDate = due.Text.Trim();
         card.Priority = priority.SelectedIndex switch { 0 => "low", 2 => "high", 3 => "urgent", _ => "normal" };
         card.CardType = cardType.SelectedIndex switch { 1 => "story", 2 => "project", _ => "task" };
-        card.CustomFields = custom.Text.Split(new[] { "\\r\\n", "\\n" }, StringSplitOptions.RemoveEmptyEntries)
+        card.CustomFields = custom.Text.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries)
             .Select(x => x.Split('=', 2)).Where(x => x.Length == 2 && !string.IsNullOrWhiteSpace(x[0]))
             .Take(30).GroupBy(x => x[0].Trim().Substring(0, Math.Min(60, x[0].Trim().Length)))
             .ToDictionary(x => x.Key, x => x.Last()[1].Trim().Substring(0, Math.Min(300, x.Last()[1].Trim().Length)));
