@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using Windows.ApplicationModel.DataTransfer;
 
 namespace BDFR.PersianCalendar.Desktop;
 
@@ -297,13 +298,20 @@ public sealed partial class MainWindow
                     var edit = MakeButton("بازکردن کارت");
                     edit.Click += async (_, _) => { await EditDesktopKanbanCardAsync(data, card, lanes); Refresh(); };
                     box.Children.Add(edit);
-                    column.Children.Add(new Border
+                    var draggable = new Border
                     {
                         Background = CreateSideSurfaceBrush(),
                         CornerRadius = new CornerRadius(9),
                         BorderBrush = BrushWithAlpha(_theme.Accent, 0x50),
-                        BorderThickness = new Thickness(1), Child = box
-                    });
+                        BorderThickness = new Thickness(1), Child = box,
+                        CanDrag = !_kanbanShowArchive
+                    };
+                    draggable.DragStarting += (_, args) =>
+                    {
+                        args.Data.SetText(card.Id);
+                        args.Data.RequestedOperation = DataPackageOperation.Move;
+                    };
+                    column.Children.Add(draggable);
                 }
                 if (!_kanbanShowArchive)
                 {
@@ -321,12 +329,30 @@ public sealed partial class MainWindow
                     };
                     column.Children.Add(addCard);
                 }
-                boardColumns.Children.Add(new Border
+                var dropColumn = new Border
                 {
                     Width = 290, Padding = new Thickness(4),
                     Background = BrushWithAlpha(_theme.Accent, 0x15),
-                    CornerRadius = new CornerRadius(12), Child = column
-                });
+                    CornerRadius = new CornerRadius(12), Child = column,
+                    AllowDrop = true
+                };
+                dropColumn.DragOver += (_, args) =>
+                {
+                    if (args.DataView.Contains(StandardDataFormats.Text))
+                        args.AcceptedOperation = DataPackageOperation.Move;
+                };
+                dropColumn.Drop += async (_, args) =>
+                {
+                    if (!args.DataView.Contains(StandardDataFormats.Text)) return;
+                    var id = await args.DataView.GetTextAsync();
+                    var dragged = data.Cards.FirstOrDefault(x => x.Id == id);
+                    if (dragged is null || dragged.Archived || dragged.LaneId == lane.Id) return;
+                    dragged.LaneId = lane.Id;
+                    dragged.Order = data.Cards.Count(x => x.LaneId == lane.Id);
+                    SaveDesktopKanban();
+                    Refresh();
+                };
+                boardColumns.Children.Add(dropColumn);
             }
             var addLane = MakeButton("＋ افزودن ستون");
             addLane.Click += async (_, _) =>
