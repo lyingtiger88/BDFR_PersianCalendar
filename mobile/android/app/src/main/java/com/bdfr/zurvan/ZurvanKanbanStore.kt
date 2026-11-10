@@ -33,8 +33,8 @@ internal class ZurvanKanbanStore(context: Context) {
         private set
     var loadWarning by mutableStateOf("")
         private set
-    init { load() }
     private val validPriority = setOf("low", "normal", "high", "urgent")
+    init { load() }
     private fun normalizeName(value: String) = value.trim().take(200)
     private fun activity(old: ZCard, action: String, detail: String) = old.copy(
         activity = (old.activity + ZActivity(Instant.now().toString(), action, detail.take(400))).takeLast(250))
