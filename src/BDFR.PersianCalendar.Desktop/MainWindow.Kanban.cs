@@ -39,6 +39,8 @@ public sealed partial class MainWindow
         public string Labels { get; set; } = "";
         public string DueDate { get; set; } = "";
         public string Priority { get; set; } = "normal";
+        public string CardType { get; set; } = "task";
+        public Dictionary<string, string> CustomFields { get; set; } = new();
         public bool Archived { get; set; }
         public int Order { get; set; }
         public List<DesktopKanbanTask> Checklist { get; set; } = new();
@@ -518,6 +520,12 @@ public sealed partial class MainWindow
             AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, MinHeight = 90 };
         var labels = new TextBox { Header = "برچسب‌ها (ویرگول)", Text = card.Labels };
         var due = new TextBox { Header = "سررسید YYYY-MM-DD", Text = card.DueDate };
+        var cardType = new ComboBox { Header = "نوع کارت", MinWidth = 190,
+            Items = { "کار", "داستان", "پروژه" },
+            SelectedIndex = card.CardType switch { "story" => 1, "project" => 2, _ => 0 } };
+        var custom = new TextBox { Header = "فیلدهای سفارشی (هر خط: نام=مقدار)",
+            Text = string.Join(Environment.NewLine, card.CustomFields.Select(x => x.Key + "=" + x.Value)),
+            AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, MinHeight = 65 };
         var priority = new ComboBox { Header = "اولویت", MinWidth = 190,
             Items = { "کم", "عادی", "زیاد", "فوری" },
             SelectedIndex = card.Priority switch { "low" => 0, "high" => 2, "urgent" => 3, _ => 1 } };
@@ -530,7 +538,7 @@ public sealed partial class MainWindow
         var comments = new TextBox { Header = "نظرات (هر خط یک نظر)",
             Text = string.Join(Environment.NewLine, card.Comments),
             AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, MinHeight = 70 };
-        foreach (var control in new Control[] { title, description, labels, due, priority, lane, checklist, comments })
+        foreach (var control in new Control[] { title, description, labels, due, priority, cardType, custom, lane, checklist, comments })
             form.Children.Add(control);
         form.Children.Add(new TextBlock
         {
@@ -639,6 +647,11 @@ public sealed partial class MainWindow
             .Select(x => x.Trim()).Where(x => x.Length > 0).Distinct().Take(12));
         card.DueDate = due.Text.Trim();
         card.Priority = priority.SelectedIndex switch { 0 => "low", 2 => "high", 3 => "urgent", _ => "normal" };
+        card.CardType = cardType.SelectedIndex switch { 1 => "story", 2 => "project", _ => "task" };
+        card.CustomFields = custom.Text.Split(new[] { "\\r\\n", "\\n" }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(x => x.Split('=', 2)).Where(x => x.Length == 2 && !string.IsNullOrWhiteSpace(x[0]))
+            .Take(30).GroupBy(x => x[0].Trim().Substring(0, Math.Min(60, x[0].Trim().Length)))
+            .ToDictionary(x => x.Key, x => x.Last()[1].Trim().Substring(0, Math.Min(300, x.Last()[1].Trim().Length)));
         card.Archived = archive.IsChecked == true;
         if (lane.SelectedIndex >= 0 && lane.SelectedIndex < lanes.Count)
         {
