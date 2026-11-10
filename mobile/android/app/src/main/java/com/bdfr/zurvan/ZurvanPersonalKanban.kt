@@ -30,6 +30,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.*
 import androidx.compose.ui.graphics.Color
 import kotlin.math.roundToInt
+import kotlin.math.abs
 import androidx.compose.ui.unit.IntOffset
 
 /** Independent PLANKA-like board UI; user-created projects start completely empty. */
@@ -219,6 +220,9 @@ private fun PersonalKanbanBoard(store: ZurvanKanbanStore, board: ZBoard, onBack:
             modifier = Modifier.fillMaxWidth(), singleLine = true,
             placeholder = { Text("جستجوی کارت‌ها") },
             leadingIcon = { Icon(Icons.Outlined.Search, null) })
+        Text("کارت را لمس و نگه‌دار، سپس برای انتقال به ستون دیگر افقی و برای تغییر ترتیب عمودی بکش.",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row(Modifier.fillMaxSize().horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             lanes.forEach { lane ->
@@ -306,26 +310,39 @@ private fun PersonalKanbanLane(
 private fun PersonalKanbanCard(store: ZurvanKanbanStore, card: ZCard, lanes: List<ZLane>) {
     var open by remember { mutableStateOf(false) }
     var drag by remember(card.id) { mutableFloatStateOf(0f) }
-    val gesture = Modifier.pointerInput(card.id, lanes) {
+    var dragY by remember(card.id) { mutableFloatStateOf(0f) }
+    val gesture = Modifier.pointerInput(card.id, card.lane, lanes) {
         detectDragGesturesAfterLongPress(
             onDragEnd = {
                 val index = lanes.indexOfFirst { it.id == card.lane }
-                val target = index + when {
-                    drag < -90.dp.toPx() -> 1
-                    drag > 90.dp.toPx() -> -1
-                    else -> 0
+                if (index >= 0 && abs(drag) > 85.dp.toPx()) {
+                    val steps = (abs(drag) / 276.dp.toPx()).roundToInt().coerceAtLeast(1)
+                    val target = (index + if (drag < 0f) steps else -steps)
+                        .coerceIn(0, lanes.lastIndex)
+                    if (target != index) store.moveCard(card.id, lanes[target].id)
+                } else if (abs(dragY) > 55.dp.toPx()) {
+                    val steps = (abs(dragY) / 95.dp.toPx()).roundToInt().coerceIn(1, 10)
+                    repeat(steps) { store.reorderCard(card.id, if (dragY > 0f) 1 else -1) }
                 }
-                if (target in lanes.indices && target != index)
-                    store.moveCard(card.id, lanes[target].id)
                 drag = 0f
+                dragY = 0f
             },
-            onDragCancel = { drag = 0f },
-            onDrag = { change, delta -> change.consume(); drag += delta.x }
+            onDragCancel = { drag = 0f; dragY = 0f },
+            onDrag = { change, delta ->
+                change.consume()
+                drag += delta.x
+                dragY += delta.y
+            }
         )
     }
     ElevatedCard(onClick = { open = true },
-        modifier = Modifier.fillMaxWidth().offset { IntOffset(drag.roundToInt(), 0) }.then(gesture),
-        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+        modifier = Modifier.fillMaxWidth().offset {
+            IntOffset(drag.roundToInt(), dragY.roundToInt())
+        }.then(gesture),
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = if (abs(drag) + abs(dragY) > 4f)
+                MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
+        )) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             val displayLabels = if (card.labels.isNotEmpty()) card.labels else listOf(card.label).filter { it.isNotBlank() }
             if (displayLabels.isNotEmpty()) Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
