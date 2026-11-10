@@ -6,6 +6,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
 import java.time.Instant
+import java.io.File
 
 // Independently developed Zurvan Kanban data model; no PLANKA code is embedded.
 internal data class ZBoard(val id: String, val name: String)
@@ -23,6 +24,7 @@ internal data class ZCard(
 
 internal class ZurvanKanbanStore(context: Context) {
     private val prefs = context.getSharedPreferences("zurvan_personal_kanban_v1", Context.MODE_PRIVATE)
+    private val attachmentDirectory = File(context.filesDir, "zurvan_kanban_files")
     var boards by mutableStateOf<List<ZBoard>>(emptyList())
         private set
     var lanes by mutableStateOf<List<ZLane>>(emptyList())
@@ -79,6 +81,16 @@ internal class ZurvanKanbanStore(context: Context) {
                         ZActivity(x.optString("at"), x.optString("action"), x.optString("detail")) } } })
         } }
     }
+    private fun cleanupAttachments(deleted: List<ZCard>) {
+        val root = attachmentDirectory.canonicalFile
+        deleted.flatMap { it.attachments }.forEach { attachment ->
+            runCatching {
+                val file = File(attachment.path).canonicalFile
+                if (file.parentFile == root && file.isFile) file.delete()
+            }
+        }
+    }
+
     private fun persist() {
         require(loadWarning.isBlank()) { "Fix or export damaged Kanban data before saving." }
         val b = JSONArray()
@@ -127,8 +139,10 @@ internal class ZurvanKanbanStore(context: Context) {
         val ids = lanes.filter { it.board == id }.map { it.id }.toSet()
         boards = boards.filterNot { it.id == id }
         lanes = lanes.filterNot { it.board == id }
+        val deleted = cards.filter { it.lane in ids }
         cards = cards.filterNot { it.lane in ids }
         persist()
+        cleanupAttachments(deleted)
     }
     fun newLane(board: String, title: String) {
         lanes = lanes + ZLane(UUID.randomUUID().toString(), board, normalizeName(title),
@@ -140,7 +154,9 @@ internal class ZurvanKanbanStore(context: Context) {
     }
     fun removeLane(id: String) {
         lanes = lanes.filterNot { it.id == id }
+        val deleted = cards.filter { it.lane == id }
         cards = cards.filterNot { it.lane == id }; persist()
+        cleanupAttachments(deleted)
     }
     fun newCard(lane: String, title: String) {
         cards = cards + ZCard(UUID.randomUUID().toString(), lane, normalizeName(title),
@@ -155,7 +171,12 @@ internal class ZurvanKanbanStore(context: Context) {
             activity(updated, "updated", "کارت ویرایش شد")
         } else it }; persist()
     }
-    fun removeCard(id: String) { cards = cards.filterNot { it.id == id }; persist() }
+    fun removeCard(id: String) {
+        val deleted = cards.filter { it.id == id }
+        cards = cards.filterNot { it.id == id }
+        persist()
+        cleanupAttachments(deleted)
+    }
     fun moveCard(id: String, lane: String) {
         val last = (cards.filter { it.lane == lane }.maxOfOrNull { it.order } ?: -1) + 1
         cards = cards.map { if (it.id == id) activity(it.copy(lane = lane, order = last), "moved", "انتقال به ستون") else it }
@@ -185,6 +206,8 @@ internal class ZurvanKanbanStore(context: Context) {
             attachments = it.attachments.filterNot { row -> row.id == attachmentId }),
             "attachment_removed", attachment.name) else it }
         persist()
+        cleanupAttachments(listOf(ZCard(id = cardId, lane = "", title = "",
+            attachments = listOf(attachment))))
         return attachment
     }
     fun reorderCard(id: String, delta: Int) {
