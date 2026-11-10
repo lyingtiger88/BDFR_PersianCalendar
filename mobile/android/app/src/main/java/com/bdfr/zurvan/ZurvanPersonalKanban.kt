@@ -1,6 +1,17 @@
 package com.bdfr.zurvan
 
 import androidx.compose.foundation.*
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.net.Uri
+import android.provider.OpenableColumns
+import android.content.Intent
+import java.io.File
+import java.util.UUID
+import java.time.LocalDate
+import java.time.format.DateTimeParseException
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -200,6 +211,10 @@ private fun PersonalKanbanLane(
                     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                         DropdownMenuItem(text = { Text("تغییر عنوان") },
                             onClick = { menu = false; rename = true })
+                    DropdownMenuItem(text = { Text("انتقال ستون به راست") },
+                            onClick = { menu = false; store.reorderLane(lane.board, lane.id, -1) })
+                    DropdownMenuItem(text = { Text("انتقال ستون به چپ") },
+                            onClick = { menu = false; store.reorderLane(lane.board, lane.id, 1) })
                         DropdownMenuItem(text = { Text("حذف ستون") },
                             onClick = { menu = false; delete = true })
                     }
@@ -249,11 +264,26 @@ private fun PersonalKanbanCard(store: ZurvanKanbanStore, card: ZCard, lanes: Lis
         modifier = Modifier.fillMaxWidth().offset { IntOffset(drag.roundToInt(), 0) }.then(gesture),
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            if (card.label.isNotBlank()) Surface(shape = RoundedCornerShape(4.dp),
-                color = MaterialTheme.colorScheme.tertiaryContainer) {
-                Text(card.label, Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                    fontSize = 11.sp, color = MaterialTheme.colorScheme.onTertiaryContainer)
+            val displayLabels = if (card.labels.isNotEmpty()) card.labels else listOf(card.label).filter { it.isNotBlank() }
+            if (displayLabels.isNotEmpty()) Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                displayLabels.take(3).forEach { tag ->
+                    Surface(shape = RoundedCornerShape(4.dp),
+                        color = MaterialTheme.colorScheme.tertiaryContainer) {
+                        Text(tag, Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                            fontSize = 10.sp, color = MaterialTheme.colorScheme.onTertiaryContainer,
+                            maxLines = 1)
+                    }
+                }
             }
+            if (card.priority != "normal") Text(
+                when (card.priority) {
+                    "urgent" -> "● فوری"
+                    "high" -> "● مهم"
+                    else -> "● کم‌اهمیت"
+                }, fontSize = 11.sp,
+                color = if (card.priority == "urgent") MaterialTheme.colorScheme.error
+                    else MaterialTheme.colorScheme.primary
+            )
             Text(card.title, fontWeight = FontWeight.Medium)
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (card.description.isNotBlank()) Icon(Icons.Outlined.Notes, null, Modifier.size(15.dp))
@@ -263,6 +293,8 @@ private fun PersonalKanbanCard(store: ZurvanKanbanStore, card: ZCard, lanes: Lis
                         style = MaterialTheme.typography.labelSmall)
                 if (card.comments.isNotEmpty())
                     Text("◉ " + card.comments.size, style = MaterialTheme.typography.labelSmall)
+                if (card.attachments.isNotEmpty())
+                    Text("📎 " + card.attachments.size, style = MaterialTheme.typography.labelSmall)
             }
         }
     }
@@ -274,8 +306,47 @@ private fun KanbanCardDialog(store: ZurvanKanbanStore, card: ZCard, lanes: List<
     val current = store.cards.firstOrNull { it.id == card.id } ?: return
     var name by remember(card.id) { mutableStateOf(card.title) }
     var description by remember(card.id) { mutableStateOf(card.description) }
-    var label by remember(card.id) { mutableStateOf(card.label) }
+    var label by remember(card.id) { mutableStateOf(card.labels.joinToString(", ").ifBlank { card.label }) }
     var due by remember(card.id) { mutableStateOf(card.due) }
+    var priority by remember(card.id) { mutableStateOf(card.priority) }
+    var priorityMenu by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf("") }
+    val context = LocalContext.current
+    val openUri = LocalUriHandler.current
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            runCatching {
+                val resolver = context.contentResolver
+                val name = resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE),
+                    null, null, null)?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                        val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
+                        (if (nameIndex >= 0) cursor.getString(nameIndex) else "attachment") to
+                        (if (sizeIndex >= 0) cursor.getLong(sizeIndex) else -1L)
+                    } else "attachment" to -1L
+                } ?: ("attachment" to -1L)
+                if (name.second > 15_000_000L) error("فایل باید کوچک‌تر از ۱۵ مگابایت باشد")
+                val dir = File(context.filesDir, "zurvan_kanban_files").apply { mkdirs() }
+                val file = File(dir, UUID.randomUUID().toString())
+                resolver.openInputStream(uri)?.use { input ->
+                    file.outputStream().use { output ->
+                        val buffer = ByteArray(8192)
+                        var count: Int
+                        var total = 0L
+                        while (input.read(buffer).also { count = it } != -1) {
+                            total += count
+                            require(total <= 15_000_000L) { "حجم فایل بیشتر از ۱۵ مگابایت است" }
+                            output.write(buffer, 0, count)
+                        }
+                    }
+                } ?: error("خواندن فایل ممکن نشد")
+                store.addAttachment(current.id,
+                    ZAttachment(UUID.randomUUID().toString(), name.first.take(150), file.absolutePath, file.length()))
+                error = ""
+            }.onFailure { ex -> error = ex.message ?: "افزودن فایل انجام نشد" }
+        }
+    }
     var task by remember { mutableStateOf("") }
     var comment by remember { mutableStateOf("") }
     var laneMenu by remember { mutableStateOf(false) }
@@ -288,8 +359,24 @@ private fun KanbanCardDialog(store: ZurvanKanbanStore, card: ZCard, lanes: List<
                     modifier = Modifier.fillMaxWidth(), singleLine = true)
                 OutlinedTextField(description, { description = it }, label = { Text("توضیحات") },
                     modifier = Modifier.fillMaxWidth(), minLines = 3)
-                OutlinedTextField(label, { label = it }, label = { Text("برچسب") },
+                OutlinedTextField(label, { label = it },
+                    label = { Text("برچسب‌ها (جدا با ویرگول)") },
                     modifier = Modifier.fillMaxWidth())
+                Box {
+                    OutlinedButton(onClick = { priorityMenu = true }) {
+                        Text("اولویت: " + when (priority) {
+                            "urgent" -> "فوری"; "high" -> "زیاد"; "low" -> "کم"; else -> "معمولی"
+                        })
+                        Icon(Icons.Outlined.ArrowDropDown, null)
+                    }
+                    DropdownMenu(expanded = priorityMenu, onDismissRequest = { priorityMenu = false }) {
+                        listOf("low" to "کم", "normal" to "معمولی",
+                            "high" to "زیاد", "urgent" to "فوری").forEach { (id, name) ->
+                            DropdownMenuItem(text = { Text(name) },
+                                onClick = { priority = id; priorityMenu = false })
+                        }
+                    }
+                }
                 OutlinedTextField(due, { due = it }, label = { Text("تاریخ سررسید YYYY-MM-DD") },
                     modifier = Modifier.fillMaxWidth())
                 Box {
@@ -345,6 +432,42 @@ private fun KanbanCardDialog(store: ZurvanKanbanStore, card: ZCard, lanes: List<
                         comment = ""
                     }) { Icon(Icons.Outlined.Send, "ثبت") }
                 }
+                HorizontalDivider()
+                Text("پیوست‌ها", fontWeight = FontWeight.Bold)
+                TextButton(onClick = { picker.launch(arrayOf("*/*")) }) {
+                    Icon(Icons.Outlined.AttachFile, null); Text("افزودن فایل تا ۱۵ مگابایت")
+                }
+                current.attachments.forEach { attachment ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(attachment.name, Modifier.weight(1f), maxLines = 1,
+                            style = MaterialTheme.typography.bodySmall)
+                        IconButton(onClick = {
+                            runCatching {
+                                val file = File(attachment.path)
+                                if (file.exists()) {
+                                    val contentUri = androidx.core.content.FileProvider.getUriForFile(
+                                        context, context.packageName + ".kanbanfiles", file)
+                                    val intent = Intent(Intent.ACTION_VIEW)
+                                        .setDataAndType(contentUri, "*/*")
+                                        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                    context.startActivity(Intent.createChooser(intent, "باز کردن فایل"))
+                                } else error = "فایل پیوست پیدا نشد"
+                            }.onFailure { error = "برنامه‌ای برای نمایش فایل پیدا نشد" }
+                        }) { Icon(Icons.Outlined.OpenInNew, "باز کردن") }
+                        IconButton(onClick = {
+                            val removed = store.removeAttachment(current.id, attachment.id)
+                            if (removed != null) File(removed.path).delete()
+                        }) { Icon(Icons.Outlined.DeleteOutline, "حذف فایل") }
+                    }
+                }
+                HorizontalDivider()
+                Text("تاریخچه فعالیت", fontWeight = FontWeight.Bold)
+                current.activity.takeLast(15).asReversed().forEach { entry ->
+                    Text(entry.at.take(16).replace("T", " ") + " · " + entry.detail,
+                        style = MaterialTheme.typography.labelSmall)
+                }
+                if (error.isNotBlank()) Text(error, color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall)
                 Row {
                     TextButton(onClick = {
                         store.updateCard(current.copy(archived = !current.archived)); onDismiss()
@@ -356,9 +479,16 @@ private fun KanbanCardDialog(store: ZurvanKanbanStore, card: ZCard, lanes: List<
             }
         },
         confirmButton = { TextButton(enabled = name.isNotBlank(), onClick = {
-            store.updateCard(current.copy(title = name.trim(),
-                description = description, label = label, due = due))
-            onDismiss()
+            val valid = due.isBlank() || runCatching { LocalDate.parse(due.trim()) }.isSuccess
+            if (!valid) {
+                error = "تاریخ سررسید را به صورت YYYY-MM-DD وارد کنید."
+            } else {
+                val tags = label.split(",", "،").map { it.trim() }.filter { it.isNotBlank() }.distinct()
+                store.updateCard(current.copy(title = name.trim(),
+                    description = description, label = tags.firstOrNull() ?: "",
+                    labels = tags.take(12), priority = priority, due = due.trim()))
+                onDismiss()
+            }
         }) { Text("ذخیره") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("بستن") } }
     )
