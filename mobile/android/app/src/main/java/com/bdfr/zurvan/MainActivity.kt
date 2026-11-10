@@ -730,7 +730,7 @@ internal fun CalendarMonthPage(
                 Arrangement.spacedBy(4.dp),
             verticalArrangement =
                 Arrangement.spacedBy(4.dp),
-            userScrollEnabled = !scrollMode
+            userScrollEnabled = false
         ) {
             items(
                 count =
