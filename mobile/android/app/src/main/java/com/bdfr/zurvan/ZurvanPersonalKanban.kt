@@ -284,7 +284,11 @@ private fun PersonalKanbanLane(
             (priorityFilter == "all" || it.priority == priorityFilter) &&
             (query.isBlank() || it.title.contains(query, ignoreCase = true) ||
                 it.description.contains(query, ignoreCase = true) ||
-                it.label.contains(query, ignoreCase = true))
+                it.label.contains(query, ignoreCase = true) ||
+                it.labels.any { label -> label.contains(query, ignoreCase = true) } ||
+                it.customFields.any { (key, value) ->
+                    key.contains(query, ignoreCase = true) || value.contains(query, ignoreCase = true)
+                })
     }.sortedBy { it.order }
     Surface(modifier, shape = RoundedCornerShape(10.dp),
         color = MaterialTheme.colorScheme.surfaceVariant) {
