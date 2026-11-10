@@ -1634,69 +1634,9 @@ private fun PlansScreen(
     viewModel: ZurvanViewModel,
     modifier: Modifier = Modifier
 ) {
-    val plans by viewModel.plans
-        .collectAsStateWithLifecycle()
-
-    var showDialog by remember {
-        mutableStateOf(false)
-    }
-
-    val today = remember {
-        val pair =
-            AndroidCalendarEngine
-                .currentPersianYearMonth()
-        val month =
-            AndroidCalendarEngine
-                .buildPersianMonth(
-                    pair.first,
-                    pair.second
-                )
-        month.days.firstOrNull {
-            it.isToday
-        }?.persianKey
-            ?: String.format(
-                "%04d-%02d-01",
-                pair.first,
-                pair.second
-            )
-    }
-
-    ZurvanTeamPlanner(
-        modifier = modifier,
-        plans = plans,
-        onAddSchedule = { showDialog = true },
-        onTogglePlan = { viewModel.togglePlan(it) }
-    )
-
-    if (showDialog) {
-        PlanDialog(
-            initialDateKey = today,
-            onDismiss = {
-                showDialog = false
-            },
-            onSave = {
-                    title,
-                    dateKey,
-                    hour,
-                    minute,
-                    kind,
-                    isPrivate,
-                    icon,
-                    deleteAfterDays ->
-                viewModel.addPlan(
-                    title,
-                    dateKey,
-                    hour,
-                    minute,
-                    kind,
-                    isPrivate,
-                    icon,
-                    deleteAfterDays
-                )
-                showDialog = false
-            }
-        )
-    }
+    // New plan workspace: personal and team remain separate.
+    // Legacy planning data is preserved in storage but its old screens are not shown.
+    ZurvanPersonalKanban(modifier)
 }
 
 @Composable
