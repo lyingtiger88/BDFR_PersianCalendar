@@ -18,9 +18,12 @@ internal data class ZCard(
 
 internal class ZurvanKanbanStore(context: Context) {
     private val prefs = context.getSharedPreferences("zurvan_personal_kanban_v1", Context.MODE_PRIVATE)
-    var boards by mutableStateOf<List<ZBoard>>(emptyList()); private set
-    var lanes by mutableStateOf<List<ZLane>>(emptyList()); private set
-    var cards by mutableStateOf<List<ZCard>>(emptyList()); private set
+    var boards by mutableStateOf<List<ZBoard>>(emptyList())
+        private set
+    var lanes by mutableStateOf<List<ZLane>>(emptyList())
+        private set
+    var cards by mutableStateOf<List<ZCard>>(emptyList())
+        private set
     init { load() }
     private fun load() = runCatching {
         val root = JSONObject(prefs.getString("data", "{}") ?: "{}")
