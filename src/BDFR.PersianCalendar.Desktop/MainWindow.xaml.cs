@@ -94,12 +94,12 @@ public sealed partial class MainWindow : Window
     private readonly TextBox TaskTitleBox = new();
     private readonly TextBox TaskTimeBox = new();
     private readonly TextBox SpecialTitleBox = new();
-    private readonly TextBox SpecialCalendarBox = new();
-    private readonly TextBox SpecialMonthBox = new();
+    private readonly ComboBox SpecialCalendarBox = new();
+    private readonly ComboBox SpecialMonthBox = new();
     private readonly TextBox SpecialDayBox = new();
     private readonly TextBox SpecialHourBox = new();
     private readonly TextBox SpecialMinuteBox = new();
-    private readonly TextBox SpecialReminderDaysBox = new();
+    private readonly ComboBox SpecialReminderDaysBox = new();
     private readonly TextBox QuickAddBox = new();
     private readonly TextBlock StatusText = new();
     private readonly TextBlock SyncProgress = new();
@@ -1222,9 +1222,14 @@ public sealed partial class MainWindow : Window
         SpecialTitleBox.PlaceholderText = "مثلاً تولد علی";
         stack.Children.Add(SpecialTitleBox);
 
-        stack.Children.Add(new TextBlock { Text = "نوع تقویم", Opacity = 0.7 });
-        SpecialCalendarBox.Text = "شمسی";
-        SpecialCalendarBox.PlaceholderText = "شمسی / میلادی / قمری";
+        SpecialCalendarBox.Header = "نوع تقویم";
+        SpecialCalendarBox.Items.Clear();
+        SpecialCalendarBox.Items.Add("شمسی");
+        SpecialCalendarBox.Items.Add("قمری");
+        SpecialCalendarBox.Items.Add("میلادی");
+        SpecialCalendarBox.SelectedIndex = 0;
+        SpecialCalendarBox.HorizontalAlignment = HorizontalAlignment.Stretch;
+        SpecialCalendarBox.SelectionChanged += (_, _) => RefreshSpecialOccasionMonthChoices();
         stack.Children.Add(SpecialCalendarBox);
 
         stack.Children.Add(new TextBlock
@@ -1236,9 +1241,8 @@ public sealed partial class MainWindow : Window
         });
 
         SpecialMonthBox.Header = "ماه";
-        SpecialMonthBox.Text = "1";
-        SpecialMonthBox.PlaceholderText = "1 تا 12";
-        SpecialMonthBox.FlowDirection = FlowDirection.LeftToRight;
+        SpecialMonthBox.HorizontalAlignment = HorizontalAlignment.Stretch;
+        SpecialMonthBox.SelectionChanged += (_, _) => RefreshSpecialOccasionDayChoices();
         stack.Children.Add(SpecialMonthBox);
 
         SpecialDayBox.Header = "روز";
@@ -1259,10 +1263,13 @@ public sealed partial class MainWindow : Window
         SpecialMinuteBox.FlowDirection = FlowDirection.LeftToRight;
         stack.Children.Add(SpecialMinuteBox);
 
-        SpecialReminderDaysBox.Header = "روزهای یادآوری قبل از مناسبت";
-        SpecialReminderDaysBox.Text = "7,1,0";
-        SpecialReminderDaysBox.PlaceholderText = "مثلاً 30,7,1,0";
+        SpecialReminderDaysBox.Header = "چند روز قبل یادآوری شود؟";
+        SpecialReminderDaysBox.HorizontalAlignment = HorizontalAlignment.Stretch;
+        for (var reminderDay = 1; reminderDay <= 10; reminderDay++)
+            SpecialReminderDaysBox.Items.Add(reminderDay.ToString(CultureInfo.InvariantCulture));
+        SpecialReminderDaysBox.SelectedItem = "7";
         stack.Children.Add(SpecialReminderDaysBox);
+        RefreshSpecialOccasionMonthChoices();
 
         var addSpecial = MakeButton("ثبت مناسبت و یادآورها");
         addSpecial.Click += AddSpecialOccasion_Click;
@@ -7073,6 +7080,41 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private void RefreshSpecialOccasionMonthChoices()
+    {
+        var selected = SpecialMonthBox.SelectedIndex;
+        var names = SpecialCalendarBox.SelectedItem?.ToString() switch
+        {
+            "میلادی" => new[] { "ژانویه", "فوریه", "مارس", "آوریل", "مه", "ژوئن", "ژوئیه", "اوت", "سپتامبر", "اکتبر", "نوامبر", "دسامبر" },
+            "قمری" => new[] { "محرم", "صفر", "ربیع‌الاول", "ربیع‌الثانی", "جمادی‌الاول", "جمادی‌الثانی", "رجب", "شعبان", "رمضان", "شوال", "ذیقعده", "ذیحجه" },
+            _ => PersianDate.MonthNames.ToArray()
+        };
+        SpecialMonthBox.Items.Clear();
+        foreach (var name in names) SpecialMonthBox.Items.Add(name);
+        SpecialMonthBox.SelectedIndex = selected >= 0 && selected < names.Length ? selected : 0;
+        RefreshSpecialOccasionDayChoices();
+    }
+
+    private void RefreshSpecialOccasionDayChoices()
+    {
+        var month = Math.Max(1, SpecialMonthBox.SelectedIndex + 1);
+        var system = SpecialCalendarBox.SelectedItem?.ToString() switch
+        {
+            "میلادی" => CalendarSystemKind.Gregorian,
+            "قمری" => CalendarSystemKind.Hijri,
+            _ => CalendarSystemKind.Persian
+        };
+        var maxDay = system switch
+        {
+            CalendarSystemKind.Persian => month <= 6 ? 31 : 30,
+            CalendarSystemKind.Gregorian => DateTime.DaysInMonth(2024, month),
+            _ => 30
+        };
+        var current = int.TryParse(PersianQuickAddParser.NormalizeDigits(SpecialDayBox.Text ?? ""), out var d) ? d : 1;
+        SpecialDayBox.Text = Math.Clamp(current, 1, maxDay).ToString(CultureInfo.InvariantCulture);
+        SpecialDayBox.PlaceholderText = $"۱ تا {maxDay}";
+    }
+
     private async void AddSpecialOccasion_Click(object sender, RoutedEventArgs e)
     {
         if (string.IsNullOrWhiteSpace(SpecialTitleBox.Text))
@@ -7081,8 +7123,7 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        if (!int.TryParse(PersianQuickAddParser.NormalizeDigits(SpecialMonthBox.Text ?? ""), out var month) ||
-            month is < 1 or > 12 ||
+        if (SpecialMonthBox.SelectedIndex < 0 ||
             !int.TryParse(PersianQuickAddParser.NormalizeDigits(SpecialDayBox.Text ?? ""), out var day) ||
             day is < 1 or > 31)
         {
@@ -7100,16 +7141,13 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        var reminderDays = (SpecialReminderDaysBox.Text ?? "7,1,0")
-            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Select(x => int.TryParse(PersianQuickAddParser.NormalizeDigits(x), out var n) ? n : -1)
-            .Where(x => x >= 0)
-            .Distinct()
-            .ToArray();
+        var month = SpecialMonthBox.SelectedIndex + 1;
+        var reminderDays = int.TryParse(SpecialReminderDaysBox.SelectedItem?.ToString(), out var selectedReminderDay)
+            ? new[] { selectedReminderDay } : new[] { 7 };
 
         try
         {
-            var calendarSystem = (SpecialCalendarBox.Text ?? "شمسی").Trim() switch
+            var calendarSystem = SpecialCalendarBox.SelectedItem?.ToString() switch
             {
                 "میلادی" => CalendarSystemKind.Gregorian,
                 "قمری" => CalendarSystemKind.Hijri,
@@ -7121,7 +7159,7 @@ public sealed partial class MainWindow : Window
                 calendarSystem,
                 month,
                 day,
-                reminderDays.Length == 0 ? [7, 1, 0] : reminderDays,
+                reminderDays,
                 notificationTime);
 
             SpecialTitleBox.Text = "";
