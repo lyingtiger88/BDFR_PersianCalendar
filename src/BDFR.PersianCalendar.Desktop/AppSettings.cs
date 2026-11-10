@@ -102,6 +102,7 @@ public sealed class AppSettings
 
     // Calendar clock presentation. Values: analog/digital and khwarazmi/pahlavi/cuneiform/roman.
     public string CalendarClockMode { get; set; } = "analog";
+    public string CalendarDigitalClockTheme { get; set; } = "cosmic_gold";
     public string CalendarClockNumeralStyle { get; set; } = "khwarazmi";
 
     // Independent visual style for zodiac artwork in the Occasions module.
