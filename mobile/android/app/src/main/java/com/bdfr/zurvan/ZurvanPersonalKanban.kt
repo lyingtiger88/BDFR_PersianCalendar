@@ -420,6 +420,11 @@ private fun KanbanCardDialog(store: ZurvanKanbanStore, card: ZCard, lanes: List<
     var label by remember(card.id) { mutableStateOf(card.labels.joinToString(", ").ifBlank { card.label }) }
     var due by remember(card.id) { mutableStateOf(card.due) }
     var priority by remember(card.id) { mutableStateOf(card.priority) }
+    var cardType by remember(card.id) { mutableStateOf(card.cardType) }
+    var customFields by remember(card.id) { mutableStateOf(card.customFields.toMap()) }
+    var fieldKey by remember { mutableStateOf("") }
+    var fieldValue by remember { mutableStateOf("") }
+    var typeMenu by remember { mutableStateOf(false) }
     var priorityMenu by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf("") }
     val context = LocalContext.current
@@ -497,6 +502,22 @@ private fun KanbanCardDialog(store: ZurvanKanbanStore, card: ZCard, lanes: List<
                         }
                     }
                 }
+                Box {
+                    OutlinedButton(onClick = { typeMenu = true }) {
+                        Text("نوع کارت: " + when (cardType) {
+                            "story" -> "داستان"; "project" -> "پروژه"; else -> "کار"
+                        })
+                        Icon(Icons.Outlined.ArrowDropDown, null)
+                    }
+                    DropdownMenu(expanded = typeMenu, onDismissRequest = { typeMenu = false }) {
+                        listOf("task" to "کار", "story" to "داستان", "project" to "پروژه")
+                            .forEach { (id, label) ->
+                                DropdownMenuItem(text = { Text(label) }, onClick = {
+                                    cardType = id; typeMenu = false
+                                })
+                            }
+                    }
+                }
                 OutlinedTextField(due, { due = it }, label = { Text("تاریخ سررسید YYYY-MM-DD") },
                     modifier = Modifier.fillMaxWidth())
                 Box {
@@ -517,6 +538,28 @@ private fun KanbanCardDialog(store: ZurvanKanbanStore, card: ZCard, lanes: List<
                     TextButton(onClick = { store.reorderCard(current.id, -1) }) { Text("↑ بالاتر") }
                     TextButton(onClick = { store.reorderCard(current.id, 1) }) { Text("↓ پایین‌تر") }
                 }
+                HorizontalDivider()
+                Text("فیلدهای سفارشی", fontWeight = FontWeight.Bold)
+                customFields.entries.toList().forEach { (key, value) ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("$key: $value", Modifier.weight(1f),
+                            style = MaterialTheme.typography.bodySmall)
+                        IconButton(onClick = { customFields = customFields - key }) {
+                            Icon(Icons.Outlined.Close, "حذف فیلد")
+                        }
+                    }
+                }
+                OutlinedTextField(fieldKey, { fieldKey = it.take(60) },
+                    label = { Text("نام فیلد") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                OutlinedTextField(fieldValue, { fieldValue = it.take(300) },
+                    label = { Text("مقدار فیلد") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                TextButton(
+                    enabled = fieldKey.isNotBlank() && customFields.size < 30,
+                    onClick = {
+                        customFields = customFields + (fieldKey.trim() to fieldValue.trim())
+                        fieldKey = ""; fieldValue = ""
+                    }
+                ) { Icon(Icons.Outlined.Add, null); Text("افزودن فیلد") }
                 HorizontalDivider()
                 Text("چک‌لیست", fontWeight = FontWeight.Bold)
                 current.tasks.forEachIndexed { index, item ->
@@ -608,7 +651,8 @@ private fun KanbanCardDialog(store: ZurvanKanbanStore, card: ZCard, lanes: List<
                 val tags = label.split(",", "،").map { it.trim() }.filter { it.isNotBlank() }.distinct()
                 store.updateCard(current.copy(title = name.trim(),
                     description = description, label = tags.firstOrNull() ?: "",
-                    labels = tags.take(12), priority = priority, due = due.trim()))
+                    labels = tags.take(12), priority = priority, due = due.trim(),
+                    cardType = cardType, customFields = customFields))
                 onDismiss()
             }
         }) { Text("ذخیره") } },
