@@ -196,6 +196,7 @@ private fun PersonalKanbanBoard(store: ZurvanKanbanStore, board: ZBoard, onBack:
     var options by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
     var showArchive by remember { mutableStateOf(false) }
+    var priorityFilter by remember { mutableStateOf("all") }
     val lanes = store.lanes.filter { it.board == board.id }.sortedBy { it.order }
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -223,10 +224,27 @@ private fun PersonalKanbanBoard(store: ZurvanKanbanStore, board: ZBoard, onBack:
         Text("کارت را لمس و نگه‌دار، سپس برای انتقال به ستون دیگر افقی و برای تغییر ترتیب عمودی بکش.",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            listOf("all" to "همه", "urgent" to "فوری", "high" to "مهم",
+                "normal" to "عادی", "low" to "کم").forEach { (key, text) ->
+                FilterChip(
+                    selected = priorityFilter == key,
+                    onClick = { priorityFilter = key },
+                    label = { Text(text) })
+            }
+        }
+        val boardCards = store.cards.filter { item ->
+            item.lane in lanes.map { it.id } && item.archived == showArchive
+        }
+        Text("${boardCards.size} کارت · ${boardCards.count { row -> row.due.isNotBlank() &&
+            runCatching { LocalDate.parse(row.due) < LocalDate.now() }.getOrDefault(false) }} سررسید گذشته",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row(Modifier.fillMaxSize().horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             lanes.forEach { lane ->
-                PersonalKanbanLane(store, lane, lanes, query, showArchive,
+                PersonalKanbanLane(store, lane, lanes, query, showArchive, priorityFilter,
                     modifier = Modifier.width(276.dp).fillMaxHeight())
             }
             OutlinedCard(onClick = { addLane = true }, modifier = Modifier.width(245.dp)) {
@@ -253,7 +271,7 @@ private fun PersonalKanbanBoard(store: ZurvanKanbanStore, board: ZBoard, onBack:
 @Composable
 private fun PersonalKanbanLane(
     store: ZurvanKanbanStore, lane: ZLane, lanes: List<ZLane>, query: String,
-    showArchive: Boolean, modifier: Modifier
+    showArchive: Boolean, priorityFilter: String, modifier: Modifier
 ) {
     var add by remember { mutableStateOf(false) }
     var title by remember { mutableStateOf("") }
@@ -263,6 +281,7 @@ private fun PersonalKanbanLane(
     var delete by remember { mutableStateOf(false) }
     val cards = store.cards.filter {
         it.lane == lane.id && it.archived == showArchive &&
+            (priorityFilter == "all" || it.priority == priorityFilter) &&
             (query.isBlank() || it.title.contains(query, ignoreCase = true) ||
                 it.description.contains(query, ignoreCase = true) ||
                 it.label.contains(query, ignoreCase = true))
@@ -365,9 +384,21 @@ private fun PersonalKanbanCard(store: ZurvanKanbanStore, card: ZCard, lanes: Lis
                     else MaterialTheme.colorScheme.primary
             )
             Text(card.title, fontWeight = FontWeight.Medium)
+            if (card.tasks.isNotEmpty()) {
+                LinearProgressIndicator(
+                    progress = { card.tasks.count { it.done }.toFloat() / card.tasks.size },
+                    modifier = Modifier.fillMaxWidth().height(3.dp))
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (card.description.isNotBlank()) Icon(Icons.Outlined.Notes, null, Modifier.size(15.dp))
-                if (card.due.isNotBlank()) Text("◷ " + card.due, style = MaterialTheme.typography.labelSmall)
+                if (card.due.isNotBlank()) {
+                    val overdue = runCatching {
+                        LocalDate.parse(card.due) < LocalDate.now()
+                    }.getOrDefault(false)
+                    Text("◷ " + card.due, style = MaterialTheme.typography.labelSmall,
+                        color = if (overdue) MaterialTheme.colorScheme.error
+                            else MaterialTheme.colorScheme.onSurfaceVariant)
+                }
                 if (card.tasks.isNotEmpty())
                     Text("☑ " + card.tasks.count { it.done } + "/" + card.tasks.size,
                         style = MaterialTheme.typography.labelSmall)
