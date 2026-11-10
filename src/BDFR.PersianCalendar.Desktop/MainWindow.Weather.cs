@@ -4,6 +4,7 @@ using System.Text.Json;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Shapes;
 
 namespace BDFR.PersianCalendar.Desktop;
 
@@ -13,9 +14,9 @@ public sealed partial class MainWindow
     private readonly TextBlock _weatherNow = new();
     private readonly TextBlock _weatherDescription = new();
     private readonly TextBlock _weatherLocation = new();
-    private readonly StackPanel _weatherPastDays = new();
+    private readonly StackPanel _weatherHourly = new();
+    private readonly ContentControl _weatherCurrentIcon = new();
     private readonly StackPanel _weatherFutureDays = new();
-    private readonly TextBox _weatherCityInput = new();
     private DateTime _weatherLastRequestUtc = DateTime.MinValue;
     private string _weatherLastCity = "";
     private bool _weatherBusy;
@@ -40,20 +41,30 @@ public sealed partial class MainWindow
         _weatherNow.FontSize = 32;
         _weatherNow.FontWeight = Microsoft.UI.Text.FontWeights.SemiBold;
         _weatherNow.Text = "در حال دریافت…";
-        layout.Children.Add(_weatherNow);
+        var conditions = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            FlowDirection = FlowDirection.LeftToRight,
+            Spacing = 10
+        };
+        _weatherCurrentIcon.Width = 44;
+        _weatherCurrentIcon.Height = 44;
+        conditions.Children.Add(_weatherCurrentIcon);
+        conditions.Children.Add(_weatherNow);
+        layout.Children.Add(conditions);
         _weatherDescription.FontSize = 11;
         _weatherDescription.TextWrapping = TextWrapping.Wrap;
         layout.Children.Add(_weatherDescription);
 
         layout.Children.Add(new TextBlock
         {
-            Text = "۷ روز گذشته",
+            Text = "دمای ۲۴ ساعت آینده",
             FontSize = 11,
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
             Foreground = ThemeService.Brush("#FFFFFFFF")
         });
-        var pastScroll = CreateWeatherDayScroller(_weatherPastDays);
-        layout.Children.Add(pastScroll);
+        var hourlyScroll = CreateWeatherDayScroller(_weatherHourly);
+        layout.Children.Add(hourlyScroll);
         layout.Children.Add(new TextBlock
         {
             Text = "۷ روز آینده",
@@ -106,7 +117,7 @@ public sealed partial class MainWindow
         _weatherBusy = true;
         _weatherNow.Text = "در حال دریافت…";
         _weatherDescription.Text = "در حال اتصال به سرویس هواشناسی";
-        _weatherPastDays.Children.Clear();
+        _weatherHourly.Children.Clear();
         _weatherFutureDays.Children.Clear();
         try
         {
@@ -145,7 +156,8 @@ public sealed partial class MainWindow
                 "&longitude=" + lon +
                 "&current=temperature_2m,relative_humidity_2m,weather_code,is_day,wind_speed_10m" +
                 "&daily=weather_code,temperature_2m_max,temperature_2m_min" +
-                "&timezone=auto&past_days=7&forecast_days=8");
+                "&hourly=temperature_2m,weather_code,is_day" +
+                "&timezone=auto&forecast_days=8");
             forecastResponse.EnsureSuccessStatusCode();
             using var forecast = JsonDocument.Parse(await forecastResponse.Content.ReadAsStringAsync());
             var root = forecast.RootElement;
@@ -156,16 +168,48 @@ public sealed partial class MainWindow
             var humidity = current.GetProperty("relative_humidity_2m").GetInt32();
             var wind = current.GetProperty("wind_speed_10m").GetDouble();
             _weatherLocation.Text = _settings.WeatherCountryName + " • " + city + " • " + place;
-            _weatherNow.Text = WeatherSymbol(code, daytime) + "  " + temp.ToString("0", CultureInfo.InvariantCulture) + "°";
+            _weatherNow.Text = temp.ToString("0", CultureInfo.InvariantCulture) + "°";
+            _weatherCurrentIcon.Content = BuildWeatherGlyph(code, daytime, 42);
             _weatherDescription.Text = WeatherCondition(code) +
                 "  •  رطوبت " + humidity.ToString(CultureInfo.InvariantCulture) +
                 "٪  •  باد " + wind.ToString("0", CultureInfo.InvariantCulture) + " km/h";
+            var hourly = root.GetProperty("hourly");
+            var hours = hourly.GetProperty("time");
+            var hourlyTemps = hourly.GetProperty("temperature_2m");
+            var hourlyCodes = hourly.GetProperty("weather_code");
+            var hourlyDay = hourly.GetProperty("is_day");
+            var locationNow = DateTime.Parse(current.GetProperty("time").GetString()!,
+                CultureInfo.InvariantCulture);
+            var hoursShown = 0;
+            for (var i = 0; i < hours.GetArrayLength() && hoursShown < 24; i++)
+            {
+                var hour = DateTime.Parse(hours[i].GetString()!, CultureInfo.InvariantCulture);
+                if (hour < new DateTime(locationNow.Year, locationNow.Month, locationNow.Day, locationNow.Hour, 0, 0))
+                    continue;
+                var hourTile = new StackPanel { Spacing = 4, Width = 46 };
+                hourTile.Children.Add(new TextBlock {
+                    Text = hour.ToString("HH:mm", CultureInfo.InvariantCulture),
+                    FontSize = 10, Foreground = ThemeService.Brush("#FFFFFFFF"),
+                    TextAlignment = TextAlignment.Center });
+                hourTile.Children.Add(BuildWeatherGlyph(
+                    hourlyCodes[i].GetInt32(), hourlyDay[i].GetInt32() == 1, 30));
+                hourTile.Children.Add(new TextBlock {
+                    Text = hourlyTemps[i].GetDouble().ToString("0", CultureInfo.InvariantCulture) + "°",
+                    FontSize = 12, Foreground = ThemeService.Brush("#FFFFFFFF"),
+                    TextAlignment = TextAlignment.Center });
+                _weatherHourly.Children.Add(new Border {
+                    CornerRadius = new CornerRadius(7),
+                    Padding = new Thickness(3, 6, 3, 6),
+                    Background = BrushWithAlpha("#FFFFFFFF", 0x20),
+                    Child = hourTile });
+                hoursShown++;
+            }
             var daily = root.GetProperty("daily");
             var dates = daily.GetProperty("time");
             var highs = daily.GetProperty("temperature_2m_max");
             var lows = daily.GetProperty("temperature_2m_min");
             var codes = daily.GetProperty("weather_code");
-            var today = DateTime.Today;
+            var today = locationNow.Date;
             var culture = new CultureInfo("fa-IR");
             for (var i = 0; i < dates.GetArrayLength(); i++)
             {
@@ -173,8 +217,8 @@ public sealed partial class MainWindow
                 var high = highs[i].GetDouble();
                 var low = lows[i].GetDouble();
                 var codeDay = codes[i].GetInt32();
+                if (date < today || date > today.AddDays(7)) continue;
                 var label = date == today ? "امروز" :
-                    date == today.AddDays(-1) ? "دیروز" :
                     date == today.AddDays(1) ? "فردا" :
                     date.ToString("ddd", culture);
                 var tile = new StackPanel { Spacing = 4, Width = 48, HorizontalAlignment = HorizontalAlignment.Center };
@@ -185,9 +229,7 @@ public sealed partial class MainWindow
                     Text = date.ToString("MM/dd", CultureInfo.InvariantCulture),
                     FontSize = 9, Opacity = 0.7,
                     Foreground = ThemeService.Brush("#FFFFFFFF"), TextAlignment = TextAlignment.Center });
-                tile.Children.Add(new TextBlock {
-                    Text = WeatherSymbol(codeDay, true), FontSize = 22,
-                    Foreground = ThemeService.Brush("#FFFFFFFF"), TextAlignment = TextAlignment.Center });
+                tile.Children.Add(BuildWeatherGlyph(codeDay, true, 32));
                 tile.Children.Add(new TextBlock {
                     Text = high.ToString("0", CultureInfo.InvariantCulture) + "°",
                     FontSize = 11, Foreground = ThemeService.Brush("#FFFFFFFF"), TextAlignment = TextAlignment.Center });
@@ -195,8 +237,7 @@ public sealed partial class MainWindow
                     Text = low.ToString("0", CultureInfo.InvariantCulture) + "°",
                     FontSize = 10, Opacity = 0.75,
                     Foreground = ThemeService.Brush("#FFFFFFFF"), TextAlignment = TextAlignment.Center });
-                var target = date < today ? _weatherPastDays : _weatherFutureDays;
-                target.Children.Add(new Border {
+                _weatherFutureDays.Children.Add(new Border {
                     CornerRadius = new CornerRadius(7), Padding = new Thickness(3, 6, 3, 6),
                     Background = BrushWithAlpha("#FFFFFFFF", 0x20), Child = tile });
             }
@@ -236,13 +277,114 @@ public sealed partial class MainWindow
         80 or 81 or 82 => "رگبار", 95 or 96 or 99 => "رعدوبرق",
         _ => "وضعیت متغیر"
     };
-    private static string WeatherSymbol(int code, bool day) => code switch
+    // Vector-drawn weather artwork: no emoji, missing glyphs or user-font fallback.
+    // All weather tiles use native WinUI shapes and remain legible under any font.
+    private static FrameworkElement BuildWeatherGlyph(int code, bool daylight, double size)
     {
-        0 => day ? "☀️" : "🌙",
-        1 or 2 => day ? "🌤️" : "☁️", 3 => "☁️",
-        45 or 48 => "🌫️", 51 or 53 or 55 or 56 or 57 => "🌦️",
-        61 or 63 or 65 or 66 or 67 or 80 or 81 or 82 => "🌧️",
-        71 or 73 or 75 or 77 or 85 or 86 => "🌨️",
-        95 or 96 or 99 => "⛈️", _ => "🌥️"
-    };
+        var canvas = new Canvas { Width = 48, Height = 48 };
+        var sun = ThemeService.Brush("#FFFFC34E");
+        var cloud = ThemeService.Brush("#FFE7F0FB");
+        var shadow = ThemeService.Brush("#FFA1B7D1");
+        var rain = ThemeService.Brush("#FF6DC5FD");
+        var snow = ThemeService.Brush("#FFFFFFFF");
+        var thunder = ThemeService.Brush("#FFFFDA63");
+
+        void Line(double x1, double y1, double x2, double y2,
+            Microsoft.UI.Xaml.Media.Brush brush, double width = 2.5)
+        {
+            canvas.Children.Add(new Line { X1 = x1, Y1 = y1, X2 = x2, Y2 = y2,
+                Stroke = brush, StrokeThickness = width,
+                StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round });
+        }
+        void Oval(double x, double y, double w, double h, Microsoft.UI.Xaml.Media.Brush fill)
+        {
+            var e = new Ellipse { Width = w, Height = h, Fill = fill };
+            Canvas.SetLeft(e, x);
+            Canvas.SetTop(e, y);
+            canvas.Children.Add(e);
+        }
+
+        var clear = code == 0;
+        var partlyCloudy = code is 1 or 2;
+        var fog = code is 45 or 48;
+        var showers = code is 51 or 53 or 55 or 56 or 57 or
+            61 or 63 or 65 or 66 or 67 or 80 or 81 or 82;
+        var snowy = code is 71 or 73 or 75 or 77 or 85 or 86;
+        var storm = code is 95 or 96 or 99;
+        var showCloud = !clear;
+
+        if (clear || partlyCloudy)
+        {
+            if (daylight)
+            {
+                Oval(clear ? 16 : 6, clear ? 16 : 6, 16, 16, sun);
+                var x = clear ? 24 : 14;
+                var y = clear ? 24 : 14;
+                for (var i = 0; i < 8; i++)
+                {
+                    var a = i * Math.PI / 4;
+                    Line(x + Math.Cos(a) * 12, y + Math.Sin(a) * 12,
+                         x + Math.Cos(a) * 17, y + Math.Sin(a) * 17, sun, 2.7);
+                }
+            }
+            else
+            {
+                Oval(clear ? 16 : 7, clear ? 13 : 6, 21, 21, thunder);
+                Oval(clear ? 23 : 14, clear ? 8 : 1, 20, 20,
+                    ThemeService.Brush("#FF173352"));
+            }
+        }
+        if (showCloud)
+        {
+            Oval(9, 21, 19, 16, shadow);
+            Oval(19, 14, 21, 21, cloud);
+            Oval(29, 23, 14, 14, cloud);
+            var baseShape = new Rectangle
+            {
+                Width = 30, Height = 11, RadiusX = 5, RadiusY = 5, Fill = cloud
+            };
+            Canvas.SetLeft(baseShape, 12);
+            Canvas.SetTop(baseShape, 27);
+            canvas.Children.Add(baseShape);
+        }
+        if (showers || storm)
+        {
+            for (var i = 0; i < 3; i++)
+                Line(15 + i * 9, 39, 12 + i * 9, 45, rain, 2.5);
+        }
+        if (snowy)
+        {
+            for (var i = 0; i < 3; i++)
+                Oval(14 + i * 10, 40, 4, 4, snow);
+        }
+        if (storm)
+        {
+            var bolt = new Polygon
+            {
+                Fill = thunder,
+                Points = new Microsoft.UI.Xaml.Media.PointCollection
+                {
+                    new Windows.Foundation.Point(27, 31),
+                    new Windows.Foundation.Point(19, 42),
+                    new Windows.Foundation.Point(26, 41),
+                    new Windows.Foundation.Point(22, 48),
+                    new Windows.Foundation.Point(35, 36),
+                    new Windows.Foundation.Point(28, 37)
+                }
+            };
+            canvas.Children.Add(bolt);
+        }
+        if (fog)
+        {
+            Line(7, 40, 41, 40, shadow, 2);
+            Line(12, 44, 36, 44, shadow, 2);
+        }
+
+        return new Viewbox
+        {
+            Width = size, Height = size, Stretch = Stretch.Uniform,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Child = canvas
+        };
+    }
 }
