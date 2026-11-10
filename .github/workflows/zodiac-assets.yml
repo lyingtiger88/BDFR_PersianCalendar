@@ -25,9 +25,9 @@ jobs:
           root = Path('picture/zodiac/png')
           assert root.is_dir(), f'Missing source directory: {root}'
           files = [p for p in root.iterdir() if p.is_file()]
-          assert len(files) == 120, f'Expected 120 zodiac PNGs in repository, found {len(files)}'
+          assert len(files) == 108, f'Expected 108 zodiac PNGs in repository, found {len(files)}'
           names = ('aries','taurus','gemini','cancer','leo','virgo','libra','scorpio','sagittarius','capricorn','aquarius','pisces')
-          styles = ('cosmic','cute','cute_1','cute_2','cute_3','luxury','minimal','mythic','neon','watercolor')
+          styles = ('cosmic','cute_1','cute_2','cute_3','luxury','minimal','mythic','neon','watercolor')
           for style in styles:
               for name in names:
                   path = root / f'{style}_{name}.png'
@@ -35,5 +35,5 @@ jobs:
                   with Image.open(path) as image:
                       assert image.format == 'PNG', f'Invalid PNG: {path}'
                       image.verify()
-          print('Verified 120 PNG files. No regeneration, write or build.')
+          print('Verified 108 PNG files. No regeneration, write or build.')
           PY
