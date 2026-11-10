@@ -68,11 +68,12 @@ fun ZurvanDigitalClockFace(
     val p = digitalPalette(theme)
     val clock = now.format(DateTimeFormatter.ofPattern("HH:mm", Locale.ROOT))
     val seconds = now.format(DateTimeFormatter.ofPattern("ss", Locale.ROOT))
-    val date = LocalDate.now()
     val persianDate = runCatching {
-        val jalali = java.time.chrono.HijrahChronology.INSTANCE // placeholder not used for display
-        date.format(DateTimeFormatter.ofPattern("yyyy/MM/dd", Locale.ROOT))
-    }.getOrDefault(date.toString())
+        val calendar = android.icu.util.PersianCalendar()
+        val monthNames = arrayOf("فروردین", "اردیبهشت", "خرداد", "تیر", "مرداد", "شهریور",
+            "مهر", "آبان", "آذر", "دی", "بهمن", "اسفند")
+        "${calendar.get(android.icu.util.Calendar.DAY_OF_MONTH)} ${monthNames[calendar.get(android.icu.util.Calendar.MONTH)]} ${calendar.get(android.icu.util.Calendar.YEAR)}"
+    }.getOrDefault(LocalDate.now().toString())
     Box(
         modifier = modifier
             .padding(4.dp)
