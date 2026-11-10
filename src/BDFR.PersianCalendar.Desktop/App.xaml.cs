@@ -357,6 +357,17 @@ public partial class App : Application
             return;
         }
 
+        if (action == "snoozePrompt")
+        {
+            _window?.DispatcherQueue.TryEnqueue(async () =>
+            {
+                _window?.Activate();
+                if (_window is MainWindow main)
+                    await main.PromptReminderSnoozeAsync(reminderId);
+            });
+            return;
+        }
+
         var message = await _reminderActions.HandleAsync(reminderId, action);
 
         _window?.DispatcherQueue.TryEnqueue(() =>
