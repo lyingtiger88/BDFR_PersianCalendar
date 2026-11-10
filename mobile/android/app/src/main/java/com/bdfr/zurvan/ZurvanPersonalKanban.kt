@@ -377,6 +377,7 @@ private fun KanbanCardDialog(store: ZurvanKanbanStore, card: ZCard, lanes: List<
     val context = LocalContext.current
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
+            var pendingFile: File? = null
             runCatching {
                 val resolver = context.contentResolver
                 val name = resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE),
@@ -384,13 +385,18 @@ private fun KanbanCardDialog(store: ZurvanKanbanStore, card: ZCard, lanes: List<
                     if (cursor.moveToFirst()) {
                         val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
                         val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
-                        (if (nameIndex >= 0) cursor.getString(nameIndex) else "attachment") to
-                        (if (sizeIndex >= 0) cursor.getLong(sizeIndex) else -1L)
+                        (if (nameIndex >= 0) cursor.getString(nameIndex).orEmpty().ifBlank { "attachment" }
+                            else "attachment") to
+                        (if (sizeIndex >= 0 && !cursor.isNull(sizeIndex)) cursor.getLong(sizeIndex) else -1L)
                     } else "attachment" to -1L
                 } ?: ("attachment" to -1L)
                 if (name.second > 15_000_000L) throw IllegalArgumentException("فایل باید کوچک‌تر از ۱۵ مگابایت باشد")
                 val dir = File(context.filesDir, "zurvan_kanban_files").apply { mkdirs() }
-                val file = File(dir, UUID.randomUUID().toString())
+                val ext = name.first.substringAfterLast('.', "").take(10)
+                    .takeIf { it.isNotBlank() && it.all { ch -> ch.isLetterOrDigit() } } ?: ""
+                val file = File(dir, UUID.randomUUID().toString() +
+                    (if (ext.isEmpty()) "" else "." + ext))
+                pendingFile = file
                 resolver.openInputStream(uri)?.use { input ->
                     file.outputStream().use { output ->
                         val buffer = ByteArray(8192)
@@ -405,8 +411,12 @@ private fun KanbanCardDialog(store: ZurvanKanbanStore, card: ZCard, lanes: List<
                 } ?: throw IllegalArgumentException("خواندن فایل ممکن نشد")
                 store.addAttachment(current.id,
                     ZAttachment(UUID.randomUUID().toString(), name.first.take(150), file.absolutePath, file.length()))
+                pendingFile = null
                 error = ""
-            }.onFailure { ex -> error = ex.message ?: "افزودن فایل انجام نشد" }
+            }.onFailure { ex ->
+                pendingFile?.delete()
+                error = ex.message ?: "افزودن فایل انجام نشد"
+            }
         }
     }
     var task by remember { mutableStateOf("") }
@@ -509,8 +519,11 @@ private fun KanbanCardDialog(store: ZurvanKanbanStore, card: ZCard, lanes: List<
                                 if (file.exists()) {
                                     val contentUri = androidx.core.content.FileProvider.getUriForFile(
                                         context, context.packageName + ".kanbanfiles", file)
+                                    val ext = attachment.name.substringAfterLast('.', "").lowercase()
+                                    val mime = android.webkit.MimeTypeMap.getSingleton()
+                                        .getMimeTypeFromExtension(ext) ?: "application/octet-stream"
                                     val intent = Intent(Intent.ACTION_VIEW)
-                                        .setDataAndType(contentUri, "*/*")
+                                        .setDataAndType(contentUri, mime)
                                         .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                     context.startActivity(Intent.createChooser(intent, "باز کردن فایل"))
                                 } else error = "فایل پیوست پیدا نشد"
