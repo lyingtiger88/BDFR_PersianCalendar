@@ -29,13 +29,30 @@ internal class ZurvanKanbanStore(context: Context) {
         private set
     var cards by mutableStateOf<List<ZCard>>(emptyList())
         private set
+    var loadWarning by mutableStateOf("")
+        private set
     init { load() }
     private val validPriority = setOf("low", "normal", "high", "urgent")
     private fun normalizeName(value: String) = value.trim().take(200)
     private fun activity(old: ZCard, action: String, detail: String) = old.copy(
         activity = (old.activity + ZActivity(Instant.now().toString(), action, detail.take(400))).takeLast(250))
-    private fun load() = runCatching {
-        val root = JSONObject(prefs.getString("data", "{}") ?: "{}")
+    private fun load() {
+        val main = prefs.getString("data", "{}") ?: "{}"
+        val fallback = prefs.getString("previous_good", null)
+        runCatching {
+            decode(main)
+        }.onFailure { cause ->
+            if (fallback != null && runCatching { decode(fallback) }.isSuccess) {
+                loadWarning = "داده‌های کانبان از نسخه پشتیبان بازیابی شدند."
+            } else {
+                loadWarning = "خواندن داده‌های کانبان ناموفق بود؛ داده‌های ذخیره‌شده تغییر نکرده‌اند: " +
+                    (cause.message ?: "خطای ناشناخته")
+            }
+        }
+    }
+
+    private fun decode(payload: String) {
+        val root = JSONObject(payload)
         val b = root.optJSONArray("boards") ?: JSONArray()
         val l = root.optJSONArray("lanes") ?: JSONArray()
         val c = root.optJSONArray("cards") ?: JSONArray()
@@ -63,6 +80,7 @@ internal class ZurvanKanbanStore(context: Context) {
         } }
     }
     private fun persist() {
+        require(loadWarning.isBlank()) { "Fix or export damaged Kanban data before saving." }
         val b = JSONArray()
         boards.forEach { b.put(JSONObject().put("id", it.id).put("name", it.name)) }
         val l = JSONArray()
@@ -86,9 +104,18 @@ internal class ZurvanKanbanStore(context: Context) {
                 .put("activity", JSONArray().apply { card.activity.forEach {
                     put(JSONObject().put("at", it.at).put("action", it.action).put("detail", it.detail)) } }))
         }
-        check(prefs.edit().putString("data",
-            JSONObject().put("boards", b).put("lanes", l).put("cards", c).toString()).commit())
+        val newData = JSONObject().put("boards", b).put("lanes", l).put("cards", c).toString()
+        val oldData = prefs.getString("data", "{}") ?: "{}"
+        val saved = prefs.edit().putString("previous_good", oldData)
+            .putString("data", newData).commit()
+        if (!saved) {
+            decode(oldData)
+            throw IllegalStateException("ذخیره کانبان ناموفق بود؛ اطلاعات قبلی بازیابی شدند.")
+        }
     }
+    /** Only metadata is exported here. Attachment file bytes are stored separately. */
+    fun exportMetadata(): String = prefs.getString("data", "{}") ?: "{}"
+
     fun newBoard(title: String): String {
         val id = UUID.randomUUID().toString()
         boards = boards + ZBoard(id, normalizeName(title)); persist(); return id
