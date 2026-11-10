@@ -9,9 +9,7 @@ import android.content.Intent
 import java.io.File
 import java.util.UUID
 import java.time.LocalDate
-import java.time.format.DateTimeParseException
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -312,7 +310,6 @@ private fun KanbanCardDialog(store: ZurvanKanbanStore, card: ZCard, lanes: List<
     var priorityMenu by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf("") }
     val context = LocalContext.current
-    val openUri = LocalUriHandler.current
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             runCatching {
@@ -326,7 +323,7 @@ private fun KanbanCardDialog(store: ZurvanKanbanStore, card: ZCard, lanes: List<
                         (if (sizeIndex >= 0) cursor.getLong(sizeIndex) else -1L)
                     } else "attachment" to -1L
                 } ?: ("attachment" to -1L)
-                if (name.second > 15_000_000L) error("فایل باید کوچک‌تر از ۱۵ مگابایت باشد")
+                if (name.second > 15_000_000L) throw IllegalArgumentException("فایل باید کوچک‌تر از ۱۵ مگابایت باشد")
                 val dir = File(context.filesDir, "zurvan_kanban_files").apply { mkdirs() }
                 val file = File(dir, UUID.randomUUID().toString())
                 resolver.openInputStream(uri)?.use { input ->
@@ -340,7 +337,7 @@ private fun KanbanCardDialog(store: ZurvanKanbanStore, card: ZCard, lanes: List<
                             output.write(buffer, 0, count)
                         }
                     }
-                } ?: error("خواندن فایل ممکن نشد")
+                } ?: throw IllegalArgumentException("خواندن فایل ممکن نشد")
                 store.addAttachment(current.id,
                     ZAttachment(UUID.randomUUID().toString(), name.first.take(150), file.absolutePath, file.length()))
                 error = ""
