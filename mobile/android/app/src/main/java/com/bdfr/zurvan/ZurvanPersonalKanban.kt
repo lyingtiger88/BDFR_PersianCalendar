@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+
 package com.bdfr.zurvan
 
 import androidx.compose.foundation.*
@@ -19,7 +21,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.offset
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -452,8 +453,7 @@ private fun KanbanCardDialog(store: ZurvanKanbanStore, card: ZCard, lanes: List<
                             }.onFailure { error = "برنامه‌ای برای نمایش فایل پیدا نشد" }
                         }) { Icon(Icons.Outlined.OpenInNew, "باز کردن") }
                         IconButton(onClick = {
-                            val removed = store.removeAttachment(current.id, attachment.id)
-                            if (removed != null) File(removed.path).delete()
+                            store.removeAttachment(current.id, attachment.id)
                         }) { Icon(Icons.Outlined.DeleteOutline, "حذف فایل") }
                     }
                 }
