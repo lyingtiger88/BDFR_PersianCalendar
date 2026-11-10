@@ -14,7 +14,6 @@ import android.content.Intent
 import java.io.File
 import java.util.UUID
 import java.time.LocalDate
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -87,8 +86,12 @@ fun ZurvanPersonalKanban(modifier: Modifier = Modifier) {
         }
         val selected = store.boards.firstOrNull { it.id == selectedId }
         if (selected != null) {
-            PersonalKanbanBoard(store, selected, onBack = { selectedId = null })
+            Box(Modifier.weight(1f)) {
+                PersonalKanbanBoard(store, selected, onBack = { selectedId = null })
+            }
         } else {
+            Column(Modifier.weight(1f).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("برنامه‌ها", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             KanbanSection("برنامه انفرادی و شخصی", "خصوصی؛ فقط برای خودتان",
                 onAdd = { modelPicker = "personal" }) {
@@ -110,6 +113,7 @@ fun ZurvanPersonalKanban(modifier: Modifier = Modifier) {
             }
             KanbanSection("برنامه مشارکتی و گروهی", "تیمی و مشترک",
                 onAdd = { modelPicker = "team" }) {}
+            }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = { exportPicker.launch("Zurvan-personal-kanban.zip") }) {
