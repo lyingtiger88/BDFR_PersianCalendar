@@ -19,7 +19,8 @@ internal data class ZCard(
     val label: String = "", val due: String = "", val tasks: List<ZTask> = emptyList(),
     val comments: List<String> = emptyList(), val archived: Boolean = false, val order: Int = 0,
     val labels: List<String> = emptyList(), val priority: String = "normal",
-    val attachments: List<ZAttachment> = emptyList(), val activity: List<ZActivity> = emptyList()
+    val attachments: List<ZAttachment> = emptyList(), val activity: List<ZActivity> = emptyList(),
+    val customFields: Map<String, String> = emptyMap(), val cardType: String = "task"
 )
 
 internal class ZurvanKanbanStore(context: Context) {
@@ -84,7 +85,11 @@ internal class ZurvanKanbanStore(context: Context) {
                 (o.optJSONArray("activity") ?: JSONArray()).let { arr ->
                     (0 until arr.length()).map { j -> arr.getJSONObject(j).let { x ->
                         ZActivity(x.optString("at"), x.optString("action"), x.optString("detail"))
-                    } } })
+                    } } },
+                o.optJSONObject("customFields")?.let { fields ->
+                    fields.keys().asSequence().associateWith { key -> fields.optString(key) }
+                } ?: emptyMap(),
+                o.optString("cardType", "task"))
         } }
         require(newBoards.map { it.id }.distinct().size == newBoards.size) { "شناسه پروژه تکراری است." }
         require(newLanes.map { it.id }.distinct().size == newLanes.size) { "شناسه ستون تکراری است." }
@@ -94,6 +99,7 @@ internal class ZurvanKanbanStore(context: Context) {
         require(newLanes.all { it.board in boardIds }) { "ستون فاقد پروژه معتبر است." }
         require(newCards.all { it.lane in laneIds }) { "کارت فاقد ستون معتبر است." }
         require(newCards.all { it.priority in validPriority }) { "اولویت نامعتبر است." }
+        require(newCards.all { it.cardType in setOf("task", "story", "project") }) { "نوع کارت معتبر نیست." }
         boards = newBoards
         lanes = newLanes
         cards = newCards
@@ -152,7 +158,9 @@ internal class ZurvanKanbanStore(context: Context) {
                 .put("attachments", JSONArray().apply { card.attachments.forEach {
                     put(JSONObject().put("id", it.id).put("name", it.name).put("path", it.path).put("bytes", it.bytes)) } })
                 .put("activity", JSONArray().apply { card.activity.forEach {
-                    put(JSONObject().put("at", it.at).put("action", it.action).put("detail", it.detail)) } }))
+                    put(JSONObject().put("at", it.at).put("action", it.action).put("detail", it.detail)) } })
+                .put("customFields", JSONObject().apply { card.customFields.forEach { (key, value) -> put(key, value) } })
+                .put("cardType", card.cardType))
         }
         val newData = JSONObject().put("boards", b).put("lanes", l).put("cards", c).toString()
         val oldData = prefs.getString("data", "{}") ?: "{}"
@@ -203,6 +211,7 @@ internal class ZurvanKanbanStore(context: Context) {
     }
     fun updateCard(card: ZCard) {
         require(card.priority in validPriority) { "Invalid priority" }
+        require(card.cardType in setOf("task", "story", "project")) { "Invalid card type" }
         cards = cards.map { if (it.id == card.id) {
             val updated = card.copy(title = normalizeName(card.title),
                 labels = card.labels.map { x -> x.trim() }.filter { x -> x.isNotBlank() }.distinct().take(12))
