@@ -275,9 +275,9 @@ jobs:
           if (-not (Test-Path $source -PathType Container)) { throw "Repository zodiac artwork folder is missing." }
           $files = @(Get-ChildItem $source -File)
           $pngs = @($files | Where-Object { $_.Extension -ieq ".png" })
-          if ($pngs.Count -ne 120) { throw "Expected 120 PNGs (10 styles x 12 signs), found $($pngs.Count)." }
+          if ($pngs.Count -ne 108) { throw "Expected 108 approved PNGs (9 styles x 12 signs), found $($pngs.Count)." }
           $signs = @("aries","taurus","gemini","cancer","leo","virgo","libra","scorpio","sagittarius","capricorn","aquarius","pisces")
-          $styles = @("cosmic","cute","cute_1","cute_2","cute_3","luxury","minimal","mythic","neon","watercolor")
+          $styles = @("cosmic","cute_1","cute_2","cute_3","luxury","minimal","mythic","neon","watercolor")
           foreach ($style in $styles) {
             foreach ($sign in $signs) {
               $file = Join-Path $source "$($style)_$($sign).png"
@@ -285,7 +285,7 @@ jobs:
               if ((Get-Item $file).Length -lt 4096) { throw "Zodiac PNG suspiciously small: $file" }
             }
           }
-          Write-Host "Validated all 120 named zodiac PNG assets. Existing files were not modified."
+          Write-Host "Validated all 108 named zodiac PNG assets. Existing files were not modified."
 
       - uses: actions/setup-dotnet@v4
         with:
@@ -444,7 +444,7 @@ jobs:
         shell: pwsh
         run: |
           $zodiacAssets = @(Get-ChildItem "picture/zodiac/png" -File)
-          if ($zodiacAssets.Count -ne 120) { throw "Expected 120 zodiac PNG assets before Debug packaging; found $($zodiacAssets.Count)." }
+          if ($zodiacAssets.Count -ne 108) { throw "Expected 108 zodiac PNG assets before Debug packaging; found $($zodiacAssets.Count)." }
           $catalog = "picture/zodiac/catalog.json"
           $cloud = "picture/desk/welcome.svg"
           if (-not (Test-Path $catalog)) { throw "Missing zodiac catalog" }
