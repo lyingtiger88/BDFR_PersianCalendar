@@ -45,7 +45,8 @@ internal class ZurvanKanbanStore(context: Context) {
             decode(main)
         }.onFailure { cause ->
             if (fallback != null && runCatching { decode(fallback) }.isSuccess) {
-                loadWarning = "داده‌های کانبان از نسخه پشتیبان بازیابی شدند."
+                if (!prefs.edit().putString("data", fallback).commit())
+                    loadWarning = "بازیابی داده‌ها انجام شد، اما ذخیره نسخه بازیابی‌شده ناموفق بود."
             } else {
                 loadWarning = "خواندن داده‌های کانبان ناموفق بود؛ داده‌های ذخیره‌شده تغییر نکرده‌اند: " +
                     (cause.message ?: "خطای ناشناخته")
