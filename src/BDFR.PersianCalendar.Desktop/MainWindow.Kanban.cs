@@ -41,6 +41,13 @@ public sealed partial class MainWindow
         public int Order { get; set; }
         public List<DesktopKanbanTask> Checklist { get; set; } = new();
         public List<string> Comments { get; set; } = new();
+        public List<DesktopKanbanActivity> Activity { get; set; } = new();
+    }
+    private sealed class DesktopKanbanActivity
+    {
+        public DateTime At { get; set; }
+        public string Action { get; set; } = "";
+        public string Detail { get; set; } = "";
     }
     private sealed class DesktopKanbanTask { public string Name { get; set; } = ""; public bool Done { get; set; } }
     private DesktopKanbanData? _personalKanbanData;
@@ -320,12 +327,21 @@ public sealed partial class MainWindow
                     var box = new StackPanel { Spacing = 5, Padding = new Thickness(12) };
                     if (!string.IsNullOrWhiteSpace(card.Labels))
                         box.Children.Add(new TextBlock { Text = card.Labels, FontSize = 11, Opacity = .85 });
+                    if (card.Priority is "urgent" or "high")
+                        box.Children.Add(new TextBlock
+                        {
+                            Text = card.Priority == "urgent" ? "● فوری" : "● اولویت بالا",
+                            FontSize = 11,
+                            Foreground = ThemeService.Brush(card.Priority == "urgent" ? "#FFD32F2F" : "#FFF0A028")
+                        });
                     box.Children.Add(new TextBlock { Text = card.Title,
                         FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap });
                     if (!string.IsNullOrEmpty(card.DueDate))
                         box.Children.Add(new TextBlock { Text = "◷ " + card.DueDate, FontSize = 12 });
                     if (card.Checklist.Count > 0)
                         box.Children.Add(new TextBlock { Text = $"☑ {card.Checklist.Count(x => x.Done)}/{card.Checklist.Count}", FontSize = 12 });
+                    if (card.Comments.Count > 0)
+                        box.Children.Add(new TextBlock { Text = $"◉ {card.Comments.Count} نظر", FontSize = 12 });
                     var edit = MakeButton("بازکردن کارت");
                     edit.Click += async (_, _) => { await EditDesktopKanbanCardAsync(data, card, lanes); Refresh(); };
                     box.Children.Add(edit);
@@ -354,7 +370,11 @@ public sealed partial class MainWindow
                         data.Cards.Add(new DesktopKanbanCard
                         {
                             Id = Guid.NewGuid().ToString("N"), LaneId = lane.Id, Title = title,
-                            Order = data.Cards.Count(x => x.LaneId == lane.Id)
+                            Order = data.Cards.Count(x => x.LaneId == lane.Id),
+                            Activity = new List<DesktopKanbanActivity>
+                            {
+                                new() { At = DateTime.UtcNow, Action = "created", Detail = "کارت ایجاد شد" }
+                            }
                         });
                         SaveDesktopKanban(); Refresh();
                     };
@@ -380,6 +400,10 @@ public sealed partial class MainWindow
                     if (dragged is null || dragged.Archived || dragged.LaneId == lane.Id) return;
                     dragged.LaneId = lane.Id;
                     dragged.Order = data.Cards.Count(x => x.LaneId == lane.Id);
+                    dragged.Activity.Add(new DesktopKanbanActivity
+                    {
+                        At = DateTime.UtcNow, Action = "moved", Detail = "کارت به ستون «" + lane.Name + "» منتقل شد"
+                    });
                     SaveDesktopKanban();
                     Refresh();
                 };
@@ -446,6 +470,14 @@ public sealed partial class MainWindow
             AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, MinHeight = 70 };
         foreach (var control in new Control[] { title, description, labels, due, priority, lane, checklist, comments })
             form.Children.Add(control);
+        form.Children.Add(new TextBlock { Text = "تاریخچه فعالیت",
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, FontSize = 16 });
+        foreach (var activity in card.Activity.TakeLast(15).Reverse())
+            form.Children.Add(new TextBlock
+            {
+                Text = activity.At.ToLocalTime().ToString("yyyy/MM/dd HH:mm") + " · " + activity.Detail,
+                FontSize = 12, Opacity = .75, TextWrapping = TextWrapping.Wrap
+            });
         var archive = new CheckBox { Content = "بایگانی کارت", IsChecked = card.Archived };
         form.Children.Add(archive);
         var dialog = new ContentDialog
@@ -499,6 +531,11 @@ public sealed partial class MainWindow
             }).ToList();
         card.Comments = comments.Text.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries)
             .Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
+        card.Activity.Add(new DesktopKanbanActivity
+        {
+            At = DateTime.UtcNow, Action = "updated", Detail = "جزئیات کارت ویرایش شد"
+        });
+        if (card.Activity.Count > 250) card.Activity = card.Activity.TakeLast(250).ToList();
         SaveDesktopKanban();
     }
 }
