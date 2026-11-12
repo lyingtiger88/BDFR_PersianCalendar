@@ -14,6 +14,10 @@ import android.content.Intent
 import java.io.File
 import java.util.UUID
 import java.time.LocalDate
+import android.graphics.BitmapFactory
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -329,9 +333,39 @@ private fun PersonalKanbanLane(
         onConfirm = { store.removeLane(lane.id); delete = false })
 }
 
+
+private fun kanbanCoverImage(context: android.content.Context, card: ZCard): ImageBitmap? {
+    val images = card.attachments.filter {
+        File(it.path).extension.lowercase() in setOf("png", "jpg", "jpeg", "webp", "bmp")
+    }
+    val fileInfo = images.firstOrNull { it.id == card.coverAttachmentId } ?: images.firstOrNull()
+        ?: return null
+    return runCatching {
+        val root = File(context.filesDir, "zurvan_kanban_files").canonicalFile
+        val file = File(fileInfo.path).canonicalFile
+        require(file.parentFile == root && file.isFile && file.length() <= 15_000_000L)
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(file.path, bounds)
+        require(bounds.outWidth > 0 && bounds.outHeight > 0)
+        var sample = 1
+        while (bounds.outWidth / sample > 960 || bounds.outHeight / sample > 720) sample *= 2
+        val bitmap = BitmapFactory.decodeFile(file.path, BitmapFactory.Options().apply {
+            inSampleSize = sample
+        }) ?: return null
+        bitmap.asImageBitmap()
+    }.getOrNull()
+}
+
+private val kanbanCardPalette = listOf(
+    "" to "پیش‌فرض", "#FFE9F3FF" to "آبی", "#FFE8F7EB" to "سبز",
+    "#FFFFF4D9" to "زرد", "#FFFFE8EF" to "صورتی", "#FFF1EAFE" to "بنفش"
+)
+
 @Composable
 private fun PersonalKanbanCard(store: ZurvanKanbanStore, card: ZCard, lanes: List<ZLane>) {
     var open by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val cover = remember(card.attachments, card.coverAttachmentId) { kanbanCoverImage(context, card) }
     var drag by remember(card.id) { mutableFloatStateOf(0f) }
     var dragY by remember(card.id) { mutableFloatStateOf(0f) }
     val gesture = Modifier.pointerInput(card.id, card.lane, lanes) {
@@ -364,9 +398,17 @@ private fun PersonalKanbanCard(store: ZurvanKanbanStore, card: ZCard, lanes: Lis
         }.then(gesture),
         colors = CardDefaults.elevatedCardColors(
             containerColor = if (abs(drag) + abs(dragY) > 4f)
-                MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
+                MaterialTheme.colorScheme.primaryContainer else if (card.cardColor.isNotBlank())
+                runCatching { Color(android.graphics.Color.parseColor(card.cardColor)) }
+                    .getOrDefault(MaterialTheme.colorScheme.surface)
+            else MaterialTheme.colorScheme.surface
         )) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            if (cover != null) Image(
+                bitmap = cover, contentDescription = "کاور کارت",
+                modifier = Modifier.fillMaxWidth().height(132.dp),
+                contentScale = ContentScale.Crop
+            )
             val displayLabels = if (card.labels.isNotEmpty()) card.labels else listOf(card.label).filter { it.isNotBlank() }
             if (displayLabels.isNotEmpty()) Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 displayLabels.take(3).forEach { tag ->
@@ -388,12 +430,18 @@ private fun PersonalKanbanCard(store: ZurvanKanbanStore, card: ZCard, lanes: Lis
                     else MaterialTheme.colorScheme.primary
             )
             Text(card.title, fontWeight = FontWeight.Medium)
+            if (card.description.isNotBlank())
+                Text(card.description, maxLines = 3, overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (card.tasks.isNotEmpty()) {
                 LinearProgressIndicator(
                     progress = { card.tasks.count { it.done }.toFloat() / card.tasks.size },
                     modifier = Modifier.fillMaxWidth().height(3.dp))
             }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (card.start.isNotBlank())
+                    Text("شروع: " + card.start, style = MaterialTheme.typography.labelSmall)
                 if (card.description.isNotBlank()) Icon(Icons.Outlined.Notes, null, Modifier.size(15.dp))
                 if (card.due.isNotBlank()) {
                     val overdue = runCatching {
