@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Media.Imaging;
 using Windows.ApplicationModel.DataTransfer;
 using System.Diagnostics;
 using Windows.Storage.Pickers;
@@ -38,6 +39,9 @@ public sealed partial class MainWindow
         public string Description { get; set; } = "";
         public string Labels { get; set; } = "";
         public string DueDate { get; set; } = "";
+        public string StartDate { get; set; } = "";
+        public string CoverAttachmentId { get; set; } = "";
+        public string CardColor { get; set; } = "";
         public string Priority { get; set; } = "normal";
         public string CardType { get; set; } = "task";
         public Dictionary<string, string> CustomFields { get; set; } = new();
@@ -66,6 +70,7 @@ public sealed partial class MainWindow
     private string? _activeKanbanBoard;
     private bool _kanbanShowArchive;
     private string _kanbanSearch = "";
+    private string _kanbanPriorityFilter = "all";
     private string _kanbanLoadError = "";
 
     private string DesktopKanbanPath => Path.Combine(
@@ -148,6 +153,41 @@ public sealed partial class MainWindow
         return await dialog.ShowAsync() == ContentDialogResult.Primary && !string.IsNullOrWhiteSpace(input.Text)
             ? input.Text.Trim() : null;
     }
+
+
+    private static string KanbanLaneColor(string name, int index)
+    {
+        if (name.Contains("انجام‌شده") || name.Contains("Done", StringComparison.OrdinalIgnoreCase)) return "#FFBCE6C5";
+        if (name.Contains("بررسی") || name.Contains("Testing", StringComparison.OrdinalIgnoreCase)) return "#FFF8DF9F";
+        if (name.Contains("در حال") || name.Contains("Doing", StringComparison.OrdinalIgnoreCase)) return "#FFAED5FF";
+        return new[] { "#FFDCE3FA", "#FFAED5FF", "#FFF8DF9F", "#FFBCE6C5" }[index % 4];
+    }
+
+    private static bool IsKanbanImage(DesktopKanbanAttachment file) =>
+        new[] { ".png", ".jpg", ".jpeg", ".webp", ".bmp" }.Contains(Path.GetExtension(file.Path).ToLowerInvariant());
+
+    private Image? KanbanCardCover(DesktopKanbanCard card)
+    {
+        var attachment = card.Attachments.FirstOrDefault(x => x.Id == card.CoverAttachmentId && IsKanbanImage(x))
+            ?? card.Attachments.FirstOrDefault(IsKanbanImage);
+        if (attachment is null) return null;
+        try
+        {
+            var root = Path.GetFullPath(DesktopKanbanFilesDirectory);
+            var path = Path.GetFullPath(attachment.Path);
+            if (!string.Equals(Path.GetDirectoryName(path), root, StringComparison.OrdinalIgnoreCase)
+                || !File.Exists(path)) return null;
+            return new Image { Source = new BitmapImage(new Uri(path, UriKind.Absolute)),
+                Height = 128, Stretch = Stretch.UniformToFill, HorizontalAlignment = HorizontalAlignment.Stretch };
+        }
+        catch { return null; }
+    }
+
+    private static string KanbanPriorityColor(string priority) => priority switch
+    {
+        "urgent" => "#FFFCE1E1", "high" => "#FFFFE4BE",
+        "low" => "#FFE1F4E7", _ => "#FFE0E9FD"
+    };
 
     private FrameworkElement BuildPersonalKanbanPage()
     {
