@@ -471,6 +471,9 @@ private fun KanbanCardDialog(store: ZurvanKanbanStore, card: ZCard, lanes: List<
     var description by remember(card.id) { mutableStateOf(card.description) }
     var label by remember(card.id) { mutableStateOf(card.labels.joinToString(", ").ifBlank { card.label }) }
     var due by remember(card.id) { mutableStateOf(card.due) }
+    var start by remember(card.id) { mutableStateOf(card.start) }
+    var selectedColor by remember(card.id) { mutableStateOf(card.cardColor) }
+    var selectedCover by remember(card.id) { mutableStateOf(card.coverAttachmentId) }
     var priority by remember(card.id) { mutableStateOf(card.priority) }
     var cardType by remember(card.id) { mutableStateOf(card.cardType) }
     var customFields by remember(card.id) { mutableStateOf(card.customFields.toMap()) }
@@ -570,7 +573,17 @@ private fun KanbanCardDialog(store: ZurvanKanbanStore, card: ZCard, lanes: List<
                             }
                     }
                 }
-                OutlinedTextField(due, { due = it }, label = { Text("تاریخ سررسید YYYY-MM-DD") },
+                Text("رنگ کارت", fontWeight = FontWeight.SemiBold)
+                Row(Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    kanbanCardPalette.forEach { (value, text) ->
+                        FilterChip(selected = selectedColor == value, onClick = { selectedColor = value },
+                            label = { Text(text) })
+                    }
+                }
+                OutlinedTextField(start, { start = it }, label = { Text("تاریخ شروع YYYY-MM-DD") },
+                    modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(due, { due = it }, label = { Text("تاریخ پایان YYYY-MM-DD") },
                     modifier = Modifier.fillMaxWidth())
                 Box {
                     OutlinedButton(onClick = { laneMenu = true }) {
@@ -652,6 +665,17 @@ private fun KanbanCardDialog(store: ZurvanKanbanStore, card: ZCard, lanes: List<
                 TextButton(onClick = { picker.launch(arrayOf("*/*")) }) {
                     Icon(Icons.Outlined.AttachFile, null); Text("افزودن فایل تا ۱۵ مگابایت")
                 }
+                Text("انتخاب تصویر کاور", fontWeight = FontWeight.SemiBold)
+                TextButton(onClick = { selectedCover = "" }) {
+                    Text(if (selectedCover.isBlank()) "✓ بدون کاور" else "بدون کاور")
+                }
+                current.attachments.filter {
+                    File(it.path).extension.lowercase() in setOf("png", "jpg", "jpeg", "webp", "bmp")
+                }.forEach { attachment ->
+                    TextButton(onClick = { selectedCover = attachment.id }) {
+                        Text((if (selectedCover == attachment.id) "✓ " else "") + attachment.name)
+                    }
+                }
                 current.attachments.forEach { attachment ->
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(attachment.name, Modifier.weight(1f), maxLines = 1,
@@ -696,14 +720,20 @@ private fun KanbanCardDialog(store: ZurvanKanbanStore, card: ZCard, lanes: List<
             }
         },
         confirmButton = { TextButton(enabled = name.isNotBlank(), onClick = {
-            val valid = due.isBlank() || runCatching { LocalDate.parse(due.trim()) }.isSuccess
+            val valid = (due.isBlank() || runCatching { LocalDate.parse(due.trim()) }.isSuccess) &&
+                (start.isBlank() || runCatching { LocalDate.parse(start.trim()) }.isSuccess) &&
+                (start.isBlank() || due.isBlank() || start.trim() <= due.trim())
             if (!valid) {
-                error = "تاریخ سررسید را به صورت YYYY-MM-DD وارد کنید."
+                error = "تاریخ شروع و پایان باید YYYY-MM-DD باشند و پایان قبل از شروع نباشد."
             } else {
                 val tags = label.split(",", "،").map { it.trim() }.filter { it.isNotBlank() }.distinct()
                 store.updateCard(current.copy(title = name.trim(),
                     description = description, label = tags.firstOrNull() ?: "",
                     labels = tags.take(12), priority = priority, due = due.trim(),
+                    start = start.trim(), cardColor = selectedColor,
+                    coverAttachmentId = selectedCover.takeIf { id ->
+                        current.attachments.any { it.id == id }
+                    } ?: "",
                     cardType = cardType, customFields = customFields))
                 onDismiss()
             }
