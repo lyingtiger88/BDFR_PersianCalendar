@@ -42,6 +42,7 @@ public sealed partial class MainWindow
         public string StartDate { get; set; } = "";
         public string CoverAttachmentId { get; set; } = "";
         public string CardColor { get; set; } = "";
+        public DateTime? CompletedAt { get; set; }
         public string Priority { get; set; } = "normal";
         public string CardType { get; set; } = "task";
         public Dictionary<string, string> CustomFields { get; set; } = new();
@@ -182,6 +183,20 @@ public sealed partial class MainWindow
         }
         catch { return null; }
     }
+
+    private static string KanbanTagColor(string label)
+    {
+        // Stable per-label palette; same label keeps its color on every card.
+        var colors = new[] { "#FFE2ECFF", "#FFF9E3DC", "#FFE4F3E8", "#FFF7ECBF", "#FFECE3FC" };
+        uint hash = 2166136261;
+        foreach (var ch in label)
+            hash = (hash ^ ch) * 16777619;
+        return colors[(int)(hash % (uint)colors.Length)];
+    }
+
+    private static bool IsKanbanDoneLane(DesktopKanbanLane lane) =>
+        lane.Name.Contains("انجام‌شده") ||
+        lane.Name.Contains("Done", StringComparison.OrdinalIgnoreCase);
 
     private static string KanbanPriorityColor(string priority) => priority switch
     {
@@ -429,7 +444,7 @@ public sealed partial class MainWindow
                         foreach (var tag in card.Labels.Split(',', '،').Select(x => x.Trim())
                             .Where(x => x.Length > 0).Take(3))
                             tags.Children.Add(new Border {
-                                Background = ThemeService.Brush("#FFDDE8FA"),
+                                Background = ThemeService.Brush(KanbanTagColor(tag)),
                                 CornerRadius = new CornerRadius(5), Padding = new Thickness(6, 3, 6, 3),
                                 Child = new TextBlock { Text = tag, FontSize = 11,
                                     Foreground = ThemeService.Brush("#FF234364") }
@@ -480,6 +495,12 @@ public sealed partial class MainWindow
                             Foreground = overdue ? ThemeService.Brush("#FFD93636") : null
                         });
                     }
+                    if (!string.IsNullOrWhiteSpace(card.StartDate))
+                        metadata.Children.Add(new TextBlock { Text = "شروع: " + card.StartDate, FontSize = 11 });
+                    if (card.CompletedAt is DateTime completedAt)
+                        metadata.Children.Add(new TextBlock {
+                            Text = "✓ " + completedAt.ToLocalTime().ToString("yyyy-MM-dd"), FontSize = 11
+                        });
                     if (card.Comments.Count > 0)
                         metadata.Children.Add(new TextBlock { Text = $"◉ {card.Comments.Count}", FontSize = 12 });
                     if (card.Attachments.Count > 0)
@@ -544,6 +565,7 @@ public sealed partial class MainWindow
                     var dragged = data.Cards.FirstOrDefault(x => x.Id == id);
                     if (dragged is null || dragged.Archived || dragged.LaneId == lane.Id) return;
                     dragged.LaneId = lane.Id;
+                    dragged.CompletedAt = IsKanbanDoneLane(lane) ? DateTime.UtcNow : null;
                     dragged.Order = data.Cards.Count(x => x.LaneId == lane.Id);
                     dragged.Activity.Add(new DesktopKanbanActivity
                     {
@@ -826,6 +848,7 @@ public sealed partial class MainWindow
             if (card.LaneId != newLane)
             {
                 card.LaneId = newLane;
+                card.CompletedAt = IsKanbanDoneLane(lanes[lane.SelectedIndex]) ? DateTime.UtcNow : null;
                 card.Order = data.Cards.Count(x => x.LaneId == newLane);
             }
         }
