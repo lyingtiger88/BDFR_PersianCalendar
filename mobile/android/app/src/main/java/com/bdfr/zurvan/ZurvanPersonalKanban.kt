@@ -297,8 +297,11 @@ private fun PersonalKanbanLane(
     Surface(modifier, shape = RoundedCornerShape(10.dp),
         color = MaterialTheme.colorScheme.surfaceVariant) {
         Column(Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(lane.name, Modifier.weight(1f), fontWeight = FontWeight.Bold)
+            Surface(color = kanbanLaneTint(lane.name),
+                shape = RoundedCornerShape(8.dp)) {
+                Row(Modifier.padding(start = 8.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(lane.name, Modifier.weight(1f), fontWeight = FontWeight.Bold,
+                    color = Color(0xFF26364A))
                 Text(cards.size.toString(), style = MaterialTheme.typography.labelSmall)
                 Box {
                     IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreHoriz, "ستون") }
@@ -312,6 +315,7 @@ private fun PersonalKanbanLane(
                         DropdownMenuItem(text = { Text("حذف ستون") },
                             onClick = { menu = false; delete = true })
                     }
+                }
                 }
             }
             Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
@@ -354,6 +358,20 @@ private fun kanbanCoverImage(context: android.content.Context, card: ZCard): Ima
         }) ?: return null
         bitmap.asImageBitmap()
     }.getOrNull()
+}
+
+private fun kanbanLaneTint(name: String): Color = when {
+    name.contains("انجام‌شده") || name.contains("Done", ignoreCase = true) -> Color(0xFFD9EFDF)
+    name.contains("بررسی") || name.contains("Testing", ignoreCase = true) -> Color(0xFFF9E8B9)
+    name.contains("در حال") || name.contains("Doing", ignoreCase = true) -> Color(0xFFD2E6FE)
+    else -> Color(0xFFE7E5F8)
+}
+
+private fun kanbanLabelTint(label: String): Color {
+    val palette = listOf(Color(0xFFDDE8FA), Color(0xFFFFE1D6),
+        Color(0xFFE0F0DF), Color(0xFFF9EDC0), Color(0xFFE9DEFA))
+    val index = (label.hashCode().toLong() and 0x7FFFFFFF) % palette.size
+    return palette[index.toInt()]
 }
 
 private val kanbanCardPalette = listOf(
@@ -413,9 +431,9 @@ private fun PersonalKanbanCard(store: ZurvanKanbanStore, card: ZCard, lanes: Lis
             if (displayLabels.isNotEmpty()) Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 displayLabels.take(3).forEach { tag ->
                     Surface(shape = RoundedCornerShape(4.dp),
-                        color = MaterialTheme.colorScheme.tertiaryContainer) {
+                        color = kanbanLabelTint(tag)) {
                         Text(tag, Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
-                            fontSize = 10.sp, color = MaterialTheme.colorScheme.onTertiaryContainer,
+                            fontSize = 10.sp, color = Color(0xFF26364A),
                             maxLines = 1)
                     }
                 }
@@ -442,6 +460,9 @@ private fun PersonalKanbanCard(store: ZurvanKanbanStore, card: ZCard, lanes: Lis
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (card.start.isNotBlank())
                     Text("شروع: " + card.start, style = MaterialTheme.typography.labelSmall)
+                if (card.completedAt.isNotBlank())
+                    Text("✓ " + card.completedAt.take(10),
+                        style = MaterialTheme.typography.labelSmall)
                 if (card.description.isNotBlank()) Icon(Icons.Outlined.Notes, null, Modifier.size(15.dp))
                 if (card.due.isNotBlank()) {
                     val overdue = runCatching {
