@@ -419,30 +419,80 @@ public sealed partial class MainWindow
                     .OrderBy(x => x.Order).ToList();
                 foreach (var card in visible)
                 {
-                    var box = new StackPanel { Spacing = 5, Padding = new Thickness(12) };
+                    var box = new StackPanel { Spacing = 7, Padding = new Thickness(10) };
+                    var cover = KanbanCardCover(card);
+                    if (cover is not null)
+                        box.Children.Add(new Border { CornerRadius = new CornerRadius(7), Child = cover });
                     if (!string.IsNullOrWhiteSpace(card.Labels))
-                        box.Children.Add(new TextBlock { Text = card.Labels, FontSize = 11, Opacity = .85 });
-                    if (card.Priority is "urgent" or "high")
-                        box.Children.Add(new TextBlock
-                        {
-                            Text = card.Priority == "urgent" ? "● فوری" : "● اولویت بالا",
-                            FontSize = 11,
-                            Foreground = ThemeService.Brush(card.Priority == "urgent" ? "#FFD32F2F" : "#FFF0A028")
+                    {
+                        var tags = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4 };
+                        foreach (var tag in card.Labels.Split(',', '،').Select(x => x.Trim())
+                            .Where(x => x.Length > 0).Take(3))
+                            tags.Children.Add(new Border {
+                                Background = ThemeService.Brush("#FFDDE8FA"),
+                                CornerRadius = new CornerRadius(5), Padding = new Thickness(6, 3, 6, 3),
+                                Child = new TextBlock { Text = tag, FontSize = 11,
+                                    Foreground = ThemeService.Brush("#FF234364") }
+                            });
+                        box.Children.Add(tags);
+                    }
+                    if (card.Priority != "normal")
+                        box.Children.Add(new Border {
+                            Background = ThemeService.Brush(KanbanPriorityColor(card.Priority)),
+                            CornerRadius = new CornerRadius(5), Padding = new Thickness(6, 3, 6, 3),
+                            HorizontalAlignment = HorizontalAlignment.Right,
+                            Child = new TextBlock {
+                                Text = card.Priority switch { "urgent" => "⚡ فوری",
+                                    "high" => "⚑ مهم", _ => "اولویت کم" }, FontSize = 11,
+                                Foreground = ThemeService.Brush("#FF343A49")
+                            }
                         });
-                    box.Children.Add(new TextBlock { Text = card.Title,
-                        FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap });
-                    if (!string.IsNullOrEmpty(card.DueDate))
-                        box.Children.Add(new TextBlock { Text = "◷ " + card.DueDate, FontSize = 12 });
+                    box.Children.Add(new TextBlock {
+                        Text = card.Title, FontSize = 15,
+                        FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                        TextWrapping = TextWrapping.Wrap
+                    });
+                    if (!string.IsNullOrWhiteSpace(card.Description))
+                        box.Children.Add(new TextBlock {
+                            Text = card.Description, FontSize = 12, Opacity = .75,
+                            TextWrapping = TextWrapping.Wrap, MaxLines = 3,
+                            TextTrimming = TextTrimming.CharacterEllipsis
+                        });
                     if (card.Checklist.Count > 0)
-                        box.Children.Add(new TextBlock { Text = $"☑ {card.Checklist.Count(x => x.Done)}/{card.Checklist.Count}", FontSize = 12 });
+                    {
+                        var completed = card.Checklist.Count(x => x.Done);
+                        box.Children.Add(new ProgressBar { Minimum = 0, Maximum = 100,
+                            Value = completed * 100.0 / card.Checklist.Count, Height = 7 });
+                        box.Children.Add(new TextBlock {
+                            Text = $"☑ {completed}/{card.Checklist.Count} · {completed * 100 / card.Checklist.Count}٪",
+                            FontSize = 12, Opacity = .8
+                        });
+                    }
+                    var metadata = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+                    if (!string.IsNullOrWhiteSpace(card.DueDate))
+                    {
+                        var overdue = DateOnly.TryParseExact(card.DueDate, "yyyy-MM-dd",
+                            System.Globalization.CultureInfo.InvariantCulture,
+                            System.Globalization.DateTimeStyles.None, out var deadline)
+                            && deadline < DateOnly.FromDateTime(DateTime.Today);
+                        metadata.Children.Add(new TextBlock {
+                            Text = (overdue ? "⚠ " : "◷ ") + card.DueDate, FontSize = 12,
+                            Foreground = overdue ? ThemeService.Brush("#FFD93636") : null
+                        });
+                    }
                     if (card.Comments.Count > 0)
-                        box.Children.Add(new TextBlock { Text = $"◉ {card.Comments.Count} نظر", FontSize = 12 });
+                        metadata.Children.Add(new TextBlock { Text = $"◉ {card.Comments.Count}", FontSize = 12 });
+                    if (card.Attachments.Count > 0)
+                        metadata.Children.Add(new TextBlock { Text = $"📎 {card.Attachments.Count}", FontSize = 12 });
+                    box.Children.Add(metadata);
                     var edit = MakeButton("بازکردن کارت");
                     edit.Click += async (_, _) => { await EditDesktopKanbanCardAsync(data, card, lanes); Refresh(); };
                     box.Children.Add(edit);
                     var draggable = new Border
                     {
-                        Background = CreateSideSurfaceBrush(),
+                        Background = card.CardColor.Length == 9 &&
+                            card.CardColor.StartsWith("#FF", StringComparison.OrdinalIgnoreCase)
+                                ? ThemeService.Brush(card.CardColor) : CreateSideSurfaceBrush(),
                         CornerRadius = new CornerRadius(9),
                         BorderBrush = BrushWithAlpha(_theme.Accent, 0x50),
                         BorderThickness = new Thickness(1), Child = box,
