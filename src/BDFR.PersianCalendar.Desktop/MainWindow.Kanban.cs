@@ -72,6 +72,7 @@ public sealed partial class MainWindow
     private bool _kanbanShowArchive;
     private string _kanbanSearch = "";
     private string _kanbanPriorityFilter = "all";
+    private int _kanbanSortMode;
     private string _kanbanLoadError = "";
 
     private string DesktopKanbanPath => Path.Combine(
@@ -351,6 +352,18 @@ public sealed partial class MainWindow
                 Refresh();
             };
             filter.Children.Add(priorityFilter);
+            var sort = new ComboBox
+            {
+                Header = "مرتب‌سازی", Width = 156,
+                Items = { "ترتیب دلخواه", "نزدیک‌ترین موعد", "بالاترین اولویت" },
+                SelectedIndex = _kanbanSortMode
+            };
+            sort.SelectionChanged += (_, _) =>
+            {
+                _kanbanSortMode = sort.SelectedIndex;
+                Refresh();
+            };
+            filter.Children.Add(sort);
             root.Children.Add(filter);
             var boardLaneIds = data.Lanes.Where(x => x.BoardId == board.Id).Select(x => x.Id).ToHashSet();
             var boardCards = data.Cards.Where(x => boardLaneIds.Contains(x.LaneId) && !x.Archived).ToList();
@@ -431,7 +444,13 @@ public sealed partial class MainWindow
                         (x.Title + " " + x.Labels + " " + x.Description + " " + string.Join(" ", x.CustomFields.Values))
                         .Contains(_kanbanSearch, StringComparison.OrdinalIgnoreCase))
                     .Where(x => _kanbanPriorityFilter == "all" || x.Priority == _kanbanPriorityFilter)
-                    .OrderBy(x => x.Order).ToList();
+                    .OrderBy(x => _kanbanSortMode == 1
+                        ? (string.IsNullOrWhiteSpace(x.DueDate) ? "9999-12-31" : x.DueDate)
+                        : _kanbanSortMode == 2
+                            ? (x.Priority switch { "urgent" => "0", "high" => "1",
+                                "normal" => "2", _ => "3" })
+                            : x.Order.ToString("D10"))
+                    .ThenBy(x => x.Order).ToList();
                 foreach (var card in visible)
                 {
                     var box = new StackPanel { Spacing = 7, Padding = new Thickness(10) };
