@@ -644,7 +644,12 @@ public sealed partial class MainWindow
         var description = new TextBox { Header = "توضیحات", Text = card.Description,
             AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, MinHeight = 90 };
         var labels = new TextBox { Header = "برچسب‌ها (ویرگول)", Text = card.Labels };
-        var due = new TextBox { Header = "سررسید YYYY-MM-DD", Text = card.DueDate };
+        var due = new TextBox { Header = "تاریخ پایان YYYY-MM-DD", Text = card.DueDate };
+        var start = new TextBox { Header = "تاریخ شروع YYYY-MM-DD", Text = card.StartDate };
+        var colors = new ComboBox { Header = "رنگ کارت", MinWidth = 190,
+            Items = { "پیش‌فرض", "آبی", "سبز", "زرد", "صورتی", "بنفش" } };
+        var cardPalette = new[] { "", "#FFE9F3FF", "#FFE8F7EB", "#FFFFF4D9", "#FFFFE8EF", "#FFF1EAFE" };
+        colors.SelectedIndex = Math.Max(0, Array.IndexOf(cardPalette, card.CardColor));
         var cardType = new ComboBox { Header = "نوع کارت", MinWidth = 190,
             Items = { "کار", "داستان", "پروژه" },
             SelectedIndex = card.CardType switch { "story" => 1, "project" => 2, _ => 0 } };
@@ -663,7 +668,7 @@ public sealed partial class MainWindow
         var comments = new TextBox { Header = "نظرات (هر خط یک نظر)",
             Text = string.Join(Environment.NewLine, card.Comments),
             AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, MinHeight = 70 };
-        foreach (var control in new Control[] { title, description, labels, due, priority, cardType, custom, lane, checklist, comments })
+        foreach (var control in new Control[] { title, description, labels, start, due, colors, priority, cardType, custom, lane, checklist, comments })
             form.Children.Add(control);
         form.Children.Add(new TextBlock
         {
@@ -671,9 +676,27 @@ public sealed partial class MainWindow
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
         });
         var attachmentList = new StackPanel { Spacing = 5 };
+        var coverPicker = new ComboBox { Header = "تصویر کاور کارت", MinWidth = 290 };
+        var coverIds = new List<string>();
+        void RefreshCovers()
+        {
+            var previouslySelected = coverIds.Count > coverPicker.SelectedIndex && coverPicker.SelectedIndex >= 0
+                ? coverIds[coverPicker.SelectedIndex] : card.CoverAttachmentId;
+            coverPicker.Items.Clear();
+            coverIds.Clear();
+            coverPicker.Items.Add("بدون تصویر کاور");
+            coverIds.Add("");
+            foreach (var image in card.Attachments.Where(IsKanbanImage))
+            {
+                coverPicker.Items.Add(image.Name);
+                coverIds.Add(image.Id);
+            }
+            coverPicker.SelectedIndex = Math.Max(0, coverIds.IndexOf(previouslySelected));
+        }
         void RenderAttachments()
         {
             attachmentList.Children.Clear();
+            RefreshCovers();
             foreach (var item in card.Attachments.ToList())
             {
                 var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 7 };
@@ -728,6 +751,7 @@ public sealed partial class MainWindow
         };
         form.Children.Add(addAttachment);
         form.Children.Add(attachmentList);
+        form.Children.Add(coverPicker);
         RenderAttachments();
         form.Children.Add(new TextBlock { Text = "تاریخچه فعالیت",
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, FontSize = 16 });
@@ -758,6 +782,14 @@ public sealed partial class MainWindow
             return;
         }
         if (result != ContentDialogResult.Primary || string.IsNullOrWhiteSpace(title.Text)) return;
+        if (!string.IsNullOrWhiteSpace(start.Text) &&
+            !DateOnly.TryParseExact(start.Text.Trim(), "yyyy-MM-dd",
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out _))
+        {
+            StatusText.Text = "تاریخ شروع باید با فرمت YYYY-MM-DD وارد شود.";
+            return;
+        }
         if (!string.IsNullOrWhiteSpace(due.Text) &&
             !DateOnly.TryParseExact(due.Text.Trim(), "yyyy-MM-dd",
                 System.Globalization.CultureInfo.InvariantCulture,
@@ -770,7 +802,17 @@ public sealed partial class MainWindow
         card.Description = description.Text;
         card.Labels = string.Join(", ", labels.Text.Split(',', '،')
             .Select(x => x.Trim()).Where(x => x.Length > 0).Distinct().Take(12));
+        if (!string.IsNullOrWhiteSpace(start.Text) && !string.IsNullOrWhiteSpace(due.Text) &&
+            string.CompareOrdinal(start.Text.Trim(), due.Text.Trim()) > 0)
+        {
+            StatusText.Text = "تاریخ پایان نباید قبل از شروع باشد.";
+            return;
+        }
+        card.StartDate = start.Text.Trim();
         card.DueDate = due.Text.Trim();
+        card.CardColor = cardPalette[Math.Max(0, colors.SelectedIndex)];
+        card.CoverAttachmentId = coverPicker.SelectedIndex >= 0 &&
+            coverPicker.SelectedIndex < coverIds.Count ? coverIds[coverPicker.SelectedIndex] : "";
         card.Priority = priority.SelectedIndex switch { 0 => "low", 2 => "high", 3 => "urgent", _ => "normal" };
         card.CardType = cardType.SelectedIndex switch { 1 => "story", 2 => "project", _ => "task" };
         card.CustomFields = custom.Text.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries)
