@@ -20,7 +20,9 @@ internal data class ZCard(
     val comments: List<String> = emptyList(), val archived: Boolean = false, val order: Int = 0,
     val labels: List<String> = emptyList(), val priority: String = "normal",
     val attachments: List<ZAttachment> = emptyList(), val activity: List<ZActivity> = emptyList(),
-    val customFields: Map<String, String> = emptyMap(), val cardType: String = "task"
+    val customFields: Map<String, String> = emptyMap(), val cardType: String = "task",
+    val start: String = "", val coverAttachmentId: String = "", val cardColor: String = "",
+    val completedAt: String = ""
 )
 
 internal class ZurvanKanbanStore(context: Context) {
@@ -89,7 +91,8 @@ internal class ZurvanKanbanStore(context: Context) {
                 o.optJSONObject("customFields")?.let { fields ->
                     fields.keys().asSequence().associateWith { key -> fields.optString(key) }
                 } ?: emptyMap(),
-                o.optString("cardType", "task"))
+                o.optString("cardType", "task"), o.optString("start"),
+                o.optString("coverAttachmentId"), o.optString("cardColor"), o.optString("completedAt"))
         } }
         require(newBoards.map { it.id }.distinct().size == newBoards.size) { "شناسه پروژه تکراری است." }
         require(newLanes.map { it.id }.distinct().size == newLanes.size) { "شناسه ستون تکراری است." }
@@ -100,6 +103,7 @@ internal class ZurvanKanbanStore(context: Context) {
         require(newCards.all { it.lane in laneIds }) { "کارت فاقد ستون معتبر است." }
         require(newCards.all { it.priority in validPriority }) { "اولویت نامعتبر است." }
         require(newCards.all { it.cardType in setOf("task", "story", "project") }) { "نوع کارت معتبر نیست." }
+        require(newCards.all { it.cardColor.isBlank() || it.cardColor.matches(Regex("#[0-9A-Fa-f]{8}")) }) { "رنگ کارت معتبر نیست." }
         boards = newBoards
         lanes = newLanes
         cards = newCards
@@ -160,7 +164,9 @@ internal class ZurvanKanbanStore(context: Context) {
                 .put("activity", JSONArray().apply { card.activity.forEach {
                     put(JSONObject().put("at", it.at).put("action", it.action).put("detail", it.detail)) } })
                 .put("customFields", JSONObject().apply { card.customFields.forEach { (key, value) -> put(key, value) } })
-                .put("cardType", card.cardType))
+                .put("cardType", card.cardType).put("start", card.start)
+                .put("coverAttachmentId", card.coverAttachmentId).put("cardColor", card.cardColor)
+                .put("completedAt", card.completedAt))
         }
         val newData = JSONObject().put("boards", b).put("lanes", l).put("cards", c).toString()
         val oldData = prefs.getString("data", "{}") ?: "{}"
@@ -224,6 +230,7 @@ internal class ZurvanKanbanStore(context: Context) {
         require(card.title.isNotBlank()) { "عنوان کارت نمی‌تواند خالی باشد." }
         require(card.priority in validPriority) { "Invalid priority" }
         require(card.cardType in setOf("task", "story", "project")) { "Invalid card type" }
+        require(card.cardColor.isBlank() || card.cardColor.matches(Regex("#[0-9A-Fa-f]{8}"))) { "Invalid card color" }
         cards = cards.map { if (it.id == card.id) {
             val updated = card.copy(title = normalizeName(card.title),
                 labels = card.labels.map { x -> x.trim() }.filter { x -> x.isNotBlank() }.distinct().take(12))
@@ -240,7 +247,11 @@ internal class ZurvanKanbanStore(context: Context) {
         require(cards.any { it.id == id }) { "کارت پیدا نشد." }
         require(lanes.any { it.id == lane }) { "ستون مقصد پیدا نشد." }
         val last = (cards.filter { it.lane == lane }.maxOfOrNull { it.order } ?: -1) + 1
-        cards = cards.map { if (it.id == id) activity(it.copy(lane = lane, order = last), "moved", "انتقال به ستون") else it }
+        val isDone = lanes.firstOrNull { it.id == lane }?.name?.let {
+            it.contains("انجام‌شده") || it.contains("Done", ignoreCase = true)
+        } == true
+        cards = cards.map { if (it.id == id) activity(it.copy(lane = lane, order = last,
+            completedAt = if (isDone) Instant.now().toString() else ""), "moved", "انتقال به ستون") else it }
         persist()
     }
     fun reorderLane(board: String, id: String, delta: Int) {
