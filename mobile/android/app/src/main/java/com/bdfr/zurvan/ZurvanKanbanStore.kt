@@ -276,7 +276,8 @@ internal class ZurvanKanbanStore(context: Context) {
         val attachment = cards.firstOrNull { it.id == cardId }?.attachments?.firstOrNull { it.id == attachmentId }
             ?: return null
         cards = cards.map { if (it.id == cardId) activity(it.copy(
-            attachments = it.attachments.filterNot { row -> row.id == attachmentId }),
+            attachments = it.attachments.filterNot { row -> row.id == attachmentId },
+                coverAttachmentId = if (it.coverAttachmentId == attachmentId) "" else it.coverAttachmentId),
             "attachment_removed", attachment.name) else it }
         persist()
         cleanupAttachments(listOf(ZCard(id = cardId, lane = "", title = "",
