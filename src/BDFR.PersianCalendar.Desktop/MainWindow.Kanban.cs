@@ -322,13 +322,38 @@ public sealed partial class MainWindow
             archived.Checked += (_, _) => { _kanbanShowArchive = true; Refresh(); };
             archived.Unchecked += (_, _) => { _kanbanShowArchive = false; Refresh(); };
             filter.Children.Add(archived);
+            var priorityFilter = new ComboBox
+            {
+                Header = "اولویت", Width = 142,
+                Items = { "همه اولویت‌ها", "فوری", "زیاد", "عادی", "کم" },
+                SelectedIndex = _kanbanPriorityFilter switch
+                { "urgent" => 1, "high" => 2, "normal" => 3, "low" => 4, _ => 0 }
+            };
+            priorityFilter.SelectionChanged += (_, _) =>
+            {
+                _kanbanPriorityFilter = priorityFilter.SelectedIndex switch
+                { 1 => "urgent", 2 => "high", 3 => "normal", 4 => "low", _ => "all" };
+                Refresh();
+            };
+            filter.Children.Add(priorityFilter);
             root.Children.Add(filter);
+            var boardLaneIds = data.Lanes.Where(x => x.BoardId == board.Id).Select(x => x.Id).ToHashSet();
+            var boardCards = data.Cards.Where(x => boardLaneIds.Contains(x.LaneId) && !x.Archived).ToList();
+            var doneLaneIds = data.Lanes.Where(x => x.BoardId == board.Id &&
+                (x.Name.Contains("انجام‌شده") || x.Name.Contains("Done", StringComparison.OrdinalIgnoreCase)))
+                .Select(x => x.Id).ToHashSet();
+            root.Children.Add(new TextBlock
+            {
+                Text = $"▦ کل کارت‌ها: {boardCards.Count}      ◷ دارای مهلت: {boardCards.Count(x => !string.IsNullOrEmpty(x.DueDate))}      ✓ انجام‌شده: {boardCards.Count(x => doneLaneIds.Contains(x.LaneId))}",
+                FontSize = 14, Opacity = .85
+            });
 
             var boardColumns = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 13,
                 FlowDirection = FlowDirection.RightToLeft };
             var lanes = data.Lanes.Where(x => x.BoardId == board.Id).OrderBy(x => x.Order).ToList();
-            foreach (var lane in lanes)
+            for (var laneIndex = 0; laneIndex < lanes.Count; laneIndex++)
             {
+                var lane = lanes[laneIndex];
                 var column = new StackPanel { Width = 277, Spacing = 8, Padding = new Thickness(10) };
                 var controls = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
                 controls.Children.Add(new TextBlock { Text = lane.Name, FontSize = 17, Width = 136,
@@ -375,12 +400,22 @@ public sealed partial class MainWindow
                     SaveDesktopKanban(); Refresh();
                 };
                 controls.Children.Add(options);
-                column.Children.Add(controls);
+                controls.Children.Add(new TextBlock {
+                    Text = data.Cards.Count(x => x.LaneId == lane.Id && !x.Archived).ToString(),
+                    VerticalAlignment = VerticalAlignment.Center, Opacity = .7
+                });
+                column.Children.Add(new Border
+                {
+                    Background = ThemeService.Brush(KanbanLaneColor(lane.Name, laneIndex)),
+                    CornerRadius = new CornerRadius(8),
+                    Padding = new Thickness(9, 6, 9, 6), Child = controls
+                });
                 var visible = data.Cards
                     .Where(x => x.LaneId == lane.Id && x.Archived == _kanbanShowArchive)
                     .Where(x => _kanbanSearch.Length == 0 ||
-                        (x.Title + " " + x.Labels + " " + x.Description)
+                        (x.Title + " " + x.Labels + " " + x.Description + " " + string.Join(" ", x.CustomFields.Values))
                         .Contains(_kanbanSearch, StringComparison.OrdinalIgnoreCase))
+                    .Where(x => _kanbanPriorityFilter == "all" || x.Priority == _kanbanPriorityFilter)
                     .OrderBy(x => x.Order).ToList();
                 foreach (var card in visible)
                 {
