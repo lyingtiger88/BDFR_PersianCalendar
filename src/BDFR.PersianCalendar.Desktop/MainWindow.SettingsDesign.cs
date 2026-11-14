@@ -195,6 +195,10 @@ public sealed partial class MainWindow
             _licenseCanWrite = result.CanWrite;
             _licenseMode = result.Mode;
             _licenseExpiresAt = result.ExpiresAt;
+            StatusText.Text = result.CanWrite
+                ? result.Mode == "trial" ? $"دوره آزمایشی فعال است؛ {result.DaysRemaining} روز باقی‌مانده."
+                    : "مجوز زروان فعال است."
+                : "مجوز ویرایش فعال نیست؛ برنامه در حالت فقط‌خواندنی است.";
             DispatcherQueue.TryEnqueue(() =>
             {
                 if (!_licenseCanWrite && _activeDesktopModule != "تنظیمات")
