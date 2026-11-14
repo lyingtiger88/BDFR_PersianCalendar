@@ -201,6 +201,7 @@ public sealed partial class MainWindow : Window
             Content = BuildRoot();
             ApplyUserFont(Content);
             BuildCalendar();
+            _ = RefreshLicensePolicyAsync();
             ApplyCornerRadiusLive(Content);
             StartupDiagnostics.MarkPhase("startup-full-ui-build-complete");
             StartupDiagnostics.Log("MainWindow: stable full UI selected as startup interface.");
