@@ -41,6 +41,9 @@ public sealed partial class MainWindow
     private string _selectedSettingsSection = "عمومی";
     private Border? _settingsProfileContainer;
     private TextBlock? _settingsServerLicenseStatus;
+    private bool _licenseCanWrite;
+    private string _licenseMode = "account_required";
+    private string? _licenseExpiresAt;
 
     private FrameworkElement BuildWindowsSettingsPage()
     {
@@ -184,21 +187,114 @@ public sealed partial class MainWindow
         try
         {
             var result = await _authClient.ReadLicenseStatusAsync();
+            if (result.TrialAvailable)
+            {
+                using var started = await _authClient.StartTrialAsync();
+                result = await _authClient.ReadLicenseStatusAsync();
+            }
+            _licenseCanWrite = result.CanWrite;
+            _licenseMode = result.Mode;
+            _licenseExpiresAt = result.ExpiresAt;
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                if (!_licenseCanWrite && _activeDesktopModule != "تنظیمات")
+                    ShowDesktopModule(_activeDesktopModule);
+            });
             if (result.AccountState != "active")
                 status.Text = "حساب زروان: " +
                     (result.AccountState == "registration_required" || result.AccountState == "provisional"
                         ? "ثبت‌نام دستگاه تکمیل نشده است"
                         : "وضعیت حساب: " + result.AccountState);
-            else if (result.LicenseAccountState != "active" || result.ActiveLicenses == 0)
-                status.Text = "حساب تأییدشده؛ لایسنس فعال پیدا نشد";
+            else if (result.CanWrite && result.Mode == "trial")
+                status.Text = $"دوره آزمایشی فعال · {result.DaysRemaining} روز باقی‌مانده";
+            else if (result.CanWrite && result.Mode == "subscription")
+                status.Text = $"اشتراک فعال · {result.DaysRemaining} روز باقی‌مانده";
+            else if (result.CanWrite)
+                status.Text = $"مجوز فعال · {result.ActiveLicenses} مجوز";
+            else if (result.Mode == "read_only")
+                status.Text = "دوره آزمایشی پایان یافته؛ برنامه در حالت فقط‌خواندنی است.";
+            else if (result.TrialAvailable)
+                status.Text = "دوره آزمایشی ۴۵ روزه آماده فعال‌سازی است.";
             else
-                status.Text = $"حساب تأییدشده · {result.ActiveLicenses} مجوز فعال";
+                status.Text = "حساب تأییدشده؛ برای ادامه استفاده اشتراک تهیه کنید.";
         }
         catch (Exception ex)
         {
             status.Text = "استعلام مجوز سرور ناموفق بود";
             StartupDiagnostics.Log("Account license verification unavailable: " + ex.Message);
         }
+    }
+
+
+    private async Task RefreshLicensePolicyAsync()
+    {
+        if (_authClient.SignedInEmail is null)
+        {
+            _licenseCanWrite = false;
+            _licenseMode = "account_required";
+            if (_activeDesktopModule != "تنظیمات") ShowDesktopModule(_activeDesktopModule);
+            return;
+        }
+        try
+        {
+            var result = await _authClient.ReadLicenseStatusAsync();
+            if (result.TrialAvailable)
+            {
+                using var started = await _authClient.StartTrialAsync();
+                result = await _authClient.ReadLicenseStatusAsync();
+            }
+            _licenseCanWrite = result.CanWrite;
+            _licenseMode = result.Mode;
+            _licenseExpiresAt = result.ExpiresAt;
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                if (_activeDesktopModule != "تنظیمات") ShowDesktopModule(_activeDesktopModule);
+                if (_settingsProfileContainer is not null)
+                    _settingsProfileContainer.Child = BuildSettingsAccountProfile();
+            });
+        }
+        catch (Exception ex)
+        {
+            _licenseCanWrite = false;
+            _licenseMode = "verification_unavailable";
+            StartupDiagnostics.Log("License policy refresh failed: " + ex.Message);
+            if (_activeDesktopModule != "تنظیمات") ShowDesktopModule(_activeDesktopModule);
+        }
+    }
+
+    private FrameworkElement BuildLicenseReadOnlyBanner()
+    {
+        var row = new StackPanel { Spacing = 8, Padding = new Thickness(14) };
+        row.Children.Add(SettingsLabel(
+            _licenseMode == "account_required"
+                ? "برای شروع دوره آزمایشی ۴۵ روزه وارد حساب زروان شوید."
+                : _licenseMode == "verification_unavailable"
+                    ? "وضعیت مجوز قابل بررسی نیست؛ برنامه فقط‌خواندنی است."
+                    : "دوره آزمایشی به پایان رسیده است. اطلاعات شما محفوظ است؛ برای ادامه ویرایش، اشتراک تهیه کنید.",
+            14, true));
+        row.Children.Add(SettingsActionButton("حساب کاربری و خرید اشتراک",
+            () => ShowDesktopModule("تنظیمات")));
+        return new Border
+        {
+            Background = ThemeService.Brush("#FFFFF2D9"),
+            BorderBrush = ThemeService.Brush("#FFE7C77E"),
+            BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(12), Child = row
+        };
+    }
+
+    private void DisableWriteControls(DependencyObject? node)
+    {
+        if (node is null) return;
+        var type = node.GetType().Name;
+        if (node is Control control && type is
+            "Button" or "HyperlinkButton" or "TextBox" or "PasswordBox" or "RichEditBox" or
+            "ComboBox" or "DatePicker" or "CalendarDatePicker" or "CheckBox" or
+            "RadioButton" or "ToggleSwitch" or "Slider" or "NumberBox" or "ColorPicker" or
+            "AutoSuggestBox")
+            control.IsEnabled = false;
+        var count = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChildrenCount(node);
+        for (var i = 0; i < count; i++)
+            DisableWriteControls(Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChild(node, i));
     }
 
     private void RefreshSettingsCategories()
