@@ -134,11 +134,8 @@ private fun ZurvanMobileShell(
 ) {
     val context = LocalContext.current
     var licenseRevision by remember { mutableIntStateOf(0) }
-    val licensed = remember(licenseRevision) {
-        val code = context.getSharedPreferences("zurvan_license", Context.MODE_PRIVATE)
-            .getString("activation_code", null)
-        code != null && ZurvanActivation.validate(context, code)
-    }
+    val entitlement = remember(licenseRevision) { ZurvanTrialPolicy.evaluate(context) }
+    val licensed = entitlement.canWrite
     var unlocked by remember { mutableStateOf(!ZurvanAppLock.enabled(context)) }
     var unlockInput by remember { mutableStateOf("") }
     var unlockMessage by remember { mutableStateOf("") }
@@ -177,9 +174,7 @@ private fun ZurvanMobileShell(
     }
     var visibleTabs by remember { mutableStateOf(ZurvanTabConfig.load(context)) }
     var selected by remember { mutableStateOf(ZurvanTab.Calendar) }
-    LaunchedEffect(licensed) {
-        if (!licensed && selected !in listOf(ZurvanTab.Calendar, ZurvanTab.Settings)) selected = ZurvanTab.Calendar
-    }
+    LaunchedEffect(licensed) { /* Navigation remains available in read-only mode. */ }
 
     val uiPreferences by appViewModel
         .uiPreferences
@@ -194,8 +189,7 @@ private fun ZurvanMobileShell(
         },
         ZurvanTabConfig.open provides { name ->
             ZurvanTab.entries.firstOrNull { it.name == name }?.let { destination ->
-                if (licensed || destination == ZurvanTab.Calendar || destination == ZurvanTab.Settings)
-                    selected = destination
+                selected = destination
             }
         }
     ) {
@@ -222,7 +216,7 @@ private fun ZurvanMobileShell(
                 if (uiPreferences.railSide == "left") {
                     ZurvanNavigationRail(
                         selected = selected,
-                        onSelected = { if (licensed || it == ZurvanTab.Calendar || it == ZurvanTab.Settings) selected = it }
+                        onSelected = { selected = it }
                     )
                 }
 
@@ -273,9 +267,9 @@ private fun ZurvanMobileShell(
                         ZurvanTab.entries.filter { it.name in ZurvanTabConfig.visible.current }.forEach { tab ->
                             NavigationBarItem(
                                 selected = selected == tab,
-                                enabled = licensed || tab == ZurvanTab.Calendar || tab == ZurvanTab.Settings,
+                                enabled = true,
                                 onClick = {
-                                    if (licensed || tab == ZurvanTab.Calendar || tab == ZurvanTab.Settings) selected = tab
+                                    selected = tab
                                 },
                                 icon = {
                                     Icon(
@@ -306,7 +300,7 @@ private fun ZurvanMobileShell(
                                     if (kotlin.math.abs(horizontalDistance) > 90f) {
                                         val allowed = ZurvanTab.entries.filter {
                                             it.name in visibleTabs &&
-                                                (licensed || it == ZurvanTab.Calendar || it == ZurvanTab.Settings)
+                                                true
                                         }
                                         val current = allowed.indexOf(selected).coerceAtLeast(0)
                                         val change = if (horizontalDistance < 0) 1 else -1
