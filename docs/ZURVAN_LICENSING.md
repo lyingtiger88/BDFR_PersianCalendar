@@ -29,3 +29,21 @@ For Android release builds, convert **only the public PEM** to a base64 UTF-8 va
 - Full hardware binding must account for platform privacy and device changes.
 
 This is a foundation, not a deployed production licensing system.
+
+
+## Trial and read-only enforcement (2026-11-15)
+
+The hosted Supabase project `zurvan-license-server` now has:
+- A server-side, one-time 45-day trial per verified Zurvan account and product.
+- Trial issuance through the authenticated `zurvan-license-start-trial` Edge Function.
+- Entitlement status through `zurvan-license-status`, including `can_write`, `mode`, `expires_at`, `days_remaining`, and `trial_available`.
+- Expired or revoked licenses return a non-writable entitlement. Existing data is retained.
+- The trial RPC is executable only by `service_role`; clients cannot call it directly.
+
+Windows now requests the server entitlement at startup and after account sign-in. When no license exists, it requests the trial and re-reads status. Non-settings workspace controls are disabled when the server reports read-only or verification is unavailable.
+
+Android now starts a 45-day local device-bound trial on first launch, shows the remaining days, preserves workspace navigation after expiry, and guards calendar data, Kanban and Desk file mutations in the data/view-model layer. The local Android trial is a rollout fallback, not server-grade anti-tamper protection: clearing app data or reinstalling can reset local state. Android account purchase synchronization and a provisioned release public key are still required before paid activation is production-ready.
+
+The 45-day trial is account-scoped in the hosted database. A trial cannot be reissued for the same account/product after expiry because the license row is retained and the account/product pair is unique. The optional device fingerprint parameter can attach a registered device activation; current Windows account flow starts the account trial without a device fingerprint.
+
+**Not yet complete:** payment-provider checkout/webhook, Windows/Android end-to-end build and runtime tests, secure Android server-account sign-in/entitlement refresh, and full cross-device transfer verification. Do not describe licensing as production-complete until these are tested.
