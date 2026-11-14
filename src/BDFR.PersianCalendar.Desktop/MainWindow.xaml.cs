@@ -202,6 +202,10 @@ public sealed partial class MainWindow : Window
             ApplyUserFont(Content);
             BuildCalendar();
             _ = RefreshLicensePolicyAsync();
+            _licenseRefreshTimer = DispatcherQueue.CreateTimer();
+            _licenseRefreshTimer.Interval = TimeSpan.FromMinutes(10);
+            _licenseRefreshTimer.Tick += (_, _) => _ = RefreshLicensePolicyAsync();
+            _licenseRefreshTimer.Start();
             ApplyCornerRadiusLive(Content);
             StartupDiagnostics.MarkPhase("startup-full-ui-build-complete");
             StartupDiagnostics.Log("MainWindow: stable full UI selected as startup interface.");
