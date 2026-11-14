@@ -10,6 +10,8 @@ class ZurvanViewModel(
     private val repository =
         AndroidLocalRepository(application)
 
+    private fun writable(): Boolean = ZurvanTrialPolicy.canWrite(getApplication())
+
     private val companionManager =
         AndroidCompanionManager(
             application,
@@ -47,7 +49,9 @@ class ZurvanViewModel(
         isPrivate: Boolean,
         icon: String = "📌",
         deleteAfterDays: Int? = null
-    ) = repository.addPlan(
+    ) {
+        if (!writable()) return
+        repository.addPlan(
         title,
         dateKey,
         hour,
@@ -56,15 +60,14 @@ class ZurvanViewModel(
         isPrivate,
         icon,
         deleteAfterDays
-    )
+        )
+    }
 
     fun purgeExpiredPlans() = repository.purgeExpiredPlans()
 
-    fun togglePlan(id: String) =
-        repository.togglePlan(id)
+    fun togglePlan(id: String) { if (!writable()) return; repository.togglePlan(id) }
 
-    fun deletePlan(id: String) =
-        repository.deletePlan(id)
+    fun deletePlan(id: String) { if (!writable()) return; repository.deletePlan(id) }
 
     fun addOccasion(
         title: String,
@@ -73,34 +76,38 @@ class ZurvanViewModel(
         day: Int,
         hour: Int,
         minute: Int
-    ) = repository.addOccasion(
+    ) {
+        if (!writable()) return
+        repository.addOccasion(
         title,
         calendar,
         month,
         day,
         hour,
         minute
-    )
+        )
+    }
 
-    fun deleteOccasion(id: String) =
-        repository.deleteOccasion(id)
+    fun deleteOccasion(id: String) { if (!writable()) return; repository.deleteOccasion(id) }
 
-    fun addMediaTag(dateKey: String, uri: String, displayName: String, mimeType: String, tags: List<String>) =
-        repository.addMediaTag(dateKey, uri, displayName, mimeType, tags)
+    fun addMediaTag(dateKey: String, uri: String, displayName: String, mimeType: String, tags: List<String>) { if (!writable()) return; repository.addMediaTag(dateKey, uri, displayName, mimeType, tags) }
 
-    fun updateMediaTags(id: String, tags: List<String>) = repository.updateMediaTags(id, tags)
+    fun updateMediaTags(id: String, tags: List<String>) { if (!writable()) return; repository.updateMediaTags(id, tags) }
 
-    fun deleteMediaTag(id: String) = repository.deleteMediaTag(id)
+    fun deleteMediaTag(id: String) { if (!writable()) return; repository.deleteMediaTag(id) }
 
     fun saveNote(
         dateKey: String,
         text: String,
         isPrivate: Boolean
-    ) = repository.saveNote(
+    ) {
+        if (!writable()) return
+        repository.saveNote(
         dateKey,
         text,
         isPrivate
-    )
+        )
+    }
 
     fun addReminder(
         title: String,
@@ -111,6 +118,7 @@ class ZurvanViewModel(
         repeatCount: Int,
         repeatIntervalMinutes: Int
     ) {
+        if (!writable()) return
         val reminder = repository.addReminder(
             title,
             dateKey,
@@ -128,6 +136,7 @@ class ZurvanViewModel(
     }
 
     fun acknowledgeReminder(id: String) {
+        if (!writable()) return
         AndroidReminderScheduler.cancel(
             getApplication(),
             id
@@ -136,6 +145,7 @@ class ZurvanViewModel(
     }
 
     fun deleteReminder(id: String) {
+        if (!writable()) return
         AndroidReminderScheduler.cancel(
             getApplication(),
             id
@@ -145,27 +155,24 @@ class ZurvanViewModel(
 
     fun setCalendarOrder(
         value: List<CalendarPriority>
-    ) = repository.setCalendarOrder(value)
+    ) { if (!writable()) return; repository.setCalendarOrder(value) }
 
-    fun setCornerRadius(value: Float) =
-        repository.setCornerRadius(value)
+    fun setCornerRadius(value: Float) { if (!writable()) return; repository.setCornerRadius(value) }
 
-    fun setRailSide(value: String) =
-        repository.setRailSide(value)
+    fun setRailSide(value: String) { if (!writable()) return; repository.setRailSide(value) }
 
-    fun setDayMediaEnabled(enabled: Boolean) = repository.setDayMediaEnabled(enabled)
+    fun setDayMediaEnabled(enabled: Boolean) { if (!writable()) return; repository.setDayMediaEnabled(enabled) }
 
-    fun startCompanionMaster() =
-        companionManager.startMaster()
+    fun startCompanionMaster() { if (!writable()) return; companionManager.startMaster() }
 
     fun joinCompanionFromQr(
         rawQr: String
-    ) = companionManager.joinFromQr(
+    ) { if (!writable()) return; companionManager.joinFromQr(
         rawQr
-    )
+        )
+    }
 
-    fun stopCompanionSession() =
-        companionManager.stop()
+    fun stopCompanionSession() { if (!writable()) return; companionManager.stop() }
 
     override fun onCleared() {
         companionManager.close()
