@@ -99,6 +99,22 @@ public sealed partial class MainWindow
             // failure must not leave the central workspace blank.
             var page = isCalendar ? null : BuildDesktopModulePage(module);
             _activeDesktopModule = module;
+            if (isCalendar)
+            {
+                if (!_licenseCanWrite)
+                {
+                    DisableWriteControls(_desktopCalendarPage);
+                    DisableWriteControls(_desktopSelectedDayPanel);
+                }
+            }
+            else if (page is not null && module != "تنظیمات" && !_licenseCanWrite)
+            {
+                DisableWriteControls(page);
+                var readOnlyPage = new StackPanel { Spacing = 10, FlowDirection = FlowDirection.RightToLeft };
+                readOnlyPage.Children.Add(BuildLicenseReadOnlyBanner());
+                readOnlyPage.Children.Add(page);
+                page = readOnlyPage;
+            }
             _desktopModulePage.Child = page;
             _desktopModulePage.FlowDirection = FlowDirection.RightToLeft;
             _desktopCalendarPage.Visibility = isCalendar ? Visibility.Visible : Visibility.Collapsed;
