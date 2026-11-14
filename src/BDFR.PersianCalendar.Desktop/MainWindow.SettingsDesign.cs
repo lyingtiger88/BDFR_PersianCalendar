@@ -44,6 +44,7 @@ public sealed partial class MainWindow
     private bool _licenseCanWrite;
     private string _licenseMode = "account_required";
     private string? _licenseExpiresAt;
+    private Microsoft.UI.Dispatching.DispatcherQueueTimer? _licenseRefreshTimer;
 
     private FrameworkElement BuildWindowsSettingsPage()
     {
