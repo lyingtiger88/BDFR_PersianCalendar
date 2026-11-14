@@ -217,6 +217,7 @@ class ZurvanDeskViewModel(
     fun restoreVault(
         phrase: String
     ) {
+        if (!ZurvanTrialPolicy.canWrite(getApplication())) return
         viewModelScope.launch {
             setLoading(true)
 
@@ -354,6 +355,7 @@ class ZurvanDeskViewModel(
         mimeType: String?,
         bytes: ByteArray
     ) {
+        if (!ZurvanTrialPolicy.canWrite(getApplication())) return
         // The API/storage cap applies to the Base64-encoded encrypted envelope.
         // A 37 MiB plaintext file stays below the 50 MiB Supabase object limit.
         if (bytes.size > 37 * 1024 * 1024) {
@@ -570,6 +572,7 @@ class ZurvanDeskViewModel(
         file: DeskUiFile,
         newName: String
     ) {
+        if (!ZurvanTrialPolicy.canWrite(getApplication())) return
         if (newName.isBlank() ||
             file.clientObjectId.isBlank()) {
             return
@@ -655,6 +658,7 @@ class ZurvanDeskViewModel(
     fun deleteFile(
         file: DeskUiFile
     ) {
+        if (!ZurvanTrialPolicy.canWrite(getApplication())) return
         viewModelScope.launch {
             setLoading(true)
 
