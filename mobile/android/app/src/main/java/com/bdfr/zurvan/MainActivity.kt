@@ -414,10 +414,7 @@ private fun ZurvanDestination(
     deskViewModel: ZurvanDeskViewModel,
     modifier: Modifier
 ) {
-    if (!licensed && tab != ZurvanTab.Calendar && tab != ZurvanTab.Settings) {
-        Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("برای استفاده از این بخش، زروان را فعال کنید.") }
-        return
-    }
+    // Expired trial keeps every workspace visible; write operations are blocked in the data layer.
     if (!licensed && tab == ZurvanTab.Settings) {
         ZurvanActivationScreen(modifier, onActivated)
         return
