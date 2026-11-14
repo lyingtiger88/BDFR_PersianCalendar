@@ -101,11 +101,8 @@ public sealed partial class MainWindow
             _activeDesktopModule = module;
             if (isCalendar)
             {
-                if (!_licenseCanWrite)
-                {
-                    DisableWriteControls(_desktopCalendarPage);
-                    DisableWriteControls(_desktopSelectedDayPanel);
-                }
+                SetWriteControlsEnabled(_desktopCalendarPage, _licenseCanWrite);
+                SetWriteControlsEnabled(_desktopSelectedDayPanel, _licenseCanWrite);
             }
             else if (page is not null && module != "تنظیمات" && !_licenseCanWrite)
             {
