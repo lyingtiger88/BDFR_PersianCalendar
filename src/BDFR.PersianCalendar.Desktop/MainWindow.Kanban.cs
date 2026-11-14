@@ -113,6 +113,11 @@ public sealed partial class MainWindow
 
     private bool SaveDesktopKanban()
     {
+        if (!_licenseCanWrite)
+        {
+            StatusText.Text = "مجوز ویرایش فعال نیست؛ کانبان در حالت فقط‌خواندنی است.";
+            return false;
+        }
         if (!string.IsNullOrEmpty(_kanbanLoadError))
         {
             StatusText.Text = _kanbanLoadError;
