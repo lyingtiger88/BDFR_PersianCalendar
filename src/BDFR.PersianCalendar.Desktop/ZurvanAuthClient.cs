@@ -129,47 +129,73 @@ internal sealed class ZurvanAuthClient
         catch { return false; }
     }
 
-    internal async Task<(string AccountState, string LicenseAccountState, int ActiveLicenses)> ReadLicenseStatusAsync()
+    internal sealed record LicenseStatus(
+        string AccountState, string LicenseAccountState, int ActiveLicenses,
+        bool CanWrite, bool TrialAvailable, string Mode, string? ExpiresAt, int DaysRemaining);
+
+    private async Task<JsonDocument> LicenseFunctionAsync(string functionName, object body)
     {
         if (!await RefreshAsync())
-            throw new InvalidOperationException("نشست حساب زروان معتبر نیست؛ دوباره وارد شوید.");
-        var session = Load()
-            ?? throw new InvalidOperationException("نشست حساب پیدا نشد.");
-
-        using var request = new HttpRequestMessage(
-            HttpMethod.Post, _url + "/functions/v1/zurvan-license-status")
+            throw new InvalidOperationException("برای استعلام لایسنس ابتدا وارد حساب تأییدشده زروان شوید.");
+        var session = Load() ?? throw new InvalidOperationException("نشست حساب پیدا نشد.");
+        using var request = new HttpRequestMessage(HttpMethod.Post, _url + "/functions/v1/" + functionName)
         {
-            Content = JsonContent.Create(new { })
+            Content = JsonContent.Create(body)
         };
         request.Headers.TryAddWithoutValidation("apikey", _key);
-        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
-            "Bearer", session.AccessToken);
+        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", session.AccessToken);
         using var response = await Http.SendAsync(request);
         var raw = await response.Content.ReadAsStringAsync();
         if (!response.IsSuccessStatusCode)
-            throw new InvalidOperationException(
-                response.StatusCode == System.Net.HttpStatusCode.Unauthorized
-                    ? "برای استعلام لایسنس، ابتدا ایمیل حساب را تأیید کنید."
-                    : $"استعلام وضعیت مجوز ناموفق بود (HTTP {(int)response.StatusCode}).");
-        using var document = JsonDocument.Parse(raw);
+        {
+            string detail = $"درخواست لایسنس ناموفق بود (HTTP {(int)response.StatusCode}).";
+            try
+            {
+                using var error = JsonDocument.Parse(raw);
+                if (error.RootElement.TryGetProperty("error", out var value))
+                    detail = value.GetString() switch
+                    {
+                        "account_not_registered" => "ابتدا ثبت‌نام دستگاه و اتصال حساب زروان را کامل کنید.",
+                        "license_account_inactive" => "حساب لایسنس فعال نیست.",
+                        "email_not_verified" => "ابتدا ایمیل حساب زروان را تأیید کنید.",
+                        "trial_unavailable" => "شروع دوره آزمایشی موقتاً ممکن نیست.",
+                        _ => detail
+                    };
+            }
+            catch { }
+            throw new InvalidOperationException(detail);
+        }
+        return JsonDocument.Parse(raw);
+    }
+
+    internal async Task<JsonDocument> StartTrialAsync()
+        => await LicenseFunctionAsync("zurvan-license-start-trial", new { });
+
+    internal async Task<LicenseStatus> ReadLicenseStatusAsync()
+    {
+        using var document = await LicenseFunctionAsync("zurvan-license-status", new { });
         var root = document.RootElement;
-        var accountState = root.TryGetProperty("account_state", out var state)
-            ? state.GetString() ?? "unknown" : "unknown";
-        var licenseState = root.TryGetProperty("license_account_state", out var license)
-            ? license.GetString() ?? "unknown" : "unknown";
+        string ReadString(string key, string fallback = "") =>
+            root.TryGetProperty(key, out var value) && value.ValueKind == JsonValueKind.String
+                ? value.GetString() ?? fallback : fallback;
+        bool ReadBool(string key) =>
+            root.TryGetProperty(key, out var value) && value.ValueKind == JsonValueKind.True;
+        int ReadInt(string key) =>
+            root.TryGetProperty(key, out var value) && value.TryGetInt32(out var number) ? number : 0;
         var activeCount = 0;
         if (root.TryGetProperty("licenses", out var licenses) && licenses.ValueKind == JsonValueKind.Array)
-        {
             foreach (var item in licenses.EnumerateArray())
-            {
                 if (item.TryGetProperty("status", out var status) &&
                     string.Equals(status.GetString(), "active", StringComparison.OrdinalIgnoreCase) &&
                     item.TryGetProperty("product_id", out var product) &&
                     string.Equals(product.GetString(), "zurvan", StringComparison.OrdinalIgnoreCase))
                     activeCount++;
-            }
-        }
-        return (accountState, licenseState, activeCount);
+        var expiryText = ReadString("expires_at");
+        return new LicenseStatus(ReadString("account_state", "unknown"),
+            ReadString("license_account_state", "unknown"), activeCount,
+            ReadBool("can_write"), ReadBool("trial_available"),
+            ReadString("mode", "unknown"), string.IsNullOrWhiteSpace(expiryText) ? null : expiryText,
+            ReadInt("days_remaining"));
     }
 
     internal async Task SignOutAsync()
