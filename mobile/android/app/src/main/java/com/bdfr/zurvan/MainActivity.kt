@@ -235,6 +235,7 @@ private fun ZurvanMobileShell(
                     ZurvanDestination(
                         tab = selected,
                         licensed = licensed,
+                        trialDaysRemaining = if (entitlement.trialActive) entitlement.daysRemaining else 0,
                         onActivated = { licenseRevision++ },
                         appViewModel = appViewModel,
                         deskViewModel = deskViewModel,
@@ -314,6 +315,7 @@ private fun ZurvanMobileShell(
                     ZurvanDestination(
                         tab = selected,
                         licensed = licensed,
+                        trialDaysRemaining = if (entitlement.trialActive) entitlement.daysRemaining else 0,
                         onActivated = { licenseRevision++ },
                         appViewModel = appViewModel,
                         deskViewModel = deskViewModel,
@@ -409,58 +411,48 @@ private fun navigationIcon(
 private fun ZurvanDestination(
     tab: ZurvanTab,
     licensed: Boolean,
+    trialDaysRemaining: Int,
     onActivated: () -> Unit,
     appViewModel: ZurvanViewModel,
     deskViewModel: ZurvanDeskViewModel,
     modifier: Modifier
 ) {
-    // Expired trial keeps every workspace visible; write operations are blocked in the data layer.
-    if (!licensed && tab == ZurvanTab.Settings) {
-        ZurvanActivationScreen(modifier, onActivated)
-        return
-    }
-    when (tab) {
-        ZurvanTab.Calendar ->
-            if (!licensed) Box(modifier.fillMaxSize()) { CalendarScreen(viewModel = appViewModel, modifier = Modifier.fillMaxSize()); Box(Modifier.fillMaxSize().clickable(enabled = true, onClick = {}).semantics { }) } else CalendarScreen(
-                viewModel = appViewModel,
-                modifier = modifier
-            )
-
-        ZurvanTab.Desk ->
-            ZurvanDeskScreen(
-                viewModel = deskViewModel,
-                modifier = modifier
-            )
-
-        ZurvanTab.Plans ->
-            PlansScreen(
-                viewModel = appViewModel,
-                modifier = modifier
-            )
-
-        ZurvanTab.Occasions ->
-            OccasionsScreen(
-                viewModel = appViewModel,
-                modifier = modifier
-            )
-
-        ZurvanTab.Reminders ->
-            RemindersScreen(
-                viewModel = appViewModel,
-                modifier = modifier
-            )
-
-        ZurvanTab.Companion ->
-            CompanionScreen(
-                viewModel = appViewModel,
-                modifier = modifier
-            )
-
-        ZurvanTab.Settings ->
-            SettingsScreen(
-                viewModel = appViewModel,
-                modifier = modifier
-            )
+    Column(modifier.fillMaxSize()) {
+        if (trialDaysRemaining > 0) {
+            Surface(color = MaterialTheme.colorScheme.secondaryContainer) {
+                Text("دوره آزمایشی زروان · $trialDaysRemaining روز باقی‌مانده",
+                    Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 7.dp),
+                    style = MaterialTheme.typography.labelMedium)
+            }
+        } else if (!licensed) {
+            Surface(color = MaterialTheme.colorScheme.tertiaryContainer) {
+                Text("دوره آزمایشی پایان یافته · حالت فقط‌خواندنی",
+                    Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 7.dp),
+                    style = MaterialTheme.typography.labelMedium)
+            }
+        }
+        Box(Modifier.weight(1f).fillMaxWidth()) {
+            when (tab) {
+                ZurvanTab.Calendar ->
+                    if (!licensed) Box(Modifier.fillMaxSize()) {
+                        CalendarScreen(viewModel = appViewModel, modifier = Modifier.fillMaxSize())
+                        Box(Modifier.fillMaxSize().clickable(enabled = true, onClick = {}).semantics { })
+                    } else CalendarScreen(viewModel = appViewModel, modifier = Modifier.fillMaxSize())
+                ZurvanTab.Desk ->
+                    ZurvanDeskScreen(viewModel = deskViewModel, modifier = Modifier.fillMaxSize())
+                ZurvanTab.Plans ->
+                    PlansScreen(viewModel = appViewModel, modifier = Modifier.fillMaxSize())
+                ZurvanTab.Occasions ->
+                    OccasionsScreen(viewModel = appViewModel, modifier = Modifier.fillMaxSize())
+                ZurvanTab.Reminders ->
+                    RemindersScreen(viewModel = appViewModel, modifier = Modifier.fillMaxSize())
+                ZurvanTab.Companion ->
+                    CompanionScreen(viewModel = appViewModel, modifier = Modifier.fillMaxSize())
+                ZurvanTab.Settings ->
+                    if (!licensed) ZurvanActivationScreen(Modifier.fillMaxSize(), onActivated)
+                    else SettingsScreen(viewModel = appViewModel, modifier = Modifier.fillMaxSize())
+            }
+        }
     }
 }
 
