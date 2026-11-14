@@ -44,6 +44,7 @@ public sealed partial class MainWindow
                 password.Password = "";
                 Update();
                 RefreshWindowsSettingsProfile();
+                _ = RefreshLicensePolicyAsync();
                 if (feedback != pending) status.Text = feedback;
             }
             catch (Exception error) { status.Text = error.Message; }
