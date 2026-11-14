@@ -136,6 +136,12 @@ private fun ZurvanMobileShell(
     var licenseRevision by remember { mutableIntStateOf(0) }
     val entitlement = remember(licenseRevision) { ZurvanTrialPolicy.evaluate(context) }
     val licensed = entitlement.canWrite
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(60_000L)
+            licenseRevision++
+        }
+    }
     var unlocked by remember { mutableStateOf(!ZurvanAppLock.enabled(context)) }
     var unlockInput by remember { mutableStateOf("") }
     var unlockMessage by remember { mutableStateOf("") }
