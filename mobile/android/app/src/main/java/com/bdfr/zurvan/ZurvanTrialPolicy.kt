@@ -8,6 +8,8 @@ internal object ZurvanTrialPolicy {
     private const val PREFS = "zurvan_license_policy"
     private const val STARTED_AT = "trial_started_at"
     private const val DEVICE_BINDING = "trial_device_binding"
+    private const val LAST_SEEN_AT = "trial_last_seen_at"
+    private const val CLOCK_ROLLBACK = "trial_clock_rollback"
     private const val TRIAL_DAYS = 45L
 
     data class Entitlement(
@@ -33,9 +35,15 @@ internal object ZurvanTrialPolicy {
             // A changed Android installation identifier is not allowed to reset the trial.
             prefs.edit().putString(DEVICE_BINDING, deviceId).commit()
         }
-        val expiry = started + TimeUnit.DAYS.toMillis(TRIAL_DAYS)
         val now = System.currentTimeMillis()
-        val trialActive = now < expiry
+        val lastSeen = prefs.getLong(LAST_SEEN_AT, 0L)
+        val rollbackDetected = prefs.getBoolean(CLOCK_ROLLBACK, false) ||
+            (lastSeen > 0L && now + TimeUnit.MINUTES.toMillis(5) < lastSeen)
+        val editor = prefs.edit().putLong(LAST_SEEN_AT, maxOf(now, lastSeen))
+        if (rollbackDetected) editor.putBoolean(CLOCK_ROLLBACK, true)
+        editor.commit()
+        val expiry = started + TimeUnit.DAYS.toMillis(TRIAL_DAYS)
+        val trialActive = !rollbackDetected && now < expiry
         val activation = app.getSharedPreferences("zurvan_license", Context.MODE_PRIVATE)
             .getString("activation_code", null)
         val paid = activation != null && ZurvanActivation.validate(app, activation)
