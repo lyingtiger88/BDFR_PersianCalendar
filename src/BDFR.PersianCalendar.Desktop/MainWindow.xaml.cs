@@ -220,6 +220,7 @@ public sealed partial class MainWindow : Window
         Activated += (_, _) => StartupDiagnostics.Log("MainWindow Activated event fired.");
         Closed += (_, _) =>
         {
+            _licenseRefreshTimer?.Stop();
             _inAppReminderTimer?.Stop();
             _seasonCarouselTimer?.Stop();
             _wallpaperRotationTimer?.Stop();
