@@ -232,6 +232,7 @@ public sealed partial class MainWindow
         {
             _licenseCanWrite = false;
             _licenseMode = "account_required";
+            StatusText.Text = "برای شروع دوره آزمایشی ۴۵ روزه، وارد حساب زروان شوید.";
             if (_activeDesktopModule != "تنظیمات") ShowDesktopModule(_activeDesktopModule);
             return;
         }
@@ -260,6 +261,21 @@ public sealed partial class MainWindow
             StartupDiagnostics.Log("License policy refresh failed: " + ex.Message);
             if (_activeDesktopModule != "تنظیمات") ShowDesktopModule(_activeDesktopModule);
         }
+    }
+
+    private void SetWriteControlsEnabled(DependencyObject? node, bool enabled)
+    {
+        if (node is null) return;
+        var type = node.GetType().Name;
+        if (node is Control control && type is
+            "Button" or "HyperlinkButton" or "TextBox" or "PasswordBox" or "RichEditBox" or
+            "ComboBox" or "DatePicker" or "CalendarDatePicker" or "CheckBox" or
+            "RadioButton" or "ToggleSwitch" or "Slider" or "NumberBox" or "ColorPicker" or
+            "AutoSuggestBox")
+            control.IsEnabled = enabled;
+        var count = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChildrenCount(node);
+        for (var i = 0; i < count; i++)
+            SetWriteControlsEnabled(Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChild(node, i), enabled);
     }
 
     private FrameworkElement BuildLicenseReadOnlyBanner()
