@@ -26,7 +26,9 @@ internal data class ZCard(
 )
 
 internal class ZurvanKanbanStore(context: Context) {
-    private val prefs = context.getSharedPreferences("zurvan_personal_kanban_v1", Context.MODE_PRIVATE)
+    private val appContext = context.applicationContext
+    private val prefs = appContext.getSharedPreferences("zurvan_personal_kanban_v1", Context.MODE_PRIVATE)
+    private fun writable() = ZurvanTrialPolicy.canWrite(appContext)
     private val attachmentDirectory = File(context.filesDir, "zurvan_kanban_files")
     var boards by mutableStateOf<List<ZBoard>>(emptyList())
         private set
@@ -111,6 +113,7 @@ internal class ZurvanKanbanStore(context: Context) {
 
     /** Replace the private Kanban workspace with a validated export; existing data is backed up. */
     fun importMetadata(payload: String) {
+        check(writable()) { "دوره آزمایشی پایان یافته؛ کانبان فقط‌خواندنی است." }
         require(payload.length <= 8_000_000) { "حجم اطلاعات کانبان بیش از حد مجاز است." }
         val previousBoards = boards
         val previousLanes = lanes
@@ -181,16 +184,19 @@ internal class ZurvanKanbanStore(context: Context) {
     fun exportMetadata(): String = prefs.getString("data", "{}") ?: "{}"
 
     fun newBoard(title: String): String {
+        if (!writable()) return ""
         require(title.isNotBlank()) { "نام پروژه نمی‌تواند خالی باشد." }
         val id = UUID.randomUUID().toString()
         boards = boards + ZBoard(id, normalizeName(title)); persist(); return id
     }
     fun renameBoard(id: String, title: String) {
+        if (!writable()) return
         require(boards.any { it.id == id }) { "پروژه پیدا نشد." }
         require(title.isNotBlank()) { "نام پروژه نمی‌تواند خالی باشد." }
         boards = boards.map { if (it.id == id) it.copy(name = normalizeName(title)) else it }; persist()
     }
     fun removeBoard(id: String) {
+        if (!writable()) return
         val ids = lanes.filter { it.board == id }.map { it.id }.toSet()
         boards = boards.filterNot { it.id == id }
         lanes = lanes.filterNot { it.board == id }
@@ -200,6 +206,7 @@ internal class ZurvanKanbanStore(context: Context) {
         cleanupAttachments(deleted)
     }
     fun newLane(board: String, title: String) {
+        if (!writable()) return
         require(boards.any { it.id == board }) { "پروژه پیدا نشد." }
         require(title.isNotBlank()) { "نام ستون نمی‌تواند خالی باشد." }
         lanes = lanes + ZLane(UUID.randomUUID().toString(), board, normalizeName(title),
@@ -207,17 +214,20 @@ internal class ZurvanKanbanStore(context: Context) {
         persist()
     }
     fun renameLane(id: String, title: String) {
+        if (!writable()) return
         require(lanes.any { it.id == id }) { "ستون پیدا نشد." }
         require(title.isNotBlank()) { "نام ستون نمی‌تواند خالی باشد." }
         lanes = lanes.map { if (it.id == id) it.copy(name = normalizeName(title)) else it }; persist()
     }
     fun removeLane(id: String) {
+        if (!writable()) return
         lanes = lanes.filterNot { it.id == id }
         val deleted = cards.filter { it.lane == id }
         cards = cards.filterNot { it.lane == id }; persist()
         cleanupAttachments(deleted)
     }
     fun newCard(lane: String, title: String) {
+        if (!writable()) return
         require(lanes.any { it.id == lane }) { "ستون پیدا نشد." }
         require(title.isNotBlank()) { "عنوان کارت نمی‌تواند خالی باشد." }
         cards = cards + ZCard(UUID.randomUUID().toString(), lane, normalizeName(title),
@@ -225,6 +235,7 @@ internal class ZurvanKanbanStore(context: Context) {
         persist()
     }
     fun updateCard(card: ZCard) {
+        if (!writable()) return
         require(cards.any { it.id == card.id }) { "کارت پیدا نشد." }
         require(lanes.any { it.id == card.lane }) { "ستون مقصد پیدا نشد." }
         require(card.title.isNotBlank()) { "عنوان کارت نمی‌تواند خالی باشد." }
@@ -238,12 +249,14 @@ internal class ZurvanKanbanStore(context: Context) {
         } else it }; persist()
     }
     fun removeCard(id: String) {
+        if (!writable()) return
         val deleted = cards.filter { it.id == id }
         cards = cards.filterNot { it.id == id }
         persist()
         cleanupAttachments(deleted)
     }
     fun moveCard(id: String, lane: String) {
+        if (!writable()) return
         require(cards.any { it.id == id }) { "کارت پیدا نشد." }
         require(lanes.any { it.id == lane }) { "ستون مقصد پیدا نشد." }
         val last = (cards.filter { it.lane == lane }.maxOfOrNull { it.order } ?: -1) + 1
@@ -255,6 +268,7 @@ internal class ZurvanKanbanStore(context: Context) {
         persist()
     }
     fun reorderLane(board: String, id: String, delta: Int) {
+        if (!writable()) return
         val ordered = lanes.filter { it.board == board }.sortedBy { it.order }.toMutableList()
         val old = ordered.indexOfFirst { it.id == id }
         if (old < 0) return
@@ -266,6 +280,7 @@ internal class ZurvanKanbanStore(context: Context) {
         persist()
     }
     fun addAttachment(cardId: String, attachment: ZAttachment) {
+        if (!writable()) return
         require(cards.any { it.id == cardId }) { "کارت پیدا نشد." }
         require(attachment.bytes in 1..15_000_000) { "Attachment must be between 1 byte and 15MB" }
         cards = cards.map { if (it.id == cardId) activity(
@@ -273,6 +288,7 @@ internal class ZurvanKanbanStore(context: Context) {
         persist()
     }
     fun removeAttachment(cardId: String, attachmentId: String): ZAttachment? {
+        if (!writable()) return null
         val attachment = cards.firstOrNull { it.id == cardId }?.attachments?.firstOrNull { it.id == attachmentId }
             ?: return null
         cards = cards.map { if (it.id == cardId) activity(it.copy(
@@ -285,6 +301,7 @@ internal class ZurvanKanbanStore(context: Context) {
         return attachment
     }
     fun reorderCard(id: String, delta: Int) {
+        if (!writable()) return
         val card = cards.firstOrNull { it.id == id } ?: return
         val ordered = cards.filter { it.lane == card.lane && !it.archived }
             .sortedBy { it.order }.toMutableList()
