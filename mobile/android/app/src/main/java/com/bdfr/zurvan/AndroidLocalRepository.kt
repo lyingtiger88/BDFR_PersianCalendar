@@ -1144,7 +1144,18 @@ class AndroidLocalRepository(
                 "%02x".format(it)
             }
 
+    /**
+     * Repository-level write guard. UI visibility checks are not a security boundary.
+     * Reads and user-interface preferences remain available after expiry.
+     */
+    private fun requireWriteAccess() {
+        check(ZurvanTrialPolicy.canWrite(appContext)) {
+            "اشتراک زروان پایان یافته یا فعال نیست؛ اطلاعات فقط قابل مشاهده هستند."
+        }
+    }
+
     private fun savePlans(value: List<LocalPlan>) {
+        requireWriteAccess()
         _plans.value = value
         val json = JSONArray()
         value.forEach { item ->
@@ -1189,6 +1200,7 @@ class AndroidLocalRepository(
     private fun saveOccasions(
         value: List<LocalOccasion>
     ) {
+        requireWriteAccess()
         _occasions.value = value
         val json = JSONArray()
         value.forEach { item ->
@@ -1231,6 +1243,7 @@ class AndroidLocalRepository(
         }
 
     private fun saveMediaTags(value: List<LocalMediaTag>) {
+        requireWriteAccess()
         _mediaTags.value = value
         val json = JSONArray()
         value.forEach { item ->
@@ -1254,6 +1267,7 @@ class AndroidLocalRepository(
     private fun saveNotes(
         value: List<LocalDayNote>
     ) {
+        requireWriteAccess()
         _notes.value = value
         val json = JSONArray()
         value.forEach { item ->
@@ -1282,6 +1296,7 @@ class AndroidLocalRepository(
     private fun saveReminders(
         value: List<LocalReminder>
     ) {
+        requireWriteAccess()
         _reminders.value = value
         val json = JSONArray()
         value.forEach { item ->
