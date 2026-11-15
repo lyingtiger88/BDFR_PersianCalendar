@@ -67,6 +67,7 @@ android {
         signingConfigs {
             create("kaliiaRelease") {
                 storeFile = file(releaseKeystorePath!!)
+                storeType = "PKCS12"
                 storePassword = releaseStorePassword
                 keyAlias = releaseKeyAlias
                 keyPassword = releaseKeyPassword
