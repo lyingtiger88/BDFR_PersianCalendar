@@ -117,7 +117,7 @@ async function api(action,body={}){
 }
 async function signedIn(){
  el("auth").classList.add("hidden");el("account").classList.remove("hidden");el("logout").classList.remove("hidden");
- const user=await authRequest("user",{}).catch(()=>null); // The verified JWT is validated independently by the payment service.
+ // The payment service verifies the signed-in user's JWT on each request.
  el("identity").textContent="ایمیل: "+(session.user?.email||el("email").value);
  el("customerEmail").value=session.user?.email||el("email").value;
  try{
