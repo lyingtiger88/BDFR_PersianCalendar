@@ -1275,6 +1275,24 @@ public sealed partial class MainWindow
         contents.Children.Add(SettingsLabel("و از همه دوستان مهربانی که با پیشنهادها، دلگرمی‌ها و همراهی‌شان کنار این پروژه بودند، به‌ویژه Zara عزیز، سپاسگزارم. سهم شما در این مسیر فراموش‌نشدنی است.", 15));
         contents.Children.Add(SettingsLabel("ساخته‌شده با عشق، برای لحظه‌هایی که ارزش به‌یادماندن دارند. 💛", 15, true));
         contents.Children.Add(SettingsHint("نسخه: " + (asm.GetName().Version?.ToString() ?? "نامشخص")));
+        contents.Children.Add(SettingsHint("وب‌سایت رسمی کالیا سافت: https://kaliia.ir"));
+        AddSettingsAction(contents, "وب‌سایت کالیا سافت",
+            "مشاهده محصولات، ثبت حساب کاربری و دریافت پشتیبانی",
+            "بازکردن وب‌سایت", () =>
+            {
+                try
+                {
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = "https://kaliia.ir",
+                        UseShellExecute = true
+                    });
+                }
+                catch (Exception ex)
+                {
+                    StatusText.Text = "بازکردن وب‌سایت ناموفق بود: " + ex.Message;
+                }
+            }, "\\uE774");
         var revision = asm.GetCustomAttributes<AssemblyMetadataAttribute>()
             .FirstOrDefault(x => x.Key == "GitCommit")?.Value;
         if (!string.IsNullOrWhiteSpace(revision))
