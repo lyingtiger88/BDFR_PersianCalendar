@@ -378,6 +378,7 @@ jobs:
         shell: pwsh
         run: |
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" `
+            /DMyAppVersion="0.6.${{ github.run_number }}" 
             /DMySourceDir="${{ github.workspace }}\artifacts\Zurvan-win-x64" `
             /DMyOutputDir="${{ github.workspace }}\artifacts" `
             installer\BDFR_PersianCalendar.iss
