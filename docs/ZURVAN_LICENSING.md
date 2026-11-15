@@ -47,3 +47,24 @@ Android now starts a 45-day local device-bound trial on first launch, shows the 
 The 45-day trial is account-scoped in the hosted database. A trial cannot be reissued for the same account/product after expiry because the license row is retained and the account/product pair is unique. The optional device fingerprint parameter can attach a registered device activation; current Windows account flow starts the account trial without a device fingerprint.
 
 **Not yet complete:** payment-provider checkout/webhook, Windows/Android end-to-end build and runtime tests, secure Android server-account sign-in/entitlement refresh, and full cross-device transfer verification. Do not describe licensing as production-complete until these are tested.
+
+
+## Manual bank transfer checkout (2026-11-15)
+
+The website source is web/manual-payment/index.html and the backend is supabase/functions/zurvan-manual-payment/index.ts.
+
+1. Customer signs up with Supabase Auth and confirms their email.
+2. On first signed-in website visit, the init action links the account and issues the 45-day trial if eligible.
+3. Customer views the merchant's bank card and account-holder name, enters full name and phone number, and uploads a JPG, PNG or PDF receipt (maximum 5 MiB).
+4. Request is stored as pending. It does not activate an annual subscription automatically.
+5. A superadmin independently verifies the real bank transaction, accesses the private receipt with a short-lived signed URL, then approves or rejects.
+6. Approval atomically changes the license to an annual subscription and records the reviewer. Repeated approval fails. Rejection does not modify the license.
+7. Windows revalidates the subscription on startup and periodically.
+
+Merchant bank number and cardholder name are not yet configured. No number has been invented. An actual superadmin must enter the bank details in the web admin panel before real submissions are enabled.
+
+Security: Edge Functions validate JWTs; private receipt bucket and RLS-protected request records; direct client table access denied; only superadmins can list or approve requests. Service role key never goes to the static website.
+
+Deployment: the HTML was committed to GitHub but is not yet deployed to the live kaliia.ir hosting. Deploy it through the hosting provider and ensure the actual HTTPS site origin is allowed by the Edge Function. Confirm data privacy disclosure and customer support contact before going live.
+
+Outstanding: runtime testing and Android server-account subscription sync. The Android local trial and signed offline code are not yet automatically unlocked by a manually approved online subscription. Account-based trials alone are not robust against multiple accounts on one physical device.
