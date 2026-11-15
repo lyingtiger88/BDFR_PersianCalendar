@@ -33,8 +33,9 @@ android {
         buildConfigField("String", "LICENSE_PUBLIC_KEY_B64", "\"" + issuerPublicKey + "\"")
         minSdk = 26
         targetSdk = 35
-        versionCode = 68
-        versionName = "0.6.0-beta.9"
+        // Override on CI for monotonically increasing installable release builds.
+        versionCode = providers.gradleProperty("ZURVAN_VERSION_CODE").orElse("68").get().toInt()
+        versionName = providers.gradleProperty("ZURVAN_VERSION_NAME").orElse("0.6.0-beta.9").get()
         buildConfigField(
             "String",
             "DESK_API_BASE_URL",
@@ -50,6 +51,34 @@ android {
             "COLLAB_API_BASE_URL",
             "\"$collaborationApiBaseUrl\""
         )
+    }
+
+    // These environment variables are supplied by GitHub Actions secrets only.
+    // Never put a release keystore or its password in source control.
+    val releaseKeystorePath = providers.environmentVariable("ZURVAN_ANDROID_KEYSTORE_PATH").orNull
+    val releaseStorePassword = providers.environmentVariable("ZURVAN_ANDROID_STORE_PASSWORD").orNull
+    val releaseKeyAlias = providers.environmentVariable("ZURVAN_ANDROID_KEY_ALIAS").orNull
+    val releaseKeyPassword = providers.environmentVariable("ZURVAN_ANDROID_KEY_PASSWORD").orNull
+    val hasReleaseSigning = listOf(
+        releaseKeystorePath, releaseStorePassword, releaseKeyAlias, releaseKeyPassword
+    ).all { !it.isNullOrBlank() }
+
+    if (hasReleaseSigning) {
+        signingConfigs {
+            create("kaliiaRelease") {
+                storeFile = file(releaseKeystorePath!!)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+    buildTypes {
+        getByName("release") {
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("kaliiaRelease")
+            }
+        }
     }
 
     compileOptions {
