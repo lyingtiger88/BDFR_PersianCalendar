@@ -2736,6 +2736,39 @@ private fun SettingsScreen(
                     style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Text("زروان فقط یک تقویم نیست؛ تلاشی است برای اینکه روزهای پرمشغله، قرارهای کوچک و آرزوهای بزرگ، همگی جای روشنی در زندگی داشته باشند. این برنامه با عشق به زبان فارسی، احترام به فرهنگ‌ها و اشتیاق به ساختن ابزاری ساده، زیبا و کاربردی شکل گرفته است.")
                 HorizontalDivider()
+                Text("وب‌سایت رسمی کالیا سافت",
+                    style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text(
+                    "https://kaliia.ir",
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.clickable {
+                        runCatching {
+                            context.startActivity(
+                                android.content.Intent(
+                                    android.content.Intent.ACTION_VIEW,
+                                    Uri.parse("https://kaliia.ir")
+                                )
+                            )
+                        }
+                    }
+                )
+                OutlinedButton(
+                    onClick = {
+                        runCatching {
+                            context.startActivity(
+                                android.content.Intent(
+                                    android.content.Intent.ACTION_VIEW,
+                                    Uri.parse("https://kaliia.ir")
+                                )
+                            )
+                        }
+                    }
+                ) {
+                    Icon(Icons.Outlined.OpenInNew, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("بازکردن وب‌سایت کالیا سافت")
+                }
+                HorizontalDivider()
                 Text("درباره توسعه‌دهنده",
                     style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 Text("من، بهزاد، زروان را با یک باور ساده می‌سازم: فناوری وقتی ارزشمند است که در کنار دقت و کارایی، حس خوبی هم به آدم‌ها بدهد. هر جزئیات زروان حاصل یادگیری، آزمون‌وخطا و شوق بهتر کردن تجربه هر روز است؛ مسیری که با ایده‌های تازه و همراهی آدم‌های عزیز ادامه پیدا می‌کند.")
