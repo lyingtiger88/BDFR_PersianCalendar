@@ -68,6 +68,8 @@ class AndroidLocalRepository(
 
     /** Expired entries are deleted from the persisted local source, not just hidden. */
     fun purgeExpiredPlans() {
+        // Expiry must never cause automatic deletion while the product is read-only.
+        if (!ZurvanTrialPolicy.canWrite(appContext)) return
         val kept = _plans.value.filterNot(::isExpiredPlan)
         if (kept.size != _plans.value.size) savePlans(kept)
         else if (loadPlans().size != kept.size) savePlans(kept)
