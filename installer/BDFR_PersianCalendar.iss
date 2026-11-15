@@ -6,7 +6,9 @@
 #endif
 
 #define MyAppName "Zurvan"
-#define MyAppVersion "1.0-test"
+#ifndef MyAppVersion
+  #define MyAppVersion "0.6.0"
+#endif
 #define MyAppPublisher "BDFR"
 #define MyAppExeName "BDFR.PersianCalendar.Desktop.exe"
 
