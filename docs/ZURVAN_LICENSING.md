@@ -68,3 +68,7 @@ Security: Edge Functions validate JWTs; private receipt bucket and RLS-protected
 Deployment: the HTML was committed to GitHub but is not yet deployed to the live kaliia.ir hosting. Deploy it through the hosting provider and ensure the actual HTTPS site origin is allowed by the Edge Function. Confirm data privacy disclosure and customer support contact before going live.
 
 Outstanding: runtime testing and Android server-account subscription sync. The Android local trial and signed offline code are not yet automatically unlocked by a manually approved online subscription. Account-based trials alone are not robust against multiple accounts on one physical device.
+
+
+## Android repository write guard (2026-11-15)
+The Android local repository now checks the current write entitlement at its private persistence boundaries for plans, occasions, media tags, notes and reminders. UI preference changes remain available in read-only mode. Automatic expiry cleanup now stops when the product is read-only, preventing license expiry from deleting existing calendar records. The Android trial authority is still the existing local device policy; this change is a defense-in-depth repository guard, not yet the Supabase account-entitlement sync. The generic Kaliia endpoint is available, but Android Supabase sign-in/token storage and periodic refresh must be completed before cloud entitlement becomes authoritative on Android.
