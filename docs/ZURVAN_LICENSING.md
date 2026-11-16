@@ -72,3 +72,29 @@ Outstanding: runtime testing and Android server-account subscription sync. The A
 
 ## Android repository write guard (2026-11-15)
 The Android local repository now checks the current write entitlement at its private persistence boundaries for plans, occasions, media tags, notes and reminders. UI preference changes remain available in read-only mode. Automatic expiry cleanup now stops when the product is read-only, preventing license expiry from deleting existing calendar records. The Android trial authority is still the existing local device policy; this change is a defense-in-depth repository guard, not yet the Supabase account-entitlement sync. The generic Kaliia endpoint is available, but Android Supabase sign-in/token storage and periodic refresh must be completed before cloud entitlement becomes authoritative on Android.
+
+
+## Restricted historical/Pahlavi occasion feed (Android)
+
+Android Settings > Calendar & Occasions now supports hiding all events or selecting
+solar/Persian, lunar/religious, and Gregorian/international occasions independently.
+Personal entries remain stored when a feed is hidden. An additional Pahlavi
+historical feed and optional imperial-era year label are **hidden by default**.
+
+Access is checked at render time and when saving the preference. It is granted only by:
+- An unexpired, device-bound, RSA-PSS signed offline activation code with Edition
+  `pahlavi` or `special` (not by `standard`).
+- The existing hard-coded preview codes, **only in DEBUG builds**, exactly as the
+  existing activation validator permits. Ordinary 45-day trials do not grant access.
+
+An issuer holding the private signing key can grant access to a specific device:
+
+```bash
+dotnet run --project tools/Zurvan.LicenseIssuer -- issue ./issuer-private.pem ZRV-0123456789ABCDEF01234567 pahlavi 2027-12-31T23:59:59Z
+```
+
+To revoke an offline grant, allow its expiry or implement a server-synced
+revocation check; an unexpired offline signed license cannot be remotely revoked
+by the current Android client. Never place the private key in the app or repository.
+The initial curated Pahlavi records are **nonofficial historical observances**, not
+legal holidays. Production rollout requires build/device acceptance testing.
