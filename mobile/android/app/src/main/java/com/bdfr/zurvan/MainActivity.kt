@@ -641,6 +641,13 @@ internal fun CalendarMonthPage(
                             .typography
                             .labelMedium
                 )
+                if (occasionVisibility.pahlavi) {
+                    Text(
+                        "سال شاهنشاهی: " + toPersianDigits((year + 1180).toString()),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
 
             IconButton(
