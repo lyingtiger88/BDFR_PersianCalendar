@@ -370,9 +370,22 @@ public sealed partial class MainWindow
         var galleryListScroll = new ScrollViewer
         {
             Content = galleryList, Height = 420,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
         };
+        // A ScrollViewer hosted in a StackPanel can measure its content with an
+        // effectively unbounded width. Give the gallery grid the actual viewport
+        // width so its four star-sized columns are laid out side-by-side instead
+        // of collapsing into a narrow vertical strip.
+        galleryListScroll.SizeChanged += (_, e) =>
+        {
+            var availableWidth = Math.Max(1, e.NewSize.Width - 18);
+            galleryList.Width = availableWidth;
+            gallery.Width = availableWidth;
+        };
+        galleryList.HorizontalAlignment = HorizontalAlignment.Stretch;
+        gallery.HorizontalAlignment = HorizontalAlignment.Stretch;
         Grid.SetColumn(galleryListScroll, 1);
         galleryLayout.Children.Add(galleryListScroll);
         var galleryCategoryPicker = new ComboBox { Header = "دسته‌بندی گالری", HorizontalAlignment = HorizontalAlignment.Stretch };
