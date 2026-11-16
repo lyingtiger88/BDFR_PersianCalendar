@@ -68,7 +68,10 @@ object ZurvanOccasionDatabase {
                     CalendarPriority.PERSIAN else CalendarPriority.GREGORIAN
                 LocalOccasion("database-${type.key}-${it.getInt("month")}-${it.getInt("day")}-$i",
                     it.getString("title"),type,it.getInt("month"),it.getInt("day"),0,0,
-                    annual = false, targetPersianYear = it.optInt("year", 0).takeIf { y -> y > 0 })
+                    annual = false, targetPersianYear = it.optInt("year", 0).takeIf { y -> y > 0 },
+                    sourceCategory = if ((0 until (it.optJSONArray("categories")?.length() ?: 0))
+                        .any { index -> it.optJSONArray("categories")?.optString(index) == "religious" })
+                        "hijri" else "persian")
             }
         }.getOrNull()
     }
