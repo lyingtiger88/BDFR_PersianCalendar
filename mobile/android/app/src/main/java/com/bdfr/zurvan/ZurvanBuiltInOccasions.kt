@@ -57,12 +57,23 @@ object ZurvanBuiltInOccasions {
         }
     }
 
-    fun onDay(day: CalendarDayCell, custom: List<LocalOccasion>): List<LocalOccasion> {
-        val base = downloaded ?: entries.mapIndexed { index, entry ->
+    fun onDay(
+        day: CalendarDayCell,
+        custom: List<LocalOccasion>,
+        selection: ZurvanOccasionDisplay.Selection = ZurvanOccasionDisplay.Selection()
+    ): List<LocalOccasion> {
+        if (!selection.enabled) return emptyList()
+        val starter = entries.mapIndexed { index, entry ->
             LocalOccasion("builtin-${entry.calendar.key}-${entry.month}-${entry.day}-$index",
                 entry.title, entry.calendar, entry.month, entry.day, 0, 0)
         }
+        // The remote annual catalog contains Persian-dated records only. Keep
+        // independent international events even after that catalog is downloaded.
+        val base = (downloaded ?: starter) +
+            (if (downloaded != null) starter.filter { it.calendar == CalendarPriority.GREGORIAN } else emptyList()) +
+            (if (selection.pahlavi) ZurvanPahlaviOccasions.onDay(day) else emptyList())
         val builtIn = base.filter { entry ->
+            selection.includes(entry) &&
             (entry.targetPersianYear == null || entry.targetPersianYear == day.persianYear) &&
                 when (entry.calendar) {
                     CalendarPriority.PERSIAN -> entry.month == day.persianMonth && entry.day == day.persianDay
@@ -71,6 +82,7 @@ object ZurvanBuiltInOccasions {
                 }
         }
         val userOccasions = custom.filter { occasion ->
+            if (!selection.includes(occasion)) return@filter false
             // Recurrence follows its source calendar; avoid nonexistent leap dates.
             val existsThisYear = when (occasion.calendar) {
                 CalendarPriority.GREGORIAN -> runCatching {
