@@ -10,7 +10,10 @@ namespace BDFR.PersianCalendar.Core;
 /// </summary>
 public static class ZurvanLicense
 {
-    public sealed record Payload(string Product, string DeviceCode, string Edition, string? ExpiresUtc);
+    // Optional signed feature grants preserve compatibility with existing four-field codes.
+    public sealed record Payload(string Product, string DeviceCode, string Edition, string? ExpiresUtc,
+        string[]? Features = null);
+    public const string PahlaviOccasionsFeature = "pahlavi-occasions";
     public const string ProductId = "zurvan";
     public static string DeviceCode(string platform, string installationId)
     {
