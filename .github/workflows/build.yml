@@ -479,6 +479,7 @@ jobs:
           path: |
             artifacts/Zurvan-win-x64.zip
             artifacts/Zurvan-win-x64.zip.sha256
+            artifacts/signing-zurvan-release/*
           if-no-files-found: error
           retention-days: 14
 
@@ -490,6 +491,7 @@ jobs:
           path: |
             artifacts/Zurvan-Setup-x64.exe
             artifacts/Zurvan-Setup-x64.exe.sha256
+            artifacts/signing-zurvan-release/*
           if-no-files-found: error
           retention-days: 14
 
