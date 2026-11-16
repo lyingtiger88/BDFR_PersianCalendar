@@ -25,30 +25,49 @@ jobs:
         run: |
           if ([string]::IsNullOrWhiteSpace($env:ZURVAN_PUBLIC_KEY_B64)) { throw "ZURVAN_LICENSE_PUBLIC_KEY_B64 repository variable is required." }
           dotnet publish src/BDFR.PersianCalendar.Desktop/BDFR.PersianCalendar.Desktop.csproj -c Release -r win-x64 --self-contained true -p:Platform=x64 -p:WindowsAppSDKSelfContained=true -p:PublishSingleFile=false -p:ZurvanLicensePublicKeyB64="$env:ZURVAN_PUBLIC_KEY_B64" -o artifacts/Zurvan-win-x64
-      - name: Create and trust temporary BDFR test certificate
+      - name: Prepare persistent BDFR signing certificate
         shell: pwsh
+        timeout-minutes: 1
+        env:
+          PFX_BASE64: ${{ secrets.BDFR_CODESIGN_PFX_BASE64 }}
+          PFX_PASSWORD: ${{ secrets.BDFR_CODESIGN_PFX_PASSWORD }}
+          EXPECTED_THUMBPRINT: ${{ secrets.BDFR_CODESIGN_THUMBPRINT }}
         run: |
-          $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject "CN=BDFR Test Publisher" -CertStoreLocation "Cert:\CurrentUser\My" -KeyAlgorithm RSA -KeyLength 3072 -HashAlgorithm SHA256 -NotAfter (Get-Date).AddYears(3)
+          $ErrorActionPreference = "Stop"
+          foreach ($name in @("PFX_BASE64", "PFX_PASSWORD", "EXPECTED_THUMBPRINT")) {
+            if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($name))) { throw "Required signing secret $name is missing." }
+          }
+          $pfxBytes = [Convert]::FromBase64String($env:PFX_BASE64)
+          $cert = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new($pfxBytes, $env:PFX_PASSWORD, [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::EphemeralKeySet)
+          if (-not $cert.HasPrivateKey -or $cert.Thumbprint -ne $env:EXPECTED_THUMBPRINT) { throw "BDFR PFX validation failed." }
           New-Item -ItemType Directory -Force artifacts/signing | Out-Null
-          Export-Certificate -Cert $cert -FilePath artifacts/signing/BDFR-Test-Publisher.cer | Out-Null
-          Import-Certificate -FilePath artifacts/signing/BDFR-Test-Publisher.cer -CertStoreLocation "Cert:\CurrentUser\Root" | Out-Null
-          Import-Certificate -FilePath artifacts/signing/BDFR-Test-Publisher.cer -CertStoreLocation "Cert:\CurrentUser\TrustedPublisher" | Out-Null
-          "BDFR_CERT_THUMBPRINT=$($cert.Thumbprint)" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
-      - name: Sign, verify and hash all Zurvan Windows binaries
+          [IO.File]::WriteAllBytes("artifacts/signing/BDFR-CodeSigning.cer", $cert.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Cert))
+          $pfxPath = Join-Path $env:RUNNER_TEMP "BDFR-CodeSigning-Zurvan.pfx"
+          [IO.File]::WriteAllBytes($pfxPath, $pfxBytes)
+          "BDFR_CODESIGN_THUMBPRINT=$($cert.Thumbprint)" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          "BDFR_PFX_PATH=$pfxPath" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+      - name: Sign, verify and hash Zurvan Windows binaries
         shell: pwsh
+        timeout-minutes: 5
+        env:
+          PFX_PASSWORD: ${{ secrets.BDFR_CODESIGN_PFX_PASSWORD }}
         run: |
+          $ErrorActionPreference = "Stop"
           $sdk = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Filter signtool.exe -Recurse | Where-Object { $_.FullName -match "\\x64\\signtool.exe$" } | Sort-Object FullName -Descending | Select-Object -First 1
           if (-not $sdk) { throw "Windows SDK SignTool not found." }
           $files = @(Get-ChildItem artifacts/Zurvan-win-x64 -Recurse -File | Where-Object { $_.Extension -in ".exe", ".dll" })
           if ($files.Count -eq 0) { throw "No Zurvan EXE/DLL outputs found." }
           foreach ($file in $files) {
-            & $sdk.FullName sign /fd SHA256 /sha1 $env:BDFR_CERT_THUMBPRINT $file.FullName
-            if ($LASTEXITCODE -ne 0) { throw "Signing failed: $($file.FullName)" }
-            & $sdk.FullName verify /pa /v $file.FullName
-            if ($LASTEXITCODE -ne 0) { throw "Signature verification failed: $($file.FullName)" }
+            & $sdk.FullName sign /f "$env:BDFR_PFX_PATH" /p "$env:PFX_PASSWORD" /fd SHA256 $file.FullName
+            if ($LASTEXITCODE -ne 0) { throw "Signing failed: $($file.Name)" }
+            $sig = Get-AuthenticodeSignature -FilePath $file.FullName
+            if (-not $sig.SignerCertificate -or $sig.SignerCertificate.Thumbprint -ne $env:BDFR_CODESIGN_THUMBPRINT) { throw "Wrong BDFR signer on $($file.Name)." }
+            $untrustedRoot = $sig.Status -eq "UnknownError" -and $sig.StatusMessage -match "root certificate which is not trusted"
+            if ($sig.Status -ne "Valid" -and -not $untrustedRoot) { throw "Authenticode validation failed for $($file.Name): $($sig.Status) $($sig.StatusMessage)" }
           }
           $files | ForEach-Object { Get-FileHash $_.FullName -Algorithm SHA256 } | ForEach-Object { "$($_.Hash) *$($_.Path)" } | Set-Content artifacts/signing/SHA256SUMS.txt
           Compress-Archive -Path artifacts/Zurvan-win-x64/* -DestinationPath artifacts/Zurvan-Windows-SelfSigned-Test.zip -Force
+          Remove-Item $env:BDFR_PFX_PATH -Force
       - uses: actions/upload-artifact@v4
         with:
           name: Zurvan-Windows-SelfSigned-Test
