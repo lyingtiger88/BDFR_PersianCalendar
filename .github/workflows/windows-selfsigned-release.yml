@@ -1,0 +1,59 @@
+name: Zurvan Windows self-signed test release
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/windows-selfsigned-release.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  windows-selfsigned-test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - name: Publish Zurvan Windows x64
+        shell: pwsh
+        env:
+          ZURVAN_PUBLIC_KEY_B64: ${{ vars.ZURVAN_LICENSE_PUBLIC_KEY_B64 }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:ZURVAN_PUBLIC_KEY_B64)) { throw "ZURVAN_LICENSE_PUBLIC_KEY_B64 repository variable is required." }
+          dotnet publish src/BDFR.PersianCalendar.Desktop/BDFR.PersianCalendar.Desktop.csproj -c Release -r win-x64 --self-contained true -p:Platform=x64 -p:WindowsAppSDKSelfContained=true -p:PublishSingleFile=false -p:ZurvanLicensePublicKeyB64="$env:ZURVAN_PUBLIC_KEY_B64" -o artifacts/Zurvan-win-x64
+      - name: Create and trust temporary BDFR test certificate
+        shell: pwsh
+        run: |
+          $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject "CN=BDFR Test Publisher" -CertStoreLocation "Cert:\CurrentUser\My" -KeyAlgorithm RSA -KeyLength 3072 -HashAlgorithm SHA256 -NotAfter (Get-Date).AddYears(3)
+          New-Item -ItemType Directory -Force artifacts/signing | Out-Null
+          Export-Certificate -Cert $cert -FilePath artifacts/signing/BDFR-Test-Publisher.cer | Out-Null
+          Import-Certificate -FilePath artifacts/signing/BDFR-Test-Publisher.cer -CertStoreLocation "Cert:\CurrentUser\Root" | Out-Null
+          Import-Certificate -FilePath artifacts/signing/BDFR-Test-Publisher.cer -CertStoreLocation "Cert:\CurrentUser\TrustedPublisher" | Out-Null
+          "BDFR_CERT_THUMBPRINT=$($cert.Thumbprint)" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+      - name: Sign, verify and hash all Zurvan Windows binaries
+        shell: pwsh
+        run: |
+          $sdk = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Filter signtool.exe -Recurse | Where-Object { $_.FullName -match "\\x64\\signtool.exe$" } | Sort-Object FullName -Descending | Select-Object -First 1
+          if (-not $sdk) { throw "Windows SDK SignTool not found." }
+          $files = @(Get-ChildItem artifacts/Zurvan-win-x64 -Recurse -File | Where-Object { $_.Extension -in ".exe", ".dll" })
+          if ($files.Count -eq 0) { throw "No Zurvan EXE/DLL outputs found." }
+          foreach ($file in $files) {
+            & $sdk.FullName sign /fd SHA256 /sha1 $env:BDFR_CERT_THUMBPRINT $file.FullName
+            if ($LASTEXITCODE -ne 0) { throw "Signing failed: $($file.FullName)" }
+            & $sdk.FullName verify /pa /v $file.FullName
+            if ($LASTEXITCODE -ne 0) { throw "Signature verification failed: $($file.FullName)" }
+          }
+          $files | ForEach-Object { Get-FileHash $_.FullName -Algorithm SHA256 } | ForEach-Object { "$($_.Hash) *$($_.Path)" } | Set-Content artifacts/signing/SHA256SUMS.txt
+          Compress-Archive -Path artifacts/Zurvan-win-x64/* -DestinationPath artifacts/Zurvan-Windows-SelfSigned-Test.zip -Force
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Zurvan-Windows-SelfSigned-Test
+          path: |
+            artifacts/Zurvan-Windows-SelfSigned-Test.zip
+            artifacts/signing/*
+          if-no-files-found: error
+          retention-days: 30
