@@ -9,7 +9,7 @@ import androidx.compose.runtime.setValue
  * Occasion feeds are independent from the three calendar date labels.
  * User preferences never grant restricted features: that is checked on every read.
  */
-internal object ZurvanOccasionDisplay {
+object ZurvanOccasionDisplay {
     private const val PREFS = "zurvan_occasion_display"
     private const val ENABLED = "enabled"
     private const val PERSIAN = "persian"
