@@ -19,6 +19,10 @@ internal sealed class IssuerForm : Form
     private readonly TextBox keyFile = new() { ReadOnly = true, Dock = DockStyle.Fill, PlaceholderText = "Select issuer private key (*.pem)" };
     private readonly TextBox device = new() { Dock = DockStyle.Fill, CharacterCasing = CharacterCasing.Upper, PlaceholderText = "ZRV-0123456789ABCDEF01234567" };
     private readonly ComboBox edition = new() { Dock = DockStyle.Fill, DropDownStyle = ComboBoxStyle.DropDownList };
+    private readonly CheckBox pahlaviOccasions = new() {
+        Text = "دسترسی اختصاصی: مناسبت‌های تاریخی پهلوی و سال شاهنشاهی",
+        AutoSize = true, Dock = DockStyle.Fill
+    };
     private readonly CheckBox expires = new() { Text = "Expiry date", AutoSize = true };
     private readonly DateTimePicker expiry = new() { Format = DateTimePickerFormat.Custom, CustomFormat = "yyyy-MM-dd HH:mm", Enabled = false, Dock = DockStyle.Fill };
     private readonly TextBox activation = new() { ReadOnly = true, Dock = DockStyle.Fill, Multiline = true, Height = 120, ScrollBars = ScrollBars.Vertical, WordWrap = false };
@@ -32,7 +36,7 @@ internal sealed class IssuerForm : Form
         MinimumSize = new Size(660, 580);
         Font = new Font("Segoe UI", 10);
         BackColor = Color.FromArgb(244, 248, 252);
-        edition.Items.AddRange(new object[] { "standard", "pro", "enterprise" });
+        edition.Items.AddRange(new object[] { "standard", "pro", "enterprise", "special" });
         edition.SelectedIndex = 0;
         expires.CheckedChanged += (_, _) => expiry.Enabled = expires.Checked;
 
@@ -61,6 +65,8 @@ internal sealed class IssuerForm : Form
         Add(layout, device, 42);
         AddText(layout, "نوع لایسنس");
         Add(layout, edition, 42);
+        AddText(layout, "مجوزهای ویژه (فقط برای کاربران منتخب)");
+        Add(layout, pahlaviOccasions, 46);
         var dateRow = new TableLayoutPanel { ColumnCount = 2, Dock = DockStyle.Fill };
         dateRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150));
         dateRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
@@ -115,9 +121,16 @@ internal sealed class IssuerForm : Form
             using var rsa = RSA.Create();
             rsa.ImportFromPem(File.ReadAllText(keyFile.Text));
             if (rsa.KeySize < 3072) throw new InvalidOperationException("کلید خصوصی باید حداقل ۳۰۷۲ بیت باشد.");
-            var payload = new ZurvanLicense.Payload(ZurvanLicense.ProductId, hardware, edition.SelectedItem?.ToString() ?? "standard", date);
+            var features = pahlaviOccasions.Checked
+                ? new[] { ZurvanLicense.PahlaviOccasionsFeature }
+                : Array.Empty<string>();
+            var payload = new ZurvanLicense.Payload(
+                ZurvanLicense.ProductId, hardware,
+                edition.SelectedItem?.ToString() ?? "standard", date, features);
             activation.Text = ZurvanLicense.Issue(payload, rsa);
-            status.Text = "کد فعال‌سازی امضاشده با موفقیت تولید شد.";
+            status.Text = pahlaviOccasions.Checked
+                ? "کد فعال‌سازی امضاشده با مجوز ویژه پهلوی تولید شد."
+                : "کد فعال‌سازی امضاشده با موفقیت تولید شد.";
         }
         catch (Exception ex)
         {
