@@ -484,6 +484,7 @@ internal fun CalendarMonthPage(
 
     val occasions by viewModel.occasions
         .collectAsStateWithLifecycle()
+    val occasionVisibility = ZurvanOccasionDisplay.current(LocalContext.current)
 
     val notes by viewModel.notes
         .collectAsStateWithLifecycle()
@@ -737,6 +738,7 @@ internal fun CalendarMonthPage(
                     it.persianKey
                 }
             ) { day ->
+                val dayOccasions = ZurvanBuiltInOccasions.onDay(day, occasions, occasionVisibility)
                 val dayHasContent =
                     plans.any {
                         it.dateKey ==
@@ -750,18 +752,11 @@ internal fun CalendarMonthPage(
                         it.dateKey ==
                             day.persianKey
                     } ||
-                    occasions.any {
-                        occasionMatches(
-                            day,
-                            it
-                        )
-                    }
-
-                val dayOccasions = ZurvanBuiltInOccasions.onDay(day, occasions)
+                    dayOccasions.isNotEmpty()
                 CalendarDayCard(
                     day = day,
                     isHoliday = ZurvanDayFlags.isHoliday(day, occasions),
-                    isMourning = ZurvanDayFlags.isMourning(day, occasions),
+                    isMourning = ZurvanDayFlags.isMourning(day, dayOccasions),
                     occasionIcons = dayOccasions.map { ZurvanBuiltInOccasions.iconFor(it.title) }.distinct(),
                     hasOccasion = dayOccasions.isNotEmpty(),
                     isCelebration = dayOccasions.any {
@@ -846,7 +841,7 @@ internal fun CalendarMonthPage(
                     it.dateKey ==
                         day.persianKey
                 },
-            occasions = ZurvanBuiltInOccasions.onDay(day, occasions),
+            occasions = ZurvanBuiltInOccasions.onDay(day, occasions, occasionVisibility),
             note = notes.firstOrNull {
                 it.dateKey ==
                     day.persianKey
@@ -1635,12 +1630,29 @@ private fun OccasionsScreen(
 ) {
     val context = LocalContext.current
     val occasions by viewModel.occasions.collectAsStateWithLifecycle()
+    val occasionVisibility = ZurvanOccasionDisplay.current(context)
     val currentYear = remember { AndroidCalendarEngine.currentPersianYearMonth().first }
     var officialItems by remember(currentYear) { mutableStateOf(ZurvanOccasionDatabase.officialTimeline(context, currentYear)) }
     var updating by remember { mutableStateOf(false) }
     var showDialog by remember { mutableStateOf(false) }
     val monthNames = remember { listOf("فروردین","اردیبهشت","خرداد","تیر","مرداد","شهریور","مهر","آبان","آذر","دی","بهمن","اسفند") }
-    val groupedItems = remember(officialItems) { officialItems.groupBy { it.month }.toSortedMap() }
+    val visibleTimeline = remember(officialItems, occasionVisibility, currentYear) {
+        val official = officialItems.filter(occasionVisibility::includesOfficial)
+        val other = if (!occasionVisibility.enabled) emptyList() else
+            (1..12).flatMap { month ->
+                AndroidCalendarEngine.buildPersianMonth(currentYear, month).days.flatMap { day ->
+                    ZurvanBuiltInOccasions.onDay(day, emptyList(), occasionVisibility)
+                        .filter { it.sourceCategory in setOf("gregorian", "pahlavi") }
+                        .map { item ->
+                            OfficialAnnualOccasion(item.id + "-" + currentYear, currentYear,
+                                day.persianMonth, day.persianDay, item.title,
+                                isHoliday = false, categories = listOf(item.sourceCategory))
+                        }
+                }
+            }
+        (official + other).distinctBy { "${it.month}/${it.day}/${it.title}" }
+    }
+    val groupedItems = visibleTimeline.groupBy { it.month }.toSortedMap()
     val personalOccasions = remember(occasions) {
         occasions.sortedWith(compareBy<LocalOccasion> { it.calendar.ordinal }.thenBy { it.month }.thenBy { it.day })
     }
@@ -1715,7 +1727,7 @@ private fun OccasionsScreen(
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("تقویم رسمی سال ${currentYear}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Text("${officialItems.size} مناسبت در تایملاین سالانه", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("${visibleTimeline.size} مناسبت در تایملاین سالانه", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 IconButton(enabled = !updating, onClick = { updating = true }) {
                     Icon(Icons.Outlined.Refresh, contentDescription = "به‌روزرسانی مناسبت‌ها")
@@ -1723,7 +1735,7 @@ private fun OccasionsScreen(
             }
             if (updating) LinearProgressIndicator(Modifier.fillMaxWidth())
         }
-        if (officialItems.isEmpty()) {
+        if (visibleTimeline.isEmpty()) {
             item(key = "official_timeline_empty") {
                 Text("تقویم رسمی این سال هنوز دریافت نشده است.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
             }
@@ -2617,6 +2629,8 @@ private fun SettingsScreen(
     val weekdayColors = ZurvanThemes.weekdayColors.current
     val setWeekdayColor = ZurvanThemes.setWeekdayColor.current
     val context = LocalContext.current
+    val occasionVisibility = ZurvanOccasionDisplay.current(context)
+    val privilegedOccasions = ZurvanActivation.hasPahlaviAccess(context)
     val zodiacStyles = listOf(
         Triple("cosmic", "کیهانی کلاسیک", "✦"),
         Triple("neon", "فانتزی نورانی", "☄"),
@@ -2879,6 +2893,43 @@ private fun SettingsScreen(
             }
         }
         if (settingsCategory == "calendar") item {
+            SettingsCard(title = "نمایش مناسبت‌ها") {
+                Text("انتخاب کنید کدام گروه مناسبت‌ها روی تقویم و در جزئیات روز نمایش داده شوند.")
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text("نمایش مناسبت‌ها", Modifier.weight(1f))
+                    Switch(checked = occasionVisibility.enabled,
+                        onCheckedChange = { ZurvanOccasionDisplay.set(context, "enabled", it) })
+                }
+                if (occasionVisibility.enabled) {
+                    listOf(
+                        "persian" to ("مناسبت‌های شمسی و ملی" to occasionVisibility.persian),
+                        "hijri" to ("مناسبت‌های قمری و مذهبی" to occasionVisibility.hijri),
+                        "gregorian" to ("مناسبت‌های میلادی و جهانی" to occasionVisibility.gregorian)
+                    ).forEach { (key, value) ->
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Text(value.first, Modifier.weight(1f))
+                            Checkbox(checked = value.second,
+                                onCheckedChange = { ZurvanOccasionDisplay.set(context, key, it) })
+                        }
+                    }
+                    if (privilegedOccasions) {
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text("مناسبت‌های تقویم شاهنشاهی (پهلوی)")
+                                Text("رویدادهای تاریخی غیررسمی؛ سال شاهنشاهی = سال شمسی + ۱۱۸۰",
+                                    style = MaterialTheme.typography.bodySmall)
+                            }
+                            Checkbox(checked = occasionVisibility.pahlavi,
+                                onCheckedChange = { ZurvanOccasionDisplay.set(context, "pahlavi", it) })
+                        }
+                    }
+                }
+                Text("این تنظیم تاریخ‌ها و مناسبت‌های ذخیره‌شده را حذف نمی‌کند.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        if (settingsCategory == "calendar") item {
             SettingsCard(title = "رسانه و خاطرات روزانه") {
                 val dayMediaEnabled = preferences.dayMediaEnabled
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -2985,6 +3036,10 @@ private fun SettingsScreen(
                     }
                     Text("ثبت شده به نام : $ownerName")
                     Text("لایسنس فعال است.", style = MaterialTheme.typography.bodySmall)
+                    if (ZurvanActivation.hasPahlaviAccess(context)) {
+                        Text("مجوز قابلیت ویژه مناسبت‌های تاریخی و تقویم شاهنشاهی فعال است.",
+                            style = MaterialTheme.typography.bodySmall)
+                    }
                 } else {
                     val deviceCode = remember { ZurvanActivation.deviceCode(context) }
                     var enteredCode by remember { mutableStateOf("") }
@@ -3006,6 +3061,7 @@ private fun SettingsScreen(
                             context.getSharedPreferences("zurvan_license", Context.MODE_PRIVATE)
                                 .edit().putString("activation_code", code).apply()
                             activatedCode = code
+                            ZurvanOccasionDisplay.refresh()
                             status = "لایسنس معتبر است."
                         } else {
                             status = ZurvanActivation.explanation(ZurvanActivation.diagnose(context, code))
