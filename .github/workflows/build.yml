@@ -49,6 +49,23 @@ jobs:
         run: |
           dotnet publish tools/Zurvan.ThemeStudio/Zurvan.ThemeStudio.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o artifacts/Zurvan-ThemeStudio
           Compress-Archive -Path artifacts/Zurvan-ThemeStudio/* -DestinationPath artifacts/Zurvan-ThemeStudio-win-x64.zip -Force
+      - name: Sign Theme Studio with temporary self-signed BDFR test certificate
+        shell: pwsh
+        run: |
+          $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject "CN=BDFR Test Publisher" -CertStoreLocation "Cert:\CurrentUser\My" -KeyAlgorithm RSA -KeyLength 3072 -HashAlgorithm SHA256 -NotAfter (Get-Date).AddYears(3)
+          New-Item -ItemType Directory -Force artifacts/signing-theme | Out-Null
+          Export-Certificate -Cert $cert -FilePath artifacts/signing-theme/BDFR-Test-Publisher.cer | Out-Null
+          $sdk = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Filter signtool.exe -Recurse | Where-Object { $_.FullName -match "\\x64\\signtool.exe$" } | Sort-Object FullName -Descending | Select-Object -First 1
+          if (-not $sdk) { throw "Windows SDK SignTool not found" }
+          $files = @(Get-ChildItem artifacts/Zurvan-ThemeStudio -Recurse -File | Where-Object { $_.Extension -in ".exe", ".dll" })
+          if ($files.Count -eq 0) { throw "No Theme Studio binaries found to sign" }
+          foreach ($file in $files) {
+            & $sdk.FullName sign /fd SHA256 /sha1 $cert.Thumbprint $file.FullName
+            if ($LASTEXITCODE -ne 0) { throw "Signing failed: $($file.Name)" }
+            & $sdk.FullName verify /pa /v $file.FullName
+            if ($LASTEXITCODE -ne 0) { throw "Signature verification failed: $($file.Name)" }
+          }
+          $files | ForEach-Object { Get-FileHash $_.FullName -Algorithm SHA256 } | ForEach-Object { "$($_.Hash) *$($_.Path)" } | Set-Content artifacts/signing-theme/SHA256SUMS.txt
       - name: Smoke test Theme Studio startup
         shell: pwsh
         run: |
@@ -89,7 +106,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Zurvan-ThemeStudio-win-x64
-          path: artifacts/Zurvan-ThemeStudio-win-x64.zip
+          path: |
+            artifacts/Zurvan-ThemeStudio-win-x64.zip
+            artifacts/signing-theme/*
           retention-days: 30
           if-no-files-found: error
 
@@ -493,6 +512,23 @@ jobs:
           $data = Get-Content $catalog -Raw | ConvertFrom-Json
           if ($data.signs.Count -ne 12 -or $data.styles.Count -ne 9) { throw "Published zodiac catalog invalid" }
           Write-Host "Verified 12 signs, 9 themes and Desk cloud illustration in Windows Debug output."
+      - name: Sign Zurvan Windows binaries with temporary self-signed BDFR test certificate
+        shell: pwsh
+        run: |
+          $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject "CN=BDFR Test Publisher" -CertStoreLocation "Cert:\CurrentUser\My" -KeyAlgorithm RSA -KeyLength 3072 -HashAlgorithm SHA256 -NotAfter (Get-Date).AddYears(3)
+          New-Item -ItemType Directory -Force artifacts/signing-zurvan | Out-Null
+          Export-Certificate -Cert $cert -FilePath artifacts/signing-zurvan/BDFR-Test-Publisher.cer | Out-Null
+          $sdk = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Filter signtool.exe -Recurse | Where-Object { $_.FullName -match "\\x64\\signtool.exe$" } | Sort-Object FullName -Descending | Select-Object -First 1
+          if (-not $sdk) { throw "Windows SDK SignTool not found" }
+          $files = @(Get-ChildItem artifacts/Zurvan-win-x64-Debug -Recurse -File | Where-Object { $_.Extension -in ".exe", ".dll" })
+          if ($files.Count -eq 0) { throw "No Zurvan Windows binaries found to sign" }
+          foreach ($file in $files) {
+            & $sdk.FullName sign /fd SHA256 /sha1 $cert.Thumbprint $file.FullName
+            if ($LASTEXITCODE -ne 0) { throw "Signing failed: $($file.Name)" }
+            & $sdk.FullName verify /pa /v $file.FullName
+            if ($LASTEXITCODE -ne 0) { throw "Signature verification failed: $($file.Name)" }
+          }
+          $files | ForEach-Object { Get-FileHash $_.FullName -Algorithm SHA256 } | ForEach-Object { "$($_.Hash) *$($_.Path)" } | Set-Content artifacts/signing-zurvan/SHA256SUMS.txt
       - name: Package Debug ZIP only
         shell: pwsh
         run: |
@@ -505,5 +541,6 @@ jobs:
           path: |
             artifacts/Zurvan-win-x64-Debug.zip
             artifacts/Zurvan-win-x64-Debug.zip.sha256
+            artifacts/signing-zurvan/*
           retention-days: 14
           if-no-files-found: error
