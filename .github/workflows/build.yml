@@ -422,11 +422,15 @@ jobs:
         if: github.event_name == 'push'
         shell: pwsh
         run: |
-          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" `
-            /DMyAppVersion="0.6.${{ github.run_number }}" 
-            /DMySourceDir="${{ github.workspace }}\artifacts\Zurvan-win-x64" `
-            /DMyOutputDir="${{ github.workspace }}\artifacts" `
-            installer\BDFR_PersianCalendar.iss
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          $isccArgs = @(
+            "/DMyAppVersion=0.6.${{ github.run_number }}"
+            "/DMySourceDir=$env:GITHUB_WORKSPACE\artifacts\Zurvan-win-x64"
+            "/DMyOutputDir=$env:GITHUB_WORKSPACE\artifacts"
+            "installer\BDFR_PersianCalendar.iss"
+          )
+          & $iscc @isccArgs
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup compiler failed with exit code $LASTEXITCODE." }
 
           (Get-FileHash artifacts/Zurvan-Setup-x64.exe -Algorithm SHA256).Hash |
             Out-File artifacts/Zurvan-Setup-x64.exe.sha256 -Encoding ascii
