@@ -82,15 +82,21 @@ Personal entries remain stored when a feed is hidden. An additional Pahlavi
 historical feed and optional imperial-era year label are **hidden by default**.
 
 Access is checked at render time and when saving the preference. It is granted only by:
-- An unexpired, device-bound, RSA-PSS signed offline activation code with Edition
-  `pahlavi` or `special` (not by `standard`).
+- An unexpired, device-bound, RSA-PSS signed offline activation code whose signed
+  `Features` contains `pahlavi-occasions`, or whose Edition is `pahlavi`/`special`.
+  Standard/pro/enterprise editions alone do not grant the feature.
 - The existing hard-coded preview codes, **only in DEBUG builds**, exactly as the
   existing activation validator permits. Ordinary 45-day trials do not grant access.
+
+The Windows License Calculator now exposes a dedicated **Pahlavi historical
+occasions** checkbox in its special entitlements area. Leave this unchecked
+for ordinary licenses, regardless of edition. The signed grant is tied to the
+specific device code and optional expiry.
 
 An issuer holding the private signing key can grant access to a specific device:
 
 ```bash
-dotnet run --project tools/Zurvan.LicenseIssuer -- issue ./issuer-private.pem ZRV-0123456789ABCDEF01234567 pahlavi 2027-12-31T23:59:59Z
+dotnet run --project tools/Zurvan.LicenseIssuer -- issue ./issuer-private.pem ZRV-0123456789ABCDEF01234567 standard 2027-12-31T23:59:59Z --pahlavi-occasions
 ```
 
 To revoke an offline grant, allow its expiry or implement a server-synced
