@@ -462,7 +462,17 @@ jobs:
             Get-Item artifacts/Zurvan-Setup-x64.exe
           )
           if ($files.Count -lt 2) { throw "Expected Zurvan Windows binaries and installer." }
+          $preservedThirdParty = 0
+          $signedWithBDFR = 0
           foreach ($file in $files) {
+            $existing = Get-AuthenticodeSignature -FilePath $file.FullName
+            $existingThumbprint = if ($existing.SignerCertificate) { $existing.SignerCertificate.Thumbprint } else { "<missing>" }
+            $isAppOrInstaller = $file.Name -in @("BDFR_PersianCalendar.exe", "Zurvan-Setup-x64.exe")
+            if ($existing.Status -eq "Valid" -and $existing.SignerCertificate -and $existingThumbprint -ne $cert.Thumbprint -and -not $isAppOrInstaller) {
+              Write-Host "Preserving trusted third-party signature for $($file.Name): $existingThumbprint"
+              $preservedThirdParty++
+              continue
+            }
             & $sdk.FullName sign /f $pfxPath /p "$env:PFX_PASSWORD" /fd SHA256 $file.FullName
             if ($LASTEXITCODE -ne 0) { throw "Signing failed: $($file.Name)" }
             $sig = Get-AuthenticodeSignature -FilePath $file.FullName
@@ -471,7 +481,13 @@ jobs:
             if (-not $sig.SignerCertificate -or $actualThumbprint -ne $cert.Thumbprint) { throw "Wrong BDFR signer on $($file.Name): actual=$actualThumbprint expected=$($cert.Thumbprint)." }
             $untrustedRoot = $sig.Status -eq "UnknownError" -and $sig.StatusMessage -match "root certificate which is not trusted"
             if ($sig.Status -ne "Valid" -and -not $untrustedRoot) { throw "Authenticode validation failed for $($file.Name): $($sig.Status) $($sig.StatusMessage)" }
+            $signedWithBDFR++
           }
+          $installerSignature = Get-AuthenticodeSignature -FilePath "artifacts/Zurvan-Setup-x64.exe"
+          if (-not $installerSignature.SignerCertificate -or $installerSignature.SignerCertificate.Thumbprint -ne $cert.Thumbprint) {
+            throw "Zurvan installer must be signed with BDFR identity."
+          }
+          Write-Host "Verified $signedWithBDFR BDFR-signed binaries; preserved $preservedThirdParty valid third-party signatures."
           $files | ForEach-Object { Get-FileHash $_.FullName -Algorithm SHA256 } | ForEach-Object { "$($_.Hash) *$($_.Path)" } | Set-Content artifacts/signing-zurvan-release/SHA256SUMS.txt
           Compress-Archive -Path artifacts/Zurvan-win-x64/* -DestinationPath artifacts/Zurvan-win-x64.zip -Force
           (Get-FileHash artifacts/Zurvan-win-x64.zip -Algorithm SHA256).Hash | Out-File artifacts/Zurvan-win-x64.zip.sha256 -Encoding ascii
