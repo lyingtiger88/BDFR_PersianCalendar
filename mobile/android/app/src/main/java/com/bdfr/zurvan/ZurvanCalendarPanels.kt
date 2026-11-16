@@ -83,15 +83,15 @@ fun ZurvanCalendarPanels(
         ) {
             CalendarMonthPage(viewModel, Modifier.fillMaxWidth(), scrollMode = true)
             HorizontalDivider()
-            PrayerClockPanel(Modifier.fillMaxWidth().heightIn(min = 520.dp))
+            PrayerClockPanel(Modifier.fillMaxWidth().heightIn(min = 520.dp), scrollable = false)
             HorizontalDivider()
-            WeatherPanel(Modifier.fillMaxWidth().heightIn(min = 420.dp))
+            WeatherPanel(Modifier.fillMaxWidth().heightIn(min = 420.dp), scrollable = false)
         }
     }
 }
 
 @Composable
-private fun PrayerClockPanel(modifier: Modifier = Modifier) {
+private fun PrayerClockPanel(modifier: Modifier = Modifier, scrollable: Boolean = true) {
     val context = LocalContext.current
     val settings = remember(context) { ZurvanPrayerTimes.settings(context) }
     val zone = remember(settings.zone) { runCatching { ZoneId.of(settings.zone) }.getOrDefault(ZoneId.systemDefault()) }
@@ -99,8 +99,12 @@ private fun PrayerClockPanel(modifier: Modifier = Modifier) {
     val prayers = remember(settings, today) {
         runCatching { ZurvanPrayerTimes.calculate(today, settings) }.getOrDefault(emptyList())
     }
+    val panelScroll = if (scrollable) rememberScrollState() else null
+    val panelModifier = if (panelScroll != null)
+        modifier.fillMaxSize().verticalScroll(panelScroll).padding(16.dp)
+    else modifier.fillMaxWidth().padding(16.dp)
     Column(
-        modifier.fillMaxWidth().padding(16.dp),
+        panelModifier,
         verticalArrangement = Arrangement.spacedBy(12.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -148,7 +152,7 @@ private data class MobileWeather(
 private data class DailyWeather(val date: String, val code: Int, val max: Double, val min: Double)
 
 @Composable
-private fun WeatherPanel(modifier: Modifier = Modifier) {
+private fun WeatherPanel(modifier: Modifier = Modifier, scrollable: Boolean = true) {
     val context = LocalContext.current
     val settings = remember(context) { ZurvanPrayerTimes.settings(context) }
     var weather by remember { mutableStateOf<MobileWeather?>(null) }
@@ -193,8 +197,12 @@ private fun WeatherPanel(modifier: Modifier = Modifier) {
             error = "دریافت وضعیت هوا ممکن نشد. اتصال اینترنت و موقعیت شهر را بررسی کنید."
         } finally { loading = false }
     }
+    val panelScroll = if (scrollable) rememberScrollState() else null
+    val panelModifier = if (panelScroll != null)
+        modifier.fillMaxSize().verticalScroll(panelScroll).padding(16.dp)
+    else modifier.fillMaxWidth().padding(16.dp)
     Column(
-        modifier.fillMaxWidth().padding(16.dp),
+        panelModifier,
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text("آب‌وهوا", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
