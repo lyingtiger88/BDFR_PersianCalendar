@@ -26,6 +26,27 @@ object ZurvanActivation {
 
     fun validate(context: Context, code: String): Boolean = diagnose(context, code) == Result.VALID
 
+    /**
+     * A feature entitlement, not a UI preference. Debug-only preview codes remain
+     * accepted only in debug builds; release users need a signed special edition.
+     */
+    fun hasPahlaviAccess(context: Context): Boolean {
+        val code = context.getSharedPreferences("zurvan_license", Context.MODE_PRIVATE)
+            .getString("activation_code", null)?.trim() ?: return false
+        if (diagnose(context, code) != Result.VALID) return false
+        if (BuildConfig.DEBUG && code in setOf(
+                "elena13731005", "zarasamtestmode", "delaramsoftheart",
+                "shirinquietfox", "nazaninstrongcare", "mehrbanmomfriend",
+                "jonoubsweetpearl", "kurdishlovelymoon", "kindheartedfriend"
+            )) return true
+        val payload = code.split('.').getOrNull(1) ?: return false
+        return runCatching {
+            val decoded = Base64.decode(payload, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
+            JSONObject(String(decoded, Charsets.UTF_8)).optString("Edition")
+                .lowercase() in setOf("pahlavi", "special")
+        }.getOrDefault(false)
+    }
+
     fun diagnose(context: Context, code: String): Result {
         if (BuildConfig.DEBUG && code.trim() in setOf(
             "elena13731005", "zarasamtestmode",
