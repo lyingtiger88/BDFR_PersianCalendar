@@ -42,8 +42,12 @@ object ZurvanActivation {
         val payload = code.split('.').getOrNull(1) ?: return false
         return runCatching {
             val decoded = Base64.decode(payload, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
-            JSONObject(String(decoded, Charsets.UTF_8)).optString("Edition")
-                .lowercase() in setOf("pahlavi", "special")
+            val license = JSONObject(String(decoded, Charsets.UTF_8))
+            val edition = license.optString("Edition").lowercase()
+            val features = license.optJSONArray("Features")
+            edition in setOf("pahlavi", "special") ||
+                (features != null && (0 until features.length())
+                    .any { features.optString(it) == "pahlavi-occasions" })
         }.getOrDefault(false)
     }
 
