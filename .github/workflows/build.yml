@@ -466,7 +466,9 @@ jobs:
             & $sdk.FullName sign /f $pfxPath /p "$env:PFX_PASSWORD" /fd SHA256 $file.FullName
             if ($LASTEXITCODE -ne 0) { throw "Signing failed: $($file.Name)" }
             $sig = Get-AuthenticodeSignature -FilePath $file.FullName
-            if (-not $sig.SignerCertificate -or $sig.SignerCertificate.Thumbprint -ne $cert.Thumbprint) { throw "Wrong BDFR signer on $($file.Name)." }
+            $actualThumbprint = if ($sig.SignerCertificate) { $sig.SignerCertificate.Thumbprint } else { "<missing>" }
+            Write-Host "Signature check for $($file.Name): Status=$($sig.Status); SignerThumbprint=$actualThumbprint; ExpectedThumbprint=$($cert.Thumbprint)"
+            if (-not $sig.SignerCertificate -or $actualThumbprint -ne $cert.Thumbprint) { throw "Wrong BDFR signer on $($file.Name): actual=$actualThumbprint expected=$($cert.Thumbprint)." }
             $untrustedRoot = $sig.Status -eq "UnknownError" -and $sig.StatusMessage -match "root certificate which is not trusted"
             if ($sig.Status -ne "Valid" -and -not $untrustedRoot) { throw "Authenticode validation failed for $($file.Name): $($sig.Status) $($sig.StatusMessage)" }
           }
