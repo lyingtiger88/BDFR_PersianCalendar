@@ -2,6 +2,11 @@ name: Zurvan Android signed upgrade APK
 
 on:
   workflow_dispatch:
+  # Validate the release-signing pipeline whenever its guarded workflow changes.
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/android-signed-release.yml"
 
 permissions:
   contents: read
