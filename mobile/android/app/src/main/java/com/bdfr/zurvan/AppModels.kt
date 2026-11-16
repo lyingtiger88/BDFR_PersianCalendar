@@ -28,7 +28,9 @@ data class LocalOccasion(
     val hour: Int,
     val minute: Int,
     val annual: Boolean = true,
-    val targetPersianYear: Int? = null
+    val targetPersianYear: Int? = null,
+    // Feed identity is distinct from the date system used for matching.
+    val sourceCategory: String = calendar.key
 )
 
 data class LocalDayNote(
