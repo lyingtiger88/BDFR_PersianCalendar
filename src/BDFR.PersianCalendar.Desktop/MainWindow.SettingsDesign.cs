@@ -278,14 +278,14 @@ public sealed partial class MainWindow
                 status.Text = "مدیر ارشد زروان";
             else if (result.CanWrite)
                 status.Text = $"مجوز فعال · {result.ActiveLicenses} مجوز";
-
-            DispatcherQueue.TryEnqueue(() => RenderSpecialRankBadge(result));
             else if (result.Mode == "read_only")
                 status.Text = "دوره آزمایشی پایان یافته؛ برنامه در حالت فقط‌خواندنی است.";
             else if (result.TrialAvailable)
                 status.Text = "دوره آزمایشی ۴۵ روزه آماده فعال‌سازی است.";
             else
                 status.Text = "حساب تأییدشده؛ برای ادامه استفاده اشتراک تهیه کنید.";
+
+            DispatcherQueue.TryEnqueue(() => RenderSpecialRankBadge(result));
         }
         catch (Exception ex)
         {
