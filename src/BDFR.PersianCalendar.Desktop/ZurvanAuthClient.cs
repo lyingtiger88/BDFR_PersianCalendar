@@ -223,7 +223,13 @@ internal sealed class ZurvanAuthClient
 
     internal async Task<LicenseStatus> ReadLicenseStatusAsync()
     {
-        using var document = await LicenseFunctionAsync("zurvan-license-status", new { });
+        // Paid licenses can still be checked if Windows cannot expose a
+        // device identity; only issuance of a *new free trial* fails closed.
+        string? fingerprint;
+        try { fingerprint = GetDeviceTrialFingerprint(); }
+        catch { fingerprint = null; }
+        using var document = await LicenseFunctionAsync("zurvan-license-status",
+            new { key_fingerprint = fingerprint });
         var root = document.RootElement;
         string ReadString(string key, string fallback = "") =>
             root.TryGetProperty(key, out var value) && value.ValueKind == JsonValueKind.String
