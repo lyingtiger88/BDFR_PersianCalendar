@@ -41,7 +41,7 @@ Deno.serve(async req => {
   }
 
   const { data: licenseAccount, error: accountError } = await db.from("zurvan_accounts")
-    .select("id,status").eq("id", user.id).maybeSingle();
+    .select("id,status,super_type").eq("id", user.id).maybeSingle();
   if (accountError) return json(503, { error: "license_account_lookup_failed" });
   if (licenseAccount && licenseAccount.status !== "active")
     return json(403, { error: "license_account_inactive" });
@@ -55,6 +55,11 @@ Deno.serve(async req => {
       return json(503, { error: "license_account_enrollment_failed" });
     }
   }
+
+  // Founder/admin ranks already have entitlement through license-status.
+  // Do not consume a free trial merely to create their account profiles.
+  if (licenseAccount?.super_type === "emperor" || licenseAccount?.super_type === "empress")
+    return json(200, { initialized: true, trial_created: false, mode: "super" });
 
   const fingerprint = body.key_fingerprint;
   if (fingerprint !== undefined &&
