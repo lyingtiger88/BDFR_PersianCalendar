@@ -41,15 +41,28 @@ Deno.serve(async req => {
     .order("created_at", { ascending: false }).limit(5);
   if (licenseError) return json(503, { error: "database_unavailable" });
 
+  const specialType = typeof licenseAccount.super_type === "string"
+    ? licenseAccount.super_type.trim().toLowerCase()
+    : null;
+  const { data: specialRank, error: specialRankError } = specialType
+    ? await db.from("zurvan_special_ranks")
+        .select("code,display_name,display_name_fa,description,badge_key,access_level,permissions,sort_order")
+        .eq("code", specialType).maybeSingle()
+    : { data: null, error: null };
+  if (specialRankError) return json(503, { error: "database_unavailable" });
+
   const rows = licenses ?? [];
   const current = rows.find(x => x.status === "active") ?? rows[0] ?? null;
   const now = Date.now();
   const expiry = current?.expires_at ? new Date(current.expires_at).getTime() : null;
   const valid = !!current && current.status === "active" && (expiry === null || expiry > now);
-  const isSuper = !!licenseAccount.super_type;
-  const canWrite = valid || isSuper;
-  const trialAvailable = rows.length === 0 && !isSuper;
-  const mode = isSuper ? "super" : valid
+
+  // Only Emperor and Empress receive administrator write entitlement.
+  // Special Advisor is an honorary/advisory rank and does not bypass licensing.
+  const isAdminRank = specialType === "emperor" || specialType === "empress";
+  const canWrite = valid || isAdminRank;
+  const trialAvailable = rows.length === 0 && !isAdminRank;
+  const mode = isAdminRank ? "super" : valid
     ? current.type : current?.type === "trial" ? "read_only" : current ? "license_inactive" : "trial_available";
   const daysRemaining = expiry === null || !valid ? 0 : Math.max(0, Math.ceil((expiry - now) / 86400000));
 
@@ -69,6 +82,16 @@ Deno.serve(async req => {
     can_write: canWrite, mode, days_remaining: daysRemaining,
     expires_at: current?.expires_at ?? null,
     super_type: licenseAccount.super_type, super_title: licenseAccount.super_title,
+    special_rank: specialRank ? {
+      code: specialRank.code,
+      display_name: specialRank.display_name,
+      display_name_fa: specialRank.display_name_fa,
+      description: specialRank.description,
+      badge_key: specialRank.badge_key,
+      access_level: specialRank.access_level,
+      sort_order: specialRank.sort_order
+    } : null,
+    special_permissions: specialRank?.permissions ?? {},
     checked_at: new Date().toISOString()
   });
 });
