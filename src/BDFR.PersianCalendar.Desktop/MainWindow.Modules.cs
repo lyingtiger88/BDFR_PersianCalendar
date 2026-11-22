@@ -654,10 +654,19 @@ public sealed partial class MainWindow
                 applySelected.IsEnabled = false;
                 return;
             }
-            var rowIndex = 1;
+            // Keep a monotonically increasing tile index. Reusing a constant
+            // row index places every wallpaper at row 1 / column 0, so the last
+            // child visually covers the first one instead of forming a 4-column grid.
+            var tileIndex = 0;
             foreach (var path in files)
             {
-                var image = new Image { Width = 94, Height = 68, Stretch = Stretch.UniformToFill };
+                var image = new Image
+                {
+                    Width = 94, Height = 68,
+                    Stretch = Stretch.UniformToFill,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
                 var select = new Button
                 {
                     Padding = new Thickness(5), Background = ThemeService.Brush("#FFFDFDFD"),
@@ -686,7 +695,7 @@ public sealed partial class MainWindow
                     BorderBrush = BrushWithAlpha(_theme.Accent, 0x55), BorderThickness = new Thickness(1),
                     CornerRadius = new CornerRadius(9), Padding = new Thickness(3), Child = select
                 };
-                var index = rowIndex - 1;
+                var index = tileIndex++;
                 var row = (index / 4) + 1;
                 var column = index % 4;
                 while (gallery.RowDefinitions.Count <= row)
