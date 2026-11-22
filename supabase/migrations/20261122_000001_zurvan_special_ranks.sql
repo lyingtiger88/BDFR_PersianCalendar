@@ -61,6 +61,7 @@ begin
   from auth.users u
   where u.id = creator_id
   on conflict (id) do update set
+    status = 'active',
     super_type = 'emperor',
     super_title = 'Founder / Emperor';
 end;
