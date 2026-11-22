@@ -349,9 +349,17 @@ public sealed partial class MainWindow
             }
             applyMenu.ShowAt(applySelected);
         };
-        var galleryLayout = new Grid { ColumnSpacing = 16, FlowDirection = FlowDirection.LeftToRight };
-        galleryLayout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.05, GridUnitType.Star) });
-        galleryLayout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.5, GridUnitType.Star) });
+        var galleryLayout = new Grid
+        {
+            ColumnSpacing = 16,
+            FlowDirection = FlowDirection.LeftToRight,
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+        // The page is hosted by a vertical StackPanel inside a ScrollViewer.
+        // Without an explicit viewport width the StackPanel measures this Grid
+        // to its children's desired width, leaving most of the card empty.
+        galleryLayout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(0.9, GridUnitType.Star) });
+        galleryLayout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.8, GridUnitType.Star) });
         var previewPanel = new StackPanel { Spacing = 9, VerticalAlignment = VerticalAlignment.Top };
         var previewFrame = new Border
         {
@@ -709,13 +717,20 @@ public sealed partial class MainWindow
         openGallery.Click += (_, _) => OpenFolderInExplorer(_wallpaperService.GalleryRoot);
         root.Children.Add(openGallery);
 
-        return new ScrollViewer
+        var pageScroll = new ScrollViewer
         {
             Content = root,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
             FlowDirection = FlowDirection.RightToLeft
         };
+        pageScroll.SizeChanged += (_, e) =>
+        {
+            var viewportWidth = Math.Max(700, e.NewSize.Width - 24);
+            root.Width = viewportWidth;
+            galleryLayout.Width = Math.Max(620, viewportWidth - 64);
+        };
+        return pageScroll;
     }
 
     private (int Width, int Height) GetPrimaryDisplayResolution()
