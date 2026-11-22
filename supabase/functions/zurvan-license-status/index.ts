@@ -78,6 +78,7 @@ Deno.serve(async req => {
 
   return json(200, {
     account_state: "active", license_account_state: "active",
+    account_username: account.username,
     licenses: rows, activations, trial_available: trialAvailable,
     can_write: canWrite, mode, days_remaining: daysRemaining,
     expires_at: current?.expires_at ?? null,
