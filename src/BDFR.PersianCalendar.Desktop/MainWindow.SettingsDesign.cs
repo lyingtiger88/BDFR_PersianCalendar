@@ -40,6 +40,7 @@ public sealed partial class MainWindow
     private TextBox? _settingsSearchBox;
     private string _selectedSettingsSection = "عمومی";
     private Border? _settingsProfileContainer;
+    private StackPanel? _settingsRankBadgeHost;
     private TextBlock? _settingsServerLicenseStatus;
     private bool _licenseCanWrite;
     private string _licenseMode = "account_required";
@@ -146,6 +147,16 @@ public sealed partial class MainWindow
         row.Children.Add(avatar);
         row.Children.Add(text);
         account.Children.Add(row);
+
+        _settingsRankBadgeHost = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 7,
+            FlowDirection = FlowDirection.RightToLeft,
+            HorizontalAlignment = HorizontalAlignment.Right
+        };
+        account.Children.Add(_settingsRankBadgeHost);
+
         if (_authClient.SignedInEmail is not null)
         {
             var status = (TextBlock)text.Children[1];
@@ -175,6 +186,53 @@ public sealed partial class MainWindow
         profile.Click += (_, _) => ShowSettingsSection("حساب کاربری");
         account.Children.Add(profile);
         return account;
+    }
+
+    private void RenderSpecialRankBadge(ZurvanAuthClient.LicenseStatus result)
+    {
+        if (_settingsRankBadgeHost is null) return;
+        _settingsRankBadgeHost.Children.Clear();
+        if (string.IsNullOrWhiteSpace(result.SpecialRankCode)) return;
+
+        var (icon, background, foreground, label) = result.SpecialRankCode switch
+        {
+            "emperor" => ("♛", "#FF332747", "#FFFFD36B", "EMPEROR · امپراتور"),
+            "empress" => ("♛", "#FF493044", "#FFF4C3D8", "EMPRESS · امپراتریس"),
+            "special_advisor" => ("✦", "#FF253C4A", "#FF9DE8F2", "SPECIAL ADVISOR · مشاور ویژه"),
+            _ => ("◆", "#FF454052", "#FFFFFFFF", result.SpecialRankName ?? result.SpecialRankCode)
+        };
+
+        var badge = new Border
+        {
+            Background = ThemeService.Brush(background),
+            CornerRadius = new CornerRadius(12),
+            Padding = new Thickness(11, 6, 11, 6),
+            Child = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Spacing = 7,
+                FlowDirection = FlowDirection.RightToLeft,
+                Children =
+                {
+                    new TextBlock
+                    {
+                        Text = icon,
+                        FontSize = 17,
+                        Foreground = ThemeService.Brush(foreground),
+                        VerticalAlignment = VerticalAlignment.Center
+                    },
+                    new TextBlock
+                    {
+                        Text = label,
+                        FontSize = 11,
+                        FontWeight = Microsoft.UI.Text.FontWeights.Bold,
+                        Foreground = ThemeService.Brush(foreground),
+                        VerticalAlignment = VerticalAlignment.Center
+                    }
+                }
+            }
+        };
+        _settingsRankBadgeHost.Children.Add(badge);
     }
 
     private void RefreshWindowsSettingsProfile()
@@ -214,8 +272,14 @@ public sealed partial class MainWindow
                 status.Text = $"دوره آزمایشی فعال · {result.DaysRemaining} روز باقی‌مانده";
             else if (result.CanWrite && result.Mode == "subscription")
                 status.Text = $"اشتراک فعال · {result.DaysRemaining} روز باقی‌مانده";
+            else if (result.CanWrite && result.SpecialRankCode == "emperor")
+                status.Text = "مالک زروان · دسترسی کامل";
+            else if (result.CanWrite && result.SpecialRankCode == "empress")
+                status.Text = "مدیر ارشد زروان";
             else if (result.CanWrite)
                 status.Text = $"مجوز فعال · {result.ActiveLicenses} مجوز";
+
+            DispatcherQueue.TryEnqueue(() => RenderSpecialRankBadge(result));
             else if (result.Mode == "read_only")
                 status.Text = "دوره آزمایشی پایان یافته؛ برنامه در حالت فقط‌خواندنی است.";
             else if (result.TrialAvailable)
