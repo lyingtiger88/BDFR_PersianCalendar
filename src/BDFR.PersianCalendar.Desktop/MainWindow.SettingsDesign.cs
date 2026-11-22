@@ -41,6 +41,7 @@ public sealed partial class MainWindow
     private string _selectedSettingsSection = "عمومی";
     private Border? _settingsProfileContainer;
     private StackPanel? _settingsRankBadgeHost;
+    private StackPanel? _settingsAccountRankBadgeHost;
     private TextBlock? _settingsServerLicenseStatus;
     private bool _licenseCanWrite;
     private string _licenseMode = "account_required";
@@ -190,8 +191,8 @@ public sealed partial class MainWindow
 
     private void RenderSpecialRankBadge(ZurvanAuthClient.LicenseStatus result)
     {
-        if (_settingsRankBadgeHost is null) return;
-        _settingsRankBadgeHost.Children.Clear();
+        if (_settingsRankBadgeHost is not null) _settingsRankBadgeHost.Children.Clear();
+        if (_settingsAccountRankBadgeHost is not null) _settingsAccountRankBadgeHost.Children.Clear();
         if (string.IsNullOrWhiteSpace(result.SpecialRankCode)) return;
 
         var (icon, background, foreground, label) = result.SpecialRankCode switch
@@ -199,7 +200,7 @@ public sealed partial class MainWindow
             "emperor" => ("♛", "#FF332747", "#FFFFD36B", "EMPEROR · امپراتور"),
             "empress" => ("♛", "#FF493044", "#FFF4C3D8", "EMPRESS · امپراتریس"),
             "special_advisor" => ("✦", "#FF253C4A", "#FF9DE8F2", "SPECIAL ADVISOR · مشاور ویژه"),
-            _ => ("◆", "#FF454052", "#FFFFFFFF", result.SpecialRankName ?? result.SpecialRankCode)
+            _ => ("◆", "#FF454052", "#FFFFFFFF", result.SpecialRankNameFa ?? result.SpecialRankName ?? result.SpecialRankCode)
         };
 
         var badge = new Border
@@ -232,7 +233,29 @@ public sealed partial class MainWindow
                 }
             }
         };
-        _settingsRankBadgeHost.Children.Add(badge);
+        if (_settingsRankBadgeHost is not null)
+            _settingsRankBadgeHost.Children.Add(badge);
+        if (_settingsAccountRankBadgeHost is not null)
+        {
+            var accountBadge = new Border
+            {
+                Background = ThemeService.Brush(background),
+                CornerRadius = new CornerRadius(12),
+                Padding = new Thickness(11, 6, 11, 6),
+                Child = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    Spacing = 7,
+                    FlowDirection = FlowDirection.RightToLeft,
+                    Children =
+                    {
+                        new TextBlock { Text = icon, FontSize = 17, Foreground = ThemeService.Brush(foreground), VerticalAlignment = VerticalAlignment.Center },
+                        new TextBlock { Text = label, FontSize = 11, FontWeight = Microsoft.UI.Text.FontWeights.Bold, Foreground = ThemeService.Brush(foreground), VerticalAlignment = VerticalAlignment.Center }
+                    }
+                }
+            };
+            _settingsAccountRankBadgeHost.Children.Add(accountBadge);
+        }
     }
 
     private void RefreshWindowsSettingsProfile()
@@ -263,7 +286,15 @@ public sealed partial class MainWindow
                 if (!_licenseCanWrite && _activeDesktopModule != "تنظیمات")
                     ShowDesktopModule(_activeDesktopModule);
             });
-            if (result.AccountState != "active")
+            if (result.SpecialRankCode == "emperor")
+                status.Text = "سازنده زروان · دسترسی مدیریتی کامل";
+            else if (result.SpecialRankCode == "empress")
+                status.Text = "مدیر ارشد زروان · دسترسی مدیریتی کامل";
+            else if (result.SpecialRankCode == "special_advisor")
+                status.Text = result.CanWrite
+                    ? "مشاور ویژه زروان · مجوز فعال"
+                    : "مشاور ویژه زروان · سطح دسترسی مشاوره‌ای";
+            else if (result.AccountState != "active")
                 status.Text = "حساب زروان: " +
                     (result.AccountState == "registration_required" || result.AccountState == "provisional"
                         ? "ثبت‌نام دستگاه تکمیل نشده است"
@@ -272,10 +303,6 @@ public sealed partial class MainWindow
                 status.Text = $"دوره آزمایشی فعال · {result.DaysRemaining} روز باقی‌مانده";
             else if (result.CanWrite && result.Mode == "subscription")
                 status.Text = $"اشتراک فعال · {result.DaysRemaining} روز باقی‌مانده";
-            else if (result.CanWrite && result.SpecialRankCode == "emperor")
-                status.Text = "مالک زروان · دسترسی کامل";
-            else if (result.CanWrite && result.SpecialRankCode == "empress")
-                status.Text = "مدیر ارشد زروان";
             else if (result.CanWrite)
                 status.Text = $"مجوز فعال · {result.ActiveLicenses} مجوز";
             else if (result.Mode == "read_only")
@@ -1224,6 +1251,15 @@ public sealed partial class MainWindow
             "ورود، ثبت‌نام و وضعیت اشتراک زروان", "\uE77B", "#FFE8AD1D");
         contents.Children.Add(SettingsHint(
             "وضعیت اشتراک صرفاً از سرور Supabase دریافت می‌شود؛ این صفحه مستقل از کدهای فعال‌سازی محلی قدیمی است."));
+        _settingsAccountRankBadgeHost = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            FlowDirection = FlowDirection.RightToLeft,
+            HorizontalAlignment = HorizontalAlignment.Right
+        };
+        contents.Children.Add(SettingsLabel("رتبه و نشان ویژه زروان", 14, true));
+        contents.Children.Add(_settingsAccountRankBadgeHost);
         contents.Children.Add(BuildAccountAuthPanel());
         _settingsServerLicenseStatus = SettingsHint(
             _authClient.SignedInEmail is null
