@@ -45,13 +45,13 @@ begin
   select u.id into creator_id
   from auth.users u
   join public.accounts a on a.auth_user_id = u.id
-  where lower(u.email) = lower('behzaddesec@gmail.com')
+  where lower(u.email) = lower('behzaddedsec@gmail.com')
     and u.email_confirmed_at is not null
     and a.state = 'active'
   limit 1;
 
   if creator_id is null then
-    raise exception 'Verified active Zurvan creator account behzaddesec@gmail.com was not found; Emperor rank was not assigned.';
+    raise exception 'Verified active Zurvan creator account behzaddedsec@gmail.com was not found; Emperor rank was not assigned.';
   end if;
 
   insert into public.zurvan_accounts
