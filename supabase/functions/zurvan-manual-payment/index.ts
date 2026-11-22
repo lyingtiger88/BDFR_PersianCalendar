@@ -90,11 +90,12 @@ Deno.serve(async req => {
         });
         if(error && error.code!=="23505")return fail("license_account_setup_failed",origin,503);
       }else if(licenseAccount.status!=="active")return fail("account_inactive",origin,403);
-      const {data:trial,error:trialError}=await db.rpc("zurvan_start_trial",{
-        p_auth_user_id:user.id,p_key_fingerprint:null
-      });
-      if(trialError)return fail("trial_setup_unavailable",origin,503);
-      return reply(200,{initialized:true,trial},origin);
+      // Website onboarding creates account records only. A browser cannot
+      // supply a trustworthy Windows device identity. The desktop client
+      // issues the one-time free trial after sending a device fingerprint.
+      return reply(200,{
+        initialized:true,trial:null,trial_source:"windows_device"
+      },origin);
     }
     if(action==="config"){
       const {data,error}=await db.from("zurvan_manual_payment_config")
