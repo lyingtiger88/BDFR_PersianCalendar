@@ -394,6 +394,8 @@ public sealed partial class MainWindow
             galleryCategoryPicker.Items.Add(new ComboBoxItem { Content = name, Tag = name });
         galleryCategoryPicker.SelectedIndex = 0;
         var rebuildingGalleryCategories = false;
+        var galleryLoadGeneration = 0;
+        var galleryLoading = false;
         var galleryRefresh = MakeButton("تازه‌سازی گالری");
         var seenIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var currentQuery = "";
@@ -590,11 +592,31 @@ public sealed partial class MainWindow
         galleryRefresh.Click += async (_, _) => await LoadGalleryAsync();
         galleryCategoryPicker.SelectionChanged += async (_, _) =>
         {
-            if (!rebuildingGalleryCategories) await LoadGalleryAsync();
+            if (!rebuildingGalleryCategories && !galleryLoading)
+                await LoadGalleryAsync();
         };
+
+        async Task LoadGalleryThumbnailAsync(Image image, string path, int generation)
+        {
+            try
+            {
+                var source = await PictureService.LoadImageAsync(path, 240);
+                if (generation == galleryLoadGeneration)
+                    image.Source = source;
+            }
+            catch (Exception ex)
+            {
+                StartupDiagnostics.Log($"Gallery thumbnail failed ({Path.GetFileName(path)}): {ex.Message}");
+            }
+        }
 
         async Task LoadGalleryAsync()
         {
+            if (galleryLoading) return;
+            galleryLoading = true;
+            var generation = ++galleryLoadGeneration;
+            try
+            {
             gallery.Children.Clear();
             gallery.RowDefinitions.Clear();
             gallery.Children.Add(galleryRefresh);
@@ -628,7 +650,6 @@ public sealed partial class MainWindow
             foreach (var path in files)
             {
                 var image = new Image { Width = 94, Height = 68, Stretch = Stretch.UniformToFill };
-                image.Source = await PictureService.LoadImageAsync(path, 240);
                 var select = new Button
                 {
                     Padding = new Thickness(5), Background = ThemeService.Brush("#FFFDFDFD"),
@@ -665,6 +686,15 @@ public sealed partial class MainWindow
                 Grid.SetRow(tile, row);
                 Grid.SetColumn(tile, column);
                 gallery.Children.Add(tile);
+
+                // Render every tile immediately, then decode thumbnails independently.
+                // A corrupt/locked image must not abort the remaining gallery.
+                _ = LoadGalleryThumbnailAsync(image, path, generation);
+            }
+            }
+            finally
+            {
+                galleryLoading = false;
             }
         }
 
