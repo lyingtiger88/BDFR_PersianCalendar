@@ -650,4 +650,65 @@ using (var qrKey = new CompanionEphemeralKey())
     }
 }
 
+
+
+// Exhaustive Persian/Gregorian round-trip regression coverage across 201 years.
+// This is deterministic and does not depend on network data or a human-operated device.
+var checkedPersianDates = 0;
+for (var year = 1300; year <= 1500; year++)
+{
+    for (var month = 1; month <= 12; month++)
+    {
+        var days = PersianDate.DaysInMonth(year, month);
+        for (var day = 1; day <= days; day++)
+        {
+            var persian = new PersianDate(year, month, day);
+            var gregorian = persian.ToDateOnly();
+            var roundTrip = PersianDate.FromDateOnly(gregorian);
+            if (roundTrip != persian)
+            {
+                throw new Exception(
+                    $"Persian/Gregorian round-trip failed: {persian} -> {gregorian} -> {roundTrip}");
+            }
+
+            checkedPersianDates++;
+        }
+    }
+}
+
+if (checkedPersianDates < 73000)
+    throw new Exception($"Unexpectedly low Persian date coverage: {checkedPersianDates}.");
+
+// Invalid user-entered dates must fail cleanly instead of producing a converted date.
+foreach (var invalidDate in new[] { "1405/13/01", "1405/00/10", "1405/07/32", "1405/12/30" })
+{
+    if (CalendarDateConverter.TryConvertInput(
+            invalidDate,
+            CalendarSystemKind.Persian,
+            out _,
+            out var invalidError) ||
+        string.IsNullOrWhiteSpace(invalidError))
+    {
+        throw new Exception($"Invalid Persian date was accepted: {invalidDate}");
+    }
+}
+
+// Validate Gregorian leap-day handling and Hijri conversion round-trips at boundaries.
+var leapDay = CalendarDateConverter.Convert(new DateOnly(2024, 2, 29));
+if (leapDay.Gregorian != new DateOnly(2024, 2, 29) ||
+    leapDay.Persian.ToDateOnly() != new DateOnly(2024, 2, 29))
+{
+    throw new Exception("Gregorian leap-day conversion failed.");
+}
+
+var hijriRoundTripDate = CalendarDateConverter.Convert(
+    CalendarSystemKind.Hijri,
+    leapDay.Hijri.Year,
+    leapDay.Hijri.Month,
+    leapDay.Hijri.Day);
+if (hijriRoundTripDate.Gregorian != leapDay.Gregorian)
+    throw new Exception("Hijri conversion round-trip failed at Gregorian leap day.");
+
+Console.WriteLine($"Calendar regression coverage: {checkedPersianDates:N0} Persian dates checked.");
+
 Console.WriteLine("BDFR Persian Calendar smoke checks passed.");
