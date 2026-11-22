@@ -1,4 +1,9 @@
 using System.Net.Http.Json;
+using System.Security.Cryptography;
+using System.Text;
+using Microsoft.Win32;
+using Windows.Storage.Streams;
+using Windows.System.Profile;
 using System.Text.Json;
 using Windows.Security.Credentials;
 
@@ -160,6 +165,9 @@ internal sealed class ZurvanAuthClient
                         "license_account_inactive" => "حساب لایسنس فعال نیست.",
                         "email_not_verified" => "ابتدا ایمیل حساب زروان را تأیید کنید.",
                         "trial_unavailable" => "شروع دوره آزمایشی موقتاً ممکن نیست.",
+                        "device_trial_already_used" => "دوره رایگان این دستگاه قبلاً برای یک حساب فعال شده است. برای استفاده با حساب جدید، اشتراک تهیه کنید.",
+                        "device_identity_required" => "برای شروع دوره رایگان، شناسه دستگاه الزامی است.",
+                        "account_inactive" => "حساب شما غیرفعال است؛ با پشتیبانی تماس بگیرید.",
                         _ => detail
                     };
             }
@@ -169,8 +177,49 @@ internal sealed class ZurvanAuthClient
         return JsonDocument.Parse(raw);
     }
 
+    // Hash a Windows system identity locally; never send a raw hardware ID to Supabase.
+    // The publisher-scoped ID is hardware-backed where Windows supports it.
+    // A fallback binds the trial to the Windows installation (not guaranteed
+    // physical hardware). These identities are deterrents, not TPM attestation.
+    private static string GetDeviceTrialFingerprint()
+    {
+        string? identity = null;
+        try
+        {
+            var info = SystemIdentification.GetSystemIdForPublisher();
+            if (info?.Id is not null && info.Id.Length > 0)
+            {
+                using var reader = DataReader.FromBuffer(info.Id);
+                var bytes = new byte[(int)info.Id.Length];
+                reader.ReadBytes(bytes);
+                identity = "win-system:" + Convert.ToHexString(bytes);
+            }
+        }
+        catch { /* Unpackaged/unsupported Windows environments use the fallback. */ }
+
+        if (string.IsNullOrWhiteSpace(identity))
+        {
+            try
+            {
+                using var key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Cryptography");
+                var machineGuid = key?.GetValue("MachineGuid") as string;
+                if (!string.IsNullOrWhiteSpace(machineGuid))
+                    identity = "win-install:" + machineGuid.Trim().ToLowerInvariant();
+            }
+            catch { /* Fail closed if the system identifier is not accessible. */ }
+        }
+        if (string.IsNullOrWhiteSpace(identity))
+            throw new InvalidOperationException(
+                "شناسه دستگاه در این ویندوز قابل دریافت نیست؛ دوره رایگان بدون شناسایی دستگاه صادر نمی‌شود.");
+
+        return Convert.ToHexString(SHA256.HashData(
+            Encoding.UTF8.GetBytes("zurvan-free-trial-device-v1|" + identity)))
+            .ToLowerInvariant();
+    }
+
     internal async Task<JsonDocument> StartTrialAsync()
-        => await LicenseFunctionAsync("zurvan-license-start-trial", new { });
+        => await LicenseFunctionAsync("zurvan-license-start-trial",
+            new { key_fingerprint = GetDeviceTrialFingerprint() });
 
     internal async Task<LicenseStatus> ReadLicenseStatusAsync()
     {
