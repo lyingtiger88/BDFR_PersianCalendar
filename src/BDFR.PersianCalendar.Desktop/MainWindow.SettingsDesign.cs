@@ -42,6 +42,7 @@ public sealed partial class MainWindow
     private Border? _settingsProfileContainer;
     private StackPanel? _settingsRankBadgeHost;
     private StackPanel? _settingsAccountRankBadgeHost;
+    private TextBlock? _settingsAccountNameText;
     private TextBlock? _settingsServerLicenseStatus;
     private bool _licenseCanWrite;
     private string _licenseMode = "account_required";
@@ -129,13 +130,14 @@ public sealed partial class MainWindow
             }
         };
         var text = new StackPanel { Spacing = 4, VerticalAlignment = VerticalAlignment.Center };
-        text.Children.Add(new TextBlock
+        _settingsAccountNameText = new TextBlock
         {
             Text = _authClient.SignedInEmail ?? "کاربر زروان",
             FontSize = 17,
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
             Foreground = ThemeService.Brush(SettingsTextColor)
-        });
+        };
+        text.Children.Add(_settingsAccountNameText);
         text.Children.Add(new TextBlock
         {
             Text = _authClient.SignedInEmail is null
@@ -274,6 +276,8 @@ public sealed partial class MainWindow
                 using var started = await _authClient.StartTrialAsync();
                 result = await _authClient.ReadLicenseStatusAsync();
             }
+            if (_settingsAccountNameText is not null && !string.IsNullOrWhiteSpace(result.AccountUsername))
+                _settingsAccountNameText.Text = result.AccountUsername;
             _licenseCanWrite = result.CanWrite;
             _licenseMode = result.Mode;
             _licenseExpiresAt = result.ExpiresAt;
