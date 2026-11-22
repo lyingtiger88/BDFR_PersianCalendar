@@ -295,7 +295,9 @@ public sealed partial class MainWindow
                 if (!_licenseCanWrite && _activeDesktopModule != "تنظیمات")
                     ShowDesktopModule(_activeDesktopModule);
             });
-            if (result.SpecialRankCode == "emperor")
+            if (result.Mode == "device_trial_mismatch")
+                status.Text = "دوره رایگان این حساب متعلق به دستگاه دیگری است؛ برای این دستگاه اشتراک تهیه کنید.";
+            else if (result.SpecialRankCode == "emperor")
                 status.Text = "سازنده زروان · دسترسی مدیریتی کامل";
             else if (result.SpecialRankCode == "empress")
                 status.Text = "مدیر ارشد زروان · دسترسی مدیریتی کامل";
