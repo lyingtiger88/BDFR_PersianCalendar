@@ -16,6 +16,16 @@ Deno.serve(async req => {
   const user = authData?.user;
   if (authError || !user || !user.email_confirmed_at) return json(401, { error: "unauthorized" });
 
+  let deviceFingerprint: string | null = null;
+  try {
+    const body = await req.json();
+    if (body?.key_fingerprint !== undefined && body?.key_fingerprint !== null) {
+      if (typeof body.key_fingerprint !== "string" || !/^[0-9a-f]{64}$/.test(body.key_fingerprint))
+        return json(400, { error: "invalid_device_fingerprint" });
+      deviceFingerprint = body.key_fingerprint;
+    }
+  } catch { return json(400, { error: "invalid_json" }); }
+
   const { data: account, error: accountError } = await db.from("accounts")
     .select("id,username,state").eq("auth_user_id", user.id).maybeSingle();
   if (accountError) return json(503, { error: "database_unavailable" });
@@ -46,7 +56,7 @@ Deno.serve(async req => {
     : null;
   const { data: specialRank, error: specialRankError } = specialType
     ? await db.from("zurvan_special_ranks")
-        .select("code,display_name,display_name_fa,description,badge_key,access_level,permissions,sort_order")
+        .select("code,display_name,display_name_fa,description,badge_key,access_level,permissions")
         .eq("code", specialType).maybeSingle()
     : { data: null, error: null };
   if (specialRankError) return json(503, { error: "database_unavailable" });
@@ -57,12 +67,27 @@ Deno.serve(async req => {
   const expiry = current?.expires_at ? new Date(current.expires_at).getTime() : null;
   const valid = !!current && current.status === "active" && (expiry === null || expiry > now);
 
+  // New one-device trials must be used on their original device. Trials
+  // issued before the fingerprint migration have no claim and are
+  // grandfathered; never silently revoke those historical entitlements.
+  let trialDeviceAllowed = true;
+  if (current?.type === "trial") {
+    const { data: claims, error: claimError } = await db
+      .from("zurvan_trial_devices")
+      .select("fingerprint")
+      .eq("first_account_id", user.id).limit(2);
+    if (claimError) return json(503, { error: "trial_device_lookup_failed" });
+    if (claims && claims.length > 0)
+      trialDeviceAllowed = deviceFingerprint !== null &&
+        claims.some(x => x.fingerprint === deviceFingerprint);
+  }
+
   // Only Emperor and Empress receive administrator write entitlement.
   // Special Advisor is an honorary/advisory rank and does not bypass licensing.
   const isAdminRank = specialType === "emperor" || specialType === "empress";
-  const canWrite = valid || isAdminRank;
+  const canWrite = (valid && trialDeviceAllowed) || isAdminRank;
   const trialAvailable = rows.length === 0 && !isAdminRank;
-  const mode = isAdminRank ? "super" : valid
+  const mode = isAdminRank ? "super" : valid && !trialDeviceAllowed ? "device_trial_mismatch" : valid
     ? current.type : current?.type === "trial" ? "read_only" : current ? "license_inactive" : "trial_available";
   const daysRemaining = expiry === null || !valid ? 0 : Math.max(0, Math.ceil((expiry - now) / 86400000));
 
@@ -89,8 +114,7 @@ Deno.serve(async req => {
       display_name_fa: specialRank.display_name_fa,
       description: specialRank.description,
       badge_key: specialRank.badge_key,
-      access_level: specialRank.access_level,
-      sort_order: specialRank.sort_order
+      access_level: specialRank.access_level
     } : null,
     special_permissions: specialRank?.permissions ?? {},
     checked_at: new Date().toISOString()
