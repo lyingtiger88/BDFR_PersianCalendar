@@ -650,8 +650,6 @@ using (var qrKey = new CompanionEphemeralKey())
     }
 }
 
-
-
 // Exhaustive Persian/Gregorian round-trip regression coverage across 201 years.
 // This is deterministic and does not depend on network data or a human-operated device.
 var checkedPersianDates = 0;
