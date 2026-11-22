@@ -271,7 +271,12 @@ public sealed partial class MainWindow
         try
         {
             var result = await _authClient.ReadLicenseStatusAsync();
-            if (result.TrialAvailable)
+            // Complete verified account enrollment and start an eligible
+            // one-time device-bound trial without administrator intervention.
+            if (result.TrialAvailable ||
+                result.AccountState == "registration_required" ||
+                result.LicenseAccountState == "not_linked" ||
+                result.LicenseAccountState == "not_found")
             {
                 using var started = await _authClient.StartTrialAsync();
                 result = await _authClient.ReadLicenseStatusAsync();
@@ -320,7 +325,7 @@ public sealed partial class MainWindow
         }
         catch (Exception ex)
         {
-            status.Text = "استعلام مجوز سرور ناموفق بود";
+            status.Text = ex.Message;
             StartupDiagnostics.Log("Account license verification unavailable: " + ex.Message);
         }
     }
@@ -339,7 +344,12 @@ public sealed partial class MainWindow
         try
         {
             var result = await _authClient.ReadLicenseStatusAsync();
-            if (result.TrialAvailable)
+            // Complete verified account enrollment and start an eligible
+            // one-time device-bound trial without administrator intervention.
+            if (result.TrialAvailable ||
+                result.AccountState == "registration_required" ||
+                result.LicenseAccountState == "not_linked" ||
+                result.LicenseAccountState == "not_found")
             {
                 using var started = await _authClient.StartTrialAsync();
                 result = await _authClient.ReadLicenseStatusAsync();
