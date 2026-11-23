@@ -121,7 +121,8 @@ internal fun ZurvanUserProgressPanel() {
             }) { Text("کپی شناسه معرف") }
             Text("شناسه را بده تا کاربر جدید در فرم ثبت‌نام وارد کند؛ نیازی به لینک نیست.",
                 style = MaterialTheme.typography.bodySmall)
-            Text("دعوت‌های موفق: ${referral.optInt("successful")} · در انتظار: ${referral.optInt("pending")}")
+            Text("کل دعوت‌ها: ${referral.optInt("total_invited")} · موفق: ${referral.optInt("successful")}")
+            Text("در انتظار تأیید: ${referral.optInt("pending")} · پاداش Silver دریافت‌شده: ${referral.optInt("earned_rewards")}")
             Text("تا جایزه بعدی: ${referral.optInt("remaining_to_next")} دعوت موفق")
             Text("هر دعوت موفق ۱۰۰ XP؛ هر ۱۵ دعوت موفق یک‌سال Premium Silver",
                 style = MaterialTheme.typography.bodySmall)
