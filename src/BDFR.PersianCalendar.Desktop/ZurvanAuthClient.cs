@@ -100,12 +100,31 @@ internal sealed class ZurvanAuthClient
         Store(email.Trim(), reply.RootElement);
     }
 
-    internal async Task<bool> SignUpAsync(string email, string password)
+    internal async Task<bool> ValidateReferralIdentifierAsync(string code)
+    {
+        if (string.IsNullOrWhiteSpace(code)) return true;
+        code = code.Trim().ToUpperInvariant();
+        if (code.Length != 16 || code.Any(x => !Uri.IsHexDigit(x)))
+            return false;
+        using var reply = await RequestAsync("/functions/v1/zurvan-referral-validate",
+            new { code });
+        return reply.RootElement.TryGetProperty("valid", out var valid) &&
+            valid.ValueKind == JsonValueKind.True;
+    }
+
+    internal async Task<bool> SignUpAsync(string email, string password,
+        string? referralCode = null)
     {
         if (string.IsNullOrWhiteSpace(email) || password.Length < 8)
             throw new ArgumentException("Use an email and password of at least 8 characters.");
+        var code = referralCode?.Trim().ToUpperInvariant() ?? "";
+        if (!await ValidateReferralIdentifierAsync(code))
+            throw new InvalidOperationException("شناسه معرف معتبر نیست.");
         using var reply = await RequestAsync("/auth/v1/signup",
-            new { email = email.Trim(), password });
+            string.IsNullOrWhiteSpace(code)
+                ? new { email = email.Trim(), password, data = (object?)null }
+                : new { email = email.Trim(), password,
+                    data = (object?)new { zurvan_referral_code = code } });
         if (!reply.RootElement.TryGetProperty("access_token", out _)) return false;
         Store(email.Trim(), reply.RootElement);
         return true;
