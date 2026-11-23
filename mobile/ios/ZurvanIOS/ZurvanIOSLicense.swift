@@ -150,11 +150,11 @@ enum ZurvanIOSLicense {
         let code = referralIdentifier.trimmingCharacters(in:.whitespacesAndNewlines)
             .uppercased()
         if !code.isEmpty {
-            let validFormat = code.count == 16 && code.utf8.allSatisfy {
+            let validFormat = code.count == 8 && code.utf8.allSatisfy {
                 (48...57).contains($0) || (65...70).contains($0)
             }
             guard validFormat else {
-                throw OnlineLicenseError.server("شناسه معرف ۱۶ کاراکتر معتبر نیست.")
+                throw OnlineLicenseError.server("شناسه معرف باید ۸ کاراکتر باشد.")
             }
             let result = try await request("/functions/v1/zurvan-referral-validate",
                 body:["code":code])
