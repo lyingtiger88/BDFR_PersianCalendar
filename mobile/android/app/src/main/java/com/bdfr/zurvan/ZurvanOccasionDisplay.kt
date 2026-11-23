@@ -41,7 +41,7 @@ object ZurvanOccasionDisplay {
     fun current(context: Context): Selection {
         @Suppress("UNUSED_VARIABLE") val observedRevision = revision
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        val authorized = ZurvanActivation.hasPahlaviAccess(context)
+        val authorized = ZurvanAndroidOnlineLicense.hasPahlaviAccess(context)
         return Selection(
             enabled = prefs.getBoolean(ENABLED, true),
             persian = prefs.getBoolean(PERSIAN, true),
@@ -53,7 +53,7 @@ object ZurvanOccasionDisplay {
 
     fun set(context: Context, key: String, checked: Boolean) {
         require(key in setOf(ENABLED, PERSIAN, HIJRI, GREGORIAN, PAHLAVI))
-        if (key == PAHLAVI && !ZurvanActivation.hasPahlaviAccess(context)) return
+        if (key == PAHLAVI && !ZurvanAndroidOnlineLicense.hasPahlaviAccess(context)) return
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putBoolean(key, checked).apply()
         revision++
