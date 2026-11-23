@@ -50,6 +50,9 @@ internal fun ZurvanUserProgressPanel() {
                     "امتیاز حضور امروز ثبت شد."
                 else "امتیاز امروز قبلاً دریافت شده است."
                 "set_visibility" -> "تنظیم نمایش در رتبه‌بندی ذخیره شد."
+                "claim_silver" -> if (result.optJSONObject("claim")?.optBoolean("claimed") == true)
+                    "لایسنس یک‌ساله Premium Silver صادر شد."
+                else "هنوز دعوت موفق کافی برای پاداش جدید نداری."
                 else -> ""
             }
         } catch (error: Exception) {
@@ -103,6 +106,35 @@ internal fun ZurvanUserProgressPanel() {
             onClick = { scope.launch { reload("claim_daily") } }
         ) { Text(if (profile.optBoolean("checked_in_today"))
             "امتیاز امروز دریافت شده" else "ثبت حضور و دریافت امتیاز امروز") }
+
+        response.optJSONObject("referral")?.let { referral ->
+            HorizontalDivider()
+            Text("دعوت دوستان با شناسه معرف", style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold)
+            val identifier = referral.optString("identifier", "")
+            Text("شناسه معرف شما: $identifier", fontWeight = FontWeight.SemiBold)
+            Button(enabled = identifier.isNotBlank(), onClick = {
+                val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE)
+                    as android.content.ClipboardManager
+                clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Zurvan referral code",identifier))
+                message = "شناسه معرف کپی شد."
+            }) { Text("کپی شناسه معرف") }
+            Text("شناسه را بده تا کاربر جدید در فرم ثبت‌نام وارد کند؛ نیازی به لینک نیست.",
+                style = MaterialTheme.typography.bodySmall)
+            Text("دعوت‌های موفق: ${referral.optInt("successful")} · در انتظار: ${referral.optInt("pending")}")
+            Text("تا جایزه بعدی: ${referral.optInt("remaining_to_next")} دعوت موفق")
+            Text("هر دعوت موفق ۱۰۰ XP؛ هر ۱۵ دعوت موفق یک‌سال Premium Silver",
+                style = MaterialTheme.typography.bodySmall)
+            if (referral.optBoolean("reward_available")) {
+                Button(enabled = !busy, onClick = { scope.launch { reload("claim_silver") } }) {
+                    Text("دریافت لایسنس یک‌ساله Premium Silver")
+                }
+            }
+            referral.optJSONObject("current_silver")?.let { reward ->
+                Text("پاداش Silver فعال تا: " + reward.optString("expires_at").take(10),
+                    style = MaterialTheme.typography.bodySmall)
+            }
+        }
 
         response.optJSONObject("special_rank")?.let { rank ->
             HorizontalDivider()
