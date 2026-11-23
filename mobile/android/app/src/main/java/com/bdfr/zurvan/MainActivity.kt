@@ -398,11 +398,26 @@ private fun ZurvanOnlineAccountSection(context: Context, onActivated: () -> Unit
 @Composable
 private fun ZurvanActivationScreen(modifier: Modifier, onActivated: () -> Unit) {
     val context = LocalContext.current
+    var showAchievements by remember { mutableStateOf(false) }
+    if (showAchievements) {
+        Column(modifier.fillMaxSize().padding(16.dp)) {
+            TextButton(onClick = { showAchievements = false }) { Text("بازگشت به فعال‌سازی") }
+            Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+                ZurvanUserProgressPanel()
+            }
+        }
+        return
+    }
     var entered by remember { mutableStateOf("") }
     var message by remember { mutableStateOf("کد سخت‌افزاری را برای دریافت لایسنس ارائه دهید.") }
     Column(modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text("فعال‌سازی زروان", style = MaterialTheme.typography.headlineSmall)
         ZurvanOnlineAccountSection(context, onActivated)
+        if (ZurvanAndroidOnlineLicense.hasLinkedOnlineAccount(context)) {
+            TextButton(onClick = { showAchievements = true }) {
+                Text("🏅 مشاهده نشان‌ها، امتیاز و دعوت‌های من")
+            }
+        }
         HorizontalDivider()
         val hardwareCode = remember { ZurvanActivation.deviceCode(context) }
         Text("کد دستگاه: " + hardwareCode)
