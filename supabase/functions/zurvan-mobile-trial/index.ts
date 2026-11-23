@@ -142,6 +142,15 @@ Deno.serve(async req => {
   if (claimError) return reply(503,{error:"device_claim_lookup_failed"});
   if (priorClaim && (priorClaim.first_account_id!==user.id || priorClaim.platform!==device))
     return reply(409,{error:"device_trial_already_used"});
+  if (existing?.type==="trial" && !priorClaim) {
+    const {data:otherClaims,error:otherError}=await db.from("zurvan_trial_devices")
+      .select("fingerprint").eq("first_account_id",user.id).limit(1);
+    if(otherError) return reply(503,{error:"device_claim_lookup_failed"});
+    if(otherClaims && otherClaims.length>0)
+      return reply(409,{error:"trial_bound_to_another_device"});
+    // Grandfathered account trial from before hardware enrollment.
+    return reply(200,{trial_created:false,license_type:existing.type,status:existing.status});
+  }
   if (existing && (!priorClaim || existing.type!=="trial"))
     return reply(200,{trial_created:false,license_type:existing.type,status:existing.status});
   if (priorClaim?.verified && existing)
