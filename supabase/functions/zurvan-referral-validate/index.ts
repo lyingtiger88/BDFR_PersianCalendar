@@ -28,7 +28,7 @@ Deno.serve(async req => {
     const data=JSON.parse(raw);
     code=typeof data.code==="string"?data.code.trim().toUpperCase():"";
   }catch{return answer(400,{valid:false});}
-  if(!/^[0-9A-F]{16}$/.test(code))return answer(200,{valid:false});
+  if(!/^([0-9A-F]{8}|[0-9A-F]{16})$/.test(code))return answer(200,{valid:false});
   const url=Deno.env.get("SUPABASE_URL");
   let key=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")??"";
   if(!key){
@@ -39,7 +39,7 @@ Deno.serve(async req => {
   const db=createClient(url,key,{auth:{persistSession:false}});
   const {data,error}=await db.from("zurvan_invite_codes")
     .select("account_id,zurvan_accounts!inner(status)")
-    .eq("code",code).eq("zurvan_accounts.status","active")
+    .or(`code.eq.${code},legacy_code.eq.${code}`).eq("zurvan_accounts.status","active")
     .maybeSingle();
   if(error)return answer(503,{error:"referral_lookup_unavailable"});
   return answer(200,{valid:data!==null});
