@@ -520,6 +520,7 @@ private struct MobileSettingsView: View {
     @AppStorage("zurvan.occasion.pahlavi.year.enabled") private var imperialYearEnabled = false
     @AppStorage("zurvan.occasion.pahlavi.enabled") private var imperialOccasionsEnabled = false
     @AppStorage("zurvan.online.pahlavi.granted") private var featureGrantChanged = false
+    @State private var verifiedImperialGrantForSettings = false
     @AppStorage("zurvan.appearance.theme") private var themeID = "windows-light"
     @AppStorage("zurvan.language") private var language = "fa"
     @AppStorage("zurvan.zodiac.theme") private var zodiacTheme = "cosmic"
@@ -565,7 +566,8 @@ private struct MobileSettingsView: View {
 
                 // Hide the entire premium section unless the account grant
                 // is recently confirmed by the server; never show a locked teaser.
-                if featureGrantChanged && ZurvanIOSLicense.hasOnlinePahlaviAccess {
+                if verifiedImperialGrantForSettings &&
+                    featureGrantChanged && ZurvanIOSLicense.hasOnlinePahlaviAccess {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("تقویم شاهنشاهی (پهلوی)").font(.headline)
                         Toggle("نمایش سال شاهنشاهی در تقویم", isOn: $imperialYearEnabled)
@@ -690,6 +692,11 @@ private struct MobileSettingsView: View {
             .padding()
         }
         .navigationTitle("تنظیمات")
+        .task {
+            verifiedImperialGrantForSettings = false
+            _ = await ZurvanIOSLicense.refreshOnlineEntitlement()
+            verifiedImperialGrantForSettings = ZurvanIOSLicense.hasOnlinePahlaviAccess
+        }
     }
 }
 
