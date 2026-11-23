@@ -461,7 +461,9 @@ if (error) {
 
     can_write: canWrite,
 
-    trial_available: normalized.length===0 && !isAdminRank,
+    // An earned Premium Silver already grants app access: never start a new
+    // hardware-bound free trial over an active referral reward.
+    trial_available: allLicenses.length===0 && !isAdminRank,
 
     expires_at: expiresAt,
 
