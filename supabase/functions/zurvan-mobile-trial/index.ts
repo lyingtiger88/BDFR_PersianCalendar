@@ -115,7 +115,12 @@ async function ensureAccount(db: any, user: any): Promise<string | null> {
 }
 Deno.serve(async req => {
   if (req.method!=="POST") return reply(405,{error:"method_not_allowed"});
-  const url=Deno.env.get("SUPABASE_URL"),key=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const url=Deno.env.get("SUPABASE_URL");
+  let key=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  if(!key){
+    try{key=JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS")??"{}").default??"";}
+    catch{/* Fail closed. */}
+  }
   if (!url || !key) return reply(503,{error:"not_configured"});
   const bearer=req.headers.get("authorization")?.match(/^Bearer (\S+)$/i)?.[1];
   if (!bearer) return reply(401,{error:"unauthorized"});
