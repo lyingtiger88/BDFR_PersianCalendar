@@ -135,7 +135,8 @@ internal sealed class ZurvanAuthClient
     internal sealed record LicenseStatus(
         string AccountState, string LicenseAccountState, int ActiveLicenses,
         bool CanWrite, bool TrialAvailable, string Mode, string? ExpiresAt, int DaysRemaining,
-        string? AccountUsername, string? SpecialRankCode, string? SpecialRankName, string? SpecialRankNameFa, string? SpecialRankBadgeKey);
+        string? AccountUsername, string? SpecialRankCode, string? SpecialRankName, string? SpecialRankNameFa, string? SpecialRankBadgeKey,
+        bool PahlaviOccasions);
 
     private async Task<JsonDocument> LicenseFunctionAsync(string functionName, object body)
     {
@@ -278,12 +279,16 @@ internal sealed class ZurvanAuthClient
             rankNameFa = ReadRankString("display_name_fa");
             badgeKey = ReadRankString("badge_key");
         }
+        var pahlaviGrant = root.TryGetProperty("features", out var featureObject)
+            && featureObject.ValueKind == JsonValueKind.Object
+            && featureObject.TryGetProperty("pahlavi_occasions", out var pahlaviValue)
+            && pahlaviValue.ValueKind == JsonValueKind.True;
         return new LicenseStatus(ReadString("account_state", "unknown"),
             ReadString("license_account_state", "unknown"), activeCount,
             ReadBool("can_write"), ReadBool("trial_available"),
             ReadString("mode", "unknown"), string.IsNullOrWhiteSpace(expiryText) ? null : expiryText,
             ReadInt("days_remaining"), string.IsNullOrWhiteSpace(accountUsername) ? null : accountUsername,
-            rankCode, rankName, rankNameFa, badgeKey);
+            rankCode, rankName, rankNameFa, badgeKey, pahlaviGrant);
     }
 
     internal async Task SignOutAsync()
