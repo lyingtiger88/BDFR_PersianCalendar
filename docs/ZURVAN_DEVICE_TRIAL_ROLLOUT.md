@@ -59,3 +59,16 @@
 - App Attest is recommended for stronger iOS **app instance** integrity but is not yet implemented in the online trial endpoint. DeviceCheck token validates Apple-issued device state, not full anti-tamper proof of an uncompromised app.
 - Windows motherboard serials and Android IDs are not cryptographically unforgeable; Google/Apple vendor-state checks mitigate common reinstallation abuse, not hardware-rooted absolute identification.
 - The repo changes have NOT been deployed to live Supabase, installed on real phones, or successfully run through device builds as part of editing the repository. Do not tell customers the full enforcement is live until tests pass.
+
+## Special calendar permissions / retired License Calculator
+
+- Production permissions are account-scoped server entitlements, not locally minted codes.
+- Apply `supabase/migrations/20261123_000006_zurvan_account_feature_grants.sql` after the device migrations. It creates `zurvan_account_features` and the immutable grant-change audit table `zurvan_feature_audit`.
+- Deploy both `zurvan-license-status` (returns `features.pahlavi_occasions`) and `zurvan-manual-payment` (superadmin-only `admin_list_users`, `admin_user_features`, `admin_set_pahlavi`).
+- The admin interface in `web/manual-payment/index.html` lists users and allows activating/revoking Pahlavi historical occasions per account, with an explicit confirmation step.
+- Android historical-occasion settings now consult the account's last verified online grant rather than locally signed legacy codes. Android policy refresh must be deployed and the user signed in before the switch appears. The 24-hour entitlement cache means revoked grants may remain effective until refresh/cache expiry.
+- Windows parses the feature entitlement for account profile integration; separate historical-occasion feed UI is not yet implemented on Windows. Existing Pahlavi numeral clock display is distinct.
+- iOS receives and stores the feature flag from online license status; the iOS historical-occasion feed UI and backend are not yet implemented.
+- The old `tools/Zurvan.LicenseCalculator` source stays for reference/legacy offline-license compatibility only. It is NOT part of the new online entitlement or payment process. Never issue new special access with it.
+- **Deployment order is mandatory**: DB migrations 000004, 000005, 000006, then new/updated Edge Functions, then web/admin frontend, then clients after CI and device validation. Deploying the status API before migration 000006 returns feature_lookup_failed.
+- A generic feature toggle never auto-approves a bank transfer and never changes annual/lifetime/trial license types.
