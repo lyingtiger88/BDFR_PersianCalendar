@@ -85,6 +85,7 @@ private enum ZurvanOccasions {
 struct ZurvanCalendarView: View {
     @AppStorage("zurvan.occasion.pahlavi.enabled") private var historicalCalendarEnabled = false
     @AppStorage("zurvan.occasion.pahlavi.year.enabled") private var imperialYearEnabled = false
+    @AppStorage("zurvan.online.pahlavi.granted") private var featureGrantChanged = false
     @State private var monthOffset = 0
     @State private var selectedDate: Date?
     private let persian = Calendar(identifier: .persian)
@@ -111,7 +112,7 @@ struct ZurvanCalendarView: View {
         formatter.dateFormat = "LLLL"
         let month = formatter.string(from: monthStart)
         let solarYear = persian.component(.year, from: monthStart)
-        if imperialYearEnabled && ZurvanIOSLicense.hasOnlinePahlaviAccess {
+        if imperialYearEnabled && featureGrantChanged && ZurvanIOSLicense.hasOnlinePahlaviAccess {
             return month + " " + String(solarYear + 1180) + " شاهنشاهی"
         }
         return month + " " + String(solarYear)
@@ -201,6 +202,7 @@ private struct SelectedZurvanDate: Identifiable {
 struct ZurvanOccasionsView: View {
     @AppStorage("zurvan.occasion.pahlavi.enabled") private var historicalCalendarEnabled = false
     @AppStorage("zurvan.occasion.pahlavi.year.enabled") private var imperialYearEnabled = false
+    @AppStorage("zurvan.online.pahlavi.granted") private var featureGrantChanged = false
     @AppStorage("zurvan.zodiac.theme") private var zodiacTheme = "cosmic"
     private let zodiacStyles: [(String, String, String, [Color])] = [
         ("cosmic", "کیهانی کلاسیک", "sparkles", [Color(red:0.08,green:0.06,blue:0.22), Color(red:0.22,green:0.12,blue:0.48)]),
@@ -235,7 +237,7 @@ struct ZurvanOccasionsView: View {
                 .background(LinearGradient(colors: zodiacStyles.first(where: { $0.0 == zodiacTheme })?.3 ?? zodiacStyles[0].3, startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 20))
                 .overlay(RoundedRectangle(cornerRadius: 20).stroke(.white.opacity(0.18), lineWidth: 1))
 
-                if ZurvanIOSLicense.hasOnlinePahlaviAccess {
+                if featureGrantChanged && ZurvanIOSLicense.hasOnlinePahlaviAccess {
                     Toggle("نمایش سال شاهنشاهی (پهلوی)", isOn:$imperialYearEnabled)
                     Toggle("مناسبت‌های تاریخی دوره پهلوی", isOn:$historicalCalendarEnabled)
                     Text("مناسبت‌های تاریخی غیررسمی؛ سال شاهنشاهی برابر سال شمسی + ۱۱۸۰ است.")
