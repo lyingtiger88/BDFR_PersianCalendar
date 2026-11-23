@@ -694,8 +694,8 @@ private struct MobileSettingsView: View {
         .navigationTitle("تنظیمات")
         .task {
             verifiedImperialGrantForSettings = false
-            _ = await ZurvanIOSLicense.refreshOnlineEntitlement()
-            verifiedImperialGrantForSettings = ZurvanIOSLicense.hasOnlinePahlaviAccess
+            verifiedImperialGrantForSettings =
+                await ZurvanIOSLicense.refreshPahlaviGrant()
         }
     }
 }
