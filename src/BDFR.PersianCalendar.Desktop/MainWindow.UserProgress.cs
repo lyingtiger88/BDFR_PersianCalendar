@@ -70,6 +70,42 @@ public sealed partial class MainWindow
                         : "امتیاز امروز قبلاً ثبت شده است."));
             }
 
+            if (root.TryGetProperty("referral", out var referral) &&
+                referral.ValueKind == JsonValueKind.Object)
+            {
+                AddSettingsSeparator(host);
+                host.Children.Add(SettingsLabel("دعوت دوستان با شناسه معرف", 17, true));
+                var identifier = ReadText(referral, "identifier");
+                host.Children.Add(SettingsLabel("شناسه معرف شما: " + identifier, 16, true));
+                host.Children.Add(SettingsActionButton("کپی شناسه معرف", () =>
+                {
+                    var package = new Windows.ApplicationModel.DataTransfer.DataPackage();
+                    package.SetText(identifier);
+                    Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(package);
+                }));
+                host.Children.Add(SettingsHint("شناسه را به دوستت بده تا در فرم ثبت‌نام وارد کند. لینک دعوت لازم نیست."));
+                host.Children.Add(SettingsHint(
+                    "دعوت موفق: " + ToPersianDigits(ReadInt(referral, "successful").ToString()) +
+                    " از ۱۵ · در انتظار تأیید: " +
+                    ToPersianDigits(ReadInt(referral, "pending").ToString()) +
+                    " · مانده تا پاداش بعدی: " +
+                    ToPersianDigits(ReadInt(referral, "remaining_to_next").ToString())));
+                host.Children.Add(SettingsHint("برای هر دعوت موفق ۱۰۰ XP؛ هر ۱۵ دعوت موفق یک سال Premium Silver."));
+                if (ReadFlag(referral, "reward_available"))
+                    host.Children.Add(SettingsActionButton("دریافت لایسنس یک‌ساله Premium Silver",
+                        () => _ = LoadUserProgressAsync(host, "claim_silver")));
+                if (referral.TryGetProperty("current_silver", out var silver) &&
+                    silver.ValueKind == JsonValueKind.Object)
+                    host.Children.Add(SettingsHint("پاداش Premium Silver فعال تا: " +
+                        ReadText(silver, "expires_at")));
+                if (action == "claim_silver" &&
+                    root.TryGetProperty("claim", out var silverClaim) &&
+                    silverClaim.ValueKind == JsonValueKind.Object)
+                    host.Children.Add(SettingsHint(ReadFlag(silverClaim, "claimed")
+                        ? "پاداش یک‌ساله Premium Silver صادر شد."
+                        : "هنوز ۱۵ دعوت موفق برای پاداش بعدی ثبت نشده است."));
+            }
+
             AddSettingsSeparator(host);
             host.Children.Add(SettingsLabel("نشان‌های کسب‌کردنی", 17, true));
             if (root.TryGetProperty("badges", out var badges) &&
