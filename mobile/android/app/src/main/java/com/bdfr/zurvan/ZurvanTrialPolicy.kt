@@ -23,6 +23,20 @@ internal object ZurvanTrialPolicy {
     @Synchronized
     fun evaluate(context: Context): Entitlement {
         val app = context.applicationContext
+        if (BuildConfig.ENFORCE_ONLINE_MOBILE_TRIAL) {
+            val activation = app.getSharedPreferences("zurvan_license", Context.MODE_PRIVATE)
+                .getString("activation_code", null)
+            val signedOffline = activation != null && ZurvanActivation.validate(app, activation)
+            val online = ZurvanAndroidOnlineLicense.hasRecentServerEntitlement(app)
+            val trial = online && ZurvanAndroidOnlineLicense.activeOnlineMode(app) == "trial"
+            return Entitlement(
+                canWrite = signedOffline || online,
+                trialActive = trial && !signedOffline,
+                trialExpired = !signedOffline && !online,
+                daysRemaining = if (trial) ZurvanAndroidOnlineLicense.onlineTrialDaysRemaining(app) else 0,
+                expiresAtMillis = 0L
+            )
+        }
         val prefs = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val deviceId = Settings.Secure.getString(app.contentResolver, Settings.Secure.ANDROID_ID)
             ?: "android-device-unavailable"
