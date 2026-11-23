@@ -172,6 +172,7 @@ Deno.serve(async req => {
       special_rank:special??null,
       referral:{
         identifier:codeResult.data?.code??null,
+        total_invited:(referralsResult.data??[]).length,
         successful:qualified,
         pending:(referralsResult.data??[]).length-qualified,
         reward_threshold:15,
