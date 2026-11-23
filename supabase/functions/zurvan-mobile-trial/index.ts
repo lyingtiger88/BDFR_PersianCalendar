@@ -78,7 +78,8 @@ async function appleRequest(path: string, token: string, body: unknown): Promise
   });
   if (!response.ok) throw Error("apple_devicecheck_upstream_failed");
   const text = await response.text();
-  if (text.trim() === "Bit State Not Found" && path === "query_two_bits")
+  if (["Bit State Not Found", "Failed to find bit state"].includes(text.trim()) &&
+      path === "query_two_bits")
     return { bit0: false, bit1: false };
   if (text.trim() === "" && path === "update_two_bits") return {};
   if (!text.trim().startsWith("{")) throw Error("apple_unexpected_response");
