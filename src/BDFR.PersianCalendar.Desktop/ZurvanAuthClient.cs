@@ -1,10 +1,7 @@
 using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
-using Microsoft.Win32;
 using System.Management;
-using Windows.Storage.Streams;
-using Windows.System.Profile;
 using System.Text.Json;
 using Windows.Security.Credentials;
 
@@ -178,60 +175,20 @@ internal sealed class ZurvanAuthClient
         return JsonDocument.Parse(raw);
     }
 
-    // Hash a Windows system identity locally; never send a raw hardware ID to Supabase.
-    // The publisher-scoped ID is hardware-backed where Windows supports it.
-    // A fallback binds the trial to the Windows installation (not guaranteed
-    // physical hardware). These identities are deterrents, not TPM attestation.
+    // Use only a validated motherboard serial for a NEW free trial.
+    // Do not fall back to BIOS/Windows installation identifiers: reinstalling
+    // Windows must not mint another free trial for the same motherboard.
+    // This is a deterrent, NOT cryptographic proof of physical hardware.
     private static string GetDeviceTrialFingerprint()
     {
-        string? identity = null;
-
-        // Prefer firmware-provided serials. Unlike MachineGuid, these generally
-        // survive a Windows reinstall. Reject generic OEM placeholder values:
-        // sharing a placeholder between machines would incorrectly burn a trial.
         var boardSerial = ReadHardwareSerial("Win32_BaseBoard", "SerialNumber");
-        if (boardSerial is not null)
-        {
-            // Manufacturer/product disambiguate serials reused by some OEMs.
-            var manufacturer = ReadHardwareLabel("Win32_BaseBoard", "Manufacturer");
-            var product = ReadHardwareLabel("Win32_BaseBoard", "Product");
-            identity = "motherboard:" + manufacturer + "|" + product + "|" + boardSerial;
-        }
-        else
-        {
-            var biosSerial = ReadHardwareSerial("Win32_BIOS", "SerialNumber");
-            if (biosSerial is not null)
-                identity = "bios:" + biosSerial;
-        }
-
-        if (identity is null) try
-        {
-            var info = SystemIdentification.GetSystemIdForPublisher();
-            if (info?.Id is not null && info.Id.Length > 0)
-            {
-                using var reader = DataReader.FromBuffer(info.Id);
-                var bytes = new byte[(int)info.Id.Length];
-                reader.ReadBytes(bytes);
-                identity = "win-system:" + Convert.ToHexString(bytes);
-            }
-        }
-        catch { /* Unpackaged/unsupported Windows environments use the fallback. */ }
-
-        if (string.IsNullOrWhiteSpace(identity))
-        {
-            try
-            {
-                using var key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Cryptography");
-                var machineGuid = key?.GetValue("MachineGuid") as string;
-                if (!string.IsNullOrWhiteSpace(machineGuid))
-                    identity = "win-install:" + machineGuid.Trim().ToLowerInvariant();
-            }
-            catch { /* Fail closed if the system identifier is not accessible. */ }
-        }
-        if (string.IsNullOrWhiteSpace(identity))
+        if (boardSerial is null)
             throw new InvalidOperationException(
-                "شناسه دستگاه در این ویندوز قابل دریافت نیست؛ دوره رایگان بدون شناسایی دستگاه صادر نمی‌شود.");
+                "سریال معتبر مادربرد پیدا نشد؛ صدور دوره رایگان نیازمند بررسی دستگاه توسط پشتیبانی است.");
 
+        var manufacturer = ReadHardwareLabel("Win32_BaseBoard", "Manufacturer") ?? "UNKNOWN";
+        var product = ReadHardwareLabel("Win32_BaseBoard", "Product") ?? "UNKNOWN";
+        var identity = "motherboard:" + manufacturer + "|" + product + "|" + boardSerial;
         return Convert.ToHexString(SHA256.HashData(
             Encoding.UTF8.GetBytes("zurvan-free-trial-device-v1|" + identity)))
             .ToLowerInvariant();
