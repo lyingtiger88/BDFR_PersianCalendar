@@ -78,7 +78,11 @@ async function appleRequest(path: string, token: string, body: unknown): Promise
   });
   if (!response.ok) throw Error("apple_devicecheck_upstream_failed");
   const text = await response.text();
-  return text.startsWith("{") ? JSON.parse(text) : {};
+  if (text.trim() === "Bit State Not Found" && path === "query_two_bits")
+    return { bit0: false, bit1: false };
+  if (text.trim() === "" && path === "update_two_bits") return {};
+  if (!text.trim().startsWith("{")) throw Error("apple_unexpected_response");
+  return JSON.parse(text);
 }
 function isFingerprint(input: unknown): input is string {
   return typeof input==="string" && /^[a-f0-9]{64}$/.test(input);
@@ -137,6 +141,11 @@ Deno.serve(async req => {
     .select("id,type,status,expires_at").eq("account_id",user.id)
     .eq("product_id","zurvan").maybeSingle();
   if (licenseError) return reply(503,{error:"license_lookup_failed"});
+  // A paid/lifetime account is not asking for another free trial and must
+  // never be blocked just because another account used this phone's trial.
+  if (existing && existing.type!=="trial")
+    return reply(200,{trial_created:false,license_type:existing.type,status:existing.status});
+
   const {data:priorClaim,error:claimError}=await db.from("zurvan_trial_devices")
     .select("first_account_id,platform,verified").eq("fingerprint",fp).maybeSingle();
   if (claimError) return reply(503,{error:"device_claim_lookup_failed"});
