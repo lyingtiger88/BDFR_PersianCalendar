@@ -951,6 +951,40 @@ public sealed partial class MainWindow
                             monthBody.Children.Add(row);
                         }
 
+                        // The Pahlavi historical feed is gated by the
+                        // account grant returned by Supabase. These are
+                        // nonofficial observances, never public holidays.
+                        if (_licensePahlaviOccasions)
+                        {
+                            var historicalItems = new (int Month, int Day, string Title)[]
+                            {
+                                (8, 4, "زادروز محمدرضا پهلوی (مناسبت تاریخی)"),
+                                (11, 6, "سالروز همه‌پرسی انقلاب سفید (مناسبت تاریخی)")
+                            };
+                            foreach (var historical in historicalItems.Where(x => x.Month == month))
+                            {
+                                var historyRow = new StackPanel
+                                {
+                                    Orientation = Orientation.Horizontal,
+                                    Spacing = 10,
+                                    FlowDirection = FlowDirection.RightToLeft
+                                };
+                                historyRow.Children.Add(new TextBlock
+                                {
+                                    Text = ToPersianDigits(historical.Day.ToString()),
+                                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                                    Foreground = ThemeService.Brush(_theme.PrimaryText)
+                                });
+                                historyRow.Children.Add(new TextBlock
+                                {
+                                    Text = "✦ " + historical.Title,
+                                    TextWrapping = TextWrapping.Wrap,
+                                    Foreground = ThemeService.Brush(_theme.PrimaryText)
+                                });
+                                monthBody.Children.Add(historyRow);
+                            }
+                        }
+
                         // Personal annual occasions are merged into the same month
                         // timeline, while retaining a distinct gold identity.
                         foreach (var personalItem in personalDates
