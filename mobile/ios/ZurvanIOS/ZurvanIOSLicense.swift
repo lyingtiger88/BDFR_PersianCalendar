@@ -9,16 +9,23 @@ enum ZurvanIOSLicense {
 
     static func deviceCode() -> String {
         let defaults = UserDefaults.standard
-        let identifier: String
-        if let existing = defaults.string(forKey: installationKey) {
-            identifier = existing
+        let identity: String
+        // Preserve already-issued, signed offline licenses that were bound
+        // to the old app-generated installation identifier.
+        if let legacy = defaults.string(forKey: installationKey), !legacy.isEmpty {
+            identity = "zurvan-license-device-v1|ios|\(legacy)"
         } else {
-            let newIdentifier = UUID().uuidString.lowercased()
-            defaults.set(newIdentifier, forKey: installationKey)
-            identifier = newIdentifier
+            // iOS does not expose the physical iPhone serial number to apps.
+            // IDFV is provided by the OS, not created by Zurvan. It can
+            // rotate after the vendor's last app is uninstalled.
+            guard let idfv = UIDevice.current.identifierForVendor else {
+                return "" // Fail closed: never issue a universal fallback code.
+            }
+            identity = "zurvan-license-device-v2|ios-idfv|\(idfv.uuidString.lowercased())"
         }
-        let data = Data("zurvan-license-device-v1|ios|\(identifier)".utf8)
-        return "ZRV-" + SHA256.hash(data: data).prefix(12).map { String(format: "%02X", $0) }.joined()
+        let data = Data(identity.utf8)
+        return "ZRV-" + SHA256.hash(data: data).prefix(12)
+            .map { String(format: "%02X", $0) }.joined()
     }
 
     static var isLicensed: Bool {
@@ -51,9 +58,11 @@ enum ZurvanIOSLicense {
 
         guard SecKeyVerifySignature(publicKey, .rsaSignatureMessagePSSSHA256,
                                     payload as CFData, signature as CFData, nil) else { return false }
-        guard let object = try? JSONSerialization.jsonObject(with: payload) as? [String: Any],
+        let currentDeviceCode = deviceCode()
+        guard !currentDeviceCode.isEmpty,
+              let object = try? JSONSerialization.jsonObject(with: payload) as? [String: Any],
               object["Product"] as? String == "zurvan",
-              object["DeviceCode"] as? String == deviceCode() else { return false }
+              object["DeviceCode"] as? String == currentDeviceCode else { return false }
         if let expiry = object["ExpiresUtc"] as? String, !expiry.isEmpty {
             let formatter = ISO8601DateFormatter()
             formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
