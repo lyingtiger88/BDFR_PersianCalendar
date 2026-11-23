@@ -14,6 +14,16 @@ const levels = [
   {xp:2500,title:"فرزانه زمان"},
   {xp:4000,title:"اسطوره زروان"}
 ];
+// Never publish email addresses, phone numbers or UUIDs as public aliases
+// even if a legacy account stored them in the username field.
+function publicAlias(value: string): string {
+  const name=value.trim();
+  if(!name || name.length>28 || /[@\\/\\]|[\\r\\n]/.test(name) ||
+      /^\\+?\\d[\\d\\s-]{7,}$/.test(name) ||
+      /^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(name)) return "کاربر زروان";
+  return name;
+}
+
 function progress(totalXp: number) {
   const xp=Math.max(0,Math.floor(Number(totalXp)||0));
   let i=levels.length-1;
@@ -87,7 +97,8 @@ Deno.serve(async req => {
         .order("display_order"),
       db.from("zurvan_user_scores").select("account_id,total_xp")
         .eq("leaderboard_opt_in",true).gt("total_xp",0)
-        .order("total_xp",{ascending:false}).limit(20)
+        .order("total_xp",{ascending:false})
+        .order("account_id",{ascending:true}).limit(100)
     ]);
     if([scoreResult,historyResult,earnedResult,catalogResult,boardResult].some(x=>x.error))
       throw Error("progress_query_failed");
@@ -98,10 +109,11 @@ Deno.serve(async req => {
     const board=boardResult.data??[];
     let usernames=new Map<string,string>();
     if(board.length){
-      const {data:users,error:ue}=await db.from("zurvan_accounts").select("id,username")
-        .in("id",board.map(x=>x.account_id));
+      const {data:users,error:ue}=await db.from("zurvan_accounts")
+        .select("id,username,status").in("id",board.map(x=>x.account_id));
       if(ue)throw Error("leaderboard_lookup_failed");
-      usernames=new Map((users??[]).map(x=>[x.id,x.username??""]));
+      usernames=new Map((users??[]).filter(x=>x.status==="active")
+        .map(x=>[x.id,publicAlias(x.username??"")]));
     }
     const rank=account.super_type??null;
     const {data:special,error:se}=rank?await db.from("zurvan_special_ranks")
@@ -119,10 +131,11 @@ Deno.serve(async req => {
       history:(historyResult.data??[]).map(x=>({
         title:"حضور روزانه",points:x.points,created_at:x.created_at,
         event_type:x.event_type})),
-      leaderboard:board.map((x,i)=>({
-        position:i+1,is_self:x.account_id===user.id,
-        display_name:(usernames.get(x.account_id)??"").trim()||"کاربر زروان",
-        total_xp:x.total_xp})),
+      leaderboard:board.filter(x=>usernames.has(x.account_id)).slice(0,20)
+        .map((x,i)=>({
+          position:i+1,is_self:x.account_id===user.id,
+          display_name:usernames.get(x.account_id)??"کاربر زروان",
+          total_xp:x.total_xp})),
       special_rank:special??null,
       claim:claimResult,
       rules:{daily_base:20,streak_bonus_per_day:5,streak_bonus_cap:30,
