@@ -345,15 +345,36 @@ if (error) {
     };
   });
 
+  // Referral Premium Silver is an independent one-year entitlement. It
+  // never overwrites an existing paid, lifetime or trial license row.
+  const {data:silverRewards,error:silverError}=await db
+    .from("zurvan_referral_silver_rewards")
+    .select("id,plan_code,awarded_at,starts_at,expires_at,status")
+    .eq("account_id",user.id).eq("status","active")
+    .order("expires_at",{ascending:false}).limit(20);
+  if(silverError)return databaseUnavailable("referral_silver_lookup",silverError);
+  const eligibleSilver=(silverRewards??[])
+    .filter(x=>new Date(x.starts_at).getTime()<=now &&
+      new Date(x.expires_at).getTime()>now)
+    .map(x=>({
+      id:x.id,product_id:"zurvan",type:"subscription",status:"active",
+      generation:1,created_at:x.awarded_at,expires_at:x.expires_at,
+      plan_code:"premium_silver",license_source:"referral_reward",can_write:true
+    }));
+  const allLicenses=[...normalized,...eligibleSilver];
+
   // --------------------------------------------------
   // ACTIVE ZURVAN LICENSE
   // --------------------------------------------------
 
-  const activeZurvanLicense = normalized.find(
-    license =>
-      license.product_id?.toLowerCase() === "zurvan" &&
-      license.status === "active"
-  );
+  // Paid or lifetime plans take precedence, followed by a current referral
+  // Silver entitlement, and only then a hardware-bound free trial.
+  const activeZurvanLicense =
+    normalized.find(x=>x.product_id?.toLowerCase()==="zurvan" &&
+      x.status==="active" && x.type!=="trial") ??
+    eligibleSilver[0] ??
+    normalized.find(x=>x.product_id?.toLowerCase()==="zurvan" &&
+      x.status==="active");
 
   const hasActiveLicense =
     activeZurvanLicense !== undefined;
@@ -376,6 +397,8 @@ if (error) {
   const canWrite=isAdminRank || (hasActiveLicense && trialDeviceAllowed);
   const mode=isAdminRank?"super":
     hasActiveLicense && !trialDeviceAllowed?"device_trial_mismatch":
+    activeZurvanLicense && "plan_code" in activeZurvanLicense &&
+      activeZurvanLicense.plan_code==="premium_silver" ? "premium_silver" :
     hasActiveLicense?activeZurvanLicense?.type??"licensed":"read_only";
 
   // --------------------------------------------------
@@ -407,7 +430,7 @@ if (error) {
 
     account_username: account.username,
 
-    licenses: normalized,
+    licenses: allLicenses,
 
     activations,
 
