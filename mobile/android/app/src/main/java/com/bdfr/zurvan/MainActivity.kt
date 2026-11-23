@@ -137,6 +137,12 @@ private fun ZurvanMobileShell(
     val entitlement = remember(licenseRevision) { ZurvanTrialPolicy.evaluate(context) }
     val licensed = entitlement.canWrite
     LaunchedEffect(Unit) {
+        if (BuildConfig.ENFORCE_ONLINE_MOBILE_TRIAL) {
+            ZurvanAndroidOnlineLicense.refresh(context)
+            licenseRevision++
+        }
+    }
+    LaunchedEffect(Unit) {
         while (true) {
             kotlinx.coroutines.delay(60_000L)
             licenseRevision++
@@ -336,12 +342,49 @@ private fun ZurvanMobileShell(
 }
 
 @Composable
+private fun ZurvanOnlineAccountSection(context: Context, onActivated: () -> Unit) {
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var busy by remember { mutableStateOf(false) }
+    var status by remember { mutableStateOf("") }
+    val scope = rememberCoroutineScope()
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("حساب زروان و دوره رایگان ۴۵روزه", style = MaterialTheme.typography.titleMedium)
+        Text("پس از تأیید ایمیل، دوره رایگان فقط یک‌بار برای هر دستگاه واجد شرایط از سرور صادر می‌شود.",
+            style = MaterialTheme.typography.bodySmall)
+        OutlinedTextField(value = email, onValueChange = { email = it.trim().take(254) },
+            label = { Text("ایمیل حساب") }, modifier = Modifier.fillMaxWidth(),
+            singleLine = true)
+        OutlinedTextField(value = password, onValueChange = { password = it.take(256) },
+            label = { Text("رمز ورود") }, modifier = Modifier.fillMaxWidth(),
+            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation())
+        Button(enabled = !busy && email.contains("@") && password.isNotBlank(), onClick = {
+            busy = true
+            scope.launch {
+                try {
+                    val allowed = ZurvanAndroidOnlineLicense.signInAndActivate(context, email, password)
+                    status = if (allowed) "مجوز زروان فعال است." else
+                        "حساب تأیید شد، اما مجوز ویرایش فعال نیست."
+                    password = ""
+                    onActivated()
+                } catch (error: Exception) {
+                    status = error.message ?: "ارتباط با سرور فعال‌سازی ممکن نشد."
+                } finally { busy = false }
+            }
+        }) { Text(if (busy) "در حال بررسی..." else "ورود و فعال‌سازی خودکار") }
+        if (status.isNotBlank()) Text(status, style = MaterialTheme.typography.bodySmall)
+    }
+}
+
+@Composable
 private fun ZurvanActivationScreen(modifier: Modifier, onActivated: () -> Unit) {
     val context = LocalContext.current
     var entered by remember { mutableStateOf("") }
     var message by remember { mutableStateOf("کد سخت‌افزاری را برای دریافت لایسنس ارائه دهید.") }
     Column(modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text("فعال‌سازی زروان", style = MaterialTheme.typography.headlineSmall)
+        ZurvanOnlineAccountSection(context, onActivated)
+        HorizontalDivider()
         val hardwareCode = remember { ZurvanActivation.deviceCode(context) }
         Text("کد دستگاه: " + hardwareCode)
         TextButton(onClick = {
@@ -456,7 +499,8 @@ private fun ZurvanDestination(
                     CompanionScreen(viewModel = appViewModel, modifier = Modifier.fillMaxSize())
                 ZurvanTab.Settings ->
                     if (!licensed) ZurvanActivationScreen(Modifier.fillMaxSize(), onActivated)
-                    else SettingsScreen(viewModel = appViewModel, modifier = Modifier.fillMaxSize())
+                    else SettingsScreen(viewModel = appViewModel, modifier = Modifier.fillMaxSize(),
+                        onActivated = onActivated)
             }
         }
     }
@@ -2613,7 +2657,8 @@ private fun CompanionScreen(
 @Composable
 private fun SettingsScreen(
     viewModel: ZurvanViewModel,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onActivated: () -> Unit = {}
 ) {
     val preferences by viewModel
         .uiPreferences
@@ -3021,6 +3066,11 @@ private fun SettingsScreen(
             }
         }
 
+        if (settingsCategory == "security") item {
+            SettingsCard(title = "حساب زروان و فعال‌سازی آنلاین") {
+                ZurvanOnlineAccountSection(context, onActivated)
+            }
+        }
         if (settingsCategory == "security") item {
             SettingsCard(title = "وضعیت لایسنس زروان") {
                 var activatedCode by remember {
