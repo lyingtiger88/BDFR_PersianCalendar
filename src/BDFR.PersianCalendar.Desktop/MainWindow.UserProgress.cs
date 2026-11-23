@@ -85,10 +85,13 @@ public sealed partial class MainWindow
                 }));
                 host.Children.Add(SettingsHint("شناسه را به دوستت بده تا در فرم ثبت‌نام وارد کند. لینک دعوت لازم نیست."));
                 host.Children.Add(SettingsHint(
-                    "دعوت موفق: " + ToPersianDigits(ReadInt(referral, "successful").ToString()) +
-                    " از ۱۵ · در انتظار تأیید: " +
-                    ToPersianDigits(ReadInt(referral, "pending").ToString()) +
-                    " · مانده تا پاداش بعدی: " +
+                    "کل دعوت‌ها: " + ToPersianDigits(ReadInt(referral, "total_invited").ToString()) +
+                    " · موفق: " + ToPersianDigits(ReadInt(referral, "successful").ToString()) +
+                    " · در انتظار تأیید: " +
+                    ToPersianDigits(ReadInt(referral, "pending").ToString())));
+                host.Children.Add(SettingsHint(
+                    "جوایز Silver صادرشده: " + ToPersianDigits(ReadInt(referral, "earned_rewards").ToString()) +
+                    " · دعوت باقی‌مانده تا جایزه بعدی: " +
                     ToPersianDigits(ReadInt(referral, "remaining_to_next").ToString())));
                 host.Children.Add(SettingsHint("برای هر دعوت موفق ۱۰۰ XP؛ هر ۱۵ دعوت موفق یک سال Premium Silver."));
                 if (ReadFlag(referral, "reward_available"))
