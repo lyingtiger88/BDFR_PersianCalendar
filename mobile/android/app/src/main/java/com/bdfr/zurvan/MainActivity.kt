@@ -2682,7 +2682,7 @@ private fun SettingsScreen(
     val setWeekdayColor = ZurvanThemes.setWeekdayColor.current
     val context = LocalContext.current
     val occasionVisibility = ZurvanOccasionDisplay.current(context)
-    val privilegedOccasions = ZurvanActivation.hasPahlaviAccess(context)
+    val privilegedOccasions = ZurvanAndroidOnlineLicense.hasPahlaviAccess(context)
     val zodiacStyles = listOf(
         Triple("cosmic", "کیهانی کلاسیک", "✦"),
         Triple("neon", "فانتزی نورانی", "☄"),
@@ -3093,7 +3093,7 @@ private fun SettingsScreen(
                     }
                     Text("ثبت شده به نام : $ownerName")
                     Text("لایسنس فعال است.", style = MaterialTheme.typography.bodySmall)
-                    if (ZurvanActivation.hasPahlaviAccess(context)) {
+                    if (ZurvanAndroidOnlineLicense.hasPahlaviAccess(context)) {
                         Text("مجوز قابلیت ویژه مناسبت‌های تاریخی و تقویم شاهنشاهی فعال است.",
                             style = MaterialTheme.typography.bodySmall)
                     }
