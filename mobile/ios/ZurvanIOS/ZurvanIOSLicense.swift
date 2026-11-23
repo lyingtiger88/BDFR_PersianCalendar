@@ -2,6 +2,7 @@ import Foundation
 import Security
 import CryptoKit
 import UIKit
+import DeviceCheck
 
 enum ZurvanIOSLicense {
     private static let storedCodeKey = "zurvan.license.activationCode"
@@ -26,6 +27,34 @@ enum ZurvanIOSLicense {
         let data = Data(identity.utf8)
         return "ZRV-" + SHA256.hash(data: data).prefix(12)
             .map { String(format: "%02X", $0) }.joined()
+    }
+
+    /// DeviceCheck is hardware-backed device evidence managed by Apple.
+    /// The server must query Apple's two per-device bits using its own private
+    /// signing key, then set the "trial consumed" bit after a successful claim.
+    /// Neither the iPhone serial nor an equivalent unrestricted hardware ID
+    /// is available to iOS applications.
+    static func deviceCheckToken() async throws -> String {
+        guard DCDevice.current.isSupported else {
+            throw DeviceProofError.notSupported
+        }
+        let token: Data = try await withCheckedThrowingContinuation { continuation in
+            DCDevice.current.generateToken { data, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                } else if let data, !data.isEmpty {
+                    continuation.resume(returning: data)
+                } else {
+                    continuation.resume(throwing: DeviceProofError.missingToken)
+                }
+            }
+        }
+        return token.base64EncodedString()
+    }
+
+    enum DeviceProofError: Error {
+        case notSupported
+        case missingToken
     }
 
     static var isLicensed: Bool {
