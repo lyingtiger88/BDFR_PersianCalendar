@@ -851,7 +851,8 @@ public sealed partial class MainWindow
                 async Task RenderOfficialMonths()
                 {
                     officialMonths.Children.Clear();
-                    var entries = await _occasionSource.GetYearAsync(_selected.Year);
+                    var entries = (await _occasionSource.GetYearAsync(_selected.Year))
+                        .Where(IsOccasionVisible).ToList();
                     var personalEntries = await _repository.GetSpecialOccasionsAsync();
                     var yearStart = new PersianDate(_selected.Year, 1, 1).ToDateOnly();
                     var gregorianYear = yearStart.Year;
