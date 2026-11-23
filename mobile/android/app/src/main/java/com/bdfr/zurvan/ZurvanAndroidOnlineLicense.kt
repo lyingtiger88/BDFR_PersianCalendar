@@ -75,22 +75,24 @@ internal object ZurvanAndroidOnlineLicense {
     }
 
     @Synchronized
-    private fun load(context: Context): Session? = try {
-        val value = context.applicationContext.getSharedPreferences(PREF, Context.MODE_PRIVATE)
-            .getString(CIPHERTEXT, null) ?: return null
-        val bytes = Base64.decode(value, Base64.DEFAULT)
-        require(bytes.size > 12 + 16)
-        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-        cipher.init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(128, bytes.copyOfRange(0, 12)))
-        Session.fromJson(JSONObject(String(cipher.doFinal(bytes.copyOfRange(12, bytes.size)), Charsets.UTF_8)))
-    } catch (_: Exception) { null }
+    private fun load(context: Context): Session? {
+        return try {
+            val value = context.applicationContext.getSharedPreferences(PREF, Context.MODE_PRIVATE)
+                .getString(CIPHERTEXT, null) ?: return null
+            val bytes = Base64.decode(value, Base64.DEFAULT)
+            require(bytes.size > 12 + 16)
+            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+            cipher.init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(128, bytes.copyOfRange(0, 12)))
+            Session.fromJson(JSONObject(String(cipher.doFinal(bytes.copyOfRange(12, bytes.size)), Charsets.UTF_8)))
+        } catch (_: Exception) { null }
+    }
 
     // Fail closed for expired or absent server policy. A separately signed
     // offline license remains independently valid.
     fun hasRecentServerEntitlement(context: Context): Boolean {
         val session = load(context) ?: return false
         val age = System.currentTimeMillis() - session.verifiedAtMs
-        return session.canWrite && age in 0..OFFLINE_CACHE_MS
+        return session.canWrite && age in 0L..OFFLINE_CACHE_MS
     }
 
     fun hasLinkedOnlineAccount(context: Context): Boolean = load(context) != null
