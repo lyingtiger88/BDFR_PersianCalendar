@@ -170,14 +170,23 @@ enum ZurvanIOSLicense {
     }
 
     private static let pahlaviGrantKey = "zurvan.online.pahlavi.granted"
+    private static let pahlaviVerifiedAtKey = "zurvan.online.pahlavi.checkedAt"
     static var hasOnlinePahlaviAccess: Bool {
-        UserDefaults.standard.bool(forKey: pahlaviGrantKey)
+        let defaults = UserDefaults.standard
+        let age = Date().timeIntervalSince1970 -
+            defaults.double(forKey: pahlaviVerifiedAtKey)
+        // Admin revocations propagate on refresh; fail closed after 24 hours
+        // without a server policy instead of trusting a stale local toggle.
+        return defaults.bool(forKey: pahlaviGrantKey) &&
+            age >= 0 && age <= 24 * 60 * 60
     }
 
     private static func applyOnlineFeatures(_ result: [String: Any]) {
         let features = result["features"] as? [String: Any]
-        UserDefaults.standard.set(features?["pahlavi_occasions"] as? Bool == true,
-            forKey: pahlaviGrantKey)
+        let allowed = features?["pahlavi_occasions"] as? Bool == true
+        UserDefaults.standard.set(allowed, forKey: pahlaviGrantKey)
+        UserDefaults.standard.set(Date().timeIntervalSince1970,
+            forKey: pahlaviVerifiedAtKey)
     }
 
     private static func readOnlineStatus(_ session: OnlineSession) async throws -> Bool {
