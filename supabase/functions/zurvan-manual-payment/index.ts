@@ -193,6 +193,31 @@ Deno.serve(async req => {
       }
       return reply(200,data,origin);
     }
+    if(action==="admin_list_users"){
+      const page=Number(body.page ?? 1);
+      if(!Number.isInteger(page) || page<1 || page>10000)
+        return fail("invalid_page",origin);
+      const {data,error}=await db.auth.admin.listUsers({page,perPage:100});
+      if(error)return fail("user_list_failed",origin,503);
+      const ids=data.users.map(u=>u.id);
+      let grants: Array<{account_id:string,pahlavi_occasions:boolean}> = [];
+      if(ids.length){
+        const {data:rows,error:grantError}=await db.from("zurvan_account_features")
+          .select("account_id,pahlavi_occasions").in("account_id",ids);
+        if(grantError)return fail("feature_list_failed",origin,503);
+        grants=rows??[];
+      }
+      const granted=new Map(grants.map(x=>[x.account_id,x.pahlavi_occasions]));
+      return reply(200,{
+        users:data.users.map(u=>({
+          account_id:u.id,
+          email:u.email??"",
+          confirmed:!!u.email_confirmed_at,
+          pahlavi_occasions:granted.get(u.id)===true
+        })),
+        page,next_page:data.users.length===100?page+1:null
+      },origin);
+    }
     if(action==="admin_user_features"){
       const {data:rows,error}=await db.from("zurvan_account_features")
         .select("account_id,pahlavi_occasions,updated_at").limit(500);
