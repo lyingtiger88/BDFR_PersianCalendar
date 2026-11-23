@@ -29,6 +29,18 @@ enum ZurvanIOSLicense {
             .map { String(format: "%02X", $0) }.joined()
     }
 
+    /// Server-side free trial fingerprint. It is NOT the device serial, nor a
+    /// trustworthy fraud signal by itself; Apple's DeviceCheck bit is the
+    /// authoritative one-time-use record for new iOS trials.
+    static func onlineTrialFingerprint() throws -> String {
+        guard let idfv = UIDevice.current.identifierForVendor else {
+            throw DeviceProofError.notSupported
+        }
+        let identity = "zurvan-free-trial-device-v1|ios-idfv|\(idfv.uuidString.lowercased())"
+        return SHA256.hash(data: Data(identity.utf8))
+            .map { String(format: "%02x", $0) }.joined()
+    }
+
     /// DeviceCheck is hardware-backed device evidence managed by Apple.
     /// The server must query Apple's two per-device bits using its own private
     /// signing key, then set the "trial consumed" bit after a successful claim.
