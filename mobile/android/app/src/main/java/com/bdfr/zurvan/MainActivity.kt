@@ -2768,6 +2768,7 @@ private fun SettingsScreen(
                 listOf(
                     Triple("appearance", "رابط کاربری", "تم، رنگ، تصویر و چیدمان"),
                     Triple("calendar", "تقویم و مناسبت‌ها", "چیدمان تاریخ و به‌روزرسانی"),
+                    Triple("progress", "امتیاز و نشان‌های من", "سطح، XP، نشان‌های کسب‌شده و رتبه‌بندی"),
                     Triple("alerts", "صدا، اعلان‌ها و اوقات شرعی", "اذان و اعلان‌های زمانی"),
                     Triple("language", "زبان و منطقه", "زبان برنامه"),
                     Triple("security", "امنیت و لایسنس", "قفل و فعال‌سازی"),
@@ -2942,6 +2943,11 @@ private fun SettingsScreen(
                         }
                     }
                 }
+            }
+        }
+        if (settingsCategory == "progress") item {
+            SettingsCard(title = "نشان‌ها، امتیاز و رتبه‌بندی") {
+                ZurvanUserProgressPanel()
             }
         }
         if (settingsCategory == "calendar") item {
