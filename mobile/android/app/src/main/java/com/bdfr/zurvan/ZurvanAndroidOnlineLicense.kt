@@ -182,6 +182,26 @@ internal object ZurvanAndroidOnlineLicense {
             session.canWrite
         }
 
+    suspend fun signUpAccount(
+        email: String, password: String, referralIdentifier: String = ""
+    ): String = withContext(Dispatchers.IO) {
+        val code = referralIdentifier.trim().uppercase(java.util.Locale.ROOT)
+        require(password.length >= 8) { "رمز عبور باید حداقل ۸ کاراکتر باشد." }
+        require(email.contains("@")) { "ایمیل معتبر وارد کنید." }
+        if (code.isNotEmpty()) {
+            require(code.matches(Regex("[0-9A-F]{16}"))) { "شناسه معرف ۱۶ کاراکتر معتبر نیست." }
+            val check = post("/functions/v1/zurvan-referral-validate",
+                JSONObject().put("code", code))
+            require(check.optBoolean("valid", false)) { "شناسه معرف پیدا نشد." }
+        }
+        val body = JSONObject().put("email", email.trim()).put("password", password)
+        if (code.isNotEmpty()) {
+            body.put("data", JSONObject().put("zurvan_referral_code", code))
+        }
+        post("/auth/v1/signup", body)
+        "ثبت‌نام انجام شد. ایمیل خود را تأیید کن و سپس وارد شو."
+    }
+
     /**
      * Points cannot be set on the client. The server accepts only enumerated
      * actions and enforces daily idempotency in Postgres.
@@ -189,7 +209,7 @@ internal object ZurvanAndroidOnlineLicense {
     suspend fun userProgress(
         context: Context, action: String = "status", visible: Boolean? = null
     ): JSONObject = withContext(Dispatchers.IO) {
-        require(action in setOf("status", "claim_daily", "set_visibility"))
+        require(action in setOf("status", "claim_daily", "set_visibility", "claim_silver"))
         require(action != "set_visibility" || visible != null)
         if (load(context) == null) error("ابتدا وارد حساب آنلاین زروان شوید.")
         // Refresh tokens through the normal secure session path. A non-writable
