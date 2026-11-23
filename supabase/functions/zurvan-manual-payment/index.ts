@@ -193,6 +193,23 @@ Deno.serve(async req => {
       }
       return reply(200,data,origin);
     }
+    if(action==="admin_user_features"){
+      const {data:rows,error}=await db.from("zurvan_account_features")
+        .select("account_id,pahlavi_occasions,updated_at").limit(500);
+      if(error)return fail("feature_list_failed",origin,503);
+      return reply(200,{features:rows??[]},origin);
+    }
+    if(action==="admin_set_pahlavi"){
+      if(typeof body.account_id!=="string" || !uuid.test(body.account_id) ||
+         typeof body.enabled!=="boolean")
+        return fail("invalid_feature_request",origin);
+      const {data,error}=await db.rpc("zurvan_admin_set_pahlavi_feature",{
+        p_actor:user.id,p_account:body.account_id,p_enabled:body.enabled
+      });
+      if(error)return fail(error.message.includes("account_not_found")?
+          "account_not_found":"feature_update_failed",origin,403);
+      return reply(200,data,origin);
+    }
     if(action==="admin_config"){
       const card=typeof body.merchant_card==="string" ?
         body.merchant_card.replace(/[\s-]/g,"") : "";
