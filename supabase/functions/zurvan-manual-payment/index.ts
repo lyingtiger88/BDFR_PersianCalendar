@@ -2,6 +2,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 
 const ORIGINS = new Set([
   "https://kaliia.ir", "https://www.kaliia.ir",
+  "https://yztithydgdvydaktuxlw.supabase.co",
   "http://localhost:8085", "http://127.0.0.1:8085"
 ]);
 const BUCKET = "zurvan-payment-receipts";
