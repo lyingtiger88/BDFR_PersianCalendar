@@ -63,6 +63,11 @@ public sealed class AppSettings
     public string? LastRandomWallpaperPath { get; set; }
     public int WallpaperChangeIntervalHours { get; set; } = 24;
     public bool ShowOccasionPictures { get; set; } = true;
+    // Independent visibility switches; only affect displayed occasion cards.
+    // Existing occasion records, holidays and user notes remain untouched.
+    public bool ShowPersianOccasions { get; set; } = true;
+    public bool ShowHijriOccasions { get; set; } = true;
+    public bool ShowGregorianOccasions { get; set; } = true;
 
     // Zara Pastel optional Liquid Glass presentation.
     public bool GlassMode { get; set; }
