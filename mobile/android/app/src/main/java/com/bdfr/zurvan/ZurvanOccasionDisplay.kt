@@ -16,6 +16,7 @@ object ZurvanOccasionDisplay {
     private const val HIJRI = "hijri"
     private const val GREGORIAN = "gregorian"
     private const val PAHLAVI = "pahlavi"
+    private const val IMPERIAL_YEAR = "imperial_year"
     private var revision by mutableIntStateOf(0)
 
     data class Selection(
@@ -23,7 +24,8 @@ object ZurvanOccasionDisplay {
         val persian: Boolean = true,
         val hijri: Boolean = true,
         val gregorian: Boolean = true,
-        val pahlavi: Boolean = false
+        val pahlavi: Boolean = false,
+        val imperialYear: Boolean = false
     ) {
         fun includes(item: LocalOccasion): Boolean {
             if (!enabled) return false
@@ -47,13 +49,15 @@ object ZurvanOccasionDisplay {
             persian = prefs.getBoolean(PERSIAN, true),
             hijri = prefs.getBoolean(HIJRI, true),
             gregorian = prefs.getBoolean(GREGORIAN, true),
-            pahlavi = authorized && prefs.getBoolean(PAHLAVI, false)
+            pahlavi = authorized && prefs.getBoolean(PAHLAVI, false),
+            imperialYear = authorized && prefs.getBoolean(IMPERIAL_YEAR, false)
         )
     }
 
     fun set(context: Context, key: String, checked: Boolean) {
-        require(key in setOf(ENABLED, PERSIAN, HIJRI, GREGORIAN, PAHLAVI))
-        if (key == PAHLAVI && !ZurvanAndroidOnlineLicense.hasPahlaviAccess(context)) return
+        require(key in setOf(ENABLED, PERSIAN, HIJRI, GREGORIAN, PAHLAVI, IMPERIAL_YEAR))
+        if ((key == PAHLAVI || key == IMPERIAL_YEAR) &&
+            !ZurvanAndroidOnlineLicense.hasPahlaviAccess(context)) return
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putBoolean(key, checked).apply()
         revision++
@@ -69,15 +73,20 @@ object ZurvanOccasionDisplay {
 internal object ZurvanPahlaviOccasions {
     private data class Entry(val month: Int, val day: Int, val title: String)
     private val entries = listOf(
+        Entry(1, 1, "نوروز شاهنشاهی؛ آغاز سال جدید (یادبود تاریخی)"),
+        Entry(6, 25, "آغاز سلطنت محمدرضا پهلوی در ۱۳۲۰ (رویداد تاریخی)"),
         Entry(8, 4, "زادروز محمدرضا پهلوی (مناسبت تاریخی)"),
-        Entry(11, 6, "سالروز همه‌پرسی انقلاب سفید (مناسبت تاریخی)")
+        Entry(8, 4, "سالروز تاج‌گذاری ۱۳۴۶ (مناسبت تاریخی)"),
+        Entry(10, 26, "خروج محمدرضا پهلوی از ایران در ۱۳۵۷ (رویداد تاریخی)"),
+        Entry(11, 6, "همه‌پرسی انقلاب سفید در ۱۳۴۱ (رویداد تاریخی)"),
+        Entry(12, 24, "تصویب تغییر مبدأ سال‌شماری شاهنشاهی در ۱۳۵۴ (رویداد تاریخی)")
     )
 
     fun onDay(day: CalendarDayCell): List<LocalOccasion> =
         entries.filter { it.month == day.persianMonth && it.day == day.persianDay }
-            .map { item ->
+            .mapIndexed { index, item ->
                 LocalOccasion(
-                    id = "historical-pahlavi-${item.month}-${item.day}",
+                    id = "historical-pahlavi-${item.month}-${item.day}-${index}",
                     title = item.title,
                     calendar = CalendarPriority.PERSIAN,
                     month = item.month,
