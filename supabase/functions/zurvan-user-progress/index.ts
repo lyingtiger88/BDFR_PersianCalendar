@@ -17,10 +17,14 @@ const levels = [
 // Never publish email addresses, phone numbers or UUIDs as public aliases
 // even if a legacy account stored them in the username field.
 function publicAlias(value: string): string {
-  const name=value.trim();
-  if(!name || name.length>28 || /[@\\/\\]|[\\r\\n]/.test(name) ||
-      /^\\+?\\d[\\d\\s-]{7,}$/.test(name) ||
-      /^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(name)) return "کاربر زروان";
+  const name = value.trim();
+  // Public rankings must not inadvertently expose email, phone or an ID.
+  if (!name || name.length > 28 || name.includes("@") ||
+      name.includes("/") || name.includes("\\") ||
+      name.includes("\n") || name.includes("\r") ||
+      /^\+?\d[\d\s-]{7,}$/.test(name) ||
+      /^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(name))
+    return "کاربر زروان";
   return name;
 }
 
