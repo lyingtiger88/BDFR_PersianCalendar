@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.weight
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -100,6 +99,14 @@ internal fun ZurvanUserProgressPanel() {
             onClick = { scope.launch { reload("claim_daily") } }
         ) { Text(if (profile.optBoolean("checked_in_today"))
             "امتیاز امروز دریافت شده" else "ثبت حضور و دریافت امتیاز امروز") }
+
+        response.optJSONObject("special_rank")?.let { rank ->
+            HorizontalDivider()
+            Text("نشان ویژه: " + rank.optString("display_name_fa"),
+                fontWeight = FontWeight.Bold)
+            Text("رتبه ویژه مدیریتی مستقل از امتیاز XP است.",
+                style = MaterialTheme.typography.bodySmall)
+        }
 
         HorizontalDivider()
         Text("نشان‌ها", style = MaterialTheme.typography.titleMedium,
