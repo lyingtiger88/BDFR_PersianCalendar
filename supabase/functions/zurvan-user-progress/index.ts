@@ -64,7 +64,7 @@ Deno.serve(async req => {
     if(!body||Array.isArray(body)||typeof body!=="object")throw Error("bad body");
   }catch{return reply(400,{error:"invalid_json"});}
   const action=body.action??"status";
-  if(!["status","claim_daily","set_visibility"].includes(String(action)))
+  if(!["status","claim_daily","set_visibility","claim_silver"].includes(String(action)))
     return reply(400,{error:"unknown_action"});
   const {data:account,error:ae}=await db.from("zurvan_accounts")
     .select("id,status,username,super_type").eq("id",user.id).maybeSingle();
@@ -74,6 +74,19 @@ Deno.serve(async req => {
 
   let claimResult:unknown=null;
   try{
+    // Server independently verifies confirmed email and legitimate device or
+    // paid activation. A request never supplies the number of invites.
+    const {data:verifiedInvites,error:qualifyError}=await db.rpc(
+      "zurvan_refresh_referrals",{p_inviter:user.id});
+    if(qualifyError)throw Error("referral_qualification_failed");
+
+    if(action==="claim_silver"){
+      const {data,error}=await db.rpc("zurvan_claim_referral_silver",{
+        p_account:user.id
+      });
+      if(error)throw Error("referral_reward_claim_failed");
+      claimResult=data;
+    }
     if(action==="claim_daily"){
       const {data,error}=await db.rpc("zurvan_claim_daily_xp",{p_account:user.id});
       if(error)throw Error("claim_failed");
@@ -86,6 +99,21 @@ Deno.serve(async req => {
       });
       if(error)throw Error("visibility_update_failed");
     }
+    const [codeResult,referralsResult,rewardsResult]=await Promise.all([
+      db.from("zurvan_invite_codes").select("code").eq("account_id",user.id).single(),
+      db.from("zurvan_referrals").select("invited_account_id,qualified_at")
+        .eq("inviter_account_id",user.id),
+      db.from("zurvan_referral_silver_rewards")
+        .select("reward_number,starts_at,expires_at,status")
+        .eq("account_id",user.id).order("reward_number",{ascending:false})
+    ]);
+    if(codeResult.error||referralsResult.error||rewardsResult.error)
+      throw Error("referral_summary_failed");
+    const qualified=(referralsResult.data??[]).filter(x=>!!x.qualified_at).length;
+    const issued=(rewardsResult.data??[]).length;
+    const recentReward=(rewardsResult.data??[]).find(x=>x.status==="active" &&
+      new Date(x.expires_at).getTime()>Date.now())??null;
+    const rewardAvailable=qualified >= (issued+1)*15;
     const [scoreResult,historyResult,earnedResult,catalogResult,boardResult]=await Promise.all([
       db.from("zurvan_user_scores")
         .select("total_xp,daily_streak,best_streak,last_claim_date,leaderboard_opt_in")
@@ -133,7 +161,8 @@ Deno.serve(async req => {
       badges:allBadges.map(x=>({...x,earned:earned.has(x.badge_key),
         earned_at:earned.get(x.badge_key)??null})),
       history:(historyResult.data??[]).map(x=>({
-        title:"حضور روزانه",points:x.points,created_at:x.created_at,
+        title:x.event_type==="referral_qualified"?"دعوت موفق":"حضور روزانه",
+        points:x.points,created_at:x.created_at,
         event_type:x.event_type})),
       leaderboard:board.filter(x=>usernames.has(x.account_id)).slice(0,20)
         .map((x,i)=>({
@@ -141,6 +170,19 @@ Deno.serve(async req => {
           display_name:usernames.get(x.account_id)??"کاربر زروان",
           total_xp:x.total_xp})),
       special_rank:special??null,
+      referral:{
+        identifier:codeResult.data?.code??null,
+        successful:qualified,
+        pending:(referralsResult.data??[]).length-qualified,
+        reward_threshold:15,
+        earned_rewards:issued,
+        remaining_to_next:Math.max(0,(issued+1)*15-qualified),
+        reward_available:rewardAvailable,
+        reward_plan:"premium_silver",
+        reward_duration_months:12,
+        bonus_xp_per_success:100,
+        current_silver:recentReward
+      },
       claim:claimResult,
       rules:{daily_base:20,streak_bonus_per_day:5,streak_bonus_cap:30,
         timezone:"UTC",leaderboard_default_private:true}
