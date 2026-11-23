@@ -73,11 +73,15 @@ internal fun ZurvanUserProgressPanel() {
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
         val response = data
-        val profile = response?.optJSONObject("profile")
-        if (profile == null) {
+        if (response == null) {
             Button(enabled = !busy, onClick = { scope.launch { reload() } }) {
                 Text("دریافت امتیازها")
             }
+            return@Column
+        }
+        val profile = response.optJSONObject("profile")
+        if (profile == null) {
+            Text("اطلاعات امتیاز از سرور دریافت نشد.")
             return@Column
         }
 
