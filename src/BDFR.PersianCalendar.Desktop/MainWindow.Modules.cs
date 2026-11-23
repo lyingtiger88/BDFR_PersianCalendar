@@ -954,12 +954,18 @@ public sealed partial class MainWindow
                         // The Pahlavi historical feed is gated by the
                         // account grant returned by Supabase. These are
                         // nonofficial observances, never public holidays.
-                        if (_licensePahlaviOccasions)
+                        if (_licensePahlaviOccasions && _settings.ShowImperialCalendar)
                         {
+                            // Curated historical observances are not statutory holidays.
                             var historicalItems = new (int Month, int Day, string Title)[]
                             {
+                                (1, 1, "نوروز شاهنشاهی؛ آغاز سال جدید (یادبود تاریخی)"),
+                                (6, 25, "آغاز سلطنت محمدرضا پهلوی در ۱۳۲۰ (رویداد تاریخی)"),
                                 (8, 4, "زادروز محمدرضا پهلوی (مناسبت تاریخی)"),
-                                (11, 6, "سالروز همه‌پرسی انقلاب سفید (مناسبت تاریخی)")
+                                (8, 4, "تاج‌گذاری سال ۱۳۴۶ (مناسبت تاریخی)"),
+                                (10, 26, "خروج محمدرضا پهلوی از ایران در ۱۳۵۷ (رویداد تاریخی)"),
+                                (11, 6, "همه‌پرسی انقلاب سفید در ۱۳۴۱ (رویداد تاریخی)"),
+                                (12, 24, "تصویب تغییر مبدأ سال‌شماری شاهنشاهی در ۱۳۵۴ (رویداد تاریخی)")
                             };
                             foreach (var historical in historicalItems.Where(x => x.Month == month))
                             {
@@ -1189,8 +1195,11 @@ public sealed partial class MainWindow
                 var selectedDayOccasions = OccasionsPanel;
                 DetachDesktopElement(selectedDayOccasions);
                 page.Children.Add(zodiacBanner);
-                page.Children.Add(Card("مناسبت‌های رسمی سال " + ToPersianDigits(_selected.Year.ToString()),
-                    "مناسبت‌ها به تفکیک ماه مرتب شده‌اند. تعطیلات رسمی با رنگ قرمز مشخص می‌شوند.", officialMonths));
+                var imperialEnabled = _licensePahlaviOccasions && _settings.ShowImperialCalendar;
+                var displayYear = imperialEnabled ? _selected.Year + 1180 : _selected.Year;
+                page.Children.Add(Card("مناسبت‌های سال " + ToPersianDigits(displayYear.ToString()) +
+                        (imperialEnabled ? " شاهنشاهی" : " هجری خورشیدی"),
+                    "مناسبت‌ها به تفکیک ماه؛ مناسبت‌های تاریخی پهلوی تعطیل رسمی نیستند.", officialMonths));
                 page.Children.Add(refresh);
                 page.Children.Add(Card("مناسبت‌های روز انتخاب‌شده", "مناسبت‌های مربوط به روز انتخاب‌شده در تقویم.", selectedDayOccasions));
                 page.Children.Add(Card("ثبت مناسبت شخصی", "تولد، سالگرد و مناسبت‌های تکرارشونده با زمان و یادآورهای مستقل.", add));
