@@ -189,7 +189,7 @@ internal object ZurvanAndroidOnlineLicense {
         require(password.length >= 8) { "رمز عبور باید حداقل ۸ کاراکتر باشد." }
         require(email.contains("@")) { "ایمیل معتبر وارد کنید." }
         if (code.isNotEmpty()) {
-            require(code.matches(Regex("[0-9A-F]{8}"))) { "شناسه معرف باید ۸ کاراکتر باشد." }
+            require(code.matches(Regex("[A-Z0-9]{5}"))) { "شناسه معرف باید ۵ کاراکتر انگلیسی یا عدد باشد." }
             val check = post("/functions/v1/zurvan-referral-validate",
                 JSONObject().put("code", code))
             require(check.optBoolean("valid", false)) { "شناسه معرف پیدا نشد." }
