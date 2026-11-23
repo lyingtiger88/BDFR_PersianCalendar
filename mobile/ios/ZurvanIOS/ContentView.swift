@@ -512,6 +512,8 @@ private struct ZurvanCloudShellView: View {
 }
 
 private struct MobileSettingsView: View {
+    @AppStorage("zurvan.occasion.pahlavi.year.enabled") private var imperialYearEnabled = false
+    @AppStorage("zurvan.occasion.pahlavi.enabled") private var imperialOccasionsEnabled = false
     @AppStorage("zurvan.appearance.theme") private var themeID = "windows-light"
     @AppStorage("zurvan.language") private var language = "fa"
     @AppStorage("zurvan.zodiac.theme") private var zodiacTheme = "cosmic"
@@ -541,6 +543,22 @@ private struct MobileSettingsView: View {
                     }.pickerStyle(.menu)
                     Text("ترجمه بخش‌های قدیمی به‌تدریج کامل می‌شود.")
                         .font(.footnote).foregroundStyle(.secondary)
+                }
+                .padding()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("تقویم شاهنشاهی (پهلوی)").font(.headline)
+                    if ZurvanIOSLicense.hasOnlinePahlaviAccess {
+                        Toggle("نمایش سال شاهنشاهی در تقویم", isOn: $imperialYearEnabled)
+                        Toggle("نمایش مناسبت‌های تاریخی دوره پهلوی", isOn: $imperialOccasionsEnabled)
+                        Text("مبدأ سال‌شماری = سال هجری خورشیدی + ۱۱۸۰؛ تاریخ‌های ذخیره‌شده تغییر نمی‌کنند. این رویدادها تعطیل رسمی نیستند.")
+                            .font(.footnote).foregroundStyle(.secondary)
+                    } else {
+                        Label("مجوز این قابلیت باید توسط مدیر برای حساب زروان فعال شود.", systemImage:"lock.fill")
+                            .font(.footnote).foregroundStyle(.secondary)
+                    }
                 }
                 .padding()
                 .frame(maxWidth: .infinity, alignment: .leading)
