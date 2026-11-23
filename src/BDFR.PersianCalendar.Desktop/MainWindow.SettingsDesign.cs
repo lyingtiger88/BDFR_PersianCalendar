@@ -40,8 +40,12 @@ public sealed partial class MainWindow
     private TextBox? _settingsSearchBox;
     private string _selectedSettingsSection = "عمومی";
     private Border? _settingsProfileContainer;
+    private StackPanel? _settingsRankBadgeHost;
+    private StackPanel? _settingsAccountRankBadgeHost;
+    private TextBlock? _settingsAccountNameText;
     private TextBlock? _settingsServerLicenseStatus;
     private bool _licenseCanWrite;
+    private bool _licensePahlaviOccasions;
     private string _licenseMode = "account_required";
     private string? _licenseExpiresAt;
     private Microsoft.UI.Dispatching.DispatcherQueueTimer? _licenseRefreshTimer;
@@ -127,13 +131,14 @@ public sealed partial class MainWindow
             }
         };
         var text = new StackPanel { Spacing = 4, VerticalAlignment = VerticalAlignment.Center };
-        text.Children.Add(new TextBlock
+        _settingsAccountNameText = new TextBlock
         {
             Text = _authClient.SignedInEmail ?? "کاربر زروان",
             FontSize = 17,
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
             Foreground = ThemeService.Brush(SettingsTextColor)
-        });
+        };
+        text.Children.Add(_settingsAccountNameText);
         text.Children.Add(new TextBlock
         {
             Text = _authClient.SignedInEmail is null
@@ -146,6 +151,16 @@ public sealed partial class MainWindow
         row.Children.Add(avatar);
         row.Children.Add(text);
         account.Children.Add(row);
+
+        _settingsRankBadgeHost = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 7,
+            FlowDirection = FlowDirection.RightToLeft,
+            HorizontalAlignment = HorizontalAlignment.Right
+        };
+        account.Children.Add(_settingsRankBadgeHost);
+
         if (_authClient.SignedInEmail is not null)
         {
             var status = (TextBlock)text.Children[1];
@@ -177,6 +192,75 @@ public sealed partial class MainWindow
         return account;
     }
 
+    private void RenderSpecialRankBadge(ZurvanAuthClient.LicenseStatus result)
+    {
+        if (_settingsRankBadgeHost is not null) _settingsRankBadgeHost.Children.Clear();
+        if (_settingsAccountRankBadgeHost is not null) _settingsAccountRankBadgeHost.Children.Clear();
+        if (string.IsNullOrWhiteSpace(result.SpecialRankCode)) return;
+
+        var (icon, background, foreground, label) = result.SpecialRankCode switch
+        {
+            "emperor" => ("♛", "#FF332747", "#FFFFD36B", "EMPEROR · امپراتور"),
+            "empress" => ("♛", "#FF493044", "#FFF4C3D8", "EMPRESS · امپراتریس"),
+            "special_advisor" => ("✦", "#FF253C4A", "#FF9DE8F2", "SPECIAL ADVISOR · مشاور ویژه"),
+            _ => ("◆", "#FF454052", "#FFFFFFFF", result.SpecialRankNameFa ?? result.SpecialRankName ?? result.SpecialRankCode)
+        };
+
+        var badge = new Border
+        {
+            Background = ThemeService.Brush(background),
+            CornerRadius = new CornerRadius(12),
+            Padding = new Thickness(11, 6, 11, 6),
+            Child = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Spacing = 7,
+                FlowDirection = FlowDirection.RightToLeft,
+                Children =
+                {
+                    new TextBlock
+                    {
+                        Text = icon,
+                        FontSize = 17,
+                        Foreground = ThemeService.Brush(foreground),
+                        VerticalAlignment = VerticalAlignment.Center
+                    },
+                    new TextBlock
+                    {
+                        Text = label,
+                        FontSize = 11,
+                        FontWeight = Microsoft.UI.Text.FontWeights.Bold,
+                        Foreground = ThemeService.Brush(foreground),
+                        VerticalAlignment = VerticalAlignment.Center
+                    }
+                }
+            }
+        };
+        if (_settingsRankBadgeHost is not null)
+            _settingsRankBadgeHost.Children.Add(badge);
+        if (_settingsAccountRankBadgeHost is not null)
+        {
+            var accountBadge = new Border
+            {
+                Background = ThemeService.Brush(background),
+                CornerRadius = new CornerRadius(12),
+                Padding = new Thickness(11, 6, 11, 6),
+                Child = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    Spacing = 7,
+                    FlowDirection = FlowDirection.RightToLeft,
+                    Children =
+                    {
+                        new TextBlock { Text = icon, FontSize = 17, Foreground = ThemeService.Brush(foreground), VerticalAlignment = VerticalAlignment.Center },
+                        new TextBlock { Text = label, FontSize = 11, FontWeight = Microsoft.UI.Text.FontWeights.Bold, Foreground = ThemeService.Brush(foreground), VerticalAlignment = VerticalAlignment.Center }
+                    }
+                }
+            };
+            _settingsAccountRankBadgeHost.Children.Add(accountBadge);
+        }
+    }
+
     private void RefreshWindowsSettingsProfile()
     {
         if (_settingsProfileContainer is not null)
@@ -188,12 +272,28 @@ public sealed partial class MainWindow
         try
         {
             var result = await _authClient.ReadLicenseStatusAsync();
-            if (result.TrialAvailable)
+            // Complete verified account enrollment and start an eligible
+            // one-time device-bound trial without administrator intervention.
+            if (result.TrialAvailable ||
+                result.AccountState == "registration_required" ||
+                result.LicenseAccountState == "not_linked" ||
+                result.LicenseAccountState == "not_found")
             {
                 using var started = await _authClient.StartTrialAsync();
                 result = await _authClient.ReadLicenseStatusAsync();
             }
+            if (_settingsAccountNameText is not null && !string.IsNullOrWhiteSpace(result.AccountUsername))
+                _settingsAccountNameText.Text = result.AccountUsername;
             _licenseCanWrite = result.CanWrite;
+            var pahlaviGrantChanged = _licensePahlaviOccasions != result.PahlaviOccasions;
+            _licensePahlaviOccasions = result.PahlaviOccasions;
+            if (pahlaviGrantChanged)
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    if (_selectedSettingsSection == "تقویم و زمان" && _activeDesktopModule == "تنظیمات")
+                        ShowSettingsSection("تقویم و زمان");
+                    BuildCalendar();
+                });
             _licenseMode = result.Mode;
             _licenseExpiresAt = result.ExpiresAt;
             StatusText.Text = result.CanWrite
@@ -205,7 +305,17 @@ public sealed partial class MainWindow
                 if (!_licenseCanWrite && _activeDesktopModule != "تنظیمات")
                     ShowDesktopModule(_activeDesktopModule);
             });
-            if (result.AccountState != "active")
+            if (result.Mode == "device_trial_mismatch")
+                status.Text = "دوره رایگان این حساب متعلق به دستگاه دیگری است؛ برای این دستگاه اشتراک تهیه کنید.";
+            else if (result.SpecialRankCode == "emperor")
+                status.Text = "سازنده زروان · دسترسی مدیریتی کامل";
+            else if (result.SpecialRankCode == "empress")
+                status.Text = "مدیر ارشد زروان · دسترسی مدیریتی کامل";
+            else if (result.SpecialRankCode == "special_advisor")
+                status.Text = result.CanWrite
+                    ? "مشاور ویژه زروان · مجوز فعال"
+                    : "مشاور ویژه زروان · سطح دسترسی مشاوره‌ای";
+            else if (result.AccountState != "active")
                 status.Text = "حساب زروان: " +
                     (result.AccountState == "registration_required" || result.AccountState == "provisional"
                         ? "ثبت‌نام دستگاه تکمیل نشده است"
@@ -222,10 +332,12 @@ public sealed partial class MainWindow
                 status.Text = "دوره آزمایشی ۴۵ روزه آماده فعال‌سازی است.";
             else
                 status.Text = "حساب تأییدشده؛ برای ادامه استفاده اشتراک تهیه کنید.";
+
+            DispatcherQueue.TryEnqueue(() => RenderSpecialRankBadge(result));
         }
         catch (Exception ex)
         {
-            status.Text = "استعلام مجوز سرور ناموفق بود";
+            status.Text = ex.Message;
             StartupDiagnostics.Log("Account license verification unavailable: " + ex.Message);
         }
     }
@@ -236,6 +348,7 @@ public sealed partial class MainWindow
         if (_authClient.SignedInEmail is null)
         {
             _licenseCanWrite = false;
+            _licensePahlaviOccasions = false;
             _licenseMode = "account_required";
             StatusText.Text = "برای شروع دوره آزمایشی ۴۵ روزه، وارد حساب زروان شوید.";
             if (_activeDesktopModule != "تنظیمات") ShowDesktopModule(_activeDesktopModule);
@@ -244,12 +357,26 @@ public sealed partial class MainWindow
         try
         {
             var result = await _authClient.ReadLicenseStatusAsync();
-            if (result.TrialAvailable)
+            // Complete verified account enrollment and start an eligible
+            // one-time device-bound trial without administrator intervention.
+            if (result.TrialAvailable ||
+                result.AccountState == "registration_required" ||
+                result.LicenseAccountState == "not_linked" ||
+                result.LicenseAccountState == "not_found")
             {
                 using var started = await _authClient.StartTrialAsync();
                 result = await _authClient.ReadLicenseStatusAsync();
             }
             _licenseCanWrite = result.CanWrite;
+            var pahlaviGrantChanged = _licensePahlaviOccasions != result.PahlaviOccasions;
+            _licensePahlaviOccasions = result.PahlaviOccasions;
+            if (pahlaviGrantChanged)
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    if (_selectedSettingsSection == "تقویم و زمان" && _activeDesktopModule == "تنظیمات")
+                        ShowSettingsSection("تقویم و زمان");
+                    BuildCalendar();
+                });
             _licenseMode = result.Mode;
             _licenseExpiresAt = result.ExpiresAt;
             DispatcherQueue.TryEnqueue(() =>
@@ -262,6 +389,7 @@ public sealed partial class MainWindow
         catch (Exception ex)
         {
             _licenseCanWrite = false;
+            _licensePahlaviOccasions = false;
             _licenseMode = "verification_unavailable";
             StartupDiagnostics.Log("License policy refresh failed: " + ex.Message);
             if (_activeDesktopModule != "تنظیمات") ShowDesktopModule(_activeDesktopModule);
@@ -1019,6 +1147,52 @@ public sealed partial class MainWindow
             "تنظیمات کامل", OpenLegacySettings, "\uE787");
         AddSettingsAction(contents, "مناسبت‌ها", "نمایش مناسبت‌های ثبت‌شده و رسمی",
             "بازکردن مناسبت‌ها", () => ShowDesktopModule("مناسبت‌ها"), "\uE787");
+        contents.Children.Add(SettingsLabel("نمایش مناسبت‌ها براساس نوع تقویم", 14, true));
+        contents.Children.Add(SettingsOptionRow("مناسبت‌های شمسی و ملی",
+            "نمایش یا پنهان‌کردن مناسبت‌های شمسی، بدون حذف داده‌ها",
+            SettingsToggle(_settings.ShowPersianOccasions, enabled =>
+            {
+                _settings.ShowPersianOccasions = enabled;
+                _settingsService.Save(_settings);
+                ApplyOccasionVisibility();
+            }), "\uE787"));
+        contents.Children.Add(SettingsOptionRow("مناسبت‌های قمری و مذهبی",
+            "نمایش یا پنهان‌کردن مناسبت‌های قمری",
+            SettingsToggle(_settings.ShowHijriOccasions, enabled =>
+            {
+                _settings.ShowHijriOccasions = enabled;
+                _settingsService.Save(_settings);
+                ApplyOccasionVisibility();
+            }), "\uE787"));
+        contents.Children.Add(SettingsOptionRow("مناسبت‌های میلادی و جهانی",
+            "نمایش یا پنهان‌کردن مناسبت‌های میلادی و بین‌المللی",
+            SettingsToggle(_settings.ShowGregorianOccasions, enabled =>
+            {
+                _settings.ShowGregorianOccasions = enabled;
+                _settingsService.Save(_settings);
+                ApplyOccasionVisibility();
+            }), "\uE787"));
+        contents.Children.Add(SettingsHint(
+            "این گزینه‌ها فقط نمایش مناسبت‌ها را تغییر می‌دهند؛ تاریخ‌ها، رویدادهای شخصی و اطلاعات ذخیره‌شده حذف نمی‌شوند."));
+        AddSettingsSeparator(contents);
+
+        // A server-confirmed account grant is the only authority to reveal
+        // this option. Hide the entire row for everyone else (no lock/teaser).
+        if (_licensePahlaviOccasions)
+        {
+            var imperialSwitch = SettingsToggle(_settings.ShowImperialCalendar, enabled =>
+            {
+                if (!_licensePahlaviOccasions)
+                    throw new InvalidOperationException("مجوز تقویم شاهنشاهی فعال نیست.");
+                _settings.ShowImperialCalendar = enabled;
+                _settingsService.Save(_settings);
+                BuildCalendar();
+            });
+            contents.Children.Add(SettingsOptionRow("تقویم شاهنشاهی (پهلوی)",
+                "نمایش سال شاهنشاهی و مناسبت‌های تاریخی غیررسمی. تاریخ ذخیره‌شده شمسی تغییر نمی‌کند.",
+                imperialSwitch, "\uE787"));
+            AddSettingsSeparator(contents);
+        }
 
         var clockGroup = SettingsGroup("ساعت زروان", "تنظیم نمایش ساعت در گوشه بالای سمت راست سربرگ تقویم", "\uE823", "#FFB88942");
         var clockMode = new ComboBox { HorizontalAlignment = HorizontalAlignment.Stretch };
@@ -1160,6 +1334,15 @@ public sealed partial class MainWindow
             "ورود، ثبت‌نام و وضعیت اشتراک زروان", "\uE77B", "#FFE8AD1D");
         contents.Children.Add(SettingsHint(
             "وضعیت اشتراک صرفاً از سرور Supabase دریافت می‌شود؛ این صفحه مستقل از کدهای فعال‌سازی محلی قدیمی است."));
+        _settingsAccountRankBadgeHost = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            FlowDirection = FlowDirection.RightToLeft,
+            HorizontalAlignment = HorizontalAlignment.Right
+        };
+        contents.Children.Add(SettingsLabel("رتبه و نشان ویژه زروان", 14, true));
+        contents.Children.Add(_settingsAccountRankBadgeHost);
         contents.Children.Add(BuildAccountAuthPanel());
         _settingsServerLicenseStatus = SettingsHint(
             _authClient.SignedInEmail is null
@@ -1168,6 +1351,10 @@ public sealed partial class MainWindow
         contents.Children.Add(_settingsServerLicenseStatus);
         if (_authClient.SignedInEmail is not null)
             _ = LoadSupabaseLicenseStatusAsync(_settingsServerLicenseStatus);
+        AddSettingsSeparator(contents);
+        var progressHost = new StackPanel { Spacing = 10 };
+        contents.Children.Add(progressHost);
+        _ = LoadUserProgressAsync(progressHost);
         _settingsContent!.Children.Add(SettingsCard(contents));
     }
 

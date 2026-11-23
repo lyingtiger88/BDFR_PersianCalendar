@@ -63,6 +63,11 @@ public sealed class AppSettings
     public string? LastRandomWallpaperPath { get; set; }
     public int WallpaperChangeIntervalHours { get; set; } = 24;
     public bool ShowOccasionPictures { get; set; } = true;
+    // Independent visibility switches; only affect displayed occasion cards.
+    // Existing occasion records, holidays and user notes remain untouched.
+    public bool ShowPersianOccasions { get; set; } = true;
+    public bool ShowHijriOccasions { get; set; } = true;
+    public bool ShowGregorianOccasions { get; set; } = true;
 
     // Zara Pastel optional Liquid Glass presentation.
     public bool GlassMode { get; set; }
@@ -70,6 +75,10 @@ public sealed class AppSettings
     // Global corner radius for cards and interactive UI elements.
     // 0 = square corners, 32 = strongly rounded.
     public double UiCornerRadius { get; set; } = 14.0;
+
+    // User preference only: the authenticated Supabase grant is always checked
+    // separately before imperial year or restricted historical events are shown.
+    public bool ShowImperialCalendar { get; set; }
 
     // Calendar display priority inside each day card.
     // First = large/primary center, second = upper-right, third = lower-left.

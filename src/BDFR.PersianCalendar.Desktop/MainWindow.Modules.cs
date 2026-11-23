@@ -349,9 +349,17 @@ public sealed partial class MainWindow
             }
             applyMenu.ShowAt(applySelected);
         };
-        var galleryLayout = new Grid { ColumnSpacing = 16, FlowDirection = FlowDirection.LeftToRight };
-        galleryLayout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.05, GridUnitType.Star) });
-        galleryLayout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.5, GridUnitType.Star) });
+        var galleryLayout = new Grid
+        {
+            ColumnSpacing = 16,
+            FlowDirection = FlowDirection.LeftToRight,
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+        // The page is hosted by a vertical StackPanel inside a ScrollViewer.
+        // Without an explicit viewport width the StackPanel measures this Grid
+        // to its children's desired width, leaving most of the card empty.
+        galleryLayout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(0.9, GridUnitType.Star) });
+        galleryLayout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.8, GridUnitType.Star) });
         var previewPanel = new StackPanel { Spacing = 9, VerticalAlignment = VerticalAlignment.Top };
         var previewFrame = new Border
         {
@@ -394,6 +402,8 @@ public sealed partial class MainWindow
             galleryCategoryPicker.Items.Add(new ComboBoxItem { Content = name, Tag = name });
         galleryCategoryPicker.SelectedIndex = 0;
         var rebuildingGalleryCategories = false;
+        var galleryLoadGeneration = 0;
+        var galleryLoading = false;
         var galleryRefresh = MakeButton("تازه‌سازی گالری");
         var seenIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var currentQuery = "";
@@ -590,11 +600,31 @@ public sealed partial class MainWindow
         galleryRefresh.Click += async (_, _) => await LoadGalleryAsync();
         galleryCategoryPicker.SelectionChanged += async (_, _) =>
         {
-            if (!rebuildingGalleryCategories) await LoadGalleryAsync();
+            if (!rebuildingGalleryCategories && !galleryLoading)
+                await LoadGalleryAsync();
         };
+
+        async Task LoadGalleryThumbnailAsync(Image image, string path, int generation)
+        {
+            try
+            {
+                var source = await PictureService.LoadImageAsync(path, 240);
+                if (generation == galleryLoadGeneration)
+                    image.Source = source;
+            }
+            catch (Exception ex)
+            {
+                StartupDiagnostics.Log($"Gallery thumbnail failed ({Path.GetFileName(path)}): {ex.Message}");
+            }
+        }
 
         async Task LoadGalleryAsync()
         {
+            if (galleryLoading) return;
+            galleryLoading = true;
+            var generation = ++galleryLoadGeneration;
+            try
+            {
             gallery.Children.Clear();
             gallery.RowDefinitions.Clear();
             gallery.Children.Add(galleryRefresh);
@@ -624,11 +654,19 @@ public sealed partial class MainWindow
                 applySelected.IsEnabled = false;
                 return;
             }
-            var rowIndex = 1;
+            // Keep a monotonically increasing tile index. Reusing a constant
+            // row index places every wallpaper at row 1 / column 0, so the last
+            // child visually covers the first one instead of forming a 4-column grid.
+            var tileIndex = 0;
             foreach (var path in files)
             {
-                var image = new Image { Width = 94, Height = 68, Stretch = Stretch.UniformToFill };
-                image.Source = await PictureService.LoadImageAsync(path, 240);
+                var image = new Image
+                {
+                    Width = 94, Height = 68,
+                    Stretch = Stretch.UniformToFill,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
                 var select = new Button
                 {
                     Padding = new Thickness(5), Background = ThemeService.Brush("#FFFDFDFD"),
@@ -657,7 +695,7 @@ public sealed partial class MainWindow
                     BorderBrush = BrushWithAlpha(_theme.Accent, 0x55), BorderThickness = new Thickness(1),
                     CornerRadius = new CornerRadius(9), Padding = new Thickness(3), Child = select
                 };
-                var index = rowIndex - 1;
+                var index = tileIndex++;
                 var row = (index / 4) + 1;
                 var column = index % 4;
                 while (gallery.RowDefinitions.Count <= row)
@@ -665,6 +703,15 @@ public sealed partial class MainWindow
                 Grid.SetRow(tile, row);
                 Grid.SetColumn(tile, column);
                 gallery.Children.Add(tile);
+
+                // Render every tile immediately, then decode thumbnails independently.
+                // A corrupt/locked image must not abort the remaining gallery.
+                _ = LoadGalleryThumbnailAsync(image, path, generation);
+            }
+            }
+            finally
+            {
+                galleryLoading = false;
             }
         }
 
@@ -679,13 +726,20 @@ public sealed partial class MainWindow
         openGallery.Click += (_, _) => OpenFolderInExplorer(_wallpaperService.GalleryRoot);
         root.Children.Add(openGallery);
 
-        return new ScrollViewer
+        var pageScroll = new ScrollViewer
         {
             Content = root,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
             FlowDirection = FlowDirection.RightToLeft
         };
+        pageScroll.SizeChanged += (_, e) =>
+        {
+            var viewportWidth = Math.Max(700, e.NewSize.Width - 24);
+            root.Width = viewportWidth;
+            galleryLayout.Width = Math.Max(620, viewportWidth - 64);
+        };
+        return pageScroll;
     }
 
     private (int Width, int Height) GetPrimaryDisplayResolution()
@@ -797,7 +851,8 @@ public sealed partial class MainWindow
                 async Task RenderOfficialMonths()
                 {
                     officialMonths.Children.Clear();
-                    var entries = await _occasionSource.GetYearAsync(_selected.Year);
+                    var entries = (await _occasionSource.GetYearAsync(_selected.Year))
+                        .Where(IsOccasionVisible).ToList();
                     var personalEntries = await _repository.GetSpecialOccasionsAsync();
                     var yearStart = new PersianDate(_selected.Year, 1, 1).ToDateOnly();
                     var gregorianYear = yearStart.Year;
@@ -834,15 +889,10 @@ public sealed partial class MainWindow
                             .ThenBy(x => x.Title)
                             .ToList();
                         var monthBody = new StackPanel { Spacing = 7, Padding = new Thickness(12) };
-                        if (monthEntries.Count == 0)
-                        {
-                            monthBody.Children.Add(new TextBlock
-                            {
-                                Text = "برای این ماه مناسبتی ثبت نشده است.",
-                                Opacity = 0.55,
-                                Foreground = ThemeService.Brush(_theme.SecondaryText)
-                            });
-                        }
+                        // Build one chronological timeline for all occasion sources.
+                        // Priority keeps official events before historical and personal
+                        // events on the same day without sending personal cards to the end.
+                        var chronologicalRows = new List<(int Day, int Priority, UIElement Row)>();
                         foreach (var item in monthEntries)
                         {
                             var holiday = item.IsHoliday;
@@ -894,7 +944,47 @@ public sealed partial class MainWindow
                                 Grid.SetColumn(badge, 2);
                                 row.Children.Add(badge);
                             }
-                            monthBody.Children.Add(row);
+                            chronologicalRows.Add((item.Date.Day, 0, row));
+                        }
+
+                        // The Pahlavi historical feed is gated by the
+                        // account grant returned by Supabase. These are
+                        // nonofficial observances, never public holidays.
+                        if (_licensePahlaviOccasions && _settings.ShowImperialCalendar)
+                        {
+                            // Curated historical observances are not statutory holidays.
+                            var historicalItems = new (int Month, int Day, string Title)[]
+                            {
+                                (1, 1, "نوروز شاهنشاهی؛ آغاز سال جدید (یادبود تاریخی)"),
+                                (6, 25, "آغاز سلطنت محمدرضا پهلوی در ۱۳۲۰ (رویداد تاریخی)"),
+                                (8, 4, "زادروز محمدرضا پهلوی (مناسبت تاریخی)"),
+                                (8, 4, "تاج‌گذاری سال ۱۳۴۶ (مناسبت تاریخی)"),
+                                (10, 26, "خروج محمدرضا پهلوی از ایران در ۱۳۵۷ (رویداد تاریخی)"),
+                                (11, 6, "همه‌پرسی انقلاب سفید در ۱۳۴۱ (رویداد تاریخی)"),
+                                (12, 24, "تصویب تغییر مبدأ سال‌شماری شاهنشاهی در ۱۳۵۴ (رویداد تاریخی)")
+                            };
+                            foreach (var historical in historicalItems.Where(x => x.Month == month))
+                            {
+                                var historyRow = new StackPanel
+                                {
+                                    Orientation = Orientation.Horizontal,
+                                    Spacing = 10,
+                                    FlowDirection = FlowDirection.RightToLeft
+                                };
+                                historyRow.Children.Add(new TextBlock
+                                {
+                                    Text = ToPersianDigits(historical.Day.ToString()),
+                                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                                    Foreground = ThemeService.Brush(_theme.PrimaryText)
+                                });
+                                historyRow.Children.Add(new TextBlock
+                                {
+                                    Text = "✦ " + historical.Title,
+                                    TextWrapping = TextWrapping.Wrap,
+                                    Foreground = ThemeService.Brush(_theme.PrimaryText)
+                                });
+                                chronologicalRows.Add((historical.Day, 1, historyRow));
+                            }
                         }
 
                         // Personal annual occasions are merged into the same month
@@ -957,7 +1047,23 @@ public sealed partial class MainWindow
                                 Padding = new Thickness(5),
                                 Child = personalRow
                             };
-                            monthBody.Children.Add(personalCard);
+                            chronologicalRows.Add((personalItem.Date.Day, 2, personalCard));
+                        }
+
+                        if (chronologicalRows.Count == 0)
+                        {
+                            monthBody.Children.Add(new TextBlock
+                            {
+                                Text = "برای این ماه مناسبتی ثبت نشده است.",
+                                Opacity = 0.55,
+                                Foreground = ThemeService.Brush(_theme.SecondaryText)
+                            });
+                        }
+                        else
+                        {
+                            foreach (var entry in chronologicalRows
+                                .OrderBy(x => x.Day).ThenBy(x => x.Priority))
+                                monthBody.Children.Add(entry.Row);
                         }
 
                         // Render the zodiac art at 200% of its former size.
@@ -1101,8 +1207,11 @@ public sealed partial class MainWindow
                 var selectedDayOccasions = OccasionsPanel;
                 DetachDesktopElement(selectedDayOccasions);
                 page.Children.Add(zodiacBanner);
-                page.Children.Add(Card("مناسبت‌های رسمی سال " + ToPersianDigits(_selected.Year.ToString()),
-                    "مناسبت‌ها به تفکیک ماه مرتب شده‌اند. تعطیلات رسمی با رنگ قرمز مشخص می‌شوند.", officialMonths));
+                var imperialEnabled = _licensePahlaviOccasions && _settings.ShowImperialCalendar;
+                var displayYear = imperialEnabled ? _selected.Year + 1180 : _selected.Year;
+                page.Children.Add(Card("مناسبت‌های سال " + ToPersianDigits(displayYear.ToString()) +
+                        (imperialEnabled ? " شاهنشاهی" : " هجری خورشیدی"),
+                    "مناسبت‌ها به تفکیک ماه؛ مناسبت‌های تاریخی پهلوی تعطیل رسمی نیستند.", officialMonths));
                 page.Children.Add(refresh);
                 page.Children.Add(Card("مناسبت‌های روز انتخاب‌شده", "مناسبت‌های مربوط به روز انتخاب‌شده در تقویم.", selectedDayOccasions));
                 page.Children.Add(Card("ثبت مناسبت شخصی", "تولد، سالگرد و مناسبت‌های تکرارشونده با زمان و یادآورهای مستقل.", add));

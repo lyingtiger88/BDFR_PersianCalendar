@@ -43,8 +43,33 @@ private enum ZurvanOccasions {
         .init(id:"ghadir",title:"عید غدیر",calendar:.islamicCivil,month:12,day:18,holiday:true,mourning:false)
     ]
 
+    // Curated historical observances, NOT official public holidays.
+    // Historical observances only; not present-day public holidays.
+    static let pahlaviRecords: [ZurvanOccasion] = [
+        .init(id:"historical-pahlavi-newyear",title:"نوروز شاهنشاهی؛ آغاز سال جدید (یادبود تاریخی)",
+              calendar:.persian,month:1,day:1,holiday:false,mourning:false),
+        .init(id:"historical-pahlavi-accession",title:"آغاز سلطنت محمدرضا پهلوی در ۱۳۲۰ (رویداد تاریخی)",
+              calendar:.persian,month:6,day:25,holiday:false,mourning:false),
+        .init(id:"historical-pahlavi-birthday",title:"زادروز محمدرضا پهلوی (مناسبت تاریخی)",
+              calendar:.persian,month:8,day:4,holiday:false,mourning:false),
+        .init(id:"historical-pahlavi-coronation",title:"تاج‌گذاری سال ۱۳۴۶ (مناسبت تاریخی)",
+              calendar:.persian,month:8,day:4,holiday:false,mourning:false),
+        .init(id:"historical-pahlavi-departure",title:"خروج محمدرضا پهلوی از ایران در ۱۳۵۷ (رویداد تاریخی)",
+              calendar:.persian,month:10,day:26,holiday:false,mourning:false),
+        .init(id:"historical-pahlavi-referendum",title:"همه‌پرسی انقلاب سفید در ۱۳۴۱ (رویداد تاریخی)",
+              calendar:.persian,month:11,day:6,holiday:false,mourning:false),
+        .init(id:"historical-pahlavi-era",title:"تصویب تغییر مبدأ سال‌شماری شاهنشاهی در ۱۳۵۴ (رویداد تاریخی)",
+              calendar:.persian,month:12,day:24,holiday:false,mourning:false)
+    ]
+
+    static var visibleRecords: [ZurvanOccasion] {
+        let allowed = ZurvanIOSLicense.hasOnlinePahlaviAccess
+        let selected = UserDefaults.standard.bool(forKey:"zurvan.occasion.pahlavi.enabled")
+        return allowed && selected ? records + pahlaviRecords : records
+    }
+
     static func forDate(_ date: Date) -> [ZurvanOccasion] {
-        records.filter { item in
+        visibleRecords.filter { item in
             let components = Calendar(identifier: item.calendar)
                 .dateComponents([.month, .day], from: date)
             return components.month == item.month && components.day == item.day
@@ -58,6 +83,9 @@ private enum ZurvanOccasions {
 }
 
 struct ZurvanCalendarView: View {
+    @AppStorage("zurvan.occasion.pahlavi.enabled") private var historicalCalendarEnabled = false
+    @AppStorage("zurvan.occasion.pahlavi.year.enabled") private var imperialYearEnabled = false
+    @AppStorage("zurvan.online.pahlavi.granted") private var featureGrantChanged = false
     @State private var monthOffset = 0
     @State private var selectedDate: Date?
     private let persian = Calendar(identifier: .persian)
@@ -81,8 +109,13 @@ struct ZurvanCalendarView: View {
         let formatter = DateFormatter()
         formatter.calendar = persian
         formatter.locale = Locale(identifier:"fa_IR")
-        formatter.dateFormat = "LLLL yyyy"
-        return formatter.string(from: monthStart)
+        formatter.dateFormat = "LLLL"
+        let month = formatter.string(from: monthStart)
+        let solarYear = persian.component(.year, from: monthStart)
+        if imperialYearEnabled && featureGrantChanged && ZurvanIOSLicense.hasOnlinePahlaviAccess {
+            return month + " " + String(solarYear + 1180) + " شاهنشاهی"
+        }
+        return month + " " + String(solarYear)
     }
     var body: some View {
         ScrollView {
@@ -127,6 +160,10 @@ struct ZurvanCalendarView: View {
                         }.buttonStyle(.plain)
                     }
                 }
+                if imperialYearEnabled && ZurvanIOSLicense.hasOnlinePahlaviAccess {
+                    Text("معادل هجری خورشیدی: \(persian.component(.year, from:monthStart))")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
                 Text("مناسبت‌های رسمی و علامت‌گذاری ایام سوگواری")
                     .font(.footnote).foregroundStyle(.secondary)
                 Text("تاریخ مناسبت‌های قمری با تقویم محاسباتی است و ممکن است با اعلام رسمی رؤیت هلال یک روز تفاوت داشته باشد.")
@@ -163,6 +200,10 @@ private struct SelectedZurvanDate: Identifiable {
 }
 
 struct ZurvanOccasionsView: View {
+    @State private var verifiedImperialGrant = false
+    @AppStorage("zurvan.occasion.pahlavi.enabled") private var historicalCalendarEnabled = false
+    @AppStorage("zurvan.occasion.pahlavi.year.enabled") private var imperialYearEnabled = false
+    @AppStorage("zurvan.online.pahlavi.granted") private var featureGrantChanged = false
     @AppStorage("zurvan.zodiac.theme") private var zodiacTheme = "cosmic"
     private let zodiacStyles: [(String, String, String, [Color])] = [
         ("cosmic", "کیهانی کلاسیک", "sparkles", [Color(red:0.08,green:0.06,blue:0.22), Color(red:0.22,green:0.12,blue:0.48)]),
@@ -197,9 +238,16 @@ struct ZurvanOccasionsView: View {
                 .background(LinearGradient(colors: zodiacStyles.first(where: { $0.0 == zodiacTheme })?.3 ?? zodiacStyles[0].3, startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 20))
                 .overlay(RoundedRectangle(cornerRadius: 20).stroke(.white.opacity(0.18), lineWidth: 1))
 
+                if verifiedImperialGrant &&
+                    featureGrantChanged && ZurvanIOSLicense.hasOnlinePahlaviAccess {
+                    Toggle("نمایش سال شاهنشاهی (پهلوی)", isOn:$imperialYearEnabled)
+                    Toggle("مناسبت‌های تاریخی دوره پهلوی", isOn:$historicalCalendarEnabled)
+                    Text("مناسبت‌های تاریخی غیررسمی؛ سال شاهنشاهی برابر سال شمسی + ۱۱۸۰ است.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
                 VStack(alignment: .leading, spacing: 8) {
                     Text("مناسبت‌های رسمی ثابت").font(.headline)
-                    ForEach(ZurvanOccasions.records) { item in
+                    ForEach(ZurvanOccasions.visibleRecords) { item in
                         HStack {
                             VStack(alignment:.leading) {
                                 Text(item.title).foregroundStyle(item.holiday ? Color.red : Color.primary)
@@ -219,5 +267,9 @@ struct ZurvanOccasionsView: View {
         }
         .background { ZurvanBackgroundView() }
         .navigationTitle("مناسبت‌ها")
+        .task {
+            verifiedImperialGrant = false
+            verifiedImperialGrant = await ZurvanIOSLicense.refreshPahlaviGrant()
+        }
     }
 }

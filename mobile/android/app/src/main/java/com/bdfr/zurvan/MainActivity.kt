@@ -137,6 +137,12 @@ private fun ZurvanMobileShell(
     val entitlement = remember(licenseRevision) { ZurvanTrialPolicy.evaluate(context) }
     val licensed = entitlement.canWrite
     LaunchedEffect(Unit) {
+        if (BuildConfig.ENFORCE_ONLINE_MOBILE_TRIAL) {
+            ZurvanAndroidOnlineLicense.refresh(context)
+            licenseRevision++
+        }
+    }
+    LaunchedEffect(Unit) {
         while (true) {
             kotlinx.coroutines.delay(60_000L)
             licenseRevision++
@@ -336,12 +342,83 @@ private fun ZurvanMobileShell(
 }
 
 @Composable
+private fun ZurvanOnlineAccountSection(context: Context, onActivated: () -> Unit) {
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var referralCode by remember { mutableStateOf("") }
+    var registering by remember { mutableStateOf(false) }
+    var busy by remember { mutableStateOf(false) }
+    var status by remember { mutableStateOf("") }
+    val scope = rememberCoroutineScope()
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("حساب زروان و دوره رایگان ۴۵روزه", style = MaterialTheme.typography.titleMedium)
+        Text("پس از تأیید ایمیل، دوره رایگان فقط یک‌بار برای هر دستگاه واجد شرایط از سرور صادر می‌شود.",
+            style = MaterialTheme.typography.bodySmall)
+        OutlinedTextField(value = email, onValueChange = { email = it.trim().take(254) },
+            label = { Text("ایمیل حساب") }, modifier = Modifier.fillMaxWidth(),
+            singleLine = true)
+        OutlinedTextField(value = password, onValueChange = { password = it.take(256) },
+            label = { Text("رمز ورود") }, modifier = Modifier.fillMaxWidth(),
+            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation())
+        if (registering) {
+            OutlinedTextField(
+                value = referralCode,
+                onValueChange = { referralCode = it.uppercase(java.util.Locale.ROOT).take(5) },
+                label = { Text("شناسه معرف (اختیاری)") },
+                supportingText = { Text("از معرف بگیر و هنگام ساخت حساب وارد کن؛ لینک لازم نیست.") },
+                modifier = Modifier.fillMaxWidth(), singleLine = true
+            )
+        }
+        Button(enabled = !busy && email.contains("@") && password.length >= 8, onClick = {
+            busy = true
+            scope.launch {
+                try {
+                    if (registering) {
+                        status = ZurvanAndroidOnlineLicense.signUpAccount(email, password, referralCode)
+                        registering = false
+                    } else {
+                        val allowed = ZurvanAndroidOnlineLicense.signInAndActivate(context, email, password)
+                        status = if (allowed) "مجوز زروان فعال است." else
+                            "حساب تأیید شد، اما مجوز ویرایش فعال نیست."
+                        onActivated()
+                    }
+                    password = ""
+                } catch (error: Exception) {
+                    status = error.message ?: "ارتباط با سرور فعال‌سازی ممکن نشد."
+                } finally { busy = false }
+            }
+        }) { Text(if (busy) "در حال بررسی..." else if (registering) "ثبت‌نام با شناسه معرف" else "ورود و فعال‌سازی خودکار") }
+        TextButton(enabled = !busy, onClick = { registering = !registering }) {
+            Text(if (registering) "حساب دارم؛ ورود" else "ساخت حساب جدید")
+        }
+        if (status.isNotBlank()) Text(status, style = MaterialTheme.typography.bodySmall)
+    }
+}
+
+@Composable
 private fun ZurvanActivationScreen(modifier: Modifier, onActivated: () -> Unit) {
     val context = LocalContext.current
+    var showAchievements by remember { mutableStateOf(false) }
+    if (showAchievements) {
+        Column(modifier.fillMaxSize().padding(16.dp)) {
+            TextButton(onClick = { showAchievements = false }) { Text("بازگشت به فعال‌سازی") }
+            Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+                ZurvanUserProgressPanel()
+            }
+        }
+        return
+    }
     var entered by remember { mutableStateOf("") }
     var message by remember { mutableStateOf("کد سخت‌افزاری را برای دریافت لایسنس ارائه دهید.") }
     Column(modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text("فعال‌سازی زروان", style = MaterialTheme.typography.headlineSmall)
+        ZurvanOnlineAccountSection(context, onActivated)
+        if (ZurvanAndroidOnlineLicense.hasLinkedOnlineAccount(context)) {
+            TextButton(onClick = { showAchievements = true }) {
+                Text("🏅 مشاهده نشان‌ها، امتیاز و دعوت‌های من")
+            }
+        }
+        HorizontalDivider()
         val hardwareCode = remember { ZurvanActivation.deviceCode(context) }
         Text("کد دستگاه: " + hardwareCode)
         TextButton(onClick = {
@@ -456,7 +533,8 @@ private fun ZurvanDestination(
                     CompanionScreen(viewModel = appViewModel, modifier = Modifier.fillMaxSize())
                 ZurvanTab.Settings ->
                     if (!licensed) ZurvanActivationScreen(Modifier.fillMaxSize(), onActivated)
-                    else SettingsScreen(viewModel = appViewModel, modifier = Modifier.fillMaxSize())
+                    else SettingsScreen(viewModel = appViewModel, modifier = Modifier.fillMaxSize(),
+                        onActivated = onActivated)
             }
         }
     }
@@ -614,12 +692,14 @@ internal fun CalendarMonthPage(
                     }
                     Box {
                         TextButton(onClick = { yearsMenu = true }) {
-                            Text(toPersianDigits(year.toString()) + " ▾", fontWeight = FontWeight.Bold)
+                            Text(toPersianDigits((if (occasionVisibility.imperialYear) year + 1180 else year).toString()) +
+                                (if (occasionVisibility.imperialYear) " شاهنشاهی ▾" else " ▾"),
+                                fontWeight = FontWeight.Bold)
                         }
                         DropdownMenu(expanded = yearsMenu, onDismissRequest = { yearsMenu = false }) {
                             ((year - 20)..(year + 20)).forEach { value ->
                                 DropdownMenuItem(
-                                    text = { Text(toPersianDigits(value.toString())) },
+                                    text = { Text(toPersianDigits((if (occasionVisibility.imperialYear) value + 1180 else value).toString())) },
                                     onClick = { year = value; yearsMenu = false }
                                 )
                             }
@@ -641,12 +721,10 @@ internal fun CalendarMonthPage(
                             .typography
                             .labelMedium
                 )
-                if (occasionVisibility.pahlavi) {
-                    Text(
-                        "سال شاهنشاهی: " + toPersianDigits((year + 1180).toString()),
+                if (occasionVisibility.imperialYear) {
+                    Text("معادل هجری خورشیدی: " + toPersianDigits(year.toString()),
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
 
@@ -2613,7 +2691,8 @@ private fun CompanionScreen(
 @Composable
 private fun SettingsScreen(
     viewModel: ZurvanViewModel,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onActivated: () -> Unit = {}
 ) {
     val preferences by viewModel
         .uiPreferences
@@ -2637,7 +2716,10 @@ private fun SettingsScreen(
     val setWeekdayColor = ZurvanThemes.setWeekdayColor.current
     val context = LocalContext.current
     val occasionVisibility = ZurvanOccasionDisplay.current(context)
-    val privilegedOccasions = ZurvanActivation.hasPahlaviAccess(context)
+    // Hidden by default until the feature grant is verified for this settings visit.
+    var calendarGrantVerified by remember { mutableStateOf(false) }
+    val privilegedOccasions = calendarGrantVerified &&
+        ZurvanAndroidOnlineLicense.hasPahlaviAccess(context)
     val zodiacStyles = listOf(
         Triple("cosmic", "کیهانی کلاسیک", "✦"),
         Triple("neon", "فانتزی نورانی", "☄"),
@@ -2705,6 +2787,13 @@ private fun SettingsScreen(
     }
 
     var settingsCategory by rememberSaveable { mutableStateOf("home") }
+    LaunchedEffect(settingsCategory) {
+        calendarGrantVerified = false
+        if (settingsCategory == "calendar") {
+            calendarGrantVerified =
+                ZurvanAndroidOnlineLicense.refreshPahlaviGrant(context)
+        }
+    }
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
@@ -2720,9 +2809,23 @@ private fun SettingsScreen(
         item {
             if (settingsCategory == "home") {
                 Text("تنظیمات", style = MaterialTheme.typography.headlineSmall)
+                // Keep earned badges visible from the settings landing page,
+                // including when earlier APKs did not have a dedicated tab.
+                OutlinedCard(
+                    onClick = { settingsCategory = "progress" },
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)
+                ) {
+                    Column(Modifier.padding(14.dp)) {
+                        Text("🏅 نشان‌ها و امتیازهای من", fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.titleMedium)
+                        Text("XP، سطح، Badge، تعداد دعوت‌ها و جوایز Premium Silver",
+                            style = MaterialTheme.typography.bodySmall)
+                    }
+                }
                 listOf(
                     Triple("appearance", "رابط کاربری", "تم، رنگ، تصویر و چیدمان"),
                     Triple("calendar", "تقویم و مناسبت‌ها", "چیدمان تاریخ و به‌روزرسانی"),
+                    Triple("progress", "امتیاز و نشان‌های من", "سطح، XP، نشان‌های کسب‌شده و رتبه‌بندی"),
                     Triple("alerts", "صدا، اعلان‌ها و اوقات شرعی", "اذان و اعلان‌های زمانی"),
                     Triple("language", "زبان و منطقه", "زبان برنامه"),
                     Triple("security", "امنیت و لایسنس", "قفل و فعال‌سازی"),
@@ -2899,6 +3002,11 @@ private fun SettingsScreen(
                 }
             }
         }
+        if (settingsCategory == "progress") item {
+            SettingsCard(title = "نشان‌ها، امتیاز و رتبه‌بندی") {
+                ZurvanUserProgressPanel()
+            }
+        }
         if (settingsCategory == "calendar") item {
             SettingsCard(title = "نمایش مناسبت‌ها") {
                 Text("انتخاب کنید کدام گروه مناسبت‌ها روی تقویم و در جزئیات روز نمایش داده شوند.")
@@ -2919,21 +3027,34 @@ private fun SettingsScreen(
                                 onCheckedChange = { ZurvanOccasionDisplay.set(context, key, it) })
                         }
                     }
-                    if (privilegedOccasions) {
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) {
-                                Text("مناسبت‌های تقویم شاهنشاهی (پهلوی)")
-                                Text("رویدادهای تاریخی غیررسمی؛ سال شاهنشاهی = سال شمسی + ۱۱۸۰",
-                                    style = MaterialTheme.typography.bodySmall)
-                            }
-                            Checkbox(checked = occasionVisibility.pahlavi,
-                                onCheckedChange = { ZurvanOccasionDisplay.set(context, "pahlavi", it) })
-                        }
-                    }
                 }
                 Text("این تنظیم تاریخ‌ها و مناسبت‌های ذخیره‌شده را حذف نمی‌کند.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        if (settingsCategory == "calendar" && privilegedOccasions) item {
+            SettingsCard(title = "تقویم شاهنشاهی (پهلوی)") {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("نمایش سال شاهنشاهی")
+                        Text("۱۴۰۵ هجری خورشیدی = ۲۵۸۵ شاهنشاهی. تاریخ ذخیره‌شده تغییر نمی‌کند.",
+                            style = MaterialTheme.typography.bodySmall)
+                    }
+                    Switch(enabled = privilegedOccasions,
+                        checked = privilegedOccasions && occasionVisibility.imperialYear,
+                        onCheckedChange = { ZurvanOccasionDisplay.set(context, "imperial_year", it) })
+                }
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("نمایش مناسبت‌های تاریخی دوره پهلوی")
+                        Text("این مناسبت‌ها تعطیل رسمی محسوب نمی‌شوند.",
+                            style = MaterialTheme.typography.bodySmall)
+                    }
+                    Switch(enabled = privilegedOccasions,
+                        checked = privilegedOccasions && occasionVisibility.pahlavi,
+                        onCheckedChange = { ZurvanOccasionDisplay.set(context, "pahlavi", it) })
+                }
             }
         }
         if (settingsCategory == "calendar") item {
@@ -3022,6 +3143,11 @@ private fun SettingsScreen(
         }
 
         if (settingsCategory == "security") item {
+            SettingsCard(title = "حساب زروان و فعال‌سازی آنلاین") {
+                ZurvanOnlineAccountSection(context, onActivated)
+            }
+        }
+        if (settingsCategory == "security") item {
             SettingsCard(title = "وضعیت لایسنس زروان") {
                 var activatedCode by remember {
                     mutableStateOf(
@@ -3043,7 +3169,7 @@ private fun SettingsScreen(
                     }
                     Text("ثبت شده به نام : $ownerName")
                     Text("لایسنس فعال است.", style = MaterialTheme.typography.bodySmall)
-                    if (ZurvanActivation.hasPahlaviAccess(context)) {
+                    if (ZurvanAndroidOnlineLicense.hasPahlaviAccess(context)) {
                         Text("مجوز قابلیت ویژه مناسبت‌های تاریخی و تقویم شاهنشاهی فعال است.",
                             style = MaterialTheme.typography.bodySmall)
                     }

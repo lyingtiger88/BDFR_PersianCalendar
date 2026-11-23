@@ -30,12 +30,26 @@ button.secondary{background:#344b65}button.reject{background:#a93c4e}button:disa
 <div class="grid">
 <div><label for="email">آدرس ایمیل</label><input type="email" id="email" autocomplete="email" required></div>
 <div><label for="password">رمز عبور (حداقل ۸ نویسه)</label><input type="password" id="password" minlength="8" autocomplete="current-password" required></div>
-</div><div class="actions"><button id="signup">ثبت‌نام</button><button id="login" class="secondary">ورود</button></div>
+</div>
+<div style="margin-top:12px"><label for="referralCode">شناسه معرف (اختیاری، فقط هنگام ثبت‌نام)</label>
+<input id="referralCode" maxlength="5" placeholder="مثلاً K7M2Q" autocomplete="off">
+<p class="small">شناسه معرف را از کسی که زروان را به شما معرفی کرده دریافت کنید. این فیلد لینک نیست.</p></div>
+<div class="actions"><button id="signup">ثبت‌نام</button><button id="login" class="secondary">ورود</button></div>
 </section>
 <section id="account" class="hidden">
 <div class="card"><h2>حساب شما</h2><div id="identity"></div>
-<p>در اولین ورود تأییدشده، دوره آزمایشی ۴۵ روزه شروع می‌شود. ثبت درخواست پرداخت به معنی تأیید پرداخت یا فعال شدن اشتراک نیست.</p>
+<p>دوره آزمایشی ۴۵ روزه پس از ورود به برنامه ویندوز و تأیید شناسه دستگاه، فقط یک‌بار برای هر دستگاه فعال می‌شود. ثبت درخواست پرداخت به معنی تأیید پرداخت یا فعال شدن اشتراک نیست.</p>
 </div>
+<div class="card">
+<h2>دعوت دوستان با شناسه معرف</h2>
+<p>شناسه اختصاصی تو: <strong id="myReferralCode" style="font-size:22px;letter-spacing:2px;direction:ltr">—</strong></p>
+<button type="button" class="secondary" id="copyReferralCode">کپی شناسه معرف</button>
+<p id="referralProgress" class="small">دریافت وضعیت دعوت‌ها...</p>
+<p class="small">هر دعوت موفق ۱۰۰ XP می‌دهد. پس از هر ۱۵ دعوت تأییدشده، می‌توانی یک سال Premium Silver بگیری.</p>
+<button id="claimReferralSilver" type="button" disabled>دریافت لایسنس یک‌ساله Premium Silver</button>
+<button id="reloadReferrals" type="button" class="secondary">به‌روزرسانی دعوت‌ها</button>
+</div>
+
 <div class="card">
 <h2>۱. واریز به حساب مقصد</h2>
 <div class="bank">
@@ -66,6 +80,18 @@ button.secondary{background:#344b65}button.reject{background:#a93c4e}button:disa
 </div>
 <div class="actions"><button id="saveBank">ثبت حساب مقصد</button><button id="reloadAdmin" class="secondary">به‌روزرسانی درخواست‌ها</button></div>
 <div id="adminRequests"></div>
+<hr>
+<h3>مجوز تقویم پهلوی کاربران</h3>
+<p class="small">این مجوز مستقل از اشتراک سالانه است و فقط مدیر ارشد می‌تواند آن را صادر یا لغو کند.</p>
+<div class="grid">
+<div><label for="featureAccount">شناسه UUID حساب کاربر</label><input id="featureAccount" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" spellcheck="false"></div>
+<div><label for="featureEnabled">دسترسی به مناسبت‌های پهلوی</label><select id="featureEnabled"><option value="true">فعال</option><option value="false">غیرفعال</option></select></div>
+</div>
+<div class="actions"><button id="savePahlavi" class="secondary">ثبت مجوز ویژه</button></div>
+<div id="adminFeatures"></div>
+<h4>لیست کاربران</h4>
+<div class="actions"><button id="reloadFeatureUsers" class="secondary">بارگذاری کاربران</button><button id="nextFeatureUsers" class="secondary">صفحه بعد</button></div>
+<div id="featureUsers"></div>
 </section>
 <div id="message" class="status" role="status" aria-live="polite">برای شروع وارد حساب شوید.</div>
 <p class="small">رسیدها خصوصی هستند و فقط مدیر مجاز لینک مشاهده موقت دریافت می‌کند. قبل از تأیید، واریز را با تراکنش بانکی واقعی تطبیق دهید.</p>
@@ -75,6 +101,7 @@ button.secondary{background:#344b65}button.reject{background:#a93c4e}button:disa
 const BASE="https://yztithydgdvydaktuxlw.supabase.co";
 const KEY="sb_publishable_UAKFYbxgWOCVRDDdv_0JLg_oIIiubmT";
 const endpoint=BASE+"/functions/v1/zurvan-manual-payment";
+const progressEndpoint=BASE+"/functions/v1/zurvan-user-progress";
 const el=id=>document.getElementById(id);
 let session=null,merchantReady=false,admin=false;
 const status=(message)=>el("message").textContent=message;
@@ -115,6 +142,39 @@ async function api(action,body={}){
  if(!response.ok)throw Error(friendly(data.error||"unknown"));
  return data;
 }
+async function checkReferralCode(code){
+  if(!code)return true;
+  if(!/^[A-Z0-9]{5}$/.test(code))return false;
+  const response=await fetch(BASE+"/functions/v1/zurvan-referral-validate",{
+    method:"POST",headers:{"apikey":KEY,"content-type":"application/json"},
+    body:JSON.stringify({code})
+  });
+  if(!response.ok)throw Error("بررسی شناسه معرف ممکن نیست.");
+  const data=await response.json();
+  return data.valid===true;
+}
+async function referralProgress(action="status"){
+ const res=await fetch(progressEndpoint,{method:"POST",
+   headers:{"apikey":KEY,"authorization":"Bearer "+await token(),
+     "content-type":"application/json"},
+   body:JSON.stringify({action})});
+ const data=await res.json().catch(()=>({}));
+ if(!res.ok)throw Error(data.error||"امکان دریافت دعوت‌ها نیست.");
+ return data;
+}
+async function loadReferralSummary(action="status"){
+ const data=await referralProgress(action),r=data.referral||{};
+ el("myReferralCode").textContent=r.identifier||"—";
+ el("referralProgress").textContent=
+   "دعوت‌های موفق: "+(r.successful||0)+
+   " | در انتظار تأیید: "+(r.pending||0)+
+   " | تا پاداش بعدی: "+(r.remaining_to_next??15)+
+   " | پاداش‌های دریافتی: "+(r.earned_rewards||0)+
+   (r.current_silver?" | Premium Silver تا "+new Date(r.current_silver.expires_at).toLocaleDateString("fa-IR"):"");
+ el("claimReferralSilver").disabled=!r.reward_available;
+ if(action==="claim_silver" && data.claim?.claimed)
+   status("لایسنس یک‌ساله Premium Silver با موفقیت صادر شد.");
+}
 async function signedIn(){
  el("auth").classList.add("hidden");el("account").classList.remove("hidden");el("logout").classList.remove("hidden");
  // The payment service verifies the signed-in user's JWT on each request.
@@ -129,6 +189,7 @@ async function signedIn(){
    el("merchantName").textContent=config.merchant_name||"در انتظار تنظیم مدیر";
    el("submit").disabled=!merchantReady;
    await loadMine();
+   loadReferralSummary().catch(e=>status(e.message));
    await loadAdmin();
    status("حساب آماده است. پس از واریز، تصویر رسید را ارسال کنید.");
  }catch(err){status(err.message);el("submit").disabled=true;}
@@ -149,6 +210,43 @@ async function loadMine(){
 }
 function addButton(parent,label,handler,css="secondary"){
  const b=document.createElement("button");b.type="button";b.textContent=label;b.className=css;b.addEventListener("click",handler);parent.append(b);
+}
+let featureUsersPage=1;
+async function loadFeatureUsers(page=1){
+  const data=await api("admin_list_users",{page});
+  featureUsersPage=page;
+  const host=el("featureUsers");host.replaceChildren();
+  for(const user of data.users){
+    const item=document.createElement("div");item.className="entry";
+    const name=document.createElement("span");
+    name.textContent=(user.email||"بدون ایمیل")+" | "+(user.pahlavi_occasions?"پهلوی فعال":"پهلوی غیرفعال");
+    item.append(name);
+    addButton(item,"انتخاب",()=>{
+      el("featureAccount").value=user.account_id;
+      el("featureEnabled").value=String(user.pahlavi_occasions);
+    });
+    host.append(item);
+  }
+  el("nextFeatureUsers").disabled=!data.next_page;
+}
+async function loadPahlaviGrants(){
+  try{
+    const data=await api("admin_user_features");
+    const host=el("adminFeatures");host.replaceChildren();
+    const title=document.createElement("p");
+    title.textContent="مجوزهای ثبت‌شده: "+data.features.length;host.append(title);
+    for(const item of data.features){
+      const entry=document.createElement("div");entry.className="entry";
+      const t=document.createElement("span");
+      t.textContent=item.account_id+" | "+(item.pahlavi_occasions?"فعال":"غیرفعال");
+      entry.append(t);
+      addButton(entry,"انتخاب کاربر",()=>{
+        el("featureAccount").value=item.account_id;
+        el("featureEnabled").value=String(item.pahlavi_occasions);
+      });
+      host.append(entry);
+    }
+  }catch(e){status(e.message);}
 }
 async function loadAdmin(){
  try{
@@ -183,11 +281,51 @@ async function loadAdmin(){
    }
  }catch(e){if(admin)status(e.message);}
 }
+el("reloadFeatureUsers").addEventListener("click",async()=>{
+  try{await loadFeatureUsers(1);}catch(e){status(e.message);}
+});
+el("nextFeatureUsers").addEventListener("click",async()=>{
+  try{await loadFeatureUsers(featureUsersPage+1);}catch(e){status(e.message);}
+});
+el("savePahlavi").addEventListener("click",async()=>{
+  const account_id=el("featureAccount").value.trim();
+  if(!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(account_id)){
+    status("شناسه UUID معتبر وارد کنید.");return;
+  }
+  const enabled=el("featureEnabled").value==="true";
+  if(!confirm("مجوز تقویم پهلوی برای این حساب "+(enabled?"فعال":"لغو")+" شود؟"))return;
+  try{
+    await api("admin_set_pahlavi",{account_id,enabled});
+    // License feature tooling may not be deployed yet; payment review
+    // must remain functional and independent of feature-list failures.
+    loadPahlaviGrants().catch(error=>status(error.message));
+    loadFeatureUsers(1).catch(error=>status(error.message));
+    status("مجوز تقویم پهلوی ذخیره شد.");
+  }catch(e){status(e.message);}
+});
+el("copyReferralCode").addEventListener("click",async()=>{
+ const code=el("myReferralCode").textContent;
+ if(code && code!=="—"){
+   try{await navigator.clipboard.writeText(code);status("شناسه معرف کپی شد.");}
+   catch{status("شناسه را انتخاب و کپی کنید.");}
+ }
+});
+el("claimReferralSilver").addEventListener("click",async()=>{
+ if(!confirm("برای هر ۱۵ دعوت موفق، یک سال Premium Silver صادر شود؟"))return;
+ try{await loadReferralSummary("claim_silver");}
+ catch(e){status(e.message);}
+});
+el("reloadReferrals").addEventListener("click",()=>loadReferralSummary().catch(e=>status(e.message)));
 el("signup").addEventListener("click",async()=>{
  try{
  const email=el("email").value.trim(),password=el("password").value;
  if(!email||password.length<8)throw Error("ایمیل و رمز عبور حداقل ۸ نویسه را وارد کنید.");
- const data=await authRequest("signup",{email,password});
+ const referral=el("referralCode").value.trim().toUpperCase();
+ if(referral && !(await checkReferralCode(referral)))
+   throw Error("شناسه معرف معتبر نیست. شناسه را بررسی کنید.");
+ const payload={email,password};
+ if(referral)payload.data={zurvan_referral_code:referral};
+ const data=await authRequest("signup",payload);
  if(data.access_token){setSession(data);await signedIn();}
  else status("ثبت‌نام انجام شد. ایمیل خود را تأیید کنید و سپس وارد شوید.");
  }catch(e){status(e.message);}

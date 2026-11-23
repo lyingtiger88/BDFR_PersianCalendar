@@ -108,6 +108,12 @@ struct ContentView: View {
             }
             .tag(ZurvanTab.settings)
         }
+        .task {
+            // Refresh account feature grants even if a legacy signed offline
+            // license already grants app access. Keep offline licenses valid.
+            let online = await ZurvanIOSLicense.refreshOnlineEntitlement()
+            if online { licensed = true }
+        }
         .onChange(of: selection) { _, newValue in
             if !licensed && newValue != .calendar && newValue != .settings { selection = .calendar }
         }
@@ -126,10 +132,69 @@ private struct ZurvanLockedView: View {
 private struct ZurvanActivationView: View {
     let onActivated: () -> Void
     @State private var activationCode = ""
+    @State private var email = ""
+    @State private var password = ""
+    @State private var referralIdentifier = ""
+    @State private var registerMode = false
+    @State private var busy = false
     @State private var status = "کد دستگاه را برای دریافت لایسنس ارائه کنید."
 
     var body: some View {
         Form {
+            Section("ورود به حساب زروان و دوره آزمایشی") {
+                Text("پس از تأیید ایمیل، دوره رایگان ۴۵روزه تنها یک‌بار برای این گوشی صادر می‌شود. بررسی دستگاه از طریق Apple DeviceCheck است.")
+                    .font(.footnote)
+                TextField("ایمیل", text: $email)
+                    .textContentType(.emailAddress)
+                    .textInputAutocapitalization(.never)
+                    .keyboardType(.emailAddress)
+                SecureField("رمز عبور", text: $password)
+                    .textContentType(.password)
+                if registerMode {
+                    TextField("شناسه معرف (اختیاری)", text:$referralIdentifier)
+                        .textInputAutocapitalization(.characters)
+                        .autocorrectionDisabled()
+                        .onChange(of:referralIdentifier) { _, value in
+                            referralIdentifier=String(value.uppercased().prefix(5))
+                        }
+                    Text("شناسه معرف را از دوستت بگیر و هنگام ثبت‌نام وارد کن؛ لینک لازم نیست.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
+                Button(registerMode ? "ثبت‌نام با شناسه معرف" : "ورود و بررسی خودکار لایسنس") {
+                    busy = true
+                    Task {
+                        defer { busy = false }
+                        do {
+                            if registerMode {
+                                try await ZurvanIOSLicense.signUpAccount(
+                                    email:email,password:password,
+                                    referralIdentifier:referralIdentifier)
+                                status = "ثبت‌نام انجام شد. ایمیل را تأیید کن، سپس وارد شو."
+                                registerMode = false
+                                password = ""
+                            } else if try await ZurvanIOSLicense.signInAndActivate(email: email, password: password) {
+                                status = "مجوز فعال شد."
+                                password = ""
+                                onActivated()
+                            } else {
+                                status = "حساب معتبر است ولی مجوز ویرایش فعال نیست."
+                            }
+                        } catch {
+                            status = error.localizedDescription
+                        }
+                    }
+                }
+                .disabled(busy || email.isEmpty || password.count < 8)
+                Button(registerMode ? "حساب دارم؛ ورود" : "ساخت حساب جدید") {
+                    registerMode.toggle()
+                }.disabled(busy)
+                Text(status).font(.footnote)
+            }
+            Section("نشان‌ها و امتیازهای حساب") {
+                NavigationLink("مشاهده XP و نشان‌های کسب‌شده") {
+                    ZurvanUserProgressView()
+                }
+            }
             Section("فعال‌سازی زروان") {
                 Text(ZurvanIOSLicense.deviceCode()).textSelection(.enabled)
                 Button("کپی کد دستگاه", systemImage: "doc.on.doc") {
@@ -475,6 +540,10 @@ private struct ZurvanCloudShellView: View {
 }
 
 private struct MobileSettingsView: View {
+    @AppStorage("zurvan.occasion.pahlavi.year.enabled") private var imperialYearEnabled = false
+    @AppStorage("zurvan.occasion.pahlavi.enabled") private var imperialOccasionsEnabled = false
+    @AppStorage("zurvan.online.pahlavi.granted") private var featureGrantChanged = false
+    @State private var verifiedImperialGrantForSettings = false
     @AppStorage("zurvan.appearance.theme") private var themeID = "windows-light"
     @AppStorage("zurvan.language") private var language = "fa"
     @AppStorage("zurvan.zodiac.theme") private var zodiacTheme = "cosmic"
@@ -508,6 +577,31 @@ private struct MobileSettingsView: View {
                 .padding()
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
+
+                NavigationLink {
+                    ZurvanUserProgressView()
+                } label: {
+                    Label("امتیاز و نشان‌های من", systemImage: "rosette")
+                }
+                .padding()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
+
+                // Hide the entire premium section unless the account grant
+                // is recently confirmed by the server; never show a locked teaser.
+                if verifiedImperialGrantForSettings &&
+                    featureGrantChanged && ZurvanIOSLicense.hasOnlinePahlaviAccess {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("تقویم شاهنشاهی (پهلوی)").font(.headline)
+                        Toggle("نمایش سال شاهنشاهی در تقویم", isOn: $imperialYearEnabled)
+                        Toggle("نمایش مناسبت‌های تاریخی دوره پهلوی", isOn: $imperialOccasionsEnabled)
+                        Text("مبدأ سال‌شماری = سال هجری خورشیدی + ۱۱۸۰؛ تاریخ‌های ذخیره‌شده تغییر نمی‌کنند. این رویدادها تعطیل رسمی نیستند.")
+                            .font(.footnote).foregroundStyle(.secondary)
+                    }
+                    .padding()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
+                }
 
                 VStack(alignment: .leading, spacing: 8) {
                     Text("تم ظاهری").font(.headline)
@@ -621,6 +715,11 @@ private struct MobileSettingsView: View {
             .padding()
         }
         .navigationTitle("تنظیمات")
+        .task {
+            verifiedImperialGrantForSettings = false
+            verifiedImperialGrantForSettings =
+                await ZurvanIOSLicense.refreshPahlaviGrant()
+        }
     }
 }
 

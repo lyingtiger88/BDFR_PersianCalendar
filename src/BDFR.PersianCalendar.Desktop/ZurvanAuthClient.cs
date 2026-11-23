@@ -1,4 +1,7 @@
 using System.Net.Http.Json;
+using System.Security.Cryptography;
+using System.Text;
+using System.Management;
 using System.Text.Json;
 using Windows.Security.Credentials;
 
@@ -97,12 +100,31 @@ internal sealed class ZurvanAuthClient
         Store(email.Trim(), reply.RootElement);
     }
 
-    internal async Task<bool> SignUpAsync(string email, string password)
+    internal async Task<bool> ValidateReferralIdentifierAsync(string code)
+    {
+        if (string.IsNullOrWhiteSpace(code)) return true;
+        code = code.Trim().ToUpperInvariant();
+        if (code.Length != 5 || code.Any(x => !(x is >= 'A' and <= 'Z' or >= '0' and <= '9')))
+            return false;
+        using var reply = await RequestAsync("/functions/v1/zurvan-referral-validate",
+            new { code });
+        return reply.RootElement.TryGetProperty("valid", out var valid) &&
+            valid.ValueKind == JsonValueKind.True;
+    }
+
+    internal async Task<bool> SignUpAsync(string email, string password,
+        string? referralCode = null)
     {
         if (string.IsNullOrWhiteSpace(email) || password.Length < 8)
             throw new ArgumentException("Use an email and password of at least 8 characters.");
+        var code = referralCode?.Trim().ToUpperInvariant() ?? "";
+        if (!await ValidateReferralIdentifierAsync(code))
+            throw new InvalidOperationException("شناسه معرف معتبر نیست.");
         using var reply = await RequestAsync("/auth/v1/signup",
-            new { email = email.Trim(), password });
+            string.IsNullOrWhiteSpace(code)
+                ? new { email = email.Trim(), password, data = (object?)null }
+                : new { email = email.Trim(), password,
+                    data = (object?)new { zurvan_referral_code = code } });
         if (!reply.RootElement.TryGetProperty("access_token", out _)) return false;
         Store(email.Trim(), reply.RootElement);
         return true;
@@ -131,7 +153,9 @@ internal sealed class ZurvanAuthClient
 
     internal sealed record LicenseStatus(
         string AccountState, string LicenseAccountState, int ActiveLicenses,
-        bool CanWrite, bool TrialAvailable, string Mode, string? ExpiresAt, int DaysRemaining);
+        bool CanWrite, bool TrialAvailable, string Mode, string? ExpiresAt, int DaysRemaining,
+        string? AccountUsername, string? SpecialRankCode, string? SpecialRankName, string? SpecialRankNameFa, string? SpecialRankBadgeKey,
+        bool PahlaviOccasions);
 
     private async Task<JsonDocument> LicenseFunctionAsync(string functionName, object body)
     {
@@ -159,6 +183,9 @@ internal sealed class ZurvanAuthClient
                         "license_account_inactive" => "حساب لایسنس فعال نیست.",
                         "email_not_verified" => "ابتدا ایمیل حساب زروان را تأیید کنید.",
                         "trial_unavailable" => "شروع دوره آزمایشی موقتاً ممکن نیست.",
+                        "device_trial_already_used" => "دوره رایگان این دستگاه قبلاً برای یک حساب فعال شده است. برای استفاده با حساب جدید، اشتراک تهیه کنید.",
+                        "device_identity_required" => "برای شروع دوره رایگان، شناسه دستگاه الزامی است.",
+                        "account_inactive" => "حساب شما غیرفعال است؛ با پشتیبانی تماس بگیرید.",
                         _ => detail
                     };
             }
@@ -168,12 +195,80 @@ internal sealed class ZurvanAuthClient
         return JsonDocument.Parse(raw);
     }
 
+    // Use only a validated motherboard serial for a NEW free trial.
+    // Do not fall back to BIOS/Windows installation identifiers: reinstalling
+    // Windows must not mint another free trial for the same motherboard.
+    // This is a deterrent, NOT cryptographic proof of physical hardware.
+    private static string GetDeviceTrialFingerprint()
+    {
+        var boardSerial = ReadHardwareSerial("Win32_BaseBoard", "SerialNumber");
+        if (boardSerial is null)
+            throw new InvalidOperationException(
+                "سریال معتبر مادربرد پیدا نشد؛ صدور دوره رایگان نیازمند بررسی دستگاه توسط پشتیبانی است.");
+
+        var manufacturer = ReadHardwareLabel("Win32_BaseBoard", "Manufacturer") ?? "UNKNOWN";
+        var product = ReadHardwareLabel("Win32_BaseBoard", "Product") ?? "UNKNOWN";
+        var identity = "motherboard:" + manufacturer + "|" + product + "|" + boardSerial;
+        return Convert.ToHexString(SHA256.HashData(
+            Encoding.UTF8.GetBytes("zurvan-free-trial-device-v1|" + identity)))
+            .ToLowerInvariant();
+    }
+
+    private static string? ReadHardwareLabel(string wmiClass, string property)
+    {
+        try
+        {
+            // Fixed internal WMI class/property names, not user-provided query text.
+            using var search = new ManagementObjectSearcher(
+                "SELECT " + property + " FROM " + wmiClass);
+            using var items = search.Get();
+            foreach (ManagementBaseObject item in items)
+            {
+                using (item)
+                {
+                    var raw = item[property]?.ToString()?.Trim();
+                    if (!string.IsNullOrWhiteSpace(raw))
+                        return raw.ToUpperInvariant();
+                }
+            }
+        }
+        catch (Exception) { /* WMI may be disabled or unavailable. */ }
+        return null;
+    }
+
+    private static string? ReadHardwareSerial(string wmiClass, string property)
+    {
+        var serial = ReadHardwareLabel(wmiClass, property);
+        if (serial is null || serial.Length < 6 || serial.Length > 128)
+            return null;
+        var compact = new string(serial.Where(char.IsLetterOrDigit).ToArray());
+        if (compact.Length < 6 || compact.All(c => c == compact[0]))
+            return null;
+        // Common placeholders and firmware defaults are not device identifiers.
+        string[] invalid = [
+            "TOBEFILLEDBYOEM", "DEFAULTSTRING", "SYSTEMSERIALNUMBER",
+            "BASEBOARDSERIALNUMBER", "SERIALNUMBER", "NOTAPPLICABLE",
+            "NOTSPECIFIED", "NOTAVAILABLE", "UNKNOWN", "NONE",
+            "OEM", "INVALID", "UNDEFINED"
+        ];
+        if (invalid.Any(x => compact == x || compact.Contains("TOBEFILLEDBYOEM")))
+            return null;
+        return serial;
+    }
+
     internal async Task<JsonDocument> StartTrialAsync()
-        => await LicenseFunctionAsync("zurvan-license-start-trial", new { });
+        => await LicenseFunctionAsync("zurvan-license-start-trial",
+            new { key_fingerprint = GetDeviceTrialFingerprint() });
 
     internal async Task<LicenseStatus> ReadLicenseStatusAsync()
     {
-        using var document = await LicenseFunctionAsync("zurvan-license-status", new { });
+        // Paid licenses can still be checked if Windows cannot expose a
+        // device identity; only issuance of a *new free trial* fails closed.
+        string? fingerprint;
+        try { fingerprint = GetDeviceTrialFingerprint(); }
+        catch { fingerprint = null; }
+        using var document = await LicenseFunctionAsync("zurvan-license-status",
+            new { key_fingerprint = fingerprint });
         var root = document.RootElement;
         string ReadString(string key, string fallback = "") =>
             root.TryGetProperty(key, out var value) && value.ValueKind == JsonValueKind.String
@@ -191,12 +286,35 @@ internal sealed class ZurvanAuthClient
                     string.Equals(product.GetString(), "zurvan", StringComparison.OrdinalIgnoreCase))
                     activeCount++;
         var expiryText = ReadString("expires_at");
+        var accountUsername = ReadString("account_username");
+        string? rankCode = null, rankName = null, rankNameFa = null, badgeKey = null;
+        if (root.TryGetProperty("special_rank", out var rank) && rank.ValueKind == JsonValueKind.Object)
+        {
+            string? ReadRankString(string key) =>
+                rank.TryGetProperty(key, out var value) && value.ValueKind == JsonValueKind.String
+                    ? value.GetString() : null;
+            rankCode = ReadRankString("code");
+            rankName = ReadRankString("display_name");
+            rankNameFa = ReadRankString("display_name_fa");
+            badgeKey = ReadRankString("badge_key");
+        }
+        var pahlaviGrant = root.TryGetProperty("features", out var featureObject)
+            && featureObject.ValueKind == JsonValueKind.Object
+            && featureObject.TryGetProperty("pahlavi_occasions", out var pahlaviValue)
+            && pahlaviValue.ValueKind == JsonValueKind.True;
         return new LicenseStatus(ReadString("account_state", "unknown"),
             ReadString("license_account_state", "unknown"), activeCount,
             ReadBool("can_write"), ReadBool("trial_available"),
             ReadString("mode", "unknown"), string.IsNullOrWhiteSpace(expiryText) ? null : expiryText,
-            ReadInt("days_remaining"));
+            ReadInt("days_remaining"), string.IsNullOrWhiteSpace(accountUsername) ? null : accountUsername,
+            rankCode, rankName, rankNameFa, badgeKey, pahlaviGrant);
     }
+
+    // User points and badges are always fetched from the trusted Supabase
+    // function. The device never supplies the awarded XP amount.
+    internal Task<JsonDocument> ReadUserProgressAsync(string action = "status", bool? visible = null)
+        => LicenseFunctionAsync("zurvan-user-progress",
+            visible.HasValue ? new { action, visible = visible.Value } : (object)new { action });
 
     internal async Task SignOutAsync()
     {
