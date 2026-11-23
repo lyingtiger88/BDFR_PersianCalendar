@@ -166,13 +166,13 @@ Deno.serve(async req => {
       const details=decoded?.requestDetails;
       if(details?.requestPackageName!==packageName ||
          details?.nonce!==expectedNonce ||
-         typeof details.timestampMillis!=="string" ||
+         !["string","number"].includes(typeof details.timestampMillis) ||
          Math.abs(Date.now()-Number(details.timestampMillis))>120000)
         return reply(403,{error:"invalid_play_integrity"});
       if(decoded?.appIntegrity?.appRecognitionVerdict!=="PLAY_RECOGNIZED" ||
          !decoded?.deviceIntegrity?.deviceRecognitionVerdict?.includes("MEETS_DEVICE_INTEGRITY"))
         return reply(403,{error:"untrusted_android_device"});
-      const recall=decoded?.deviceRecall?.values;
+      const recall=decoded?.deviceIntegrity?.deviceRecall?.values;
       if (typeof recall?.bitFirst!=="boolean")
         return reply(503,{error:"play_device_recall_not_enabled"});
       if (recall.bitFirst && !priorClaim)
