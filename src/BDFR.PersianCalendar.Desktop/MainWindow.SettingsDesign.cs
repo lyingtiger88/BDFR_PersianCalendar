@@ -1139,7 +1139,6 @@ public sealed partial class MainWindow
             _settings.ShowImperialCalendar = enabled;
             _settingsService.Save(_settings);
             BuildCalendar();
-            ShowDesktopModule("مناسبت‌ها");
         });
         imperialSwitch.IsEnabled = imperialAllowed;
         contents.Children.Add(SettingsOptionRow("تقویم شاهنشاهی (پهلوی)",
