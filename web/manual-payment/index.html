@@ -75,6 +75,9 @@ button.secondary{background:#344b65}button.reject{background:#a93c4e}button:disa
 </div>
 <div class="actions"><button id="savePahlavi" class="secondary">ثبت مجوز ویژه</button></div>
 <div id="adminFeatures"></div>
+<h4>لیست کاربران</h4>
+<div class="actions"><button id="reloadFeatureUsers" class="secondary">بارگذاری کاربران</button><button id="nextFeatureUsers" class="secondary">صفحه بعد</button></div>
+<div id="featureUsers"></div>
 </section>
 <div id="message" class="status" role="status" aria-live="polite">برای شروع وارد حساب شوید.</div>
 <p class="small">رسیدها خصوصی هستند و فقط مدیر مجاز لینک مشاهده موقت دریافت می‌کند. قبل از تأیید، واریز را با تراکنش بانکی واقعی تطبیق دهید.</p>
@@ -159,6 +162,24 @@ async function loadMine(){
 function addButton(parent,label,handler,css="secondary"){
  const b=document.createElement("button");b.type="button";b.textContent=label;b.className=css;b.addEventListener("click",handler);parent.append(b);
 }
+let featureUsersPage=1;
+async function loadFeatureUsers(page=1){
+  const data=await api("admin_list_users",{page});
+  featureUsersPage=page;
+  const host=el("featureUsers");host.replaceChildren();
+  for(const user of data.users){
+    const item=document.createElement("div");item.className="entry";
+    const name=document.createElement("span");
+    name.textContent=(user.email||"بدون ایمیل")+" | "+(user.pahlavi_occasions?"پهلوی فعال":"پهلوی غیرفعال");
+    item.append(name);
+    addButton(item,"انتخاب",()=>{
+      el("featureAccount").value=user.account_id;
+      el("featureEnabled").value=String(user.pahlavi_occasions);
+    });
+    host.append(item);
+  }
+  el("nextFeatureUsers").disabled=!data.next_page;
+}
 async function loadPahlaviGrants(){
   try{
     const data=await api("admin_user_features");
@@ -211,6 +232,12 @@ async function loadAdmin(){
    }
  }catch(e){if(admin)status(e.message);}
 }
+el("reloadFeatureUsers").addEventListener("click",async()=>{
+  try{await loadFeatureUsers(1);}catch(e){status(e.message);}
+});
+el("nextFeatureUsers").addEventListener("click",async()=>{
+  try{await loadFeatureUsers(featureUsersPage+1);}catch(e){status(e.message);}
+});
 el("savePahlavi").addEventListener("click",async()=>{
   const account_id=el("featureAccount").value.trim();
   if(!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(account_id)){
@@ -221,6 +248,7 @@ el("savePahlavi").addEventListener("click",async()=>{
   try{
     await api("admin_set_pahlavi",{account_id,enabled});
     await loadPahlaviGrants();
+    await loadFeatureUsers(1);
     status("مجوز تقویم پهلوی ذخیره شد.");
   }catch(e){status(e.message);}
 });
