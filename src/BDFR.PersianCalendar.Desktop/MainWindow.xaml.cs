@@ -5686,7 +5686,8 @@ public sealed partial class MainWindow : Window
 
                 panel.Children.Clear();
 
-                var visible = snapshot.Occasions
+                var allVisibleOccasions = snapshot.Occasions.Where(IsOccasionVisible).ToArray();
+                var visible = allVisibleOccasions
                     .OrderByDescending(x => x.IsHoliday)
                     .ThenBy(x => x.Source == "personal" ? 0 : 1)
                     .ThenBy(x => x.Title)
@@ -5781,18 +5782,18 @@ public sealed partial class MainWindow : Window
                     });
                 }
 
-                if (snapshot.Occasions.Count > visible.Length)
+                if (allVisibleOccasions.Length > visible.Length)
                 {
                     panel.Children.Add(new TextBlock
                     {
-                        Text = $"+{ToPersianDigits((snapshot.Occasions.Count - visible.Length).ToString())}",
+                        Text = $"+{ToPersianDigits((allVisibleOccasions.Length - visible.Length).ToString())}",
                         FontSize = 10,
                         Opacity = 0.55,
                         HorizontalAlignment = HorizontalAlignment.Center
                     });
                 }
 
-                var hasOfficialHoliday = snapshot.Occasions.Any(
+                var hasOfficialHoliday = allVisibleOccasions.Any(
                     x => IsOfficialHolidayOccasion(date, x));
 
                 if (hasOfficialHoliday)
@@ -5888,7 +5889,7 @@ public sealed partial class MainWindow : Window
             _selectedOccasionCards.Clear();
             var personalOccasionLookup = (await _repository.GetSpecialOccasionsAsync())
                 .ToDictionary(x => x.Id, StringComparer.Ordinal);
-            foreach (var item in snapshot.Occasions)
+            foreach (var item in snapshot.Occasions.Where(IsOccasionVisible))
             {
                 if (item.Source == "personal" && personalOccasionLookup.TryGetValue(item.Id, out var personalItem))
                 {
