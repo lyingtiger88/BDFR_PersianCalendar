@@ -140,6 +140,38 @@ enum ZurvanIOSLicense {
         }
     }
 
+    /// Creates an account using a manually shared referral identifier, not a link.
+    /// The backend captures the code at original account creation.
+    static func signUpAccount(email: String, password: String,
+                              referralIdentifier: String) async throws {
+        guard password.count >= 8 && email.contains("@") else {
+            throw OnlineLicenseError.server("ایمیل یا رمز عبور معتبر نیست.")
+        }
+        let code = referralIdentifier.trimmingCharacters(in:.whitespacesAndNewlines)
+            .uppercased()
+        if !code.isEmpty {
+            let validFormat = code.count == 16 && code.utf8.allSatisfy {
+                (48...57).contains($0) || (65...70).contains($0)
+            }
+            guard validFormat else {
+                throw OnlineLicenseError.server("شناسه معرف ۱۶ کاراکتر معتبر نیست.")
+            }
+            let result = try await request("/functions/v1/zurvan-referral-validate",
+                body:["code":code])
+            guard result["valid"] as? Bool == true else {
+                throw OnlineLicenseError.server("شناسه معرف پیدا نشد.")
+            }
+        }
+        var body:[String:Any] = [
+            "email":email.trimmingCharacters(in:.whitespacesAndNewlines),
+            "password":password
+        ]
+        if !code.isEmpty {
+            body["data"] = ["zurvan_referral_code":code]
+        }
+        _ = try await request("/auth/v1/signup",body:body)
+    }
+
     /// Online account sign-in. New free trials require Apple DeviceCheck proof;
     /// paid subscriptions can be read without issuing another free trial.
     static func signInAndActivate(email: String, password: String) async throws -> Bool {
@@ -217,7 +249,7 @@ enum ZurvanIOSLicense {
     /// authoritative on the server; a device cannot choose the points earned.
     static func userProgress(action: String = "status",
                              visible: Bool? = nil) async throws -> [String: Any] {
-        guard ["status", "claim_daily", "set_visibility"].contains(action) else {
+        guard ["status", "claim_daily", "set_visibility", "claim_silver"].contains(action) else {
             throw OnlineLicenseError.invalidResponse
         }
         guard action != "set_visibility" || visible != nil else {
