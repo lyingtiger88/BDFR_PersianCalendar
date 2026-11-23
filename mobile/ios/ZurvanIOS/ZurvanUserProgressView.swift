@@ -41,6 +41,11 @@ struct ZurvanUserProgressView: View {
                     : "امتیاز امروز را قبلاً دریافت کرده‌ای."
             } else if action == "set_visibility" {
                 message = "تنظیم حریم خصوصی رتبه‌بندی ذخیره شد."
+            } else if action == "claim_silver" {
+                let claim = result["claim"] as? [String:Any] ?? [:]
+                message = enabled(claim,"claimed")
+                    ? "لایسنس یک‌ساله Premium Silver صادر شد."
+                    : "هنوز دعوت موفق کافی برای دریافت جایزه ثبت نشده است."
             } else {
                 message = ""
             }
@@ -71,6 +76,32 @@ struct ZurvanUserProgressView: View {
                         Task { await reload("claim_daily") }
                     }
                     .disabled(busy || enabled(profile,"checked_in_today"))
+                }
+                if let referral = snapshot["referral"] as? [String:Any] {
+                    Section("دعوت دوستان با شناسه معرف") {
+                        Text("شناسه معرف شما: \(caption(referral,"identifier"))")
+                            .font(.headline.monospaced())
+                            .textSelection(.enabled)
+                        Button("کپی شناسه معرف", systemImage:"doc.on.doc") {
+                            UIPasteboard.general.string=caption(referral,"identifier")
+                            message="شناسه معرف کپی شد."
+                        }
+                        Text("شناسه را به دوستان بده تا هنگام ثبت‌نام وارد کنند؛ لینک لازم نیست.")
+                            .font(.footnote).foregroundStyle(.secondary)
+                        Text("دعوت موفق: \(count(referral,"successful")) · در انتظار تأیید: \(count(referral,"pending"))")
+                        Text("تا پاداش بعدی: \(count(referral,"remaining_to_next")) نفر")
+                        Text("هر دعوت موفق ۱۰۰ XP؛ هر ۱۵ دعوت موفق یک‌سال Premium Silver")
+                            .font(.footnote).foregroundStyle(.secondary)
+                        if enabled(referral,"reward_available") {
+                            Button("دریافت لایسنس یک‌ساله Premium Silver") {
+                                Task { await reload("claim_silver") }
+                            }.disabled(busy)
+                        }
+                        if let silver = referral["current_silver"] as? [String:Any] {
+                            Text("Premium Silver فعال تا: \(caption(silver,"expires_at"))")
+                                .font(.footnote)
+                        }
+                    }
                 }
                 if let special = snapshot["special_rank"] as? [String:Any] {
                     Section("نشان ویژه مدیر") {
