@@ -182,6 +182,25 @@ internal object ZurvanAndroidOnlineLicense {
             session.canWrite
         }
 
+    /**
+     * Points cannot be set on the client. The server accepts only enumerated
+     * actions and enforces daily idempotency in Postgres.
+     */
+    suspend fun userProgress(
+        context: Context, action: String = "status", visible: Boolean? = null
+    ): JSONObject = withContext(Dispatchers.IO) {
+        require(action in setOf("status", "claim_daily", "set_visibility"))
+        require(action != "set_visibility" || visible != null)
+        if (load(context) == null) error("ابتدا وارد حساب آنلاین زروان شوید.")
+        // Refresh tokens through the normal secure session path. A non-writable
+        // license must not block access to already-earned points and badges.
+        refresh(context)
+        val session = load(context) ?: error("نشست حساب زروان موجود نیست.")
+        val body = JSONObject().put("action", action)
+        if (visible != null) body.put("visible", visible)
+        post("/functions/v1/zurvan-user-progress", body, session.accessToken)
+    }
+
     suspend fun refresh(context: Context): Boolean = withContext(Dispatchers.IO) {
         val session = load(context) ?: return@withContext false
         try {
