@@ -167,6 +167,11 @@ private struct ZurvanActivationView: View {
                 }
                 .disabled(busy || email.isEmpty || password.isEmpty)
             }
+            Section("نشان‌ها و امتیازهای حساب") {
+                NavigationLink("مشاهده XP و نشان‌های کسب‌شده") {
+                    ZurvanUserProgressView()
+                }
+            }
             Section("فعال‌سازی زروان") {
                 Text(ZurvanIOSLicense.deviceCode()).textSelection(.enabled)
                 Button("کپی کد دستگاه", systemImage: "doc.on.doc") {
@@ -544,6 +549,15 @@ private struct MobileSettingsView: View {
                     }.pickerStyle(.menu)
                     Text("ترجمه بخش‌های قدیمی به‌تدریج کامل می‌شود.")
                         .font(.footnote).foregroundStyle(.secondary)
+                }
+                .padding()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
+
+                NavigationLink {
+                    ZurvanUserProgressView()
+                } label: {
+                    Label("امتیاز و نشان‌های من", systemImage: "rosette")
                 }
                 .padding()
                 .frame(maxWidth: .infinity, alignment: .leading)
