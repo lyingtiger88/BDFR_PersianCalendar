@@ -2,7 +2,7 @@
 
 ## Rule
 
-Every registered Zurvan account receives a random **16-character uppercase
+Every registered Zurvan account receives a random **8-character uppercase
 hexadecimal referral identifier** (not a link). In the main Zurvan sign-up
 form, a newly registered user may enter the inviter's identifier once.
 It is passed using Supabase Auth signup's `data.zurvan_referral_code` field.
