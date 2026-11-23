@@ -19,7 +19,7 @@ public sealed partial class MainWindow
         var status = new TextBlock { TextWrapping = TextWrapping.Wrap };
         var email = new TextBox { PlaceholderText = "ایمیل" };
         var password = new PasswordBox { PlaceholderText = "رمز عبور" };
-        var referralCode = new TextBox { PlaceholderText = "شناسه معرف (اختیاری، فقط هنگام ثبت‌نام)", MaxLength = 16 };
+        var referralCode = new TextBox { PlaceholderText = "شناسه معرف (اختیاری، فقط هنگام ثبت‌نام)", MaxLength = 8 };
         var signIn = new Button { Content = "ورود" };
         var signUp = new Button { Content = "ثبت‌نام" };
         var signOut = new Button { Content = "خروج از حساب" };
