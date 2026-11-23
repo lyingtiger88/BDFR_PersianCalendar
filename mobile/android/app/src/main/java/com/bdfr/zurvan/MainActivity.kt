@@ -2682,7 +2682,10 @@ private fun SettingsScreen(
     val setWeekdayColor = ZurvanThemes.setWeekdayColor.current
     val context = LocalContext.current
     val occasionVisibility = ZurvanOccasionDisplay.current(context)
-    val privilegedOccasions = ZurvanAndroidOnlineLicense.hasPahlaviAccess(context)
+    // Hidden by default until the feature grant is verified for this settings visit.
+    var calendarGrantVerified by remember { mutableStateOf(false) }
+    val privilegedOccasions = calendarGrantVerified &&
+        ZurvanAndroidOnlineLicense.hasPahlaviAccess(context)
     val zodiacStyles = listOf(
         Triple("cosmic", "کیهانی کلاسیک", "✦"),
         Triple("neon", "فانتزی نورانی", "☄"),
@@ -2750,6 +2753,13 @@ private fun SettingsScreen(
     }
 
     var settingsCategory by rememberSaveable { mutableStateOf("home") }
+    LaunchedEffect(settingsCategory) {
+        calendarGrantVerified = false
+        if (settingsCategory == "calendar") {
+            calendarGrantVerified =
+                ZurvanAndroidOnlineLicense.refreshPahlaviGrant(context)
+        }
+    }
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
