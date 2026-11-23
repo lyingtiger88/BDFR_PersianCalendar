@@ -61,6 +61,11 @@ Deno.serve(async req => {
     : { data: null, error: null };
   if (specialRankError) return json(503, { error: "database_unavailable" });
 
+  const {data:featureGrant,error:featureError}=await db
+    .from("zurvan_account_features")
+    .select("pahlavi_occasions").eq("account_id",user.id).maybeSingle();
+  if(featureError)return json(503,{error:"feature_lookup_failed"});
+
   const rows = licenses ?? [];
   const current = rows.find(x => x.status === "active") ?? rows[0] ?? null;
   const now = Date.now();
@@ -117,6 +122,7 @@ Deno.serve(async req => {
       access_level: specialRank.access_level
     } : null,
     special_permissions: specialRank?.permissions ?? {},
+    features: { pahlavi_occasions: featureGrant?.pahlavi_occasions === true },
     checked_at: new Date().toISOString()
   });
 });
