@@ -4,7 +4,7 @@
 
 - Verified Supabase Auth users are enrolled automatically when the Windows app starts its first trial check.
 - A **free 45-day trial is issued only once per device identity** and only once per account/product.
-- The trial device is recorded by a unique server-side claim. Different free accounts cannot claim the same device. The desktop sends a domain-separated SHA-256 fingerprint of the Windows publisher-scoped system ID; when unavailable it uses the Windows MachineGuid (OS-installation identity).
+- The trial device is recorded by a unique server-side claim. Different free accounts cannot claim the same device. The desktop first reads the motherboard serial from WMI (`Win32_BaseBoard.SerialNumber`), with motherboard manufacturer/product as namespacing. If it is blank or a known placeholder, it tries the BIOS serial (`Win32_BIOS.SerialNumber`), then the Windows publisher-scoped system ID, finally Windows MachineGuid (OS-installation identity). All values are normalized and locally SHA-256 hashed with a Zurvan domain prefix; raw hardware serials never leave the app. WMI access uses the managed `System.Management` package, borrowing the query approach (not the Node.js addon binary) from `jepnoda/hardware-identification-addon`.
 - Existing paid accounts remain usable regardless of inability to read the local device identifier.
 - An active trial issued with a device claim can only grant write access when the currently presented device identifier matches the claim.
 - The website **does not issue** free trials without a device identity. It only prepares verified user accounts.
@@ -34,5 +34,5 @@
 
 - A hardware/device fingerprint is **not cryptographic device attestation**. A sufficiently motivated user can spoof Windows IDs, clone installations, patch the client, or use a virtual machine. The server-side unique claim blocks ordinary multi-account reuse; stronger anti-fraud requires TPM-backed device attestation and an operational recovery process.
 - Existing legacy trial licenses issued before the migration have no device claim, so are grandfathered in status checks. This migration cannot retrospectively recover an identifier that was never collected.
-- Hardware replacement or Windows reinstallation may change the device identity. An administrator-reviewed reset/migration process is required before enforcing this at scale.
+- A good motherboard serial will generally survive a Windows reinstall, but changing firmware identifiers, a motherboard swap, or falling back to MachineGuid can change the device identity. Some OEMs ship duplicate/placeholder serials; the system rejects common placeholders but cannot establish global uniqueness. New fingerprints are not interchangeable with the previous Windows-only v1 fingerprints, so already-claimed devices need a migration plan before production rollout. An administrator-reviewed reset/migration process is required before enforcing this at scale.
 - Direct UI/Edge Function deployment and real Windows device testing are separate from committing source changes; do not call this production enabled until completed.
