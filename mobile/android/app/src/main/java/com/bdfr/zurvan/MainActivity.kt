@@ -2964,30 +2964,39 @@ private fun SettingsScreen(
                                 onCheckedChange = { ZurvanOccasionDisplay.set(context, key, it) })
                         }
                     }
-                    if (privilegedOccasions) {
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) {
-                                Text("نمایش تقویم شاهنشاهی (پهلوی)")
-                                Text("سال شاهنشاهی را در سربرگ تقویم و انتخاب سال نمایش می‌دهد؛ تاریخ رویدادها تغییر نمی‌کند.",
-                                    style = MaterialTheme.typography.bodySmall)
-                            }
-                            Switch(checked = occasionVisibility.imperialYear,
-                                onCheckedChange = { ZurvanOccasionDisplay.set(context, "imperial_year", it) })
-                        }
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) {
-                                Text("مناسبت‌های تقویم شاهنشاهی (پهلوی)")
-                                Text("رویدادهای تاریخی غیررسمی؛ سال شاهنشاهی = سال شمسی + ۱۱۸۰",
-                                    style = MaterialTheme.typography.bodySmall)
-                            }
-                            Checkbox(checked = occasionVisibility.pahlavi,
-                                onCheckedChange = { ZurvanOccasionDisplay.set(context, "pahlavi", it) })
-                        }
-                    }
                 }
                 Text("این تنظیم تاریخ‌ها و مناسبت‌های ذخیره‌شده را حذف نمی‌کند.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        if (settingsCategory == "calendar") item {
+            SettingsCard(title = "تقویم شاهنشاهی (پهلوی)") {
+                if (!privilegedOccasions) {
+                    Text("این قابلیت ویژه است. مدیر باید مجوز تقویم پهلوی را برای ایمیل حساب شما در زروان فعال کند.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("نمایش سال شاهنشاهی")
+                        Text("۱۴۰۵ هجری خورشیدی = ۲۵۸۵ شاهنشاهی. تاریخ ذخیره‌شده تغییر نمی‌کند.",
+                            style = MaterialTheme.typography.bodySmall)
+                    }
+                    Switch(enabled = privilegedOccasions,
+                        checked = privilegedOccasions && occasionVisibility.imperialYear,
+                        onCheckedChange = { ZurvanOccasionDisplay.set(context, "imperial_year", it) })
+                }
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("نمایش مناسبت‌های تاریخی دوره پهلوی")
+                        Text("این مناسبت‌ها تعطیل رسمی محسوب نمی‌شوند.",
+                            style = MaterialTheme.typography.bodySmall)
+                    }
+                    Switch(enabled = privilegedOccasions,
+                        checked = privilegedOccasions && occasionVisibility.pahlavi,
+                        onCheckedChange = { ZurvanOccasionDisplay.set(context, "pahlavi", it) })
+                }
             }
         }
         if (settingsCategory == "calendar") item {
