@@ -108,6 +108,11 @@ struct ContentView: View {
             }
             .tag(ZurvanTab.settings)
         }
+        .task {
+            if !licensed && await ZurvanIOSLicense.refreshOnlineEntitlement() {
+                licensed = true
+            }
+        }
         .onChange(of: selection) { _, newValue in
             if !licensed && newValue != .calendar && newValue != .settings { selection = .calendar }
         }
@@ -126,10 +131,41 @@ private struct ZurvanLockedView: View {
 private struct ZurvanActivationView: View {
     let onActivated: () -> Void
     @State private var activationCode = ""
+    @State private var email = ""
+    @State private var password = ""
+    @State private var busy = false
     @State private var status = "کد دستگاه را برای دریافت لایسنس ارائه کنید."
 
     var body: some View {
         Form {
+            Section("ورود به حساب زروان و دوره آزمایشی") {
+                Text("پس از تأیید ایمیل، دوره رایگان ۴۵روزه تنها یک‌بار برای این گوشی صادر می‌شود. بررسی دستگاه از طریق Apple DeviceCheck است.")
+                    .font(.footnote)
+                TextField("ایمیل", text: $email)
+                    .textContentType(.emailAddress)
+                    .textInputAutocapitalization(.never)
+                    .keyboardType(.emailAddress)
+                SecureField("رمز عبور", text: $password)
+                    .textContentType(.password)
+                Button("ورود و بررسی خودکار لایسنس") {
+                    busy = true
+                    Task {
+                        defer { busy = false }
+                        do {
+                            if try await ZurvanIOSLicense.signInAndActivate(email: email, password: password) {
+                                status = "مجوز فعال شد."
+                                password = ""
+                                onActivated()
+                            } else {
+                                status = "حساب معتبر است ولی مجوز ویرایش فعال نیست."
+                            }
+                        } catch {
+                            status = error.localizedDescription
+                        }
+                    }
+                }
+                .disabled(busy || email.isEmpty || password.isEmpty)
+            }
             Section("فعال‌سازی زروان") {
                 Text(ZurvanIOSLicense.deviceCode()).textSelection(.enabled)
                 Button("کپی کد دستگاه", systemImage: "doc.on.doc") {
