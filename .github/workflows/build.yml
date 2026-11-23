@@ -173,7 +173,8 @@ jobs:
           unzip -l mobile/android/app/build/outputs/apk/debug/app-debug.apk | grep -E 'resources.arsc|AndroidManifest.xml'
 
       - name: Upload Android debug APK
-        if: github.event_name == 'push'
+        # Make feature-branch PR test APKs downloadable without publishing
+        # any unsigned/temporary debug build as a production release.
         uses: actions/upload-artifact@v4
         with:
           name: Zurvan-Android-debug
