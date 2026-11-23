@@ -71,6 +71,10 @@ public sealed class AppSettings
     // 0 = square corners, 32 = strongly rounded.
     public double UiCornerRadius { get; set; } = 14.0;
 
+    // User preference only: the authenticated Supabase grant is always checked
+    // separately before imperial year or restricted historical events are shown.
+    public bool ShowImperialCalendar { get; set; }
+
     // Calendar display priority inside each day card.
     // First = large/primary center, second = upper-right, third = lower-left.
     public string PrimaryCalendar { get; set; } = "persian";
