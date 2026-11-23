@@ -291,6 +291,12 @@ internal sealed class ZurvanAuthClient
             rankCode, rankName, rankNameFa, badgeKey, pahlaviGrant);
     }
 
+    // User points and badges are always fetched from the trusted Supabase
+    // function. The device never supplies the awarded XP amount.
+    internal Task<JsonDocument> ReadUserProgressAsync(string action = "status", bool? visible = null)
+        => LicenseFunctionAsync("zurvan-user-progress",
+            visible.HasValue ? new { action, visible = visible.Value } : (object)new { action });
+
     internal async Task SignOutAsync()
     {
         var session = Load();
