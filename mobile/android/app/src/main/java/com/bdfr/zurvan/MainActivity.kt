@@ -345,6 +345,8 @@ private fun ZurvanMobileShell(
 private fun ZurvanOnlineAccountSection(context: Context, onActivated: () -> Unit) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var referralCode by remember { mutableStateOf("") }
+    var registering by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
@@ -358,20 +360,37 @@ private fun ZurvanOnlineAccountSection(context: Context, onActivated: () -> Unit
         OutlinedTextField(value = password, onValueChange = { password = it.take(256) },
             label = { Text("رمز ورود") }, modifier = Modifier.fillMaxWidth(),
             visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation())
-        Button(enabled = !busy && email.contains("@") && password.isNotBlank(), onClick = {
+        if (registering) {
+            OutlinedTextField(
+                value = referralCode,
+                onValueChange = { referralCode = it.uppercase(java.util.Locale.ROOT).take(16) },
+                label = { Text("شناسه معرف (اختیاری)") },
+                supportingText = { Text("از معرف بگیر و هنگام ساخت حساب وارد کن؛ لینک لازم نیست.") },
+                modifier = Modifier.fillMaxWidth(), singleLine = true
+            )
+        }
+        Button(enabled = !busy && email.contains("@") && password.length >= 8, onClick = {
             busy = true
             scope.launch {
                 try {
-                    val allowed = ZurvanAndroidOnlineLicense.signInAndActivate(context, email, password)
-                    status = if (allowed) "مجوز زروان فعال است." else
-                        "حساب تأیید شد، اما مجوز ویرایش فعال نیست."
+                    if (registering) {
+                        status = ZurvanAndroidOnlineLicense.signUpAccount(email, password, referralCode)
+                        registering = false
+                    } else {
+                        val allowed = ZurvanAndroidOnlineLicense.signInAndActivate(context, email, password)
+                        status = if (allowed) "مجوز زروان فعال است." else
+                            "حساب تأیید شد، اما مجوز ویرایش فعال نیست."
+                        onActivated()
+                    }
                     password = ""
-                    onActivated()
                 } catch (error: Exception) {
                     status = error.message ?: "ارتباط با سرور فعال‌سازی ممکن نشد."
                 } finally { busy = false }
             }
-        }) { Text(if (busy) "در حال بررسی..." else "ورود و فعال‌سازی خودکار") }
+        }) { Text(if (busy) "در حال بررسی..." else if (registering) "ثبت‌نام با شناسه معرف" else "ورود و فعال‌سازی خودکار") }
+        TextButton(enabled = !busy, onClick = { registering = !registering }) {
+            Text(if (registering) "حساب دارم؛ ورود" else "ساخت حساب جدید")
+        }
         if (status.isNotBlank()) Text(status, style = MaterialTheme.typography.bodySmall)
     }
 }
