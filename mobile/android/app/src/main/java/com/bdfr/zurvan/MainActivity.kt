@@ -363,7 +363,7 @@ private fun ZurvanOnlineAccountSection(context: Context, onActivated: () -> Unit
         if (registering) {
             OutlinedTextField(
                 value = referralCode,
-                onValueChange = { referralCode = it.uppercase(java.util.Locale.ROOT).take(16) },
+                onValueChange = { referralCode = it.uppercase(java.util.Locale.ROOT).take(8) },
                 label = { Text("شناسه معرف (اختیاری)") },
                 supportingText = { Text("از معرف بگیر و هنگام ساخت حساب وارد کن؛ لینک لازم نیست.") },
                 modifier = Modifier.fillMaxWidth(), singleLine = true
