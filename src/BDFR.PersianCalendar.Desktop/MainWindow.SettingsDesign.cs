@@ -1131,6 +1131,23 @@ public sealed partial class MainWindow
             "تنظیمات کامل", OpenLegacySettings, "\uE787");
         AddSettingsAction(contents, "مناسبت‌ها", "نمایش مناسبت‌های ثبت‌شده و رسمی",
             "بازکردن مناسبت‌ها", () => ShowDesktopModule("مناسبت‌ها"), "\uE787");
+        var imperialAllowed = _licensePahlaviOccasions;
+        var imperialSwitch = SettingsToggle(imperialAllowed && _settings.ShowImperialCalendar, enabled =>
+        {
+            if (enabled && !_licensePahlaviOccasions)
+                throw new InvalidOperationException("مجوز تقویم شاهنشاهی برای این حساب فعال نیست.");
+            _settings.ShowImperialCalendar = enabled;
+            _settingsService.Save(_settings);
+            BuildCalendar();
+            ShowDesktopModule("مناسبت‌ها");
+        });
+        imperialSwitch.IsEnabled = imperialAllowed;
+        contents.Children.Add(SettingsOptionRow("تقویم شاهنشاهی (پهلوی)",
+            imperialAllowed
+                ? "نمایش سال شاهنشاهی و مناسبت‌های تاریخی غیررسمی. تاریخ ذخیره‌شده شمسی تغییر نمی‌کند."
+                : "برای فعال‌سازی، مدیر باید مجوز پهلوی را در حساب زروان صادر کند.",
+            imperialSwitch, "\uE787"));
+        AddSettingsSeparator(contents);
 
         var clockGroup = SettingsGroup("ساعت زروان", "تنظیم نمایش ساعت در گوشه بالای سمت راست سربرگ تقویم", "\uE823", "#FFB88942");
         var clockMode = new ComboBox { HorizontalAlignment = HorizontalAlignment.Stretch };
