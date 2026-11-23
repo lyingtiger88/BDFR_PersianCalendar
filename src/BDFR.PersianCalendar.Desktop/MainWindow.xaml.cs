@@ -512,7 +512,10 @@ public sealed partial class MainWindow : Window
         if (_safeCalendarGrid is null || _safeMonthTitle is null)
             return;
 
-        _safeMonthTitle.Text = $"{PersianDate.MonthNames[_month - 1]} {ToPersianDigits(_year.ToString())}";
+        var showImperial = _licensePahlaviOccasions && _settings.ShowImperialCalendar;
+        var visibleYear = showImperial ? _year + 1180 : _year;
+        _safeMonthTitle.Text = $"{PersianDate.MonthNames[_month - 1]} {ToPersianDigits(visibleYear.ToString())}" +
+            (showImperial ? " · شاهنشاهی" : "");
 
         _safeCalendarGrid.Children.Clear();
         _safeCalendarGrid.RowDefinitions.Clear();
@@ -5440,7 +5443,10 @@ public sealed partial class MainWindow : Window
     private void BuildCalendar()
     {
         RefreshElenaSeasonalPalette();
-        MonthTitle.Text = $"{PersianDate.MonthNames[_month - 1]} {_year}";
+        var imperialDisplay = _licensePahlaviOccasions && _settings.ShowImperialCalendar;
+        var visibleYear = imperialDisplay ? _year + 1180 : _year;
+        MonthTitle.Text = $"{PersianDate.MonthNames[_month - 1]} {ToPersianDigits(visibleYear.ToString())}" +
+            (imperialDisplay ? " · شاهنشاهی" : "");
         UpdateMonthDecorations();
         CalendarGrid.Children.Clear();
         CalendarGrid.RowDefinitions.Clear();
