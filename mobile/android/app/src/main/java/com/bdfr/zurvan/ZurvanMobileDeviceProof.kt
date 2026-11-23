@@ -7,7 +7,6 @@ import com.google.android.play.core.integrity.IntegrityManagerFactory
 import com.google.android.play.core.integrity.IntegrityTokenRequest
 import com.google.android.gms.tasks.Tasks
 import java.security.MessageDigest
-import java.security.SecureRandom
 import java.util.concurrent.TimeUnit
 
 /**
@@ -35,9 +34,10 @@ internal object ZurvanMobileDeviceProof {
      * authenticated request so the server can check the verified verdict.
      * Never treat an unverified client-supplied nonce or token as permission.
      */
-    fun createNonce(): String {
-        val bytes = ByteArray(32)
-        SecureRandom().nextBytes(bytes)
+    fun nonceFor(authUserId: String, fingerprint: String, requestTimeMillis: Long): String {
+        require(authUserId.isNotBlank() && fingerprint.matches(Regex("[0-9a-f]{64}")))
+        val payload = "zurvan-trial-v1|$authUserId|$fingerprint|$requestTimeMillis"
+        val bytes = MessageDigest.getInstance("SHA-256").digest(payload.toByteArray(Charsets.UTF_8))
         return Base64.encodeToString(
             bytes, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING
         )
