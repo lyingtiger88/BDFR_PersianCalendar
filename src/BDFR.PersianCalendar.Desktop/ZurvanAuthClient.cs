@@ -104,7 +104,7 @@ internal sealed class ZurvanAuthClient
     {
         if (string.IsNullOrWhiteSpace(code)) return true;
         code = code.Trim().ToUpperInvariant();
-        if (code.Length != 16 || code.Any(x => !Uri.IsHexDigit(x)))
+        if (code.Length != 8 || code.Any(x => !Uri.IsHexDigit(x)))
             return false;
         using var reply = await RequestAsync("/functions/v1/zurvan-referral-validate",
             new { code });
