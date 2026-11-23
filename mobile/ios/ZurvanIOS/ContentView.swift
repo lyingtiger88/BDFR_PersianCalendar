@@ -134,6 +134,8 @@ private struct ZurvanActivationView: View {
     @State private var activationCode = ""
     @State private var email = ""
     @State private var password = ""
+    @State private var referralIdentifier = ""
+    @State private var registerMode = false
     @State private var busy = false
     @State private var status = "کد دستگاه را برای دریافت لایسنس ارائه کنید."
 
@@ -148,12 +150,29 @@ private struct ZurvanActivationView: View {
                     .keyboardType(.emailAddress)
                 SecureField("رمز عبور", text: $password)
                     .textContentType(.password)
-                Button("ورود و بررسی خودکار لایسنس") {
+                if registerMode {
+                    TextField("شناسه معرف (اختیاری)", text:$referralIdentifier)
+                        .textInputAutocapitalization(.characters)
+                        .autocorrectionDisabled()
+                        .onChange(of:referralIdentifier) { _, value in
+                            referralIdentifier=String(value.uppercased().prefix(16))
+                        }
+                    Text("شناسه معرف را از دوستت بگیر و هنگام ثبت‌نام وارد کن؛ لینک لازم نیست.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
+                Button(registerMode ? "ثبت‌نام با شناسه معرف" : "ورود و بررسی خودکار لایسنس") {
                     busy = true
                     Task {
                         defer { busy = false }
                         do {
-                            if try await ZurvanIOSLicense.signInAndActivate(email: email, password: password) {
+                            if registerMode {
+                                try await ZurvanIOSLicense.signUpAccount(
+                                    email:email,password:password,
+                                    referralIdentifier:referralIdentifier)
+                                status = "ثبت‌نام انجام شد. ایمیل را تأیید کن، سپس وارد شو."
+                                registerMode = false
+                                password = ""
+                            } else if try await ZurvanIOSLicense.signInAndActivate(email: email, password: password) {
                                 status = "مجوز فعال شد."
                                 password = ""
                                 onActivated()
@@ -165,7 +184,11 @@ private struct ZurvanActivationView: View {
                         }
                     }
                 }
-                .disabled(busy || email.isEmpty || password.isEmpty)
+                .disabled(busy || email.isEmpty || password.count < 8)
+                Button(registerMode ? "حساب دارم؛ ورود" : "ساخت حساب جدید") {
+                    registerMode.toggle()
+                }.disabled(busy)
+                Text(status).font(.footnote)
             }
             Section("نشان‌ها و امتیازهای حساب") {
                 NavigationLink("مشاهده XP و نشان‌های کسب‌شده") {
