@@ -69,6 +69,124 @@ enum ZurvanIOSLicense {
         case missingToken
     }
 
+    private static let authBase = "https://yztithydgdvydaktuxlw.supabase.co"
+    // A publishable key is not a secret; the Edge Function validates a real JWT.
+    private static let publishableKey = "sb_publishable_UAKFYbxgWOCVRDDdv_0JLg_oIIiubmT"
+    private static let sessionAccount = "zurvan-online-license-session-v1"
+
+    private struct OnlineSession: Codable {
+        var accessToken: String
+        var refreshToken: String
+        var userId: String
+    }
+
+    private static func store(_ session: OnlineSession) throws {
+        let bytes = try JSONEncoder().encode(session)
+        let item: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: sessionAccount,
+            kSecAttrAccount as String: sessionAccount,
+            kSecValueData as String: bytes,
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        ]
+        SecItemDelete(item.filter { $0.key != kSecValueData as String } as CFDictionary)
+        let status = SecItemAdd(item as CFDictionary, nil)
+        guard status == errSecSuccess else { throw OnlineLicenseError.keychainFailure }
+    }
+
+    private static func load() -> OnlineSession? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: sessionAccount,
+            kSecAttrAccount as String: sessionAccount,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+        var data: CFTypeRef?
+        guard SecItemCopyMatching(query as CFDictionary, &data) == errSecSuccess,
+              let bytes = data as? Data else { return nil }
+        return try? JSONDecoder().decode(OnlineSession.self, from: bytes)
+    }
+
+    private static func request(_ path: String, body: [String: Any],
+                                bearer: String? = nil) async throws -> [String: Any] {
+        guard let url = URL(string: authBase + path) else { throw OnlineLicenseError.invalidResponse }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(publishableKey, forHTTPHeaderField: "apikey")
+        if let bearer { request.setValue("Bearer " + bearer, forHTTPHeaderField: "Authorization") }
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data,response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse else { throw OnlineLicenseError.invalidResponse }
+        let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] ?? [:]
+        guard (200..<300).contains(http.statusCode) else {
+            throw OnlineLicenseError.server((json["error"] as? String) ?? "HTTP \(http.statusCode)")
+        }
+        return json
+    }
+
+    enum OnlineLicenseError: Error, LocalizedError {
+        case invalidResponse
+        case keychainFailure
+        case server(String)
+
+        var errorDescription: String? {
+            switch self {
+            case .invalidResponse: return "پاسخ سرور نامعتبر بود."
+            case .keychainFailure: return "ذخیره امن نشست حساب ممکن نشد."
+            case .server(let code): return "فعالسازی سرور: " + code
+            }
+        }
+    }
+
+    /// Online account sign-in. New free trials require Apple DeviceCheck proof;
+    /// paid subscriptions can be read without issuing another free trial.
+    static func signInAndActivate(email: String, password: String) async throws -> Bool {
+        let auth = try await request("/auth/v1/token?grant_type=password",
+            body:["email":email.trimmingCharacters(in:.whitespacesAndNewlines),
+                  "password":password])
+        guard let access = auth["access_token"] as? String,
+              let refresh = auth["refresh_token"] as? String,
+              let user = auth["user"] as? [String: Any],
+              let userId = user["id"] as? String else {
+            throw OnlineLicenseError.invalidResponse
+        }
+        let session = OnlineSession(accessToken:access,refreshToken:refresh,userId:userId)
+        try store(session)
+        let status = try await request("/functions/v1/zurvan-license-status",
+            body:[:],bearer:access)
+        if status["can_write"] as? Bool == true { return true }
+
+        let fingerprint = try onlineTrialFingerprint()
+        let proof = try await deviceCheckToken()
+        _ = try await request("/functions/v1/zurvan-mobile-trial",
+            body:["platform":"ios","key_fingerprint":fingerprint,
+                  "devicecheck_token":proof],bearer:access)
+        return try await readOnlineStatus(session)
+    }
+
+    private static func readOnlineStatus(_ session: OnlineSession) async throws -> Bool {
+        let fingerprint = try onlineTrialFingerprint()
+        let result = try await request("/functions/v1/zurvan-license-status",
+            body:["key_fingerprint":fingerprint],bearer:session.accessToken)
+        return result["can_write"] as? Bool == true
+    }
+
+    static func refreshOnlineEntitlement() async -> Bool {
+        guard var session = load() else { return false }
+        do {
+            let data = try await request("/auth/v1/token?grant_type=refresh_token",
+                body:["refresh_token":session.refreshToken])
+            guard let access = data["access_token"] as? String,
+                  let refresh = data["refresh_token"] as? String else { return false }
+            session.accessToken = access
+            session.refreshToken = refresh
+            try store(session)
+            return try await readOnlineStatus(session)
+        } catch { return false }
+    }
+
     static var isLicensed: Bool {
         guard let stored = UserDefaults.standard.string(forKey: storedCodeKey) else { return false }
         return verify(stored)
