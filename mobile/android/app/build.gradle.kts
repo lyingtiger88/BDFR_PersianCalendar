@@ -31,6 +31,11 @@ android {
         val issuerPublicKey = providers.gradleProperty("ZURVAN_LICENSE_PUBLIC_KEY_B64")
             .orElse("").get()
         buildConfigField("String", "LICENSE_PUBLIC_KEY_B64", "\"" + issuerPublicKey + "\"")
+        // Flip to true only with the production mobile Edge Function and vendor
+        // attestation credentials deployed. Defaults off to preserve old users.
+        buildConfigField("boolean", "ENFORCE_ONLINE_MOBILE_TRIAL",
+            providers.gradleProperty("ZURVAN_ENFORCE_ONLINE_MOBILE_TRIAL")
+                .orElse("false").get().toBoolean().toString())
         minSdk = 26
         targetSdk = 35
         // Override on CI for monotonically increasing installable release builds.
