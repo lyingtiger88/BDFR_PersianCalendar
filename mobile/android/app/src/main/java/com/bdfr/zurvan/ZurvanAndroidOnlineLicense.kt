@@ -201,6 +201,25 @@ internal object ZurvanAndroidOnlineLicense {
         post("/functions/v1/zurvan-user-progress", body, session.accessToken)
     }
 
+    /**
+     * Fetch the restricted-feature grant directly on opening Calendar Settings.
+     * Unlike the license's offline fallback, a failed server check never
+     * reveals this premium setting.
+     */
+    suspend fun refreshPahlaviGrant(context: Context): Boolean = withContext(Dispatchers.IO) {
+        val session = load(context) ?: return@withContext false
+        try {
+            val refreshed = post("/auth/v1/token?grant_type=refresh_token",
+                JSONObject().put("refresh_token", session.refreshToken))
+            session.accessToken = refreshed.getString("access_token")
+            session.refreshToken = refreshed.getString("refresh_token")
+            save(context, session)
+            val current = status(context, session)
+            applyStatus(context, session, current)
+            session.pahlaviOccasions && hasPahlaviAccess(context)
+        } catch (_: Exception) { false }
+    }
+
     suspend fun refresh(context: Context): Boolean = withContext(Dispatchers.IO) {
         val session = load(context) ?: return@withContext false
         try {
