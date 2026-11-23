@@ -888,15 +888,10 @@ public sealed partial class MainWindow
                             .ThenBy(x => x.Title)
                             .ToList();
                         var monthBody = new StackPanel { Spacing = 7, Padding = new Thickness(12) };
-                        if (monthEntries.Count == 0)
-                        {
-                            monthBody.Children.Add(new TextBlock
-                            {
-                                Text = "برای این ماه مناسبتی ثبت نشده است.",
-                                Opacity = 0.55,
-                                Foreground = ThemeService.Brush(_theme.SecondaryText)
-                            });
-                        }
+                        // Build one chronological timeline for all occasion sources.
+                        // Priority keeps official events before historical and personal
+                        // events on the same day without sending personal cards to the end.
+                        var chronologicalRows = new List<(int Day, int Priority, UIElement Row)>();
                         foreach (var item in monthEntries)
                         {
                             var holiday = item.IsHoliday;
@@ -948,7 +943,7 @@ public sealed partial class MainWindow
                                 Grid.SetColumn(badge, 2);
                                 row.Children.Add(badge);
                             }
-                            monthBody.Children.Add(row);
+                            chronologicalRows.Add((item.Date.Day, 0, row));
                         }
 
                         // The Pahlavi historical feed is gated by the
@@ -987,7 +982,7 @@ public sealed partial class MainWindow
                                     TextWrapping = TextWrapping.Wrap,
                                     Foreground = ThemeService.Brush(_theme.PrimaryText)
                                 });
-                                monthBody.Children.Add(historyRow);
+                                chronologicalRows.Add((historical.Day, 1, historyRow));
                             }
                         }
 
@@ -1051,7 +1046,23 @@ public sealed partial class MainWindow
                                 Padding = new Thickness(5),
                                 Child = personalRow
                             };
-                            monthBody.Children.Add(personalCard);
+                            chronologicalRows.Add((personalItem.Date.Day, 2, personalCard));
+                        }
+
+                        if (chronologicalRows.Count == 0)
+                        {
+                            monthBody.Children.Add(new TextBlock
+                            {
+                                Text = "برای این ماه مناسبتی ثبت نشده است.",
+                                Opacity = 0.55,
+                                Foreground = ThemeService.Brush(_theme.SecondaryText)
+                            });
+                        }
+                        else
+                        {
+                            foreach (var entry in chronologicalRows
+                                .OrderBy(x => x.Day).ThenBy(x => x.Priority))
+                                monthBody.Children.Add(entry.Row);
                         }
 
                         // Render the zodiac art at 200% of its former size.
