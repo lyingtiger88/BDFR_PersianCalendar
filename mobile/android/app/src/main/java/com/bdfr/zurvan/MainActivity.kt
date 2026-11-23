@@ -2794,6 +2794,19 @@ private fun SettingsScreen(
         item {
             if (settingsCategory == "home") {
                 Text("تنظیمات", style = MaterialTheme.typography.headlineSmall)
+                // Keep earned badges visible from the settings landing page,
+                // including when earlier APKs did not have a dedicated tab.
+                OutlinedCard(
+                    onClick = { settingsCategory = "progress" },
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)
+                ) {
+                    Column(Modifier.padding(14.dp)) {
+                        Text("🏅 نشان‌ها و امتیازهای من", fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.titleMedium)
+                        Text("XP، سطح، Badge، تعداد دعوت‌ها و جوایز Premium Silver",
+                            style = MaterialTheme.typography.bodySmall)
+                    }
+                }
                 listOf(
                     Triple("appearance", "رابط کاربری", "تم، رنگ، تصویر و چیدمان"),
                     Triple("calendar", "تقویم و مناسبت‌ها", "چیدمان تاریخ و به‌روزرسانی"),
