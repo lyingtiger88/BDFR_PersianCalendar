@@ -88,7 +88,8 @@ struct ZurvanUserProgressView: View {
                         }
                         Text("شناسه را به دوستان بده تا هنگام ثبت‌نام وارد کنند؛ لینک لازم نیست.")
                             .font(.footnote).foregroundStyle(.secondary)
-                        Text("دعوت موفق: \(count(referral,"successful")) · در انتظار تأیید: \(count(referral,"pending"))")
+                        Text("کل دعوت‌ها: \(count(referral,"total_invited")) · موفق: \(count(referral,"successful"))")
+                        Text("در انتظار تأیید: \(count(referral,"pending")) · جوایز Silver: \(count(referral,"earned_rewards"))")
                         Text("تا پاداش بعدی: \(count(referral,"remaining_to_next")) نفر")
                         Text("هر دعوت موفق ۱۰۰ XP؛ هر ۱۵ دعوت موفق یک‌سال Premium Silver")
                             .font(.footnote).foregroundStyle(.secondary)
