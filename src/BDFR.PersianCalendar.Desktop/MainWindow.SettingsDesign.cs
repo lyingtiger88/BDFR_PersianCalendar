@@ -285,7 +285,15 @@ public sealed partial class MainWindow
             if (_settingsAccountNameText is not null && !string.IsNullOrWhiteSpace(result.AccountUsername))
                 _settingsAccountNameText.Text = result.AccountUsername;
             _licenseCanWrite = result.CanWrite;
+            var pahlaviGrantChanged = _licensePahlaviOccasions != result.PahlaviOccasions;
             _licensePahlaviOccasions = result.PahlaviOccasions;
+            if (pahlaviGrantChanged)
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    if (_selectedSettingsSection == "تقویم و زمان" && _activeDesktopModule == "تنظیمات")
+                        ShowSettingsSection("تقویم و زمان");
+                    BuildCalendar();
+                });
             _licenseMode = result.Mode;
             _licenseExpiresAt = result.ExpiresAt;
             StatusText.Text = result.CanWrite
@@ -360,7 +368,15 @@ public sealed partial class MainWindow
                 result = await _authClient.ReadLicenseStatusAsync();
             }
             _licenseCanWrite = result.CanWrite;
+            var pahlaviGrantChanged = _licensePahlaviOccasions != result.PahlaviOccasions;
             _licensePahlaviOccasions = result.PahlaviOccasions;
+            if (pahlaviGrantChanged)
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    if (_selectedSettingsSection == "تقویم و زمان" && _activeDesktopModule == "تنظیمات")
+                        ShowSettingsSection("تقویم و زمان");
+                    BuildCalendar();
+                });
             _licenseMode = result.Mode;
             _licenseExpiresAt = result.ExpiresAt;
             DispatcherQueue.TryEnqueue(() =>
