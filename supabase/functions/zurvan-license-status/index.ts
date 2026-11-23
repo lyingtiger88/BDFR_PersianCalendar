@@ -74,12 +74,12 @@ Deno.serve(async req => {
   if (current?.type === "trial") {
     const { data: claims, error: claimError } = await db
       .from("zurvan_trial_devices")
-      .select("fingerprint")
-      .eq("first_account_id", user.id).limit(2);
+      .select("fingerprint,platform,verified")
+      .eq("first_account_id", user.id).limit(10);
     if (claimError) return json(503, { error: "trial_device_lookup_failed" });
     if (claims && claims.length > 0)
       trialDeviceAllowed = deviceFingerprint !== null &&
-        claims.some(x => x.fingerprint === deviceFingerprint);
+        claims.some(x => x.fingerprint === deviceFingerprint && x.verified === true);
   }
 
   // Only Emperor and Empress receive administrator write entitlement.
