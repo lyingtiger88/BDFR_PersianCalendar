@@ -172,6 +172,8 @@ enum ZurvanIOSLicense {
     private static let pahlaviGrantKey = "zurvan.online.pahlavi.granted"
     private static let pahlaviVerifiedAtKey = "zurvan.online.pahlavi.checkedAt"
     static var hasOnlinePahlaviAccess: Bool {
+        // Never apply a previous account's cached feature to a signed-out user.
+        guard load() != nil else { return false }
         let defaults = UserDefaults.standard
         let age = Date().timeIntervalSince1970 -
             defaults.double(forKey: pahlaviVerifiedAtKey)
@@ -231,6 +233,23 @@ enum ZurvanIOSLicense {
         if let visible { body["visible"] = visible }
         return try await request("/functions/v1/zurvan-user-progress",
             body:body,bearer:session.accessToken)
+    }
+
+    /// Re-check the Pahlavi feature on entering Settings. Network failure
+    /// hides the premium controls instead of relying on the 24-hour cache.
+    static func refreshPahlaviGrant() async -> Bool {
+        guard var session = load() else { return false }
+        do {
+            let refreshed = try await request("/auth/v1/token?grant_type=refresh_token",
+                body:["refresh_token":session.refreshToken])
+            guard let access = refreshed["access_token"] as? String,
+                  let refresh = refreshed["refresh_token"] as? String else { return false }
+            session.accessToken = access
+            session.refreshToken = refresh
+            try store(session)
+            _ = try await readOnlineStatus(session)
+            return hasOnlinePahlaviAccess
+        } catch { return false }
     }
 
     static var isLicensed: Bool {
