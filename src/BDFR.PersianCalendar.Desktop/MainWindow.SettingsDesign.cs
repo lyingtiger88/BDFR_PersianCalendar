@@ -1305,6 +1305,10 @@ public sealed partial class MainWindow
         contents.Children.Add(_settingsServerLicenseStatus);
         if (_authClient.SignedInEmail is not null)
             _ = LoadSupabaseLicenseStatusAsync(_settingsServerLicenseStatus);
+        AddSettingsSeparator(contents);
+        var progressHost = new StackPanel { Spacing = 10 };
+        contents.Children.Add(progressHost);
+        _ = LoadUserProgressAsync(progressHost);
         _settingsContent!.Children.Add(SettingsCard(contents));
     }
 
