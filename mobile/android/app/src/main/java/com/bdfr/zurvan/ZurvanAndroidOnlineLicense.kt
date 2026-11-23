@@ -34,6 +34,7 @@ internal object ZurvanAndroidOnlineLicense {
         var canWrite: Boolean = false,
         var mode: String = "unknown",
         var daysRemaining: Int = 0,
+        var pahlaviOccasions: Boolean = false,
         var verifiedAtMs: Long = 0L
     ) {
         fun json() = JSONObject()
@@ -43,12 +44,14 @@ internal object ZurvanAndroidOnlineLicense {
             .put("can_write", canWrite)
             .put("mode", mode)
             .put("days_remaining", daysRemaining)
+            .put("pahlavi_occasions", pahlaviOccasions)
             .put("verified_at_ms", verifiedAtMs)
         companion object {
             fun fromJson(value: JSONObject) = Session(
                 value.getString("access_token"), value.getString("refresh_token"),
                 value.getString("auth_user_id"), value.optBoolean("can_write", false),
                 value.optString("mode", "unknown"), value.optInt("days_remaining", 0),
+                value.optBoolean("pahlavi_occasions", false),
                 value.optLong("verified_at_ms", 0)
             )
         }
@@ -105,6 +108,12 @@ internal object ZurvanAndroidOnlineLicense {
         load(context)?.takeIf { hasRecentServerEntitlement(context) }
             ?.daysRemaining?.coerceAtLeast(0) ?: 0
 
+    fun hasPahlaviAccess(context: Context): Boolean {
+        val session = load(context) ?: return false
+        val age = System.currentTimeMillis() - session.verifiedAtMs
+        return session.pahlaviOccasions && age in 0L..OFFLINE_CACHE_MS
+    }
+
     fun hasLinkedOnlineAccount(context: Context): Boolean = load(context) != null
 
     private fun post(path: String, body: JSONObject, token: String? = null): JSONObject {
@@ -137,6 +146,8 @@ internal object ZurvanAndroidOnlineLicense {
         session.canWrite = response.optBoolean("can_write", false)
         session.mode = response.optString("mode", "unknown")
         session.daysRemaining = response.optInt("days_remaining", 0)
+        session.pahlaviOccasions = response.optJSONObject("features")
+            ?.optBoolean("pahlavi_occasions", false) == true
         session.verifiedAtMs = System.currentTimeMillis()
         save(context, session)
     }
