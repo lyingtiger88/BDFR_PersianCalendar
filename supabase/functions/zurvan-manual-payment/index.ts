@@ -90,12 +90,21 @@ Deno.serve(async req => {
         });
         if(error && error.code!=="23505")return fail("license_account_setup_failed",origin,503);
       }else if(licenseAccount.status!=="active")return fail("account_inactive",origin,403);
-      // Website onboarding creates account records only. A browser cannot
-      // supply a trustworthy Windows device identity. The desktop client
-      // issues the one-time free trial after sending a device fingerprint.
-      return reply(200,{
-        initialized:true,trial:null,trial_source:"windows_device"
-      },origin);
+      // A web request has no verifiable physical-device evidence.
+      // Do not consume an account-only free trial; issue it on a validated app.
+      return reply(200,{initialized:true,trial_created:false},origin);
+    }
+    if(action==="catalog"){
+      const {data:products,error:productError}=await db.from("zurvan_products")
+        .select("id,name,sales_enabled,enabled").eq("enabled",true).order("id");
+      if(productError)return fail("catalog_unavailable",origin,503);
+      const {data:plans,error:planError}=await db.from("kaliia_store_plans")
+        .select("product_id,months,amount_minor,currency,enabled")
+        .eq("enabled",true).order("months");
+      if(planError)return fail("catalog_unavailable",origin,503);
+      return reply(200,{products:(products??[]).map(p=>({
+        ...p,plans:p.sales_enabled?(plans??[]).filter(x=>x.product_id===p.id):[]
+      }))},origin);
     }
     if(action==="config"){
       const {data,error}=await db.from("zurvan_manual_payment_config")
@@ -109,12 +118,27 @@ Deno.serve(async req => {
     }
     if(action==="mine"){
       const {data,error}=await db.from("zurvan_manual_payments")
-        .select("id,status,submitted_at,reviewed_at,admin_note")
+        .select("id,status,product_id,plan_code,duration_months,amount_minor,currency,bank_reference,submitted_at,reviewed_at,admin_note")
         .eq("auth_user_id",user.id).order("submitted_at",{ascending:false}).limit(10);
       if(error)return fail("requests_unavailable",origin,503);
       return reply(200,{requests:data??[]},origin);
     }
     if(action==="submit"){
+      const productId=typeof body.product_id==="string"?body.product_id.trim():"";
+      const months=Number(body.months);
+      if(!/^[a-z][a-z0-9-]{1,50}$/.test(productId)||
+        ![1,3,6,12].includes(months))return fail("invalid_product_plan",origin);
+      const {data:saleProduct,error:saleError}=await db.from("zurvan_products")
+        .select("id").eq("id",productId).eq("enabled",true)
+        .eq("sales_enabled",true).maybeSingle();
+      if(saleError||!saleProduct)return fail("product_not_for_sale",origin);
+      const {data:price,error:priceError}=await db.from("kaliia_store_plans")
+        .select("amount_minor,currency,enabled").eq("product_id",productId)
+        .eq("months",months).eq("enabled",true).maybeSingle();
+      if(priceError||!price||!price.amount_minor||price.amount_minor<=0)
+        return fail("plan_not_configured",origin,409);
+      const reference=typeof body.bank_reference==="string"?body.bank_reference.trim():"";
+      if(reference.length>80)return fail("invalid_bank_reference",origin);
       const full_name=typeof body.full_name==="string" ? body.full_name.trim() : "";
       const phone=typeof body.phone==="string" ? body.phone.trim().replace(/[\s()-]/g,"") : "";
       if(full_name.length<3 || full_name.length>120 || !/^\+?[0-9]{9,15}$/.test(phone))
@@ -150,21 +174,61 @@ Deno.serve(async req => {
       if(uploadError)return fail("receipt_upload_failed",origin,503);
       const {error:insertError}=await db.from("zurvan_manual_payments").insert({
         id,auth_user_id:user.id,full_name,contact_email:user.email,
-        phone,receipt_path:path,receipt_mime:file.mime,receipt_size:file.bytes.length
+        phone,receipt_path:path,receipt_mime:file.mime,receipt_size:file.bytes.length,
+        product_id:productId,plan_code:String(months)+"m",duration_months:months,
+        amount_minor:price.amount_minor,currency:price.currency,
+        bank_reference:reference||null
       });
       if(insertError){
         await db.storage.from(BUCKET).remove([path]);
         if(insertError.code==="23505")return fail("pending_request_exists",origin,409);
         return fail("request_save_failed",origin,503);
       }
-      return reply(201,{id,status:"pending",message:"submitted_for_review"},origin);
+      return reply(201,{id,status:"pending",product_id:productId,months,amount_minor:price.amount_minor,currency:price.currency,message:"submitted_for_review"},origin);
     }
 
     if(!(await isAdmin()))return fail("admin_required",origin,403);
 
+    if(action==="admin_list_users"){
+      const page=Number(body.page??1);
+      if(!Number.isInteger(page)||page<1||page>10000)
+        return fail("invalid_page",origin);
+      const {data,error}=await db.auth.admin.listUsers({page,perPage:100});
+      if(error)return fail("user_list_failed",origin,503);
+      const ids=data.users.map(u=>u.id);
+      let grants: Array<{account_id:string,pahlavi_occasions:boolean}>=[];
+      if(ids.length){
+        const {data:rows,error:ge}=await db.from("zurvan_account_features")
+          .select("account_id,pahlavi_occasions").in("account_id",ids);
+        if(ge)return fail("feature_list_failed",origin,503);
+        grants=rows??[];
+      }
+      const granted=new Map(grants.map(x=>[x.account_id,x.pahlavi_occasions]));
+      return reply(200,{users:data.users.map(u=>({
+        account_id:u.id,email:u.email??"",confirmed:!!u.email_confirmed_at,
+        pahlavi_occasions:granted.get(u.id)===true
+      })),page,next_page:data.users.length===100?page+1:null},origin);
+    }
+    if(action==="admin_user_features"){
+      const {data,error}=await db.from("zurvan_account_features")
+        .select("account_id,pahlavi_occasions,updated_at").limit(500);
+      if(error)return fail("feature_list_failed",origin,503);
+      return reply(200,{features:data??[]},origin);
+    }
+    if(action==="admin_set_pahlavi"){
+      if(typeof body.account_id!=="string" || !uuid.test(body.account_id) ||
+          typeof body.enabled!=="boolean")
+        return fail("invalid_feature_request",origin);
+      const {data,error}=await db.rpc("zurvan_admin_set_pahlavi_feature",{
+        p_actor:user.id,p_account:body.account_id,p_enabled:body.enabled
+      });
+      if(error)return fail(error.message.includes("account_not_found")?
+        "account_not_found":"feature_update_failed",origin,403);
+      return reply(200,data,origin);
+    }
     if(action==="admin_list"){
       const {data,error}=await db.from("zurvan_manual_payments")
-        .select("id,full_name,contact_email,phone,status,submitted_at,reviewed_at,admin_note,receipt_mime,receipt_size")
+        .select("id,auth_user_id,full_name,contact_email,phone,status,product_id,plan_code,duration_months,amount_minor,currency,bank_reference,submitted_at,reviewed_at,admin_note,receipt_mime,receipt_size")
         .order("submitted_at",{ascending:false}).limit(100);
       if(error)return fail("list_unavailable",origin,503);
       return reply(200,{requests:data??[]},origin);
@@ -193,47 +257,32 @@ Deno.serve(async req => {
       }
       return reply(200,data,origin);
     }
-    if(action==="admin_list_users"){
-      const page=Number(body.page ?? 1);
-      if(!Number.isInteger(page) || page<1 || page>10000)
-        return fail("invalid_page",origin);
-      const {data,error}=await db.auth.admin.listUsers({page,perPage:100});
-      if(error)return fail("user_list_failed",origin,503);
-      const ids=data.users.map(u=>u.id);
-      let grants: Array<{account_id:string,pahlavi_occasions:boolean}> = [];
-      if(ids.length){
-        const {data:rows,error:grantError}=await db.from("zurvan_account_features")
-          .select("account_id,pahlavi_occasions").in("account_id",ids);
-        if(grantError)return fail("feature_list_failed",origin,503);
-        grants=rows??[];
-      }
-      const granted=new Map(grants.map(x=>[x.account_id,x.pahlavi_occasions]));
-      return reply(200,{
-        users:data.users.map(u=>({
-          account_id:u.id,
-          email:u.email??"",
-          confirmed:!!u.email_confirmed_at,
-          pahlavi_occasions:granted.get(u.id)===true
-        })),
-        page,next_page:data.users.length===100?page+1:null
-      },origin);
+    if(action==="admin_plans"){
+      const {data,error}=await db.from("kaliia_store_plans")
+        .select("product_id,months,amount_minor,currency,enabled,updated_at")
+        .order("product_id").order("months");
+      if(error)return fail("plans_unavailable",origin,503);
+      return reply(200,{plans:data??[]},origin);
     }
-    if(action==="admin_user_features"){
-      const {data:rows,error}=await db.from("zurvan_account_features")
-        .select("account_id,pahlavi_occasions,updated_at").limit(500);
-      if(error)return fail("feature_list_failed",origin,503);
-      return reply(200,{features:rows??[]},origin);
-    }
-    if(action==="admin_set_pahlavi"){
-      if(typeof body.account_id!=="string" || !uuid.test(body.account_id) ||
-         typeof body.enabled!=="boolean")
-        return fail("invalid_feature_request",origin);
-      const {data,error}=await db.rpc("zurvan_admin_set_pahlavi_feature",{
-        p_actor:user.id,p_account:body.account_id,p_enabled:body.enabled
-      });
-      if(error)return fail(error.message.includes("account_not_found")?
-          "account_not_found":"feature_update_failed",origin,403);
-      return reply(200,data,origin);
+    if(action==="admin_set_plan"){
+      const productId=typeof body.product_id==="string"?body.product_id.trim():"";
+      const months=Number(body.months),amount=Number(body.amount_minor);
+      const enabled=body.enabled===true;
+      const currency=String(body.currency??"IRR");
+      if(!/^[a-z][a-z0-9-]{1,50}$/.test(productId)||
+         ![1,3,6,12].includes(months)||!Number.isSafeInteger(amount)||
+         amount<=0||!["IRR","IRT"].includes(currency))
+        return fail("invalid_plan",origin);
+      const {data:product,error:productError}=await db.from("zurvan_products")
+        .select("id").eq("id",productId).eq("enabled",true)
+        .maybeSingle();
+      if(productError||!product)return fail("product_not_for_sale",origin,403);
+      const {error}=await db.from("kaliia_store_plans").upsert({
+        product_id:productId,months,amount_minor:amount,currency,enabled,
+        updated_at:new Date().toISOString(),updated_by:user.id
+      },{onConflict:"product_id,months"});
+      if(error)return fail("plan_save_failed",origin,503);
+      return reply(200,{saved:true,product_id:productId,months,enabled},origin);
     }
     if(action==="admin_config"){
       const card=typeof body.merchant_card==="string" ?
