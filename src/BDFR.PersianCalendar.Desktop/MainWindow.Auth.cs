@@ -62,6 +62,7 @@ public sealed partial class MainWindow
             status.Text = "اگر حسابی با این ایمیل وجود داشته باشد، پیام بازیابی ارسال می‌شود.";
         });
         signOut.Click += async (_, _) => await Run(() => _authClient.SignOutAsync());
+        panel.Children.Add(BuildAccountBadgeDashboard());
         panel.Children.Add(status);
         panel.Children.Add(email);
         panel.Children.Add(password);
@@ -74,4 +75,52 @@ public sealed partial class MainWindow
         Update();
         return panel;
     }
+    private FrameworkElement BuildAccountBadgeDashboard()
+    {
+        var navy = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 20, 23, 46));
+        var cardBrush = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 34, 37, 68));
+        var gold = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 244, 199, 92));
+        var muted = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 183, 184, 210));
+        var white = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Colors.White);
+        var root = new StackPanel { Spacing = 12 };
+        root.Children.Add(new TextBlock {
+            Text = "♛  " + (_authClient.SignedInEmail ?? "کاربر زروان"),
+            FontSize = 21, FontWeight = Microsoft.UI.Text.FontWeights.Bold,
+            Foreground = gold, TextWrapping = TextWrapping.Wrap
+        });
+        root.Children.Add(new TextBlock { Text = "سطح: در انتظار دریافت", Foreground = muted });
+        var stats = new Grid { ColumnSpacing = 8 };
+        for (int i = 0; i < 3; i++) stats.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        var metrics = new[] { "★ XP", "◈ Silver", "♧ دعوت موفق" };
+        for (int i = 0; i < metrics.Length; i++) {
+            var stack = new StackPanel { Spacing = 6, HorizontalAlignment = HorizontalAlignment.Center };
+            stack.Children.Add(new TextBlock { Text = metrics[i], Foreground = muted });
+            stack.Children.Add(new TextBlock { Text = "—", Foreground = white, FontSize = 20, HorizontalAlignment = HorizontalAlignment.Center });
+            var panel = new Border { Background = cardBrush, CornerRadius = new CornerRadius(12), Padding = new Thickness(8), Child = stack };
+            Grid.SetColumn(panel, i);
+            stats.Children.Add(panel);
+        }
+        root.Children.Add(stats);
+        root.Children.Add(new TextBlock { Text = "🏅 نشان‌ها (Badge)", Foreground = white, FontSize = 18, FontWeight = Microsoft.UI.Text.FontWeights.Bold });
+        var badges = new Grid { ColumnSpacing = 6 };
+        for (int i = 0; i < 4; i++) badges.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        var names = new[] { "📅 کاربر فعال", "✦ کاوشگر", "♧ دعوت‌کننده", "♛ عضو ویژه" };
+        for (int i = 0; i < names.Length; i++) {
+            var item = new Border {
+                Background = cardBrush, CornerRadius = new CornerRadius(12), Padding = new Thickness(8),
+                Child = new TextBlock { Text = names[i], Foreground = gold, TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Center }
+            };
+            Grid.SetColumn(item, i);
+            badges.Children.Add(item);
+        }
+        root.Children.Add(badges);
+        root.Children.Add(new TextBlock { Text = "وضعیت دریافت نشان‌ها هنوز به حساب متصل نشده است.", Foreground = muted, TextWrapping = TextWrapping.Wrap });
+        var referral = new StackPanel { Spacing = 7 };
+        referral.Children.Add(new TextBlock { Text = "دعوت از دوستان", Foreground = white, FontSize = 18 });
+        referral.Children.Add(new TextBlock { Text = "کد معرف: در انتظار دریافت از سرور", Foreground = gold });
+        referral.Children.Add(new TextBlock { Text = "۱۰۰ XP برای هر دعوت موفق · Premium Silver برای هر ۱۵ دعوت موفق", Foreground = muted, TextWrapping = TextWrapping.Wrap });
+        root.Children.Add(new Border { Background = cardBrush, CornerRadius = new CornerRadius(14), Padding = new Thickness(12), Child = referral });
+        return new Border { Background = navy, CornerRadius = new CornerRadius(22), Padding = new Thickness(16), Child = root };
+    }
+
 }
