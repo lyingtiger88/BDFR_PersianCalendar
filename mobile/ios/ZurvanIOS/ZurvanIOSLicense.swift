@@ -156,7 +156,10 @@ enum ZurvanIOSLicense {
         try store(session)
         let status = try await request("/functions/v1/zurvan-license-status",
             body:[:],bearer:access)
-        if status["can_write"] as? Bool == true { return true }
+        if status["can_write"] as? Bool == true {
+            applyOnlineFeatures(status)
+            return true
+        }
 
         let fingerprint = try onlineTrialFingerprint()
         let proof = try await deviceCheckToken()
@@ -166,10 +169,22 @@ enum ZurvanIOSLicense {
         return try await readOnlineStatus(session)
     }
 
+    private static let pahlaviGrantKey = "zurvan.online.pahlavi.granted"
+    static var hasOnlinePahlaviAccess: Bool {
+        UserDefaults.standard.bool(forKey: pahlaviGrantKey)
+    }
+
+    private static func applyOnlineFeatures(_ result: [String: Any]) {
+        let features = result["features"] as? [String: Any]
+        UserDefaults.standard.set(features?["pahlavi_occasions"] as? Bool == true,
+            forKey: pahlaviGrantKey)
+    }
+
     private static func readOnlineStatus(_ session: OnlineSession) async throws -> Bool {
         let fingerprint = try onlineTrialFingerprint()
         let result = try await request("/functions/v1/zurvan-license-status",
             body:["key_fingerprint":fingerprint],bearer:session.accessToken)
+        applyOnlineFeatures(result)
         return result["can_write"] as? Bool == true
     }
 
