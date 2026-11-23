@@ -2,6 +2,7 @@ using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Win32;
+using System.Management;
 using Windows.Storage.Streams;
 using Windows.System.Profile;
 using System.Text.Json;
@@ -184,7 +185,26 @@ internal sealed class ZurvanAuthClient
     private static string GetDeviceTrialFingerprint()
     {
         string? identity = null;
-        try
+
+        // Prefer firmware-provided serials. Unlike MachineGuid, these generally
+        // survive a Windows reinstall. Reject generic OEM placeholder values:
+        // sharing a placeholder between machines would incorrectly burn a trial.
+        var boardSerial = ReadHardwareSerial("Win32_BaseBoard", "SerialNumber");
+        if (boardSerial is not null)
+        {
+            // Manufacturer/product disambiguate serials reused by some OEMs.
+            var manufacturer = ReadHardwareLabel("Win32_BaseBoard", "Manufacturer");
+            var product = ReadHardwareLabel("Win32_BaseBoard", "Product");
+            identity = "motherboard:" + manufacturer + "|" + product + "|" + boardSerial;
+        }
+        else
+        {
+            var biosSerial = ReadHardwareSerial("Win32_BIOS", "SerialNumber");
+            if (biosSerial is not null)
+                identity = "bios:" + biosSerial;
+        }
+
+        if (identity is null) try
         {
             var info = SystemIdentification.GetSystemIdForPublisher();
             if (info?.Id is not null && info.Id.Length > 0)
@@ -215,6 +235,48 @@ internal sealed class ZurvanAuthClient
         return Convert.ToHexString(SHA256.HashData(
             Encoding.UTF8.GetBytes("zurvan-free-trial-device-v1|" + identity)))
             .ToLowerInvariant();
+    }
+
+    private static string? ReadHardwareLabel(string wmiClass, string property)
+    {
+        try
+        {
+            // Fixed internal WMI class/property names, not user-provided query text.
+            using var search = new ManagementObjectSearcher(
+                "SELECT " + property + " FROM " + wmiClass);
+            using var items = search.Get();
+            foreach (ManagementBaseObject item in items)
+            {
+                using (item)
+                {
+                    var raw = item[property]?.ToString()?.Trim();
+                    if (!string.IsNullOrWhiteSpace(raw))
+                        return raw.ToUpperInvariant();
+                }
+            }
+        }
+        catch (Exception) { /* WMI may be disabled or unavailable. */ }
+        return null;
+    }
+
+    private static string? ReadHardwareSerial(string wmiClass, string property)
+    {
+        var serial = ReadHardwareLabel(wmiClass, property);
+        if (serial is null || serial.Length < 6 || serial.Length > 128)
+            return null;
+        var compact = new string(serial.Where(char.IsLetterOrDigit).ToArray());
+        if (compact.Length < 6 || compact.All(c => c == compact[0]))
+            return null;
+        // Common placeholders and firmware defaults are not device identifiers.
+        string[] invalid = [
+            "TOBEFILLEDBYOEM", "DEFAULTSTRING", "SYSTEMSERIALNUMBER",
+            "BASEBOARDSERIALNUMBER", "SERIALNUMBER", "NOTAPPLICABLE",
+            "NOTSPECIFIED", "NOTAVAILABLE", "UNKNOWN", "NONE",
+            "OEM", "INVALID", "UNDEFINED"
+        ];
+        if (invalid.Any(x => compact == x || compact.Contains("TOBEFILLEDBYOEM")))
+            return null;
+        return serial;
     }
 
     internal async Task<JsonDocument> StartTrialAsync()
