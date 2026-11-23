@@ -2976,13 +2976,8 @@ private fun SettingsScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-        if (settingsCategory == "calendar") item {
+        if (settingsCategory == "calendar" && privilegedOccasions) item {
             SettingsCard(title = "تقویم شاهنشاهی (پهلوی)") {
-                if (!privilegedOccasions) {
-                    Text("این قابلیت ویژه است. مدیر باید مجوز تقویم پهلوی را برای ایمیل حساب شما در زروان فعال کند.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text("نمایش سال شاهنشاهی")
