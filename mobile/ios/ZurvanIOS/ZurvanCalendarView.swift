@@ -43,8 +43,24 @@ private enum ZurvanOccasions {
         .init(id:"ghadir",title:"عید غدیر",calendar:.islamicCivil,month:12,day:18,holiday:true,mourning:false)
     ]
 
+    // Curated historical observances, NOT official public holidays.
+    static let pahlaviRecords: [ZurvanOccasion] = [
+        .init(id:"historical-pahlavi-8-4",
+              title:"زادروز محمدرضا پهلوی (مناسبت تاریخی)",
+              calendar:.persian,month:8,day:4,holiday:false,mourning:false),
+        .init(id:"historical-pahlavi-11-6",
+              title:"سالروز همه‌پرسی انقلاب سفید (مناسبت تاریخی)",
+              calendar:.persian,month:11,day:6,holiday:false,mourning:false)
+    ]
+
+    static var visibleRecords: [ZurvanOccasion] {
+        let allowed = ZurvanIOSLicense.hasOnlinePahlaviAccess
+        let selected = UserDefaults.standard.bool(forKey:"zurvan.occasion.pahlavi.enabled")
+        return allowed && selected ? records + pahlaviRecords : records
+    }
+
     static func forDate(_ date: Date) -> [ZurvanOccasion] {
-        records.filter { item in
+        visibleRecords.filter { item in
             let components = Calendar(identifier: item.calendar)
                 .dateComponents([.month, .day], from: date)
             return components.month == item.month && components.day == item.day
@@ -58,6 +74,8 @@ private enum ZurvanOccasions {
 }
 
 struct ZurvanCalendarView: View {
+    @AppStorage("zurvan.occasion.pahlavi.enabled") private var historicalCalendarEnabled = false
+    @AppStorage("zurvan.online.pahlavi.granted") private var historicalCalendarAllowed = false
     @State private var monthOffset = 0
     @State private var selectedDate: Date?
     private let persian = Calendar(identifier: .persian)
@@ -163,6 +181,8 @@ private struct SelectedZurvanDate: Identifiable {
 }
 
 struct ZurvanOccasionsView: View {
+    @AppStorage("zurvan.occasion.pahlavi.enabled") private var historicalCalendarEnabled = false
+    @AppStorage("zurvan.online.pahlavi.granted") private var historicalCalendarAllowed = false
     @AppStorage("zurvan.zodiac.theme") private var zodiacTheme = "cosmic"
     private let zodiacStyles: [(String, String, String, [Color])] = [
         ("cosmic", "کیهانی کلاسیک", "sparkles", [Color(red:0.08,green:0.06,blue:0.22), Color(red:0.22,green:0.12,blue:0.48)]),
@@ -197,9 +217,14 @@ struct ZurvanOccasionsView: View {
                 .background(LinearGradient(colors: zodiacStyles.first(where: { $0.0 == zodiacTheme })?.3 ?? zodiacStyles[0].3, startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 20))
                 .overlay(RoundedRectangle(cornerRadius: 20).stroke(.white.opacity(0.18), lineWidth: 1))
 
+                if historicalCalendarAllowed {
+                    Toggle("مناسبت‌های تقویم شاهنشاهی (پهلوی)", isOn:$historicalCalendarEnabled)
+                    Text("مناسبت‌های تاریخی غیررسمی؛ سال شاهنشاهی برابر سال شمسی + ۱۱۸۰ است.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
                 VStack(alignment: .leading, spacing: 8) {
                     Text("مناسبت‌های رسمی ثابت").font(.headline)
-                    ForEach(ZurvanOccasions.records) { item in
+                    ForEach(ZurvanOccasions.visibleRecords) { item in
                         HStack {
                             VStack(alignment:.leading) {
                                 Text(item.title).foregroundStyle(item.holiday ? Color.red : Color.primary)
