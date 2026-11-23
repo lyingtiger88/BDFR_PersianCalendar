@@ -172,10 +172,13 @@ Deno.serve(async req => {
       if(decoded?.appIntegrity?.appRecognitionVerdict!=="PLAY_RECOGNIZED" ||
          !decoded?.deviceIntegrity?.deviceRecognitionVerdict?.includes("MEETS_DEVICE_INTEGRITY"))
         return reply(403,{error:"untrusted_android_device"});
-      const recall=decoded?.deviceIntegrity?.deviceRecall?.values;
-      if (typeof recall?.bitFirst!=="boolean")
+      const recall=decoded?.deviceIntegrity?.deviceRecall;
+      // A fresh, evaluated device commonly returns values: {} with no bits.
+      // Missing the deviceRecall object altogether means the feature has
+      // not been enabled/evaluated; do not issue an unprotected trial.
+      if (!recall || !recall.values || typeof recall.values!=="object")
         return reply(503,{error:"play_device_recall_not_enabled"});
-      if (recall.bitFirst && !priorClaim)
+      if (recall.values.bitFirst===true && !priorClaim)
         return reply(409,{error:"device_trial_already_used"});
       vendorToken=integrityToken;
       marked=async()=>{
