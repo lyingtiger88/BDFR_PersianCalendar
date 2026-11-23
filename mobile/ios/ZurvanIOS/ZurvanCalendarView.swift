@@ -200,6 +200,7 @@ private struct SelectedZurvanDate: Identifiable {
 }
 
 struct ZurvanOccasionsView: View {
+    @State private var verifiedImperialGrant = false
     @AppStorage("zurvan.occasion.pahlavi.enabled") private var historicalCalendarEnabled = false
     @AppStorage("zurvan.occasion.pahlavi.year.enabled") private var imperialYearEnabled = false
     @AppStorage("zurvan.online.pahlavi.granted") private var featureGrantChanged = false
@@ -237,7 +238,8 @@ struct ZurvanOccasionsView: View {
                 .background(LinearGradient(colors: zodiacStyles.first(where: { $0.0 == zodiacTheme })?.3 ?? zodiacStyles[0].3, startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 20))
                 .overlay(RoundedRectangle(cornerRadius: 20).stroke(.white.opacity(0.18), lineWidth: 1))
 
-                if featureGrantChanged && ZurvanIOSLicense.hasOnlinePahlaviAccess {
+                if verifiedImperialGrant &&
+                    featureGrantChanged && ZurvanIOSLicense.hasOnlinePahlaviAccess {
                     Toggle("نمایش سال شاهنشاهی (پهلوی)", isOn:$imperialYearEnabled)
                     Toggle("مناسبت‌های تاریخی دوره پهلوی", isOn:$historicalCalendarEnabled)
                     Text("مناسبت‌های تاریخی غیررسمی؛ سال شاهنشاهی برابر سال شمسی + ۱۱۸۰ است.")
@@ -265,5 +267,9 @@ struct ZurvanOccasionsView: View {
         }
         .background { ZurvanBackgroundView() }
         .navigationTitle("مناسبت‌ها")
+        .task {
+            verifiedImperialGrant = false
+            verifiedImperialGrant = await ZurvanIOSLicense.refreshPahlaviGrant()
+        }
     }
 }
