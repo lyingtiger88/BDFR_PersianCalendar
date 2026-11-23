@@ -109,8 +109,9 @@ struct ContentView: View {
             .tag(ZurvanTab.settings)
         }
         .task {
-            if !licensed && await ZurvanIOSLicense.refreshOnlineEntitlement() {
-                licensed = true
+            if !licensed {
+                let online = await ZurvanIOSLicense.refreshOnlineEntitlement()
+                if online { licensed = true }
             }
         }
         .onChange(of: selection) { _, newValue in
