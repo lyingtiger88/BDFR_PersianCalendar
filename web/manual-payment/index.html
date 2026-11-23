@@ -66,6 +66,15 @@ button.secondary{background:#344b65}button.reject{background:#a93c4e}button:disa
 </div>
 <div class="actions"><button id="saveBank">ثبت حساب مقصد</button><button id="reloadAdmin" class="secondary">به‌روزرسانی درخواست‌ها</button></div>
 <div id="adminRequests"></div>
+<hr>
+<h3>مجوز تقویم پهلوی کاربران</h3>
+<p class="small">این مجوز مستقل از اشتراک سالانه است و فقط مدیر ارشد می‌تواند آن را صادر یا لغو کند.</p>
+<div class="grid">
+<div><label for="featureAccount">شناسه UUID حساب کاربر</label><input id="featureAccount" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" spellcheck="false"></div>
+<div><label for="featureEnabled">دسترسی به مناسبت‌های پهلوی</label><select id="featureEnabled"><option value="true">فعال</option><option value="false">غیرفعال</option></select></div>
+</div>
+<div class="actions"><button id="savePahlavi" class="secondary">ثبت مجوز ویژه</button></div>
+<div id="adminFeatures"></div>
 </section>
 <div id="message" class="status" role="status" aria-live="polite">برای شروع وارد حساب شوید.</div>
 <p class="small">رسیدها خصوصی هستند و فقط مدیر مجاز لینک مشاهده موقت دریافت می‌کند. قبل از تأیید، واریز را با تراکنش بانکی واقعی تطبیق دهید.</p>
@@ -150,6 +159,25 @@ async function loadMine(){
 function addButton(parent,label,handler,css="secondary"){
  const b=document.createElement("button");b.type="button";b.textContent=label;b.className=css;b.addEventListener("click",handler);parent.append(b);
 }
+async function loadPahlaviGrants(){
+  try{
+    const data=await api("admin_user_features");
+    const host=el("adminFeatures");host.replaceChildren();
+    const title=document.createElement("p");
+    title.textContent="مجوزهای ثبت‌شده: "+data.features.length;host.append(title);
+    for(const item of data.features){
+      const entry=document.createElement("div");entry.className="entry";
+      const t=document.createElement("span");
+      t.textContent=item.account_id+" | "+(item.pahlavi_occasions?"فعال":"غیرفعال");
+      entry.append(t);
+      addButton(entry,"انتخاب کاربر",()=>{
+        el("featureAccount").value=item.account_id;
+        el("featureEnabled").value=String(item.pahlavi_occasions);
+      });
+      host.append(entry);
+    }
+  }catch(e){status(e.message);}
+}
 async function loadAdmin(){
  try{
    const data=await api("admin_list");
@@ -183,6 +211,19 @@ async function loadAdmin(){
    }
  }catch(e){if(admin)status(e.message);}
 }
+el("savePahlavi").addEventListener("click",async()=>{
+  const account_id=el("featureAccount").value.trim();
+  if(!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(account_id)){
+    status("شناسه UUID معتبر وارد کنید.");return;
+  }
+  const enabled=el("featureEnabled").value==="true";
+  if(!confirm("مجوز تقویم پهلوی برای این حساب "+(enabled?"فعال":"لغو")+" شود؟"))return;
+  try{
+    await api("admin_set_pahlavi",{account_id,enabled});
+    await loadPahlaviGrants();
+    status("مجوز تقویم پهلوی ذخیره شد.");
+  }catch(e){status(e.message);}
+});
 el("signup").addEventListener("click",async()=>{
  try{
  const email=el("email").value.trim(),password=el("password").value;
