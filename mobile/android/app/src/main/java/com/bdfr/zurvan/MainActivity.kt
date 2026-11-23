@@ -3465,6 +3465,10 @@ private fun ZurvanDeskScreen(
             }
         }
 
+        if (state.authenticated) {
+            ZurvanBadgeDashboard(state.displayName ?: state.identifier ?: "کاربر زروان", state.identifier.orEmpty())
+        }
+
         if (!state.authenticated) {
             Card(
                 modifier =
@@ -5264,3 +5268,61 @@ private fun toArabicDigits(
         .replace('7', '٧')
         .replace('8', '٨')
         .replace('9', '٩')
+
+@Composable
+private fun ZurvanBadgeDashboard(name: String, identifier: String) {
+    val navy = Color(0xFF14172E)
+    val card = Color(0xFF222544)
+    val gold = Color(0xFFF4C75C)
+    val violet = Color(0xFFAA8CFF)
+    val muted = Color(0xFFB7B8D2)
+    Column(
+        modifier = Modifier.fillMaxWidth().background(navy, RoundedCornerShape(24.dp))
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Surface(color = card, shape = RoundedCornerShape(50), border = BorderStroke(1.dp, gold)) {
+                Icon(Icons.Outlined.Person, null, Modifier.padding(13.dp).size(36.dp), tint = gold)
+            }
+            Column {
+                Text(name, color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
+                Text(identifier, color = muted, style = MaterialTheme.typography.bodySmall)
+                Text("سطح: در انتظار دریافت", color = violet, style = MaterialTheme.typography.labelMedium)
+            }
+        }
+        Row(
+            Modifier.fillMaxWidth().background(card, RoundedCornerShape(16.dp)).padding(vertical = 12.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            listOf(Triple("★", "XP", "—"), Triple("◈", "Silver", "—"), Triple("♧", "دعوت موفق", "—")).forEach { item ->
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(item.first, color = gold, style = MaterialTheme.typography.titleLarge)
+                    Text(item.second, color = muted, style = MaterialTheme.typography.labelSmall)
+                    Text(item.third, color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+        Column(Modifier.fillMaxWidth().background(card, RoundedCornerShape(18.dp)).padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("🏅 نشان‌ها (Badge)", color = Color.White, fontWeight = FontWeight.Bold)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                listOf("📅" to "کاربر فعال", "✦" to "کاوشگر", "♧" to "دعوت‌کننده", "♛" to "عضو ویژه").forEach { (symbol, label) ->
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                        Text(symbol, fontSize = 25.sp, color = gold)
+                        Text(label, color = muted, fontSize = 10.sp, textAlign = TextAlign.Center)
+                    }
+                }
+            }
+            Text("وضعیت دریافت نشان‌ها هنوز به حساب متصل نشده است.", color = muted,
+                style = MaterialTheme.typography.bodySmall)
+        }
+        Column(Modifier.fillMaxWidth().background(card, RoundedCornerShape(18.dp)).padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("دعوت از دوستان", color = Color.White, fontWeight = FontWeight.Bold)
+            Text("کد معرف: در انتظار دریافت از سرور", color = gold)
+            Text("۱۰۰ XP برای هر دعوت موفق · Premium Silver برای هر ۱۵ دعوت موفق",
+                color = muted, style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
