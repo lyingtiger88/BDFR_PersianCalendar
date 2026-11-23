@@ -155,7 +155,7 @@ private struct ZurvanActivationView: View {
                         .textInputAutocapitalization(.characters)
                         .autocorrectionDisabled()
                         .onChange(of:referralIdentifier) { _, value in
-                            referralIdentifier=String(value.uppercased().prefix(16))
+                            referralIdentifier=String(value.uppercased().prefix(8))
                         }
                     Text("شناسه معرف را از دوستت بگیر و هنگام ثبت‌نام وارد کن؛ لینک لازم نیست.")
                         .font(.footnote).foregroundStyle(.secondary)
