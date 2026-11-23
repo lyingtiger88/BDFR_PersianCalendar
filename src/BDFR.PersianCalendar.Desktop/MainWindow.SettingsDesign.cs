@@ -1147,6 +1147,35 @@ public sealed partial class MainWindow
             "تنظیمات کامل", OpenLegacySettings, "\uE787");
         AddSettingsAction(contents, "مناسبت‌ها", "نمایش مناسبت‌های ثبت‌شده و رسمی",
             "بازکردن مناسبت‌ها", () => ShowDesktopModule("مناسبت‌ها"), "\uE787");
+        contents.Children.Add(SettingsLabel("نمایش مناسبت‌ها براساس نوع تقویم", 14, true));
+        contents.Children.Add(SettingsOptionRow("مناسبت‌های شمسی و ملی",
+            "نمایش یا پنهان‌کردن مناسبت‌های شمسی، بدون حذف داده‌ها",
+            SettingsToggle(_settings.ShowPersianOccasions, enabled =>
+            {
+                _settings.ShowPersianOccasions = enabled;
+                _settingsService.Save(_settings);
+                ApplyOccasionVisibility();
+            }), "\uE787"));
+        contents.Children.Add(SettingsOptionRow("مناسبت‌های قمری و مذهبی",
+            "نمایش یا پنهان‌کردن مناسبت‌های قمری",
+            SettingsToggle(_settings.ShowHijriOccasions, enabled =>
+            {
+                _settings.ShowHijriOccasions = enabled;
+                _settingsService.Save(_settings);
+                ApplyOccasionVisibility();
+            }), "\uE787"));
+        contents.Children.Add(SettingsOptionRow("مناسبت‌های میلادی و جهانی",
+            "نمایش یا پنهان‌کردن مناسبت‌های میلادی و بین‌المللی",
+            SettingsToggle(_settings.ShowGregorianOccasions, enabled =>
+            {
+                _settings.ShowGregorianOccasions = enabled;
+                _settingsService.Save(_settings);
+                ApplyOccasionVisibility();
+            }), "\uE787"));
+        contents.Children.Add(SettingsHint(
+            "این گزینه‌ها فقط نمایش مناسبت‌ها را تغییر می‌دهند؛ تاریخ‌ها، رویدادهای شخصی و اطلاعات ذخیره‌شده حذف نمی‌شوند."));
+        AddSettingsSeparator(contents);
+
         // A server-confirmed account grant is the only authority to reveal
         // this option. Hide the entire row for everyone else (no lock/teaser).
         if (_licensePahlaviOccasions)
