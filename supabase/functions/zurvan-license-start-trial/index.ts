@@ -7,7 +7,12 @@ const json = (status: number, body: unknown) => new Response(JSON.stringify(body
 Deno.serve(async req => {
   if (req.method !== "POST") return json(405, { error: "method_not_allowed" });
   const url = Deno.env.get("SUPABASE_URL");
-  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  // Support Supabase's modern secret-key environment on the live project.
+  let key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  if (!key) {
+    try { key = JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS") ?? "{}").default ?? ""; }
+    catch { /* Explicitly fail closed if the secret-key mapping is malformed. */ }
+  }
   if (!url || !key) return json(503, { error: "not_configured" });
   const token = req.headers.get("authorization")?.match(/^Bearer (\S+)$/i)?.[1];
   if (!token) return json(401, { error: "unauthorized" });
