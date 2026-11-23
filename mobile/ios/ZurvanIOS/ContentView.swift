@@ -109,10 +109,10 @@ struct ContentView: View {
             .tag(ZurvanTab.settings)
         }
         .task {
-            if !licensed {
-                let online = await ZurvanIOSLicense.refreshOnlineEntitlement()
-                if online { licensed = true }
-            }
+            // Refresh account feature grants even if a legacy signed offline
+            // license already grants app access. Keep offline licenses valid.
+            let online = await ZurvanIOSLicense.refreshOnlineEntitlement()
+            if online { licensed = true }
         }
         .onChange(of: selection) { _, newValue in
             if !licensed && newValue != .calendar && newValue != .settings { selection = .calendar }
