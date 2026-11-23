@@ -45,6 +45,7 @@ public sealed partial class MainWindow
     private TextBlock? _settingsAccountNameText;
     private TextBlock? _settingsServerLicenseStatus;
     private bool _licenseCanWrite;
+    private bool _licensePahlaviOccasions;
     private string _licenseMode = "account_required";
     private string? _licenseExpiresAt;
     private Microsoft.UI.Dispatching.DispatcherQueueTimer? _licenseRefreshTimer;
@@ -284,6 +285,7 @@ public sealed partial class MainWindow
             if (_settingsAccountNameText is not null && !string.IsNullOrWhiteSpace(result.AccountUsername))
                 _settingsAccountNameText.Text = result.AccountUsername;
             _licenseCanWrite = result.CanWrite;
+            _licensePahlaviOccasions = result.PahlaviOccasions;
             _licenseMode = result.Mode;
             _licenseExpiresAt = result.ExpiresAt;
             StatusText.Text = result.CanWrite
@@ -338,6 +340,7 @@ public sealed partial class MainWindow
         if (_authClient.SignedInEmail is null)
         {
             _licenseCanWrite = false;
+            _licensePahlaviOccasions = false;
             _licenseMode = "account_required";
             StatusText.Text = "برای شروع دوره آزمایشی ۴۵ روزه، وارد حساب زروان شوید.";
             if (_activeDesktopModule != "تنظیمات") ShowDesktopModule(_activeDesktopModule);
@@ -357,6 +360,7 @@ public sealed partial class MainWindow
                 result = await _authClient.ReadLicenseStatusAsync();
             }
             _licenseCanWrite = result.CanWrite;
+            _licensePahlaviOccasions = result.PahlaviOccasions;
             _licenseMode = result.Mode;
             _licenseExpiresAt = result.ExpiresAt;
             DispatcherQueue.TryEnqueue(() =>
@@ -369,6 +373,7 @@ public sealed partial class MainWindow
         catch (Exception ex)
         {
             _licenseCanWrite = false;
+            _licensePahlaviOccasions = false;
             _licenseMode = "verification_unavailable";
             StartupDiagnostics.Log("License policy refresh failed: " + ex.Message);
             if (_activeDesktopModule != "تنظیمات") ShowDesktopModule(_activeDesktopModule);
