@@ -33,6 +33,7 @@ internal object ZurvanAndroidOnlineLicense {
         val authUserId: String,
         var canWrite: Boolean = false,
         var mode: String = "unknown",
+        var daysRemaining: Int = 0,
         var verifiedAtMs: Long = 0L
     ) {
         fun json() = JSONObject()
@@ -41,12 +42,14 @@ internal object ZurvanAndroidOnlineLicense {
             .put("auth_user_id", authUserId)
             .put("can_write", canWrite)
             .put("mode", mode)
+            .put("days_remaining", daysRemaining)
             .put("verified_at_ms", verifiedAtMs)
         companion object {
             fun fromJson(value: JSONObject) = Session(
                 value.getString("access_token"), value.getString("refresh_token"),
                 value.getString("auth_user_id"), value.optBoolean("can_write", false),
-                value.optString("mode", "unknown"), value.optLong("verified_at_ms", 0)
+                value.optString("mode", "unknown"), value.optInt("days_remaining", 0),
+                value.optLong("verified_at_ms", 0)
             )
         }
     }
@@ -95,6 +98,13 @@ internal object ZurvanAndroidOnlineLicense {
         return session.canWrite && age in 0L..OFFLINE_CACHE_MS
     }
 
+    fun activeOnlineMode(context: Context): String? =
+        load(context)?.takeIf { hasRecentServerEntitlement(context) }?.mode
+
+    fun onlineTrialDaysRemaining(context: Context): Int =
+        load(context)?.takeIf { hasRecentServerEntitlement(context) }
+            ?.daysRemaining?.coerceAtLeast(0) ?: 0
+
     fun hasLinkedOnlineAccount(context: Context): Boolean = load(context) != null
 
     private fun post(path: String, body: JSONObject, token: String? = null): JSONObject {
@@ -126,6 +136,7 @@ internal object ZurvanAndroidOnlineLicense {
     private fun applyStatus(context: Context, session: Session, response: JSONObject) {
         session.canWrite = response.optBoolean("can_write", false)
         session.mode = response.optString("mode", "unknown")
+        session.daysRemaining = response.optInt("days_remaining", 0)
         session.verifiedAtMs = System.currentTimeMillis()
         save(context, session)
     }
