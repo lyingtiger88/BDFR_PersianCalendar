@@ -658,12 +658,14 @@ internal fun CalendarMonthPage(
                     }
                     Box {
                         TextButton(onClick = { yearsMenu = true }) {
-                            Text(toPersianDigits(year.toString()) + " ▾", fontWeight = FontWeight.Bold)
+                            Text(toPersianDigits((if (occasionVisibility.imperialYear) year + 1180 else year).toString()) +
+                                (if (occasionVisibility.imperialYear) " شاهنشاهی ▾" else " ▾"),
+                                fontWeight = FontWeight.Bold)
                         }
                         DropdownMenu(expanded = yearsMenu, onDismissRequest = { yearsMenu = false }) {
                             ((year - 20)..(year + 20)).forEach { value ->
                                 DropdownMenuItem(
-                                    text = { Text(toPersianDigits(value.toString())) },
+                                    text = { Text(toPersianDigits((if (occasionVisibility.imperialYear) value + 1180 else value).toString())) },
                                     onClick = { year = value; yearsMenu = false }
                                 )
                             }
@@ -685,12 +687,10 @@ internal fun CalendarMonthPage(
                             .typography
                             .labelMedium
                 )
-                if (occasionVisibility.pahlavi) {
-                    Text(
-                        "سال شاهنشاهی: " + toPersianDigits((year + 1180).toString()),
+                if (occasionVisibility.imperialYear) {
+                    Text("معادل هجری خورشیدی: " + toPersianDigits(year.toString()),
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
 
@@ -2965,6 +2965,15 @@ private fun SettingsScreen(
                         }
                     }
                     if (privilegedOccasions) {
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text("نمایش تقویم شاهنشاهی (پهلوی)")
+                                Text("سال شاهنشاهی را در سربرگ تقویم و انتخاب سال نمایش می‌دهد؛ تاریخ رویدادها تغییر نمی‌کند.",
+                                    style = MaterialTheme.typography.bodySmall)
+                            }
+                            Switch(checked = occasionVisibility.imperialYear,
+                                onCheckedChange = { ZurvanOccasionDisplay.set(context, "imperial_year", it) })
+                        }
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
                                 Text("مناسبت‌های تقویم شاهنشاهی (پهلوی)")
