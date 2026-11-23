@@ -247,8 +247,10 @@ el("savePahlavi").addEventListener("click",async()=>{
   if(!confirm("مجوز تقویم پهلوی برای این حساب "+(enabled?"فعال":"لغو")+" شود؟"))return;
   try{
     await api("admin_set_pahlavi",{account_id,enabled});
-    await loadPahlaviGrants();
-    await loadFeatureUsers(1);
+    // License feature tooling may not be deployed yet; payment review
+    // must remain functional and independent of feature-list failures.
+    loadPahlaviGrants().catch(error=>status(error.message));
+    loadFeatureUsers(1).catch(error=>status(error.message));
     status("مجوز تقویم پهلوی ذخیره شد.");
   }catch(e){status(e.message);}
 });
