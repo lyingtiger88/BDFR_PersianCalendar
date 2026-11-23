@@ -211,6 +211,28 @@ enum ZurvanIOSLicense {
         } catch { return false }
     }
 
+    /// Authenticated user progress endpoint. All XP awards and badges remain
+    /// authoritative on the server; a device cannot choose the points earned.
+    static func userProgress(action: String = "status",
+                             visible: Bool? = nil) async throws -> [String: Any] {
+        guard ["status", "claim_daily", "set_visibility"].contains(action) else {
+            throw OnlineLicenseError.invalidResponse
+        }
+        guard action != "set_visibility" || visible != nil else {
+            throw OnlineLicenseError.invalidResponse
+        }
+        // Refresh the session even for expired/read-only subscriptions, whose
+        // owners must still be able to view their earned achievements.
+        _ = await refreshOnlineEntitlement()
+        guard let session = load() else {
+            throw OnlineLicenseError.server("برای مشاهده امتیاز، وارد حساب زروان شوید.")
+        }
+        var body: [String: Any] = ["action":action]
+        if let visible { body["visible"] = visible }
+        return try await request("/functions/v1/zurvan-user-progress",
+            body:body,bearer:session.accessToken)
+    }
+
     static var isLicensed: Bool {
         guard let stored = UserDefaults.standard.string(forKey: storedCodeKey) else { return false }
         return verify(stored)
