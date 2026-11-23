@@ -514,6 +514,7 @@ private struct ZurvanCloudShellView: View {
 private struct MobileSettingsView: View {
     @AppStorage("zurvan.occasion.pahlavi.year.enabled") private var imperialYearEnabled = false
     @AppStorage("zurvan.occasion.pahlavi.enabled") private var imperialOccasionsEnabled = false
+    @AppStorage("zurvan.online.pahlavi.granted") private var featureGrantChanged = false
     @AppStorage("zurvan.appearance.theme") private var themeID = "windows-light"
     @AppStorage("zurvan.language") private var language = "fa"
     @AppStorage("zurvan.zodiac.theme") private var zodiacTheme = "cosmic"
@@ -550,7 +551,7 @@ private struct MobileSettingsView: View {
 
                 VStack(alignment: .leading, spacing: 8) {
                     Text("تقویم شاهنشاهی (پهلوی)").font(.headline)
-                    if ZurvanIOSLicense.hasOnlinePahlaviAccess {
+                    if featureGrantChanged && ZurvanIOSLicense.hasOnlinePahlaviAccess {
                         Toggle("نمایش سال شاهنشاهی در تقویم", isOn: $imperialYearEnabled)
                         Toggle("نمایش مناسبت‌های تاریخی دوره پهلوی", isOn: $imperialOccasionsEnabled)
                         Text("مبدأ سال‌شماری = سال هجری خورشیدی + ۱۱۸۰؛ تاریخ‌های ذخیره‌شده تغییر نمی‌کنند. این رویدادها تعطیل رسمی نیستند.")
