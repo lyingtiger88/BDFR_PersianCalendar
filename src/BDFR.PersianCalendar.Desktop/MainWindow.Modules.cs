@@ -125,6 +125,7 @@ public sealed partial class MainWindow
                 _physicalLeftSidebarColumn.Width = new GridLength(
                     isCalendar ? Math.Clamp(_settings.LeftSidebarWidth, 220, 560) : 0);
             StartupDiagnostics.Log($"Desktop module opened: '{module}' (calendar={isCalendar}).");
+            ReportExploreAchievement(module);
         }
         catch (Exception ex)
         {
