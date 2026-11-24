@@ -33,7 +33,8 @@ internal object ZurvanAchievementTracker {
                     || month == null || month !in 1..12)) return
         scope.launch {
             runCatching {
-                val event = JSONObject().put("kind", kind).apply {
+                val identity = ZurvanXpClient(app).signedInEmail?.trim()?.lowercase() ?: "guest"
+                val event = JSONObject().put("account", identity).put("kind", kind).apply {
                     if (section != null) put("section", section)
                     if (year != null) put("year", year)
                     if (month != null) put("month", month)
@@ -64,7 +65,7 @@ internal object ZurvanAchievementTracker {
     suspend fun flush(context: Context) = mutex.withLock {
         val app = context.applicationContext
         val client = ZurvanXpClient(app)
-        if (client.signedInEmail.isNullOrBlank()) return@withLock
+        val signedIn = client.signedInEmail?.trim()?.lowercase() ?: return@withLock
         val prefs = app.getSharedPreferences(STORAGE, Context.MODE_PRIVATE)
         val snapshot = synchronized(ioLock) {
             val items = runCatching { JSONArray(prefs.getString(KEY, "[]")) }
@@ -79,6 +80,8 @@ internal object ZurvanAchievementTracker {
                 synchronized(ioLock) { remove(prefs, item) }
                 continue
             }
+            val owner = event.optString("account", "guest")
+            if (owner != signedIn && owner != "guest") continue
             val ok = runCatching {
                 client.reportAchievement(
                     event.getString("kind"),
