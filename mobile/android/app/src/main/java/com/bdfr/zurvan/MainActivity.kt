@@ -73,6 +73,10 @@ class MainActivity : ComponentActivity() {
                 .onSuccess { ZurvanBuiltInOccasions.reload(this@MainActivity) }
         }
         ZurvanPlanExpirySchedule.register(this)
+        lifecycleScope.launch(Dispatchers.IO) {
+            // A successful, verified session claims at most once every rolling 60 minutes.
+            runCatching { ZurvanXpClient(this@MainActivity).claimOpen() }
+        }
 
         if (
             Build.VERSION.SDK_INT >=
@@ -2727,6 +2731,7 @@ private fun SettingsScreen(
                     Triple("language", "زبان و منطقه", "زبان برنامه"),
                     Triple("security", "امنیت و لایسنس", "قفل و فعال‌سازی"),
                     Triple("cloud", "حساب و همگام‌سازی", "Zurvan Desk"),
+                    Triple("xp", "حساب XP و نشان‌ها", "امتیاز، Badge و دعوت دوستان"),
                     Triple("accessibility", "دسترس‌پذیری و زروان گویا", "گفتار به متن و متن به گفتار فارسی"),
                     Triple("about", "درباره ما", "داستان زروان، توسعه‌دهنده و سپاسگزاری")
                 ).forEach { section ->
@@ -2750,6 +2755,9 @@ private fun SettingsScreen(
                     Text("بازگشت به دسته‌ها")
                 }
             }
+        }
+        if (settingsCategory == "xp") item {
+            ZurvanXpAccountCard()
         }
         if (settingsCategory == "about") item {
             SettingsCard(title = "درباره زروان") {
@@ -5324,5 +5332,110 @@ private fun ZurvanBadgeDashboard(name: String, identifier: String) {
             Text("۱۰۰ XP برای هر دعوت موفق · Premium Silver برای هر ۱۵ دعوت موفق",
                 color = muted, style = MaterialTheme.typography.bodySmall)
         }
+    }
+}
+
+@Composable
+private fun ZurvanXpAccountCard() {
+    val context = LocalContext.current
+    val client = remember(context) { ZurvanXpClient(context) }
+    val scope = rememberCoroutineScope()
+    var email by remember { mutableStateOf(client.signedInEmail.orEmpty()) }
+    var password by remember { mutableStateOf("") }
+    var loggedIn by remember { mutableStateOf(client.signedInEmail != null) }
+    var busy by remember { mutableStateOf(false) }
+    var message by remember { mutableStateOf("") }
+    var progress by remember { mutableStateOf<org.json.JSONObject?>(null) }
+    LaunchedEffect(loggedIn) {
+        if (loggedIn) {
+            runCatching { client.progress() }
+                .onSuccess { progress = it }
+                .onFailure { message = "دریافت اطلاعات امتیاز ناموفق بود." }
+        }
+    }
+    SettingsCard(title = "حساب زروان · XP و نشان‌ها") {
+        if (!loggedIn) {
+            Text("برای دریافت پاداش‌ها به حساب تأییدشده زروان وارد شوید.")
+            OutlinedTextField(value=email,onValueChange={email=it},
+                label={Text("ایمیل حساب")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+            OutlinedTextField(value=password,onValueChange={password=it},
+                label={Text("رمز عبور")},modifier=Modifier.fillMaxWidth(),
+                visualTransformation=androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                singleLine=true)
+            Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                Button(onClick={
+                    busy=true
+                    scope.launch {
+                        runCatching { client.signIn(email,password) }.onSuccess {
+                            loggedIn=true; progress=it; message="ورود انجام شد."
+                        }.onFailure { message="ورود ناموفق بود. ایمیل، رمز یا تأیید حساب را بررسی کنید." }
+                        password="";busy=false
+                    }
+                },enabled=!busy && email.isNotBlank() && password.isNotBlank()) { Text("ورود") }
+                OutlinedButton(onClick={
+                    busy=true
+                    scope.launch {
+                        runCatching { client.signUp(email,password) }.onSuccess {
+                            loggedIn=it; message=if(it) "ثبت‌نام انجام شد." else
+                                "ایمیل تأیید ارسال شد؛ پس از تأیید وارد شوید."
+                        }.onFailure { message="ثبت‌نام ناموفق بود." }
+                        password="";busy=false
+                    }
+                },enabled=!busy && email.isNotBlank() && password.length>=8) { Text("ثبت‌نام") }
+            }
+        } else {
+            Text(email,fontWeight=FontWeight.Bold)
+            val profile=progress?.optJSONObject("profile")
+            val referral=progress?.optJSONObject("referral")
+            val stats=listOf(
+                "XP" to (profile?.optString("total_xp") ?: "—"),
+                "Silver" to (if(referral?.optJSONObject("current_silver")!=null) "فعال" else "—"),
+                "دعوت موفق" to (referral?.optString("successful") ?: "—")
+            )
+            Text("سطح: " + (profile?.optString("level_title") ?: "در حال دریافت"),
+                color=MaterialTheme.colorScheme.primary)
+            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceEvenly) {
+                stats.forEach { (label,value) ->
+                    Column(horizontalAlignment=Alignment.CenterHorizontally) {
+                        Text(label,style=MaterialTheme.typography.labelSmall)
+                        Text(value,fontWeight=FontWeight.Bold)
+                    }
+                }
+            }
+            Text("🏅 نشان‌های زروان",fontWeight=FontWeight.Bold)
+            val badges=progress?.optJSONArray("badges")
+            if(badges!=null) {
+                for(i in 0 until badges.length()) {
+                    val badge=badges.optJSONObject(i) ?: continue
+                    Text((if(badge.optBoolean("earned")) "🏅 " else "🔒 ") +
+                        badge.optString("name_fa"))
+                }
+            } else Text("در حال دریافت نشان‌ها")
+            Text("دعوت از دوستان",fontWeight=FontWeight.Bold)
+            val code=referral?.optString("identifier").orEmpty()
+            Text("کد معرف: " + code.ifBlank { "هنوز دریافت نشده" })
+            if(code.isNotBlank()) {
+                OutlinedButton(onClick={
+                    val clipboard=context.getSystemService(Context.CLIPBOARD_SERVICE)
+                        as android.content.ClipboardManager
+                    clipboard.setPrimaryClip(android.content.ClipData.newPlainText("کد دعوت زروان",code))
+                    message="کد دعوت کپی شد."
+                }) { Text("کپی کد") }
+            }
+            Text("هر دعوت موفق: ۱۰۰ XP · هر ۱۵ دعوت: Premium Silver",
+                style=MaterialTheme.typography.bodySmall)
+            TextButton(onClick={
+                busy=true
+                scope.launch {
+                    runCatching { client.progress() }.onSuccess { progress=it }
+                        .onFailure {message="خطا در به‌روزرسانی امتیازات"}
+                    busy=false
+                }
+            },enabled=!busy) { Text("به‌روزرسانی امتیازات") }
+            TextButton(onClick={client.signOut();loggedIn=false;progress=null;message=""}) {
+                Text("خروج از حساب")
+            }
+        }
+        if(message.isNotBlank()) Text(message,style=MaterialTheme.typography.bodySmall)
     }
 }
