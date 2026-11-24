@@ -28,6 +28,14 @@ public sealed partial class MainWindow
         }
     }
 
+    private void RefreshAchievementSession()
+    {
+        _monthsReportedThisSession.Clear();
+        _sectionsReportedThisSession.Clear();
+        ReportMonthAchievement();
+        ReportExploreAchievement(_activeDesktopModule);
+    }
+
     private void ReportMonthAchievement()
     {
         if (_authClient.SignedInEmail is null || _month is < 1 or > 12) return;
@@ -103,6 +111,7 @@ public sealed partial class MainWindow
                 password.Password = "";
                 Update();
                 RefreshWindowsSettingsProfile();
+                RefreshAchievementSession();
                 _ = RefreshLicensePolicyAsync();
                 _ = ClaimAppOpenXpSafelyAsync();
                 if (feedback != pending) status.Text = feedback;
