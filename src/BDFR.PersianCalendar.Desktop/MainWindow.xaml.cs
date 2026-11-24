@@ -6626,20 +6626,45 @@ public sealed partial class MainWindow : Window
 
     private async void SaveNote_Click(object sender, RoutedEventArgs e)
     {
-        await _repository.UpsertNoteAsync(_selected, NoteBox.Text ?? string.Empty, NotePinnedCheck.IsChecked == true);
-        if (!string.IsNullOrWhiteSpace(NoteBox.Text))
-            ReportAchievementSafely("content_saved");
-        await _repository.AddActivityAsync(new ActivityLogEntry(
-            Guid.NewGuid().ToString("N"),
-            DateTimeOffset.UtcNow,
-            "note-saved",
-            CalendarItemKind.Note,
-            null,
-            $"یادداشت {_selected} ذخیره شد"));
+        var saved = false;
+        try
+        {
+            var text = NoteBox.Text ?? string.Empty;
+            var pinned = NotePinnedCheck.IsChecked == true;
+            var date = _selected;
+            await _repository.UpsertNoteAsync(date, text, pinned);
+            saved = true;
 
-        StatusText.Text = "یادداشت ذخیره شد.";
-        await LoadSelectedDayAsync();
-        await LoadActivitiesAsync();
+            // Achievement delivery is queued off-thread, never awaited by note storage.
+            if (!string.IsNullOrWhiteSpace(text))
+                ReportAchievementSafely("content_saved");
+            try
+            {
+                await _repository.AddActivityAsync(new ActivityLogEntry(
+                    Guid.NewGuid().ToString("N"), DateTimeOffset.UtcNow,
+                    "note-saved", CalendarItemKind.Note, null,
+                    $"یادداشت {date} ذخیره شد"));
+            }
+            catch (Exception logError)
+            {
+                StartupDiagnostics.Log("Note saved; activity history unavailable: " + logError);
+            }
+
+            StatusText.Text = "یادداشت ذخیره شد.";
+            await LoadSelectedDayAsync();
+            await LoadActivitiesAsync();
+        }
+        catch (Exception ex)
+        {
+            StartupDiagnostics.Log("SaveNote_Click failed (saved=" + saved + "): " + ex);
+            try
+            {
+                StatusText.Text = saved
+                    ? "یادداشت ذخیره شد، اما به‌روزرسانی نمایش با خطا مواجه شد."
+                    : "ذخیره یادداشت ناموفق بود؛ اطلاعات قبلی تغییر نکرد.";
+            }
+            catch { /* Rendering errors must not terminate the process. */ }
+        }
     }
 
     private async Task<bool> ConfirmDeleteAsync(string title, string message)
