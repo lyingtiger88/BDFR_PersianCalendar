@@ -59,6 +59,7 @@ internal static class StartupDiagnostics
         catch { }
 
         Log($"PHASE: {phase}");
+        CrashDiagnostics.Record("STARTUP_PHASE", phase);
     }
 
     public static void ShowFatal(Exception ex)
