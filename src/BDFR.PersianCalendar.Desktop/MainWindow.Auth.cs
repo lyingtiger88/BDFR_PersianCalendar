@@ -7,6 +7,52 @@ public sealed partial class MainWindow
 {
     private readonly ZurvanAuthClient _authClient = new();
 
+    private readonly System.Collections.Generic.HashSet<string> _monthsReportedThisSession = new();
+    private readonly System.Collections.Generic.HashSet<string> _sectionsReportedThisSession = new();
+
+    private async Task ReportAchievementSafelyAsync(string kind, string? section = null,
+        int? year = null, int? month = null)
+    {
+        if (_authClient.SignedInEmail is null) return;
+        try
+        {
+            using var _ = await _authClient.ReportAchievementAsync(kind, section, year, month);
+        }
+        catch (Exception ex)
+        {
+            StartupDiagnostics.Log("Achievement event deferred: " + ex.GetType().Name);
+            if (kind == "calendar_month" && year.HasValue && month.HasValue)
+                _monthsReportedThisSession.Remove(year + ":" + month);
+            if (kind == "explore" && section is not null)
+                _sectionsReportedThisSession.Remove(section);
+        }
+    }
+
+    private void ReportMonthAchievement()
+    {
+        if (_authClient.SignedInEmail is null || _month is < 1 or > 12) return;
+        var key = _year + ":" + _month;
+        if (_monthsReportedThisSession.Add(key))
+            _ = ReportAchievementSafelyAsync("calendar_month", year: _year, month: _month);
+    }
+
+    private void ReportExploreAchievement(string module)
+    {
+        if (_authClient.SignedInEmail is null) return;
+        var section = module switch
+        {
+            "تقویم" => "calendar",
+            "برنامه‌ها" => "plans",
+            "مناسبت‌ها" => "occasions",
+            "یادآورها" => "reminders",
+            "زروان دسک" => "desk",
+            "تنظیمات" => "settings",
+            _ => null
+        };
+        if (section is not null && _sectionsReportedThisSession.Add(section))
+            _ = ReportAchievementSafelyAsync("explore", section: section);
+    }
+
     private async Task ClaimAppOpenXpSafelyAsync()
     {
         if (_authClient.SignedInEmail is null) return;
