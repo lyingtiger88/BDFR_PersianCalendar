@@ -112,8 +112,15 @@ internal class ZurvanXpClient(context: Context) {
             if (section != null) payload.put("section", section)
             if (year != null) payload.put("year", year)
             if (month != null) payload.put("month", month)
-            call("/functions/v1/zurvan-user-progress", payload, token)
+            payload.put("action", "record")
+            call("/functions/v1/zurvan-achievements", payload, token)
         }
+
+    suspend fun achievementStatus(): JSONObject? = withContext(Dispatchers.IO) {
+        val token = accessToken() ?: return@withContext null
+        call("/functions/v1/zurvan-achievements",
+            JSONObject().put("action", "status"), token)
+    }
 
     suspend fun progress(): JSONObject? = withContext(Dispatchers.IO) {
         val token = accessToken() ?: return@withContext null
