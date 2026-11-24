@@ -59,7 +59,10 @@ internal class ZurvanXpClient(context: Context) {
             JSONObject().put("email", email.trim()).put("password", password))
         storeSession(email.trim(), response)
         val claim = runCatching { claimOpen() }.getOrNull()
-        refreshEntitlement()
+        runCatching { refreshEntitlement() }.onFailure {
+            ZurvanAccountEntitlement.canWrite = false
+            ZurvanAccountEntitlement.mode = "unavailable"
+        }
         claim ?: JSONObject()
     }
 
@@ -69,7 +72,10 @@ internal class ZurvanXpClient(context: Context) {
         if (result.has("access_token") && !result.isNull("access_token")) {
             storeSession(email.trim(), result)
             runCatching { claimOpen() }
-            refreshEntitlement()
+            runCatching { refreshEntitlement() }.onFailure {
+                ZurvanAccountEntitlement.canWrite = false
+                ZurvanAccountEntitlement.mode = "unavailable"
+            }
             true
         } else false // Confirm email before signing in.
     }
