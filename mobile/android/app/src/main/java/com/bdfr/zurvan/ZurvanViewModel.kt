@@ -61,7 +61,7 @@ class ZurvanViewModel(
         icon,
         deleteAfterDays
         )
-        if (title.isNotBlank()) ZurvanAchievementTracker.record(getApplication(), "content_saved")
+        if (title.isNotBlank() && kind == "event") ZurvanAchievementTracker.record(getApplication(), "content_saved")
     }
 
     fun purgeExpiredPlans() = repository.purgeExpiredPlans()
