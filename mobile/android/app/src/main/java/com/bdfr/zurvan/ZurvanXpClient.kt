@@ -58,7 +58,9 @@ internal class ZurvanXpClient(context: Context) {
         val response = call("/auth/v1/token?grant_type=password",
             JSONObject().put("email", email.trim()).put("password", password))
         storeSession(email.trim(), response)
-        claimOpen() ?: JSONObject()
+        val claim = runCatching { claimOpen() }.getOrNull()
+        refreshEntitlement()
+        claim ?: JSONObject()
     }
 
     suspend fun signUp(email: String, password: String): Boolean = withContext(Dispatchers.IO) {
@@ -66,7 +68,8 @@ internal class ZurvanXpClient(context: Context) {
             .put("email", email.trim()).put("password", password))
         if (result.has("access_token") && !result.isNull("access_token")) {
             storeSession(email.trim(), result)
-            claimOpen()
+            runCatching { claimOpen() }
+            refreshEntitlement()
             true
         } else false // Confirm email before signing in.
     }
@@ -76,13 +79,34 @@ internal class ZurvanXpClient(context: Context) {
         call("/functions/v1/zurvan-user-progress", JSONObject().put("action", "claim_open"), token)
     }
 
+    /** Signed-in and verified server entitlements are authoritative. */
+    suspend fun licenseStatus(): JSONObject? = withContext(Dispatchers.IO) {
+        val token = accessToken() ?: return@withContext null
+        call("/functions/v1/zurvan-license-status", JSONObject(), token)
+    }
+
+    suspend fun refreshEntitlement(): Boolean = withContext(Dispatchers.IO) {
+        val response = licenseStatus()
+        val granted = response?.optBoolean("can_write", false) == true
+        ZurvanAccountEntitlement.canWrite = granted
+        ZurvanAccountEntitlement.mode = response?.optString("mode") ?: "read_only"
+        granted
+    }
+
     suspend fun progress(): JSONObject? = withContext(Dispatchers.IO) {
         val token = accessToken() ?: return@withContext null
         call("/functions/v1/zurvan-user-progress", JSONObject().put("action", "status"), token)
     }
 
     fun signOut() {
+        ZurvanAccountEntitlement.canWrite = false
+        ZurvanAccountEntitlement.mode = "signed_out"
         listOf("xp_access_token", "xp_refresh_token", "xp_account_email", "xp_expiry_seconds")
             .forEach(storage::remove)
     }
+}
+
+internal object ZurvanAccountEntitlement {
+    var canWrite by androidx.compose.runtime.mutableStateOf(false)
+    var mode by androidx.compose.runtime.mutableStateOf("unknown")
 }
