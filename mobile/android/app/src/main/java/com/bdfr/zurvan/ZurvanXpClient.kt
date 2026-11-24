@@ -108,11 +108,10 @@ internal class ZurvanXpClient(context: Context) {
                                   year: Int? = null, month: Int? = null): JSONObject? =
         withContext(Dispatchers.IO) {
             val token = accessToken() ?: return@withContext null
-            val payload = JSONObject().put("action", "activity").put("kind", kind)
+            val payload = JSONObject().put("action", "record").put("kind", kind)
             if (section != null) payload.put("section", section)
             if (year != null) payload.put("year", year)
             if (month != null) payload.put("month", month)
-            payload.put("action", "record")
             call("/functions/v1/zurvan-achievements", payload, token)
         }
 
@@ -128,7 +127,7 @@ internal class ZurvanXpClient(context: Context) {
     }
 
     fun signOut() {
-        ZurvanAchievementTracker.clearPending(storageContext)
+        // Keep account-scoped pending achievements for later reconnection.
         ZurvanAccountEntitlement.canWrite = false
         ZurvanAccountEntitlement.mode = "signed_out"
         listOf("xp_access_token", "xp_refresh_token", "xp_account_email", "xp_expiry_seconds")
