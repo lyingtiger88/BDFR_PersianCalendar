@@ -7,6 +7,19 @@ public sealed partial class MainWindow
 {
     private readonly ZurvanAuthClient _authClient = new();
 
+    private async Task ClaimAppOpenXpSafelyAsync()
+    {
+        if (_authClient.SignedInEmail is null) return;
+        try
+        {
+            using var _ = await _authClient.ClaimAppOpenXpAsync();
+        }
+        catch (Exception ex)
+        {
+            StartupDiagnostics.Log("XP open claim deferred: " + ex.GetType().Name);
+        }
+    }
+
     private FrameworkElement BuildAccountAuthPanel()
     {
         var panel = new StackPanel { Spacing = 8 };
@@ -45,6 +58,7 @@ public sealed partial class MainWindow
                 Update();
                 RefreshWindowsSettingsProfile();
                 _ = RefreshLicensePolicyAsync();
+                _ = ClaimAppOpenXpSafelyAsync();
                 if (feedback != pending) status.Text = feedback;
             }
             catch (Exception error) { status.Text = error.Message; }
