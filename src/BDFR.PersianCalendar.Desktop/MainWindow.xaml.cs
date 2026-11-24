@@ -221,6 +221,7 @@ public sealed partial class MainWindow : Window
         Activated += (_, _) =>
         {
             StartupDiagnostics.Log("MainWindow Activated event fired.");
+            CrashDiagnostics.Record("WINDOW_ACTIVATED_EVENT");
             CountForegroundVisit();
         };
         Closed += (_, _) =>
@@ -230,6 +231,7 @@ public sealed partial class MainWindow : Window
             _seasonCarouselTimer?.Stop();
             _wallpaperRotationTimer?.Stop();
             StartupDiagnostics.Log("MainWindow Closed event fired.");
+            CrashDiagnostics.CloseCleanly();
         };
         AppWindow.Changed += (_, e) =>
         {
@@ -5444,6 +5446,7 @@ public sealed partial class MainWindow : Window
 
     private void BuildCalendar()
     {
+        CrashDiagnostics.Record("CALENDAR_RENDER_BEGIN", "year=" + _year + " month=" + _month);
         ReportMonthAchievement();
         RefreshElenaSeasonalPalette();
         MonthTitle.Text = $"{PersianDate.MonthNames[_month - 1]} {_year}";
@@ -5667,6 +5670,7 @@ public sealed partial class MainWindow : Window
         {
             StartupDiagnostics.Log("BuildCalendar: async refresh deferred until post-activation.");
         }
+        CrashDiagnostics.Record("CALENDAR_RENDER_END", "year=" + _year + " month=" + _month);
     }
 
     private async Task LoadCalendarCellOccasionsAsync(int year, int month)
@@ -5877,7 +5881,9 @@ public sealed partial class MainWindow : Window
     {
         try
         {
+            CrashDiagnostics.Record("DAY_READ_BEGIN", "day=" + _selected);
             var snapshot = await _repository.GetDayAsync(_selected);
+            CrashDiagnostics.Record("DAY_READ_END", "has_note=" + (snapshot.Note != null));
             ApplySelectedDateCalendarOrder();
             NoteBox.Text = snapshot.Note?.Text ?? string.Empty;
             NotePinnedCheck.IsChecked = snapshot.Note?.Pinned == true;
@@ -6059,6 +6065,7 @@ public sealed partial class MainWindow : Window
         catch (Exception ex)
         {
             StartupDiagnostics.Log($"LoadSelectedDayAsync failed: {ex}");
+            CrashDiagnostics.Fatal("LoadSelectedDayAsync", ex, false);
             StatusText.Text = ex.Message;
         }
     }
@@ -6627,17 +6634,24 @@ public sealed partial class MainWindow : Window
     private async void SaveNote_Click(object sender, RoutedEventArgs e)
     {
         var saved = false;
+        var operation = CrashDiagnostics.BeginAction("note.save");
         try
         {
             var text = NoteBox.Text ?? string.Empty;
             var pinned = NotePinnedCheck.IsChecked == true;
             var date = _selected;
+            CrashDiagnostics.Step(operation, "sqlite.upsert.begin; nonempty=" + (!string.IsNullOrWhiteSpace(text)));
             await _repository.UpsertNoteAsync(date, text, pinned);
             saved = true;
+            CrashDiagnostics.Step(operation, "sqlite.upsert.complete");
 
             // Achievement delivery is queued off-thread, never awaited by note storage.
             if (!string.IsNullOrWhiteSpace(text))
+            {
+                CrashDiagnostics.Step(operation, "achievement.enqueue.begin");
                 ReportAchievementSafely("content_saved");
+                CrashDiagnostics.Step(operation, "achievement.enqueue.complete");
+            }
             try
             {
                 await _repository.AddActivityAsync(new ActivityLogEntry(
@@ -6651,12 +6665,16 @@ public sealed partial class MainWindow : Window
             }
 
             StatusText.Text = "یادداشت ذخیره شد.";
+            CrashDiagnostics.Step(operation, "selected_day.reload.begin");
             await LoadSelectedDayAsync();
+            CrashDiagnostics.Step(operation, "selected_day.reload.complete");
             await LoadActivitiesAsync();
+            CrashDiagnostics.Step(operation, "activity_panel.reload.complete");
         }
         catch (Exception ex)
         {
             StartupDiagnostics.Log("SaveNote_Click failed (saved=" + saved + "): " + ex);
+            CrashDiagnostics.Failure(operation, "note.save; saved=" + saved, ex);
             try
             {
                 StatusText.Text = saved
@@ -6665,6 +6683,7 @@ public sealed partial class MainWindow : Window
             }
             catch { /* Rendering errors must not terminate the process. */ }
         }
+        finally { CrashDiagnostics.EndAction(operation, "note.save; saved=" + saved); }
     }
 
     private async Task<bool> ConfirmDeleteAsync(string title, string message)
