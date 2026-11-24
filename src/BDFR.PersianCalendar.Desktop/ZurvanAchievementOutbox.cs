@@ -37,6 +37,7 @@ internal static class ZurvanAchievementOutbox
                 _ => "month:" + year + ":" + month
             };
             var entry = new Entry(account, kind, section, year, month, eventKey);
+            CrashDiagnostics.Record("ACHIEVEMENT_ENQUEUE", "kind=" + kind);
             // The UI thread never awaits HTTP or disk I/O.
             _ = Task.Run(() => EnqueueAndFlushAsync(client, entry));
         }
@@ -64,6 +65,7 @@ internal static class ZurvanAchievementOutbox
                 pending.Add(incoming);
                 if (pending.Count > 512) pending.RemoveRange(0, pending.Count - 512);
                 SaveQueue(pending);
+                CrashDiagnostics.Record("ACHIEVEMENT_QUEUED", "kind=" + incoming.Kind + " pending=" + pending.Count);
             }
             while (true)
             {
@@ -74,6 +76,7 @@ internal static class ZurvanAchievementOutbox
                         StringComparison.OrdinalIgnoreCase));
                 if (index < 0) break;
                 var next = pending[index];
+                CrashDiagnostics.Record("ACHIEVEMENT_SEND_BEGIN", "kind=" + next.Kind);
                 try
                 {
                     using var response = await client.ReportAchievementAsync(
@@ -84,15 +87,18 @@ internal static class ZurvanAchievementOutbox
                 catch (Exception ex)
                 {
                     StartupDiagnostics.Log("Achievement delivery deferred: " + ex.GetType().Name);
+                    CrashDiagnostics.Record("ACHIEVEMENT_SEND_FAILED", "kind=" + next.Kind + " exception=" + ex.GetType().Name);
                     break;
                 }
                 pending.RemoveAt(index);
                 SaveQueue(pending);
+                CrashDiagnostics.Record("ACHIEVEMENT_SEND_COMPLETE", "kind=" + next.Kind);
             }
         }
         catch (Exception ex)
         {
             StartupDiagnostics.Log("Achievement queue unavailable: " + ex.GetType().Name);
+            CrashDiagnostics.Record("ACHIEVEMENT_QUEUE_FAILED", "exception=" + ex.GetType().Name);
         }
         finally { Gate.Release(); }
     }
