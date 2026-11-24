@@ -81,7 +81,7 @@ public sealed partial class MainWindow
         var cardBrush = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 34, 37, 68));
         var gold = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 244, 199, 92));
         var muted = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 183, 184, 210));
-        var white = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Colors.White);
+        var white = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 255, 255, 255));
         var root = new StackPanel { Spacing = 12 };
         root.Children.Add(new TextBlock {
             Text = "♛  " + (_authClient.SignedInEmail ?? "کاربر زروان"),
