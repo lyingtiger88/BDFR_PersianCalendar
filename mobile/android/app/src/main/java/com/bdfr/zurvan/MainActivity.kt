@@ -5318,11 +5318,15 @@ private fun ZurvanXpAccountCard() {
     var busy by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf("") }
     var progress by remember { mutableStateOf<org.json.JSONObject?>(null) }
+    var achievements by remember { mutableStateOf<org.json.JSONObject?>(null) }
     LaunchedEffect(loggedIn) {
         if (loggedIn) {
             runCatching { client.progress() }
                 .onSuccess { progress = it }
                 .onFailure { message = "دریافت اطلاعات امتیاز ناموفق بود." }
+            runCatching { client.achievementStatus() }
+                .onSuccess { achievements = it }
+                .onFailure { message = "دریافت نشان‌ها موقتاً در دسترس نیست." }
         }
     }
     SettingsCard(title = "حساب زروان، فعال‌سازی و نشان‌ها") {
@@ -5382,12 +5386,42 @@ private fun ZurvanXpAccountCard() {
                 }
             }
             Text("🏅 نشان‌های زروان",fontWeight=FontWeight.Bold)
-            val badges=progress?.optJSONArray("badges")
-            if(badges!=null) {
-                for(i in 0 until badges.length()) {
-                    val badge=badges.optJSONObject(i) ?: continue
-                    Text((if(badge.optBoolean("earned")) "🏅 " else "🔒 ") +
-                        badge.optString("name_fa"))
+            val badges=achievements?.optJSONArray("badges")
+            if (badges != null) {
+                val items = (0 until badges.length()).mapNotNull { badges.optJSONObject(it) }
+                items.chunked(3).forEach { group ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        group.forEach { badge ->
+                            val earned = badge.optBoolean("earned")
+                            val ink = if (earned) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Box(
+                                    modifier = Modifier.size(76.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text("⬡", fontSize = 67.sp, color = ink)
+                                    Text(
+                                        if (earned) badge.optString("icon", "★") else "🔒",
+                                        fontSize = 23.sp
+                                    )
+                                }
+                                Text(
+                                    badge.optString("name_fa", "نشان"),
+                                    color = ink,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        }
+                        repeat(3 - group.size) { Spacer(Modifier.weight(1f)) }
+                    }
                 }
             } else Text("در حال دریافت نشان‌ها")
             Text("دعوت از دوستان",fontWeight=FontWeight.Bold)
@@ -5409,12 +5443,17 @@ private fun ZurvanXpAccountCard() {
                     runCatching {
                         client.refreshEntitlement()
                         client.progress()
-                    }.onSuccess { progress=it; message="وضعیت حساب و مجوز به‌روزرسانی شد." }
+                    }.onSuccess {
+                        progress=it
+                        runCatching { client.achievementStatus() }
+                            .onSuccess { result -> achievements = result }
+                        message="وضعیت حساب، مجوز و نشان‌ها به‌روزرسانی شد."
+                    }
                         .onFailure { message="ارتباط با سرور حساب یا لایسنس ناموفق بود." }
                     busy=false
                 }
             },enabled=!busy) { Text("به‌روزرسانی حساب و مجوز") }
-            TextButton(onClick={client.signOut();loggedIn=false;progress=null;message=""}) {
+            TextButton(onClick={client.signOut();loggedIn=false;progress=null;achievements=null;message=""}) {
                 Text("خروج از حساب")
             }
         }
