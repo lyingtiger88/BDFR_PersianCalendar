@@ -61,6 +61,7 @@ class ZurvanViewModel(
         icon,
         deleteAfterDays
         )
+        if (title.isNotBlank()) ZurvanAchievementTracker.record(getApplication(), "content_saved")
     }
 
     fun purgeExpiredPlans() = repository.purgeExpiredPlans()
@@ -86,6 +87,7 @@ class ZurvanViewModel(
         hour,
         minute
         )
+        if (title.isNotBlank()) ZurvanAchievementTracker.record(getApplication(), "content_saved")
     }
 
     fun deleteOccasion(id: String) { if (!writable()) return; repository.deleteOccasion(id) }
@@ -107,6 +109,7 @@ class ZurvanViewModel(
         text,
         isPrivate
         )
+        if (text.isNotBlank()) ZurvanAchievementTracker.record(getApplication(), "content_saved")
     }
 
     fun addReminder(
