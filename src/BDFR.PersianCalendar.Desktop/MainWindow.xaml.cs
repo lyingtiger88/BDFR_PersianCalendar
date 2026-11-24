@@ -5440,6 +5440,7 @@ public sealed partial class MainWindow : Window
 
     private void BuildCalendar()
     {
+        ReportMonthAchievement();
         RefreshElenaSeasonalPalette();
         MonthTitle.Text = $"{PersianDate.MonthNames[_month - 1]} {_year}";
         UpdateMonthDecorations();
@@ -6622,6 +6623,8 @@ public sealed partial class MainWindow : Window
     private async void SaveNote_Click(object sender, RoutedEventArgs e)
     {
         await _repository.UpsertNoteAsync(_selected, NoteBox.Text ?? string.Empty, NotePinnedCheck.IsChecked == true);
+        if (!string.IsNullOrWhiteSpace(NoteBox.Text))
+            _ = ReportAchievementSafelyAsync("content_saved");
         await _repository.AddActivityAsync(new ActivityLogEntry(
             Guid.NewGuid().ToString("N"),
             DateTimeOffset.UtcNow,
@@ -7003,6 +7006,7 @@ public sealed partial class MainWindow : Window
                 reminderRepeatCount: repeatCount,
                 reminderRepeatIntervalMinutes: repeatInterval,
                 icon: iconPicker.SelectedItem?.ToString());
+            _ = ReportAchievementSafelyAsync("content_saved");
 
             _selected = eventDate.Persian;
             _year = _selected.Year;
