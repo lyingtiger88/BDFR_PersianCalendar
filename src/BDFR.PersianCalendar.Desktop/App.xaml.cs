@@ -19,16 +19,27 @@ public partial class App : Application
     public App()
     {
         StartupDiagnostics.BeginSession();
+        CrashDiagnostics.Start();
+        CrashDiagnostics.Record("APP_CONSTRUCTOR_ENTER");
 
         AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+        {
             StartupDiagnostics.Log($"AppDomain unhandled exception (terminating={e.IsTerminating}): {e.ExceptionObject}");
+            if (e.ExceptionObject is Exception ex)
+                CrashDiagnostics.Fatal("AppDomain.UnhandledException", ex, e.IsTerminating);
+            else CrashDiagnostics.Record("APPDOMAIN_UNHANDLED", "non-Exception object");
+        };
 
         AppDomain.CurrentDomain.ProcessExit += (_, _) =>
+        {
             StartupDiagnostics.Log("ProcessExit raised.");
+            CrashDiagnostics.Record("PROCESS_EXIT", "CLR exit event");
+        };
 
         TaskScheduler.UnobservedTaskException += (_, e) =>
         {
             StartupDiagnostics.Log($"Unobserved task exception: {e.Exception}");
+            CrashDiagnostics.Fatal("TaskScheduler.UnobservedTaskException", e.Exception, false);
             e.SetObserved();
         };
 
@@ -52,6 +63,7 @@ public partial class App : Application
         try
         {
             StartupDiagnostics.Log("OnLaunched entered.");
+            CrashDiagnostics.Record("LAUNCH_ENTER");
 
             var dataDir = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -63,6 +75,7 @@ public partial class App : Application
             StartupDiagnostics.Log("Initializing SQLite.");
             await repository.InitializeAsync();
             StartupDiagnostics.Log("SQLite initialized.");
+            CrashDiagnostics.Record("DATABASE_INITIALIZED");
 
             var timeZone = TimeZoneInfo.Local;
 
@@ -140,6 +153,8 @@ public partial class App : Application
             StartupDiagnostics.MarkPhase("before-window-activate");
             StartupDiagnostics.Log("Activating MainWindow.");
             _window.Activate();
+            CrashDiagnostics.Record("WINDOW_ACTIVATED");
+            CrashDiagnostics.AttachUiWatchdog(mainWindow.DispatcherQueue);
             StartupDiagnostics.MarkPhase("after-window-activate");
             StartupDiagnostics.Log("MainWindow activated; requesting deferred UI initialization.");
 
@@ -316,6 +331,7 @@ public partial class App : Application
     private void OnUnhandledException(object sender, Microsoft.UI.Xaml.UnhandledExceptionEventArgs e)
     {
         StartupDiagnostics.Log($"WinUI unhandled exception (handled to keep app alive): {e.Exception}");
+        CrashDiagnostics.Fatal("WinUI.UnhandledException", e.Exception, false);
 
         try
         {
