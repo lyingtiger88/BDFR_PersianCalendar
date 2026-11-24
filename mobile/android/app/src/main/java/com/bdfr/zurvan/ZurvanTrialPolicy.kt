@@ -56,5 +56,5 @@ internal object ZurvanTrialPolicy {
         )
     }
 
-    fun canWrite(context: Context): Boolean = evaluate(context).canWrite
+    fun canWrite(context: Context): Boolean = evaluate(context).canWrite || ZurvanAccountEntitlement.canWrite
 }
