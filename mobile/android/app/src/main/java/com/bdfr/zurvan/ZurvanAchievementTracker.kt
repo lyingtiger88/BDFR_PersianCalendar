@@ -32,6 +32,11 @@ internal object ZurvanAchievementTracker {
         CoroutineScope(Dispatchers.IO).launch { flush(app) }
     }
 
+    fun clearPending(context: Context) {
+        context.applicationContext.getSharedPreferences(STORAGE, Context.MODE_PRIVATE)
+            .edit().remove(KEY).apply()
+    }
+
     suspend fun flush(context: Context) = mutex.withLock {
         val prefs = context.applicationContext.getSharedPreferences(STORAGE, Context.MODE_PRIVATE)
         val client = ZurvanXpClient(context.applicationContext)
