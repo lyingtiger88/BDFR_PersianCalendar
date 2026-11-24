@@ -11,7 +11,8 @@ import kotlinx.coroutines.withContext
 
 /** Only the public publishable key is shipped; rewards are authorised by Supabase JWT. */
 internal class ZurvanXpClient(context: Context) {
-    private val storage = ZurvanCloudSecureStore(context.applicationContext)
+    private val storageContext = context.applicationContext
+    private val storage = ZurvanCloudSecureStore(storageContext)
     private val base = "https://yztithydgdvydaktuxlw.supabase.co"
     val signedInEmail: String? get() = storage.get("xp_account_email")
 
@@ -65,6 +66,7 @@ internal class ZurvanXpClient(context: Context) {
             ZurvanAccountEntitlement.canWrite = false
             ZurvanAccountEntitlement.mode = "unavailable"
         }
+        runCatching { ZurvanAchievementTracker.flush(storageContext) }
         claim ?: JSONObject()
     }
 
@@ -78,6 +80,7 @@ internal class ZurvanXpClient(context: Context) {
                 ZurvanAccountEntitlement.canWrite = false
                 ZurvanAccountEntitlement.mode = "unavailable"
             }
+            runCatching { ZurvanAchievementTracker.flush(storageContext) }
             true
         } else false // Confirm email before signing in.
     }
@@ -118,6 +121,7 @@ internal class ZurvanXpClient(context: Context) {
     }
 
     fun signOut() {
+        ZurvanAchievementTracker.clearPending(storageContext)
         ZurvanAccountEntitlement.canWrite = false
         ZurvanAccountEntitlement.mode = "signed_out"
         listOf("xp_access_token", "xp_refresh_token", "xp_account_email", "xp_expiry_seconds")
