@@ -76,6 +76,7 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch(Dispatchers.IO) {
             // A successful, verified session claims at most once every rolling 60 minutes.
             runCatching { ZurvanXpClient(this@MainActivity).claimOpen() }
+            runCatching { ZurvanAchievementTracker.flush(this@MainActivity) }
         }
 
         if (
@@ -191,6 +192,18 @@ private fun ZurvanMobileShell(
     }
     var visibleTabs by remember { mutableStateOf(ZurvanTabConfig.load(context)) }
     var selected by remember { mutableStateOf(ZurvanTab.Calendar) }
+    LaunchedEffect(selected) {
+        val section = when (selected) {
+            ZurvanTab.Calendar -> "calendar"
+            ZurvanTab.Plans -> "plans"
+            ZurvanTab.Occasions -> "occasions"
+            ZurvanTab.Reminders -> "reminders"
+            ZurvanTab.Desk -> "desk"
+            ZurvanTab.Settings -> "settings"
+            else -> null
+        }
+        if (section != null) ZurvanAchievementTracker.record(context, "explore", section)
+    }
     LaunchedEffect(licensed) { /* Navigation remains available in read-only mode. */ }
 
     val uiPreferences by appViewModel
@@ -516,6 +529,11 @@ internal fun CalendarMonthPage(
 
     var month by remember {
         mutableIntStateOf(initial.second)
+    }
+    LaunchedEffect(year, month) {
+        ZurvanAchievementTracker.record(
+            LocalContext.current, "calendar_month", year = year, month = month
+        )
     }
     val updateSeasonArtwork = ZurvanThemes.setDisplayedPersianMonth.current
     LaunchedEffect(month) { updateSeasonArtwork(month) }
