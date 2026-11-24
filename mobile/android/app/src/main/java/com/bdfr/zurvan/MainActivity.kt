@@ -530,9 +530,10 @@ internal fun CalendarMonthPage(
     var month by remember {
         mutableIntStateOf(initial.second)
     }
+    val achievementContext = LocalContext.current
     LaunchedEffect(year, month) {
         ZurvanAchievementTracker.record(
-            LocalContext.current, "calendar_month", year = year, month = month
+            achievementContext, "calendar_month", year = year, month = month
         )
     }
     val updateSeasonArtwork = ZurvanThemes.setDisplayedPersianMonth.current
