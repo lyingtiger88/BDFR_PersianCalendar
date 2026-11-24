@@ -7,31 +7,19 @@ public sealed partial class MainWindow
 {
     private readonly ZurvanAuthClient _authClient = new();
 
-    private readonly System.Collections.Generic.HashSet<string> _monthsReportedThisSession = new();
-    private readonly System.Collections.Generic.HashSet<string> _sectionsReportedThisSession = new();
+    private readonly HashSet<string> _monthsReportedThisSession = new();
+    private readonly HashSet<string> _sectionsReportedThisSession = new();
 
-    private async Task ReportAchievementSafelyAsync(string kind, string? section = null,
+    private void ReportAchievementSafely(string kind, string? section = null,
         int? year = null, int? month = null)
-    {
-        if (_authClient.SignedInEmail is null) return;
-        try
-        {
-            using var _ = await _authClient.ReportAchievementAsync(kind, section, year, month);
-        }
-        catch (Exception ex)
-        {
-            StartupDiagnostics.Log("Achievement event deferred: " + ex.GetType().Name);
-            if (kind == "calendar_month" && year.HasValue && month.HasValue)
-                _monthsReportedThisSession.Remove(year + ":" + month);
-            if (kind == "explore" && section is not null)
-                _sectionsReportedThisSession.Remove(section);
-        }
-    }
+        => ZurvanAchievementOutbox.Record(_authClient, kind, section, year, month);
 
     private void RefreshAchievementSession()
     {
         _monthsReportedThisSession.Clear();
         _sectionsReportedThisSession.Clear();
+        ZurvanAchievementOutbox.Retry(_authClient);
+        ReportAchievementSafely("app_open");
         ReportMonthAchievement();
         ReportExploreAchievement(_activeDesktopModule);
     }
@@ -41,7 +29,7 @@ public sealed partial class MainWindow
         if (_authClient.SignedInEmail is null || _month is < 1 or > 12) return;
         var key = _year + ":" + _month;
         if (_monthsReportedThisSession.Add(key))
-            _ = ReportAchievementSafelyAsync("calendar_month", year: _year, month: _month);
+            ReportAchievementSafely("calendar_month", year: _year, month: _month);
     }
 
     private void ReportExploreAchievement(string module)
@@ -58,7 +46,7 @@ public sealed partial class MainWindow
             _ => null
         };
         if (section is not null && _sectionsReportedThisSession.Add(section))
-            _ = ReportAchievementSafelyAsync("explore", section: section);
+            ReportAchievementSafely("explore", section: section);
     }
 
     private DateTimeOffset _lastForegroundAchievementCheck = DateTimeOffset.MinValue;
@@ -69,7 +57,8 @@ public sealed partial class MainWindow
         var now = DateTimeOffset.UtcNow;
         if (now - _lastForegroundAchievementCheck < TimeSpan.FromMinutes(5)) return;
         _lastForegroundAchievementCheck = now;
-        _ = ClaimAppOpenXpSafelyAsync();
+        ReportAchievementSafely("app_open");
+        _ = Task.Run(ClaimAppOpenXpSafelyAsync);
     }
 
     private async Task ClaimAppOpenXpSafelyAsync()
@@ -77,7 +66,7 @@ public sealed partial class MainWindow
         if (_authClient.SignedInEmail is null) return;
         try
         {
-            using var _ = await _authClient.ClaimAppOpenXpAsync();
+            using var _ = await _authClient.ClaimAppOpenXpAsync().ConfigureAwait(false);
         }
         catch (Exception ex)
         {
