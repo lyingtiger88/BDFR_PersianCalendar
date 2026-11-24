@@ -65,11 +65,15 @@ internal static class ZurvanAchievementOutbox
                 if (pending.Count > 512) pending.RemoveRange(0, pending.Count - 512);
                 SaveQueue(pending);
             }
-            while (pending.Count > 0)
+            while (true)
             {
-                var next = pending[0];
-                if (!string.Equals(client.SignedInEmail, next.AccountEmail,
-                    StringComparison.OrdinalIgnoreCase)) break;
+                var currentAccount = client.SignedInEmail;
+                if (string.IsNullOrWhiteSpace(currentAccount)) break;
+                var index = pending.FindIndex(entry =>
+                    string.Equals(entry.AccountEmail, currentAccount,
+                        StringComparison.OrdinalIgnoreCase));
+                if (index < 0) break;
+                var next = pending[index];
                 try
                 {
                     using var response = await client.ReportAchievementAsync(
@@ -82,7 +86,7 @@ internal static class ZurvanAchievementOutbox
                     StartupDiagnostics.Log("Achievement delivery deferred: " + ex.GetType().Name);
                     break;
                 }
-                pending.RemoveAt(0);
+                pending.RemoveAt(index);
                 SaveQueue(pending);
             }
         }
