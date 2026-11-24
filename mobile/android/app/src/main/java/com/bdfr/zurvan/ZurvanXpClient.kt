@@ -1,6 +1,8 @@
 package com.bdfr.zurvan
 
 import android.content.Context
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import java.net.HttpURLConnection
 import java.net.URL
 import org.json.JSONObject
