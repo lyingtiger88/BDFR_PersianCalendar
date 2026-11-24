@@ -64,6 +64,7 @@ class MainActivity : ComponentActivity() {
         if (lastForegroundClaimElapsed != 0L &&
             now - lastForegroundClaimElapsed < 5 * 60_000L) return
         lastForegroundClaimElapsed = now
+        ZurvanAchievementTracker.record(this, "app_open")
         lifecycleScope.launch(Dispatchers.IO) {
             runCatching { ZurvanXpClient(this@MainActivity).claimOpen() }
             runCatching { ZurvanAchievementTracker.flush(this@MainActivity) }
