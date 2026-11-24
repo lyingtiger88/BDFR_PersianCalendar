@@ -202,6 +202,7 @@ public sealed partial class MainWindow : Window
             ApplyUserFont(Content);
             BuildCalendar();
             _ = RefreshLicensePolicyAsync();
+            _ = ClaimAppOpenXpSafelyAsync();
             _licenseRefreshTimer = DispatcherQueue.CreateTimer();
             _licenseRefreshTimer.Interval = TimeSpan.FromMinutes(10);
             _licenseRefreshTimer.Tick += (_, _) => _ = RefreshLicensePolicyAsync();
