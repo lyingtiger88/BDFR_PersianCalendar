@@ -171,6 +171,11 @@ internal sealed class ZurvanAuthClient
     internal async Task<JsonDocument> ClaimAppOpenXpAsync()
         => await LicenseFunctionAsync("zurvan-user-progress", new { action = "claim_open" });
 
+    internal async Task<JsonDocument> ReportAchievementAsync(
+        string kind, string? section = null, int? year = null, int? month = null)
+        => await LicenseFunctionAsync("zurvan-user-progress",
+            new { action = "activity", kind, section, year, month });
+
     internal async Task<JsonDocument> ReadXpProgressAsync()
         => await LicenseFunctionAsync("zurvan-user-progress", new { action = "status" });
 
