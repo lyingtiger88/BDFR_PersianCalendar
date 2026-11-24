@@ -218,7 +218,11 @@ public sealed partial class MainWindow : Window
             Content = BuildStartupSafeShell();
         }
 
-        Activated += (_, _) => StartupDiagnostics.Log("MainWindow Activated event fired.");
+        Activated += (_, _) =>
+        {
+            StartupDiagnostics.Log("MainWindow Activated event fired.");
+            CountForegroundVisit();
+        };
         Closed += (_, _) =>
         {
             _licenseRefreshTimer?.Stop();
