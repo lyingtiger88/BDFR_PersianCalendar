@@ -139,11 +139,18 @@ private fun ZurvanMobileShell(
     val context = LocalContext.current
     var licenseRevision by remember { mutableIntStateOf(0) }
     val entitlement = remember(licenseRevision) { ZurvanTrialPolicy.evaluate(context) }
-    val licensed = entitlement.canWrite
-    LaunchedEffect(Unit) {
+    val licensed = entitlement.canWrite || ZurvanAccountEntitlement.canWrite
+    LaunchedEffect(context) {
+        val client = ZurvanXpClient(context)
         while (true) {
-            kotlinx.coroutines.delay(60_000L)
+            if (client.signedInEmail != null) {
+                runCatching { client.refreshEntitlement() }
+                    .onFailure { ZurvanAccountEntitlement.canWrite = false }
+            } else {
+                ZurvanAccountEntitlement.canWrite = false
+            }
             licenseRevision++
+            kotlinx.coroutines.delay(10 * 60_000L)
         }
     }
     var unlocked by remember { mutableStateOf(!ZurvanAppLock.enabled(context)) }
@@ -459,8 +466,7 @@ private fun ZurvanDestination(
                 ZurvanTab.Companion ->
                     CompanionScreen(viewModel = appViewModel, modifier = Modifier.fillMaxSize())
                 ZurvanTab.Settings ->
-                    if (!licensed) ZurvanActivationScreen(Modifier.fillMaxSize(), onActivated)
-                    else SettingsScreen(viewModel = appViewModel, modifier = Modifier.fillMaxSize())
+                    SettingsScreen(viewModel = appViewModel, modifier = Modifier.fillMaxSize())
             }
         }
     }
@@ -2730,8 +2736,7 @@ private fun SettingsScreen(
                     Triple("alerts", "صدا، اعلان‌ها و اوقات شرعی", "اذان و اعلان‌های زمانی"),
                     Triple("language", "زبان و منطقه", "زبان برنامه"),
                     Triple("security", "امنیت", "قفل برنامه و تنظیمات امنیتی"),
-                    Triple("cloud", "حساب و همگام‌سازی", "Zurvan Desk"),
-                    Triple("xp", "حساب XP و نشان‌ها", "امتیاز، Badge و دعوت دوستان"),
+                    Triple("cloud", "حساب و همگام‌سازی", "ورود، مجوز حساب، XP، نشان‌ها و Zurvan Desk"),
                     Triple("accessibility", "دسترس‌پذیری و زروان گویا", "گفتار به متن و متن به گفتار فارسی"),
                     Triple("about", "درباره ما", "داستان زروان، توسعه‌دهنده و سپاسگزاری")
                 ).forEach { section ->
@@ -2755,9 +2760,6 @@ private fun SettingsScreen(
                     Text("بازگشت به دسته‌ها")
                 }
             }
-        }
-        if (settingsCategory == "xp") item {
-            ZurvanXpAccountCard()
         }
         if (settingsCategory == "about") item {
             SettingsCard(title = "درباره زروان") {
@@ -3301,6 +3303,9 @@ private fun SettingsScreen(
         }
 
         if (settingsCategory == "cloud") item {
+            ZurvanXpAccountCard()
+        }
+        if (settingsCategory == "cloud") item {
             SettingsCard(
                 title =
                     "Zurvan Desk"
@@ -3414,10 +3419,6 @@ private fun ZurvanDeskScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-        }
-
-        if (state.authenticated) {
-            ZurvanBadgeDashboard(state.displayName ?: state.identifier ?: "کاربر زروان", state.identifier.orEmpty())
         }
 
         if (!state.authenticated) {
@@ -5296,9 +5297,9 @@ private fun ZurvanXpAccountCard() {
                 .onFailure { message = "دریافت اطلاعات امتیاز ناموفق بود." }
         }
     }
-    SettingsCard(title = "حساب زروان · XP و نشان‌ها") {
+    SettingsCard(title = "حساب زروان، فعال‌سازی و نشان‌ها") {
         if (!loggedIn) {
-            Text("برای دریافت پاداش‌ها به حساب تأییدشده زروان وارد شوید.")
+            Text("با حساب تأییدشده وارد شوید؛ فعال‌سازی از وضعیت مجوز معتبر سرور انجام می‌شود.")
             OutlinedTextField(value=email,onValueChange={email=it},
                 label={Text("ایمیل حساب")},modifier=Modifier.fillMaxWidth(),singleLine=true)
             OutlinedTextField(value=password,onValueChange={password=it},
@@ -5328,6 +5329,13 @@ private fun ZurvanXpAccountCard() {
             }
         } else {
             Text(email,fontWeight=FontWeight.Bold)
+            val serverActive = ZurvanAccountEntitlement.canWrite
+            Text(
+                if (serverActive) "مجوز حساب: فعال ✓"
+                else "مجوز حساب: هنوز توسط سرور فعال تأیید نشده است",
+                color = if (serverActive) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurfaceVariant
+            )
             val profile=progress?.optJSONObject("profile")
             val referral=progress?.optJSONObject("referral")
             val stats=listOf(
@@ -5370,11 +5378,14 @@ private fun ZurvanXpAccountCard() {
             TextButton(onClick={
                 busy=true
                 scope.launch {
-                    runCatching { client.progress() }.onSuccess { progress=it }
-                        .onFailure {message="خطا در به‌روزرسانی امتیازات"}
+                    runCatching {
+                        client.refreshEntitlement()
+                        client.progress()
+                    }.onSuccess { progress=it; message="وضعیت حساب و مجوز به‌روزرسانی شد." }
+                        .onFailure { message="ارتباط با سرور حساب یا لایسنس ناموفق بود." }
                     busy=false
                 }
-            },enabled=!busy) { Text("به‌روزرسانی امتیازات") }
+            },enabled=!busy) { Text("به‌روزرسانی حساب و مجوز") }
             TextButton(onClick={client.signOut();loggedIn=false;progress=null;message=""}) {
                 Text("خروج از حساب")
             }
