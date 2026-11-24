@@ -47,7 +47,7 @@ internal object ZurvanAchievementTracker {
                         ?.let(events::add)
                     events.add(event)
                     // Bounded offline queue; badge awards themselves live on the server.
-                    val latest = events.takeLast(512)
+                    val latest = events.toList().takeLast(512)
                     prefs.edit().putString(KEY, JSONArray(latest).toString()).apply()
                 }
                 flush(app)
