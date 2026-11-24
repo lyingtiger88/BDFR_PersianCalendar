@@ -765,7 +765,9 @@ public sealed partial class MainWindow : Window
             FlowDirection = FlowDirection.LeftToRight,
             Margin = new Thickness(0),
             ColumnSpacing = 0,
-            Background = BrushWithAlpha("#FFF9F5F2", 0xF3)
+            // The wallpaper is drawn in the parent outer grid. An opaque workspace
+            // background masked it completely even when the image decoded successfully.
+            Background = new SolidColorBrush(Colors.Transparent)
         };
         _workspaceLayoutGrid = root;
 
@@ -3947,6 +3949,7 @@ public sealed partial class MainWindow : Window
         }
 
         _backgroundWash.Background = ThemeService.Brush(_theme.WindowBackground);
+        UpdateWallpaperBackdropVisibility(_backgroundImage.Source is not null);
 
         if (_leftPanelSurface is not null)
         {
@@ -5033,6 +5036,18 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    /// <summary>
+    /// Keep wallpaper under the interactive panels rather than under an opaque
+    /// full-window workspace fill. Restore the original color when no image is loaded.
+    /// </summary>
+    private void UpdateWallpaperBackdropVisibility(bool hasWallpaper)
+    {
+        if (_workspaceLayoutGrid is null) return;
+        _workspaceLayoutGrid.Background = hasWallpaper
+            ? new SolidColorBrush(Colors.Transparent)
+            : BrushWithAlpha("#FFF9F5F2", 0xF3);
+    }
+
     private async Task ApplyBackgroundAsync(bool forceRandom = false)
     {
         try
@@ -5174,6 +5189,10 @@ public sealed partial class MainWindow : Window
 
             _backgroundImage.Source = source;
             _backgroundImage.Opacity = Math.Clamp(_settings.BackgroundOpacity, 0, 0.95);
+            UpdateWallpaperBackdropVisibility(source is not null);
+            CrashDiagnostics.Record("WALLPAPER_APPLY",
+                "mode=" + wallpaperMode + " loaded=" + (source is not null) +
+                " opacity=" + _backgroundImage.Opacity.ToString("0.00", CultureInfo.InvariantCulture));
 
             _backgroundWash.Opacity = source is null
                 ? 0
@@ -5204,6 +5223,8 @@ public sealed partial class MainWindow : Window
             StartupDiagnostics.Log($"ApplyBackgroundAsync failed: {ex}");
             _backgroundImage.Source = null;
             _backgroundWash.Opacity = 0;
+            UpdateWallpaperBackdropVisibility(false);
+            CrashDiagnostics.Record("WALLPAPER_ERROR", ex.GetType().Name);
             _backgroundPathText.Text = "بارگذاری تصویر زمینه انجام نشد.";
         }
     }
@@ -5331,7 +5352,9 @@ public sealed partial class MainWindow : Window
         _settings.AppearanceMode = "theme";
         _settingsService.Save(_settings);
         await ApplyBackgroundAsync();
-        StatusText.Text = "تصویر زمینه انتخاب و اعمال شد.";
+        StatusText.Text = _backgroundImage.Source is not null
+            ? "تصویر زمینه انتخاب و اعمال شد."
+            : "تصویر انتخاب شد ولی نمایش آن ناموفق بود؛ گزارش Diagnostics را بررسی کنید.";
     }
 
     private async Task PickWallpaperMappingAsync(bool seasonal, string key)
