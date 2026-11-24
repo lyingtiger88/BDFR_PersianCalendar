@@ -89,6 +89,7 @@ public sealed partial class MainWindow
         Update();
         return panel;
     }
+
     private FrameworkElement BuildAccountBadgeDashboard()
     {
         var navy = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 20, 23, 46));
@@ -96,45 +97,170 @@ public sealed partial class MainWindow
         var gold = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 244, 199, 92));
         var muted = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 183, 184, 210));
         var white = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 255, 255, 255));
+
         var root = new StackPanel { Spacing = 12 };
-        root.Children.Add(new TextBlock {
+        var heading = new TextBlock {
             Text = "♛  " + (_authClient.SignedInEmail ?? "کاربر زروان"),
             FontSize = 21, FontWeight = Microsoft.UI.Text.FontWeights.Bold,
             Foreground = gold, TextWrapping = TextWrapping.Wrap
-        });
-        root.Children.Add(new TextBlock { Text = "سطح: در انتظار دریافت", Foreground = muted });
+        };
+        root.Children.Add(heading);
+        var level = new TextBlock { Text = "سطح: در حال دریافت...", Foreground = muted };
+        root.Children.Add(level);
         var stats = new Grid { ColumnSpacing = 8 };
-        for (int i = 0; i < 3; i++) stats.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        for (int i = 0; i < 3; i++)
+            stats.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         var metrics = new[] { "★ XP", "◈ Silver", "♧ دعوت موفق" };
-        for (int i = 0; i < metrics.Length; i++) {
+        var metricValues = new TextBlock[3];
+        for (int i = 0; i < metrics.Length; i++)
+        {
             var stack = new StackPanel { Spacing = 6, HorizontalAlignment = HorizontalAlignment.Center };
             stack.Children.Add(new TextBlock { Text = metrics[i], Foreground = muted });
-            stack.Children.Add(new TextBlock { Text = "—", Foreground = white, FontSize = 20, HorizontalAlignment = HorizontalAlignment.Center });
-            var panel = new Border { Background = cardBrush, CornerRadius = new CornerRadius(12), Padding = new Thickness(8), Child = stack };
-            Grid.SetColumn(panel, i);
-            stats.Children.Add(panel);
+            metricValues[i] = new TextBlock {
+                Text = "…", Foreground = white, FontSize = 20,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                TextWrapping = TextWrapping.Wrap
+            };
+            stack.Children.Add(metricValues[i]);
+            var tile = new Border {
+                Background = cardBrush, CornerRadius = new CornerRadius(12),
+                Padding = new Thickness(8), Child = stack
+            };
+            Grid.SetColumn(tile, i);
+            stats.Children.Add(tile);
         }
         root.Children.Add(stats);
-        root.Children.Add(new TextBlock { Text = "🏅 نشان‌ها (Badge)", Foreground = white, FontSize = 18, FontWeight = Microsoft.UI.Text.FontWeights.Bold });
-        var badges = new Grid { ColumnSpacing = 6 };
-        for (int i = 0; i < 4; i++) badges.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        var names = new[] { "📅 کاربر فعال", "✦ کاوشگر", "♧ دعوت‌کننده", "♛ عضو ویژه" };
-        for (int i = 0; i < names.Length; i++) {
-            var item = new Border {
-                Background = cardBrush, CornerRadius = new CornerRadius(12), Padding = new Thickness(8),
-                Child = new TextBlock { Text = names[i], Foreground = gold, TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Center }
-            };
-            Grid.SetColumn(item, i);
-            badges.Children.Add(item);
-        }
-        root.Children.Add(badges);
-        root.Children.Add(new TextBlock { Text = "وضعیت دریافت نشان‌ها هنوز به حساب متصل نشده است.", Foreground = muted, TextWrapping = TextWrapping.Wrap });
+        root.Children.Add(new TextBlock {
+            Text = "🏅 نشان‌ها (Badge)", Foreground = white,
+            FontSize = 18, FontWeight = Microsoft.UI.Text.FontWeights.Bold
+        });
+        var badges = new StackPanel { Spacing = 6 };
+        badges.Children.Add(new TextBlock {
+            Text = "در حال دریافت وضعیت نشان‌ها...", Foreground = muted,
+            TextWrapping = TextWrapping.Wrap
+        });
+        root.Children.Add(new Border {
+            Background = cardBrush, CornerRadius = new CornerRadius(12),
+            Padding = new Thickness(12), Child = badges
+        });
+
         var referral = new StackPanel { Spacing = 7 };
-        referral.Children.Add(new TextBlock { Text = "دعوت از دوستان", Foreground = white, FontSize = 18 });
-        referral.Children.Add(new TextBlock { Text = "کد معرف: در انتظار دریافت از سرور", Foreground = gold });
-        referral.Children.Add(new TextBlock { Text = "۱۰۰ XP برای هر دعوت موفق · Premium Silver برای هر ۱۵ دعوت موفق", Foreground = muted, TextWrapping = TextWrapping.Wrap });
-        root.Children.Add(new Border { Background = cardBrush, CornerRadius = new CornerRadius(14), Padding = new Thickness(12), Child = referral });
-        return new Border { Background = navy, CornerRadius = new CornerRadius(22), Padding = new Thickness(16), Child = root };
+        referral.Children.Add(new TextBlock {
+            Text = "دعوت از دوستان", Foreground = white, FontSize = 18
+        });
+        var codeText = new TextBlock {
+            Text = "کد معرف: در حال دریافت...", Foreground = gold, TextWrapping = TextWrapping.Wrap
+        };
+        referral.Children.Add(codeText);
+        var copyCode = new Button {
+            Content = "کپی کد دعوت", Visibility = Visibility.Collapsed
+        };
+        referral.Children.Add(copyCode);
+        referral.Children.Add(new TextBlock {
+            Text = "۱۰۰ XP برای هر دعوت موفق · Premium Silver برای هر ۱۵ دعوت موفق",
+            Foreground = muted, TextWrapping = TextWrapping.Wrap
+        });
+        root.Children.Add(new Border {
+            Background = cardBrush, CornerRadius = new CornerRadius(14),
+            Padding = new Thickness(12), Child = referral
+        });
+
+        var feedback = new TextBlock {
+            Text = "", Foreground = muted, TextWrapping = TextWrapping.Wrap
+        };
+        root.Children.Add(feedback);
+        var refresh = new Button { Content = "↻ به‌روزرسانی امتیازات" };
+        root.Children.Add(refresh);
+
+        async Task LoadProgressAsync()
+        {
+            if (_authClient.SignedInEmail is null)
+            {
+                feedback.Text = "برای نمایش موجودی و نشان‌ها ابتدا وارد حساب تأییدشده شوید.";
+                level.Text = "سطح: نیاز به ورود";
+                for (int i = 0; i < metricValues.Length; i++) metricValues[i].Text = "—";
+                badges.Children.Clear();
+                copyCode.Visibility = Visibility.Collapsed;
+                codeText.Text = "کد معرف: —";
+                return;
+            }
+
+            refresh.IsEnabled = false;
+            feedback.Text = "در حال دریافت اطلاعات از سرور زروان...";
+            try
+            {
+                using var document = await _authClient.ReadXpProgressAsync();
+                var response = document.RootElement;
+                var profile = response.GetProperty("profile");
+                var refData = response.GetProperty("referral");
+                var xp = profile.GetProperty("total_xp").GetInt64();
+
+                heading.Text = "♛  " + (_authClient.SignedInEmail ?? "کاربر زروان");
+                level.Text = "سطح: " + profile.GetProperty("level_title").GetString();
+                metricValues[0].Text = xp.ToString("N0", System.Globalization.CultureInfo.InvariantCulture);
+                metricValues[1].Text = refData.TryGetProperty("current_silver", out var silver)
+                    && silver.ValueKind == System.Text.Json.JsonValueKind.Object ? "فعال" : "غیرفعال";
+                metricValues[2].Text = refData.GetProperty("successful").GetInt32().ToString(
+                    System.Globalization.CultureInfo.InvariantCulture);
+
+                badges.Children.Clear();
+                if (response.TryGetProperty("special_rank", out var rank) &&
+                    rank.ValueKind == System.Text.Json.JsonValueKind.Object &&
+                    rank.TryGetProperty("display_name_fa", out var title))
+                {
+                    badges.Children.Add(new TextBlock {
+                        Text = "♛ " + title.GetString(), Foreground = gold,
+                        FontWeight = Microsoft.UI.Text.FontWeights.Bold
+                    });
+                }
+                if (response.TryGetProperty("badges", out var receivedBadges) &&
+                    receivedBadges.ValueKind == System.Text.Json.JsonValueKind.Array)
+                {
+                    foreach (var badge in receivedBadges.EnumerateArray())
+                    {
+                        var earned = badge.TryGetProperty("earned", out var earnedValue) &&
+                            earnedValue.ValueKind == System.Text.Json.JsonValueKind.True;
+                        var name = badge.TryGetProperty("name_fa", out var nameValue)
+                            ? nameValue.GetString() : "نشان";
+                        badges.Children.Add(new TextBlock {
+                            Text = (earned ? "🏅 " : "🔒 ") + name,
+                            Foreground = earned ? gold : muted,
+                            TextWrapping = TextWrapping.Wrap
+                        });
+                    }
+                }
+                if (badges.Children.Count == 0)
+                    badges.Children.Add(new TextBlock { Text = "هنوز نشانی دریافت نشده است.", Foreground = muted });
+
+                var code = refData.TryGetProperty("identifier", out var identifier)
+                    && identifier.ValueKind == System.Text.Json.JsonValueKind.String
+                    ? identifier.GetString() : null;
+                codeText.Text = "کد معرف: " + (string.IsNullOrWhiteSpace(code) ? "هنوز تخصیص داده نشده" : code);
+                copyCode.Visibility = string.IsNullOrWhiteSpace(code)
+                    ? Visibility.Collapsed : Visibility.Visible;
+                copyCode.Click += (_, _) =>
+                {
+                    if (string.IsNullOrWhiteSpace(code)) return;
+                    var package = new Windows.ApplicationModel.DataTransfer.DataPackage();
+                    package.SetText(code);
+                    Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(package);
+                    feedback.Text = "کد معرف کپی شد.";
+                };
+                feedback.Text = "مقادیر از حساب زروان دریافت و به‌روزرسانی شدند.";
+            }
+            catch (Exception ex)
+            {
+                feedback.Text = "دریافت امتیازات ناموفق بود: " + ex.Message;
+                StartupDiagnostics.Log("XP account view failed: " + ex.GetType().Name);
+            }
+            finally { refresh.IsEnabled = true; }
+        }
+        refresh.Click += async (_, _) => await LoadProgressAsync();
+        _ = LoadProgressAsync();
+        return new Border {
+            Background = navy, CornerRadius = new CornerRadius(22),
+            Padding = new Thickness(16), Child = root
+        };
     }
 
 }
