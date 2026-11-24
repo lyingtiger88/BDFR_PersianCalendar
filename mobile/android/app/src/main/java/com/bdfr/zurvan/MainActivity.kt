@@ -56,6 +56,20 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
+    private var lastForegroundClaimElapsed: Long = 0L
+
+    override fun onResume() {
+        super.onResume()
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (lastForegroundClaimElapsed != 0L &&
+            now - lastForegroundClaimElapsed < 5 * 60_000L) return
+        lastForegroundClaimElapsed = now
+        lifecycleScope.launch(Dispatchers.IO) {
+            runCatching { ZurvanXpClient(this@MainActivity).claimOpen() }
+            runCatching { ZurvanAchievementTracker.flush(this@MainActivity) }
+        }
+    }
+
     private val notificationPermissionLauncher =
         registerForActivityResult(
             ActivityResultContracts.RequestPermission()
@@ -73,12 +87,6 @@ class MainActivity : ComponentActivity() {
                 .onSuccess { ZurvanBuiltInOccasions.reload(this@MainActivity) }
         }
         ZurvanPlanExpirySchedule.register(this)
-        lifecycleScope.launch(Dispatchers.IO) {
-            // A successful, verified session claims at most once every rolling 60 minutes.
-            runCatching { ZurvanXpClient(this@MainActivity).claimOpen() }
-            runCatching { ZurvanAchievementTracker.flush(this@MainActivity) }
-        }
-
         if (
             Build.VERSION.SDK_INT >=
                 Build.VERSION_CODES.TIRAMISU &&
