@@ -113,7 +113,7 @@ public sealed partial class MainWindow
                 RefreshWindowsSettingsProfile();
                 RefreshAchievementSession();
                 _ = RefreshLicensePolicyAsync();
-                _ = ClaimAppOpenXpSafelyAsync();
+                _ = Task.Run(ClaimAppOpenXpSafelyAsync);
                 if (feedback != pending) status.Text = feedback;
             }
             catch (Exception error) { status.Text = error.Message; }
