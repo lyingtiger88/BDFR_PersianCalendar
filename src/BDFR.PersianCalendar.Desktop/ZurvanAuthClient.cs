@@ -168,6 +168,12 @@ internal sealed class ZurvanAuthClient
         return JsonDocument.Parse(raw);
     }
 
+    internal async Task<JsonDocument> ClaimAppOpenXpAsync()
+        => await LicenseFunctionAsync("zurvan-user-progress", new { action = "claim_open" });
+
+    internal async Task<JsonDocument> ReadXpProgressAsync()
+        => await LicenseFunctionAsync("zurvan-user-progress", new { action = "status" });
+
     internal async Task<JsonDocument> StartTrialAsync()
         => await LicenseFunctionAsync("zurvan-license-start-trial", new { });
 
