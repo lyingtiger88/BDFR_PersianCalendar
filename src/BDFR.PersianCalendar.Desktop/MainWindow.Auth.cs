@@ -61,6 +61,17 @@ public sealed partial class MainWindow
             _ = ReportAchievementSafelyAsync("explore", section: section);
     }
 
+    private DateTimeOffset _lastForegroundAchievementCheck = DateTimeOffset.MinValue;
+
+    private void CountForegroundVisit()
+    {
+        if (_authClient.SignedInEmail is null) return;
+        var now = DateTimeOffset.UtcNow;
+        if (now - _lastForegroundAchievementCheck < TimeSpan.FromMinutes(5)) return;
+        _lastForegroundAchievementCheck = now;
+        _ = ClaimAppOpenXpSafelyAsync();
+    }
+
     private async Task ClaimAppOpenXpSafelyAsync()
     {
         if (_authClient.SignedInEmail is null) return;
