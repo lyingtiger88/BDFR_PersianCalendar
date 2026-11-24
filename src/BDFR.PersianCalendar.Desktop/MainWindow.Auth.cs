@@ -362,13 +362,25 @@ public sealed partial class MainWindow
             }
             catch (Exception ex)
             {
-                feedback.Text = "دریافت امتیازات ناموفق بود: " + ex.Message;
+                try {
+                    if (root.IsLoaded)
+                        feedback.Text = "دریافت امتیازات ناموفق بود: " + ex.Message;
+                } catch { }
                 StartupDiagnostics.Log("XP account view failed: " + ex.GetType().Name);
             }
-            finally { refresh.IsEnabled = true; }
+            finally {
+                try { if (root.IsLoaded) refresh.IsEnabled = true; }
+                catch { /* Unloaded WinUI controls must not interrupt the app. */ }
+            }
         }
         refresh.Click += async (_, _) => await LoadProgressAsync();
-        _ = LoadProgressAsync();
+        var initialLoadStarted = false;
+        root.Loaded += (_, _) =>
+        {
+            if (initialLoadStarted) return;
+            initialLoadStarted = true;
+            _ = LoadProgressAsync();
+        };
         return new Border {
             Background = navy, CornerRadius = new CornerRadius(22),
             Padding = new Thickness(16), Child = root
