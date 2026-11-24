@@ -244,7 +244,10 @@ public sealed partial class MainWindow
             feedback.Text = "در حال دریافت اطلاعات از سرور زروان...";
             try
             {
+                var requestedAccount = _authClient.SignedInEmail;
                 using var document = await _authClient.ReadXpProgressAsync();
+                if (!root.IsLoaded || !string.Equals(requestedAccount, _authClient.SignedInEmail,
+                    StringComparison.OrdinalIgnoreCase)) return;
                 var response = document.RootElement;
                 var profile = response.GetProperty("profile");
                 var refData = response.GetProperty("referral");
@@ -268,21 +271,75 @@ public sealed partial class MainWindow
                         FontWeight = Microsoft.UI.Text.FontWeights.Bold
                     });
                 }
-                if (response.TryGetProperty("badges", out var receivedBadges) &&
-                    receivedBadges.ValueKind == System.Text.Json.JsonValueKind.Array)
+                // Achievement status is fetched independently from XP, Silver and referrals.
+                try
                 {
-                    foreach (var badge in receivedBadges.EnumerateArray())
+                    using var achievements = await _authClient.ReadAchievementsAsync();
+                    if (!root.IsLoaded) return;
+                    var achievementRoot = achievements.RootElement;
+                    if (achievementRoot.TryGetProperty("badges", out var receivedBadges) &&
+                        receivedBadges.ValueKind == System.Text.Json.JsonValueKind.Array)
                     {
-                        var earned = badge.TryGetProperty("earned", out var earnedValue) &&
-                            earnedValue.ValueKind == System.Text.Json.JsonValueKind.True;
-                        var name = badge.TryGetProperty("name_fa", out var nameValue)
-                            ? nameValue.GetString() : "نشان";
-                        badges.Children.Add(new TextBlock {
-                            Text = (earned ? "🏅 " : "🔒 ") + name,
-                            Foreground = earned ? gold : muted,
-                            TextWrapping = TextWrapping.Wrap
-                        });
+                        var tiles = new Grid { ColumnSpacing = 10, RowSpacing = 12 };
+                        for (int column = 0; column < 3; column++)
+                            tiles.ColumnDefinitions.Add(new ColumnDefinition {
+                                Width = new GridLength(1, GridUnitType.Star)
+                            });
+                        var index = 0;
+                        foreach (var badge in receivedBadges.EnumerateArray())
+                        {
+                            var earned = badge.TryGetProperty("earned", out var earnedValue) &&
+                                earnedValue.ValueKind == System.Text.Json.JsonValueKind.True;
+                            var name = badge.TryGetProperty("name_fa", out var nameValue)
+                                ? nameValue.GetString() ?? "نشان" : "نشان";
+                            var icon = earned && badge.TryGetProperty("icon", out var iconValue)
+                                ? iconValue.GetString() ?? "★" : "🔒";
+                            var emblem = new Grid { Width = 76, Height = 76 };
+                            emblem.Children.Add(new TextBlock {
+                                Text = "⬡", FontSize = 69,
+                                HorizontalAlignment = HorizontalAlignment.Center,
+                                VerticalAlignment = VerticalAlignment.Center,
+                                Foreground = earned ? gold : muted,
+                                Opacity = earned ? 1 : 0.45
+                            });
+                            emblem.Children.Add(new TextBlock {
+                                Text = icon, FontSize = 25,
+                                HorizontalAlignment = HorizontalAlignment.Center,
+                                VerticalAlignment = VerticalAlignment.Center,
+                                Foreground = earned ? white : muted
+                            });
+                            var content = new StackPanel {
+                                Spacing = 4, HorizontalAlignment = HorizontalAlignment.Center,
+                                Children = {
+                                    emblem,
+                                    new TextBlock {
+                                        Text = name, Foreground = earned ? white : muted,
+                                        FontSize = 12, TextAlignment = TextAlignment.Center,
+                                        TextWrapping = TextWrapping.Wrap
+                                    }
+                                }
+                            };
+                            var tile = new Border {
+                                Padding = new Thickness(6), CornerRadius = new CornerRadius(12),
+                                Background = navy, Child = content
+                            };
+                            if (index % 3 == 0)
+                                tiles.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                            Grid.SetColumn(tile, index % 3);
+                            Grid.SetRow(tile, index / 3);
+                            tiles.Children.Add(tile);
+                            index++;
+                        }
+                        if (index > 0) badges.Children.Add(tiles);
                     }
+                }
+                catch (Exception ex)
+                {
+                    if (root.IsLoaded) badges.Children.Add(new TextBlock {
+                        Text = "دریافت نشان‌ها موقتاً در دسترس نیست؛ داده‌های تقویم محفوظ است.",
+                        Foreground = muted, TextWrapping = TextWrapping.Wrap
+                    });
+                    StartupDiagnostics.Log("Achievement status unavailable: " + ex.GetType().Name);
                 }
                 if (badges.Children.Count == 0)
                     badges.Children.Add(new TextBlock { Text = "هنوز نشانی دریافت نشده است.", Foreground = muted });
