@@ -6628,7 +6628,7 @@ public sealed partial class MainWindow : Window
     {
         await _repository.UpsertNoteAsync(_selected, NoteBox.Text ?? string.Empty, NotePinnedCheck.IsChecked == true);
         if (!string.IsNullOrWhiteSpace(NoteBox.Text))
-            _ = ReportAchievementSafelyAsync("content_saved");
+            ReportAchievementSafely("content_saved");
         await _repository.AddActivityAsync(new ActivityLogEntry(
             Guid.NewGuid().ToString("N"),
             DateTimeOffset.UtcNow,
@@ -7010,7 +7010,7 @@ public sealed partial class MainWindow : Window
                 reminderRepeatCount: repeatCount,
                 reminderRepeatIntervalMinutes: repeatInterval,
                 icon: iconPicker.SelectedItem?.ToString());
-            _ = ReportAchievementSafelyAsync("content_saved");
+            ReportAchievementSafely("content_saved");
 
             _selected = eventDate.Persian;
             _year = _selected.Year;
