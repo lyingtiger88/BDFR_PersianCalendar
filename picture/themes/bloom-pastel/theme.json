@@ -1,6 +1,7 @@
 {
   "id": "bloom-pastel",
   "displayName": "Bloom Pastel",
+  "defaultWallpaperFile": "floral-pattern.svg",
   "windowBackground": "#FFFFF8F5",
   "panelBackground": "#E8FFFFFF",
   "cardBackground": "#F0FFFFFF",
