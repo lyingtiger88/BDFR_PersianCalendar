@@ -20,6 +20,10 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
+      - name: Generate Zurvan Windows application icon
+        shell: pwsh
+        run: ./tools/GenerateZurvanIcon.ps1
+
       - name: Publish Windows app
         shell: pwsh
         env:
