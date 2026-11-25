@@ -4,6 +4,7 @@ public sealed class ThemeDefinition
 {
     public string Id { get; set; } = "zara-pastel";
     public string DisplayName { get; set; } = "Zara Pastel";
+    public string? DefaultWallpaperFile { get; set; }
     public string WindowBackground { get; set; } = "#FFFDF9F6";
     public string PanelBackground { get; set; } = "#EFFFFFFF";
     public string CardBackground { get; set; } = "#F7FFFFFF";
