@@ -60,17 +60,20 @@ public sealed partial class MainWindow
 
         _zurvanDigitalTime = new TextBlock
         {
+            Tag = "ZurvanKeepForeground",
             FontSize = 46, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
             HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
             FlowDirection = FlowDirection.LeftToRight
         };
         _zurvanDigitalDate = new TextBlock
         {
+            Tag = "ZurvanKeepForeground",
             FontSize = 16, HorizontalAlignment = HorizontalAlignment.Center,
             TextAlignment = TextAlignment.Center
         };
         _zurvanDigitalCaption = new TextBlock
         {
+            Tag = "ZurvanKeepForeground",
             FontSize = 13, HorizontalAlignment = HorizontalAlignment.Center,
             TextAlignment = TextAlignment.Center
         };
