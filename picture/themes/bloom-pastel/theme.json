@@ -1,0 +1,21 @@
+{
+  "id": "bloom-pastel",
+  "displayName": "Bloom Pastel",
+  "windowBackground": "#FFFFF8F5",
+  "panelBackground": "#E8FFFFFF",
+  "cardBackground": "#F0FFFFFF",
+  "primaryText": "#FF403044",
+  "secondaryText": "#FF88747E",
+  "accent": "#FFE5A0B0",
+  "selectedDay": "#FFB8D7D0",
+  "holidayText": "#FFD46F78",
+  "weekdayColors": [
+    "#FFF7E2E5",
+    "#FFFFEED8",
+    "#FFE7F0DE",
+    "#FFDDEFEA",
+    "#FFE5E8F8",
+    "#FFF0E5F1",
+    "#FFF8E1E6"
+  ]
+}
