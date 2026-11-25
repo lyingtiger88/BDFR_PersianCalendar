@@ -323,7 +323,8 @@ public sealed partial class MainWindow : Window
                      _settings.BackgroundMode,
                      "custom",
                      StringComparison.OrdinalIgnoreCase) &&
-                 !string.IsNullOrWhiteSpace(_settings.CustomBackgroundPath));
+                 !string.IsNullOrWhiteSpace(_settings.CustomBackgroundPath)) ||
+                string.Equals(_settings.BackgroundMode, "theme-default", StringComparison.OrdinalIgnoreCase);
 
             if (shouldApplyBackground)
             {
@@ -3832,6 +3833,16 @@ public sealed partial class MainWindow : Window
             _settings.ThemeId = themeId;
             _settings.UseSeasonalBackground = false;
 
+            if (string.Equals(themeId, "bloom-pastel", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!string.Equals(_settings.BackgroundMode, "custom", StringComparison.OrdinalIgnoreCase))
+                    _settings.BackgroundMode = "theme-default";
+            }
+            else if (string.Equals(_settings.BackgroundMode, "theme-default", StringComparison.OrdinalIgnoreCase))
+            {
+                _settings.BackgroundMode = "none";
+            }
+
             if (string.Equals(_settings.BackgroundMode, "elena", StringComparison.OrdinalIgnoreCase))
                 _settings.BackgroundMode = "none";
 
@@ -5158,6 +5169,18 @@ public sealed partial class MainWindow : Window
                 label = path is null
                     ? $"Elena Mode · {season} · Season Carousel · فایل Season_N پیدا نشد"
                     : $"Elena Mode · {season} · {ToPersianDigits((_seasonCarouselIndex + 1).ToString())}/{ToPersianDigits(seasonalFiles.Count.ToString())} · {Path.GetFileName(path)}";
+            }
+            else if (wallpaperMode == "manual" &&
+                     string.Equals(_settings.BackgroundMode, "theme-default", StringComparison.OrdinalIgnoreCase) &&
+                     !string.IsNullOrWhiteSpace(_theme.DefaultWallpaperFile))
+            {
+                var bundled = Path.Combine(_themeService.ThemeRoot(_theme), _theme.DefaultWallpaperFile);
+                if (File.Exists(bundled))
+                {
+                    path = bundled;
+                    isCustom = true;
+                    label = $"پس‌زمینه گل‌گلی · {Path.GetFileName(path)}";
+                }
             }
             else if (wallpaperMode == "manual" &&
                      string.Equals(_settings.BackgroundMode, "custom", StringComparison.OrdinalIgnoreCase) &&
