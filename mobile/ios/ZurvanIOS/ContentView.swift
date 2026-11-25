@@ -517,7 +517,15 @@ private struct MobileSettingsView: View {
                         }
                     }
                     .pickerStyle(.menu)
-                    Text("تم‌های متناظر با ویندوز و اندروید؛ انتخاب در دستگاه ذخیره می‌شود.")
+                    .onChange(of: themeID) { oldValue, newValue in
+                        guard oldValue != newValue else { return }
+                        // Theme changes always discard the previous custom image.
+                        // The newly selected theme's bundled default becomes active.
+                        ZurvanBackgroundStore.remove()
+                        backgroundAvailable = false
+                        selectedBackground = nil
+                    }
+                    Text("با تغییر تم، تصویر پیش‌فرض همان تم اعمال می‌شود؛ تصویر دلخواه فقط تا تعویض تم باقی می‌ماند.")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
                 .padding()
