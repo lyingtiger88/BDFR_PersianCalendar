@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800">
+<defs>
+ <pattern id="florals" width="240" height="200" patternUnits="userSpaceOnUse">
+  <rect width="240" height="200" fill="#FFF8F5"/>
+  <g opacity=".78" stroke="#9BA98B" stroke-width="2" fill="none" stroke-linecap="round">
+   <path d="M32 76 Q48 55 58 35 M48 59 Q25 48 20 32 M51 52 Q70 45 76 28"/>
+   <path d="M170 157 Q183 130 190 112 M181 137 Q161 125 153 108 M183 130 Q205 120 211 103"/>
+   <path d="M120 183 Q127 166 128 150"/>
+  </g>
+  <g transform="translate(58 31)">
+   <g fill="#EBA7AF" stroke="#D88C9A" stroke-width="1"><ellipse cy="-9" rx="5" ry="9"/><ellipse cy="-9" rx="5" ry="9" transform="rotate(72)"/><ellipse cy="-9" rx="5" ry="9" transform="rotate(144)"/><ellipse cy="-9" rx="5" ry="9" transform="rotate(216)"/><ellipse cy="-9" rx="5" ry="9" transform="rotate(288)"/></g><circle r="4" fill="#E7C77E"/>
+  </g>
+  <g transform="translate(20 32)" fill="#A9B99B"><path d="M0 0 Q-18 -15 -22 -2 Q-12 8 0 0Z"/><path d="M0 0 Q14 -18 20 -7 Q15 4 0 0Z"/></g>
+  <g transform="translate(190 108)">
+   <g fill="#E8C49A" stroke="#D7AB83" stroke-width="1"><ellipse cy="-7" rx="4" ry="7"/><ellipse cy="-7" rx="4" ry="7" transform="rotate(72)"/><ellipse cy="-7" rx="4" ry="7" transform="rotate(144)"/><ellipse cy="-7" rx="4" ry="7" transform="rotate(216)"/><ellipse cy="-7" rx="4" ry="7" transform="rotate(288)"/></g><circle r="3.2" fill="#D9B76E"/>
+  </g>
+  <g transform="translate(128 148)">
+   <g fill="#C5B7DB" stroke="#A99AC9" stroke-width="1"><ellipse cy="-6" rx="4" ry="6"/><ellipse cy="-6" rx="4" ry="6" transform="rotate(72)"/><ellipse cy="-6" rx="4" ry="6" transform="rotate(144)"/><ellipse cy="-6" rx="4" ry="6" transform="rotate(216)"/><ellipse cy="-6" rx="4" ry="6" transform="rotate(288)"/></g><circle r="3" fill="#E9D38D"/>
+  </g>
+  <g transform="translate(222 42) scale(.72)">
+   <g fill="#F1B9A4"><ellipse cy="-8" rx="5" ry="8"/><ellipse cy="-8" rx="5" ry="8" transform="rotate(72)"/><ellipse cy="-8" rx="5" ry="8" transform="rotate(144)"/><ellipse cy="-8" rx="5" ry="8" transform="rotate(216)"/><ellipse cy="-8" rx="5" ry="8" transform="rotate(288)"/></g><circle r="3.5" fill="#E8C779"/>
+  </g>
+  <g fill="#AAB99E"><ellipse cx="26" cy="88" rx="7" ry="3" transform="rotate(-28 26 88)"/><ellipse cx="43" cy="67" rx="7" ry="3" transform="rotate(28 43 67)"/><ellipse cx="176" cy="149" rx="7" ry="3" transform="rotate(-28 176 149)"/></g>
+  <g fill="#E9C5CC"><circle cx="100" cy="40" r="2.5"/><circle cx="104" cy="47" r="2"/><circle cx="88" cy="164" r="2.5"/><circle cx="91" cy="171" r="2"/></g>
+ </pattern>
+</defs>
+<rect width="1200" height="800" fill="url(#florals)"/>
+</svg>
