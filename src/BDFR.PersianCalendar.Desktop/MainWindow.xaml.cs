@@ -159,6 +159,15 @@ public sealed partial class MainWindow : Window
         _settingsService = new SettingsService();
         _themeService = new ThemeService();
         _settings = _settingsService.Load();
+        if (string.Equals(_settings.AppearanceMode, "theme", StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(_settings.ThemeId, "bloom-pastel", StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(_settings.BackgroundMode, "custom", StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(_settings.BackgroundMode, "theme-default", StringComparison.OrdinalIgnoreCase))
+        {
+            _settings.BackgroundMode = "theme-default";
+            _settings.WallpaperMode = "manual";
+            _settings.CustomBackgroundPath = null;
+        }
         NormalizeCalendarOrderSettings();
         _settingsService.Save(_settings);
         StartupDiagnostics.Log(
@@ -756,7 +765,7 @@ public sealed partial class MainWindow : Window
 
         _backgroundWash.Background =
             ThemeService.Brush(_theme.WindowBackground);
-        _backgroundWash.Opacity = 0.62;
+        _backgroundWash.Opacity = string.Equals(_theme.Id, "bloom-pastel", StringComparison.OrdinalIgnoreCase) ? 0.08 : 0.62;
         outer.Children.Add(_backgroundWash);
 
         // Use a physical LTR grid so "left" and "right" settings always map
@@ -1397,6 +1406,9 @@ public sealed partial class MainWindow : Window
         if (IsZaraPastelActive())
             return BrushWithAlpha(_theme.CardBackground, 0x44);
 
+        if (string.Equals(_theme.Id, "bloom-pastel", StringComparison.OrdinalIgnoreCase))
+            return BrushWithAlpha(_theme.CardBackground, 0x42);
+
         return BrushWithAlpha(_theme.CardBackground, 0x58);
     }
 
@@ -1404,6 +1416,9 @@ public sealed partial class MainWindow : Window
     {
         if (IsLiquidGlassActive())
             return CreateLiquidGlassBrush(_theme.PanelBackground, 0.22, 0xB0);
+
+        if (string.Equals(_theme.Id, "bloom-pastel", StringComparison.OrdinalIgnoreCase))
+            return BrushWithAlpha(_theme.PanelBackground, 0x58);
 
         return ThemeService.Brush(_theme.PanelBackground);
     }
@@ -4062,7 +4077,8 @@ public sealed partial class MainWindow : Window
                 button.Background = ThemeService.Brush(_theme.Accent);
                 button.Foreground = ThemeService.Brush(_theme.PrimaryText);
             }
-            else if (root is TextBlock text)
+            else if (root is TextBlock text &&
+                     !string.Equals(text.Tag as string, "ZurvanKeepForeground", StringComparison.Ordinal))
             {
                 text.Foreground = ThemeService.Brush(_theme.PrimaryText);
             }
@@ -5206,7 +5222,10 @@ public sealed partial class MainWindow : Window
             }
 
             _backgroundImage.Source = source;
-            _backgroundImage.Opacity = Math.Clamp(_settings.BackgroundOpacity, 0, 0.95);
+            var isBloomPastel = string.Equals(_theme.Id, "bloom-pastel", StringComparison.OrdinalIgnoreCase);
+            _backgroundImage.Opacity = isBloomPastel && source is not null
+                ? Math.Max(0.42, Math.Clamp(_settings.BackgroundOpacity, 0, 0.95))
+                : Math.Clamp(_settings.BackgroundOpacity, 0, 0.95);
             UpdateWallpaperBackdropVisibility(source is not null);
             CrashDiagnostics.Record("WALLPAPER_APPLY",
                 "mode=" + wallpaperMode + " loaded=" + (source is not null) +
@@ -5214,7 +5233,9 @@ public sealed partial class MainWindow : Window
 
             _backgroundWash.Opacity = source is null
                 ? 0
-                : IsLiquidGlassActive()
+                : isBloomPastel
+                    ? 0.06
+                    : IsLiquidGlassActive()
                     ? 0.08
                     : IsZaraPastelActive()
                         ? 0.12
