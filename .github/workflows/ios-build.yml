@@ -1,0 +1,55 @@
+name: Zurvan iOS build
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "mobile/ios/**"
+      - ".github/workflows/ios-build.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ios-simulator:
+    name: Build iOS Simulator app
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        working-directory: mobile/ios
+        run: xcodegen generate --spec project.yml
+
+      - name: Build iOS app (unsigned simulator)
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project mobile/ios/ZurvanIOS.xcodeproj \
+            -scheme ZurvanIOS \
+            -configuration Release \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/ZurvanDerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Package simulator app
+        run: |
+          set -euo pipefail
+          APP="$RUNNER_TEMP/ZurvanDerivedData/Build/Products/Release-iphonesimulator/Zurvan.app"
+          test -d "$APP"
+          ditto -c -k --sequesterRsrc --keepParent "$APP" Zurvan-iOS-Simulator.zip
+          shasum -a 256 Zurvan-iOS-Simulator.zip > Zurvan-iOS-Simulator.zip.sha256
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Zurvan-iOS-Simulator
+          path: |
+            Zurvan-iOS-Simulator.zip
+            Zurvan-iOS-Simulator.zip.sha256
+          retention-days: 14
