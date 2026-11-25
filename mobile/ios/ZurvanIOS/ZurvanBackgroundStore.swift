@@ -76,8 +76,8 @@ private struct BloomPastelWallpaperView: View {
                     let color = flowers[(row + Int(x / stepX)) % flowers.count]
                     for petal in 0..<5 {
                         let angle = Double(petal) * 2 * Double.pi / 5
-                        let px = x + cos(angle) * 6
-                        let py = y + sin(angle) * 6
+                        let px = x + CGFloat(cos(angle) * 6)
+                        let py = y + CGFloat(sin(angle) * 6)
                         context.fill(Path(ellipseIn: CGRect(x: px - 4.5, y: py - 4.5, width: 9, height: 9)), with: .color(color))
                     }
                     context.fill(Path(ellipseIn: CGRect(x: x - 2.5, y: y - 2.5, width: 5, height: 5)), with: .color(Color(red: 0.85, green: 0.72, blue: 0.44).opacity(0.65)))
