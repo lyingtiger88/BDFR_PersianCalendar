@@ -1,0 +1,95 @@
+name: Zurvan Bloom Pastel Windows Mini Update
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - ".github/workflows/windows-bloom-pastel-patch.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-mini-update:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Publish Windows app
+        shell: pwsh
+        env:
+          ZURVAN_PUBLIC_KEY_B64: ${{ vars.ZURVAN_LICENSE_PUBLIC_KEY_B64 }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          if ([string]::IsNullOrWhiteSpace($env:ZURVAN_PUBLIC_KEY_B64)) { throw "Missing Zurvan license public key variable." }
+          dotnet publish src/BDFR.PersianCalendar.Desktop/BDFR.PersianCalendar.Desktop.csproj -c Release -r win-x64 --self-contained true -p:Platform=x64 -p:WindowsAppSDKSelfContained=true -p:PublishSingleFile=false -p:ZurvanLicensePublicKeyB64="$env:ZURVAN_PUBLIC_KEY_B64" -o artifacts/publish
+          $dll = "artifacts/publish/BDFR.PersianCalendar.Desktop.dll"
+          if (-not (Test-Path $dll)) { throw "Desktop assembly missing from publish output." }
+          New-Item -ItemType Directory -Force artifacts/Zurvan-Bloom-Pastel-MiniUpdate/picture/themes/bloom-pastel | Out-Null
+          Copy-Item $dll artifacts/Zurvan-Bloom-Pastel-MiniUpdate/BDFR.PersianCalendar.Desktop.dll
+          Copy-Item picture/themes/bloom-pastel/theme.json artifacts/Zurvan-Bloom-Pastel-MiniUpdate/picture/themes/bloom-pastel/theme.json
+          Copy-Item picture/themes/bloom-pastel/floral-pattern.svg artifacts/Zurvan-Bloom-Pastel-MiniUpdate/picture/themes/bloom-pastel/floral-pattern.svg
+
+      - name: Sign desktop assembly with persistent BDFR certificate
+        shell: pwsh
+        env:
+          PFX_BASE64: ${{ secrets.BDFR_CODESIGN_PFX_BASE64 }}
+          PFX_PASSWORD: ${{ secrets.BDFR_CODESIGN_PFX_PASSWORD }}
+          EXPECTED_THUMBPRINT: ${{ secrets.BDFR_CODESIGN_THUMBPRINT }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          foreach ($name in @("PFX_BASE64", "PFX_PASSWORD", "EXPECTED_THUMBPRINT")) {
+            if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($name))) { throw "Missing signing secret $name." }
+          }
+          $bytes = [Convert]::FromBase64String($env:PFX_BASE64)
+          $cert = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new($bytes, $env:PFX_PASSWORD, [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::EphemeralKeySet)
+          if (-not $cert.HasPrivateKey -or $cert.Thumbprint -ne $env:EXPECTED_THUMBPRINT) { throw "BDFR signing certificate validation failed." }
+          $pfx = Join-Path $env:RUNNER_TEMP "BDFR-CodeSigning.pfx"
+          [IO.File]::WriteAllBytes($pfx, $bytes)
+          $sdk = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Filter signtool.exe -Recurse | Where-Object { $_.FullName -match "\\\\x64\\\\signtool.exe$" } | Sort-Object FullName -Descending | Select-Object -First 1
+          if (-not $sdk) { throw "SignTool not found." }
+          $target = "artifacts/Zurvan-Bloom-Pastel-MiniUpdate/BDFR.PersianCalendar.Desktop.dll"
+          & $sdk.FullName sign /f $pfx /p $env:PFX_PASSWORD /fd SHA256 $target
+          if ($LASTEXITCODE -ne 0) { throw "Desktop assembly signing failed." }
+          $sig = Get-AuthenticodeSignature $target
+          if (-not $sig.SignerCertificate -or $sig.SignerCertificate.Thumbprint -ne $cert.Thumbprint) { throw "Signed assembly identity mismatch." }
+          Remove-Item $pfx -Force
+
+      - name: Create safe mini updater
+        shell: pwsh
+        run: |
+          $script = @'
+          param([string]$InstallDir = (Join-Path $env:LOCALAPPDATA "Programs\Zurvan"))
+          $ErrorActionPreference = "Stop"
+          $exe = Join-Path $InstallDir "BDFR.PersianCalendar.Desktop.exe"
+          if (-not (Test-Path $exe)) { throw "Zurvan installation not found at $InstallDir. Pass -InstallDir with the actual installation folder." }
+          $process = Get-Process "BDFR.PersianCalendar.Desktop" -ErrorAction SilentlyContinue
+          if ($process) { $process | Stop-Process -Force; Start-Sleep -Seconds 2 }
+          $backup = Join-Path $InstallDir ("update-backup-" + (Get-Date -Format "yyyyMMdd-HHmmss"))
+          New-Item -ItemType Directory -Force $backup | Out-Null
+          $dll = Join-Path $InstallDir "BDFR.PersianCalendar.Desktop.dll"
+          if (Test-Path $dll) { Copy-Item $dll $backup }
+          $themeDir = Join-Path $InstallDir "picture\themes\bloom-pastel"
+          if (Test-Path $themeDir) { Copy-Item $themeDir (Join-Path $backup "bloom-pastel") -Recurse }
+          Copy-Item (Join-Path $PSScriptRoot "BDFR.PersianCalendar.Desktop.dll") $dll -Force
+          New-Item -ItemType Directory -Force $themeDir | Out-Null
+          Copy-Item (Join-Path $PSScriptRoot "picture\themes\bloom-pastel\*") $themeDir -Force
+          Write-Host "Bloom Pastel mini update installed. Your calendar data and settings were not changed."
+          Write-Host "Backup: $backup"
+          '@
+          Set-Content -Path artifacts/Zurvan-Bloom-Pastel-MiniUpdate/Install-Update.ps1 -Value $script -Encoding UTF8
+          $hashes = Get-ChildItem artifacts/Zurvan-Bloom-Pastel-MiniUpdate -Recurse -File | Get-FileHash -Algorithm SHA256
+          $hashes | ForEach-Object { "$($_.Hash) *$($_.Path.Substring((Resolve-Path artifacts/Zurvan-Bloom-Pastel-MiniUpdate).Path.Length + 1))" } | Set-Content artifacts/Zurvan-Bloom-Pastel-MiniUpdate/SHA256SUMS.txt
+          Compress-Archive -Path artifacts/Zurvan-Bloom-Pastel-MiniUpdate/* -DestinationPath artifacts/Zurvan-Bloom-Pastel-MiniUpdate.zip -CompressionLevel Optimal -Force
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Zurvan-Bloom-Pastel-MiniUpdate
+          path: artifacts/Zurvan-Bloom-Pastel-MiniUpdate.zip
+          if-no-files-found: error
+          retention-days: 30
