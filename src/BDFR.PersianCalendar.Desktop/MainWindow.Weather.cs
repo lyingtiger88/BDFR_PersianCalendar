@@ -34,10 +34,12 @@ public sealed partial class MainWindow
         top.Children.Add(refresh);
         layout.Children.Add(top);
 
+        _weatherLocation.Tag = "ZurvanKeepForeground";
         _weatherLocation.FontSize = 11;
         _weatherLocation.Opacity = 0.8;
         _weatherLocation.Text = "آب‌وهوای شهر انتخابی";
         layout.Children.Add(_weatherLocation);
+        _weatherNow.Tag = "ZurvanKeepForeground";
         _weatherNow.FontSize = 32;
         _weatherNow.FontWeight = Microsoft.UI.Text.FontWeights.SemiBold;
         _weatherNow.Text = "در حال دریافت…";
@@ -52,13 +54,15 @@ public sealed partial class MainWindow
         conditions.Children.Add(_weatherCurrentIcon);
         conditions.Children.Add(_weatherNow);
         layout.Children.Add(conditions);
+        _weatherDescription.Tag = "ZurvanKeepForeground";
         _weatherDescription.FontSize = 11;
         _weatherDescription.TextWrapping = TextWrapping.Wrap;
         layout.Children.Add(_weatherDescription);
 
         layout.Children.Add(new TextBlock
-        {
-            Text = "دمای ۲۴ ساعت آینده",
+                {
+                    Tag = "ZurvanKeepForeground",
+                    Text = "دمای ۲۴ ساعت آینده",
             FontSize = 11,
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
             Foreground = ThemeService.Brush("#FFFFFFFF")
@@ -66,8 +70,9 @@ public sealed partial class MainWindow
         var hourlyScroll = CreateWeatherDayScroller(_weatherHourly);
         layout.Children.Add(hourlyScroll);
         layout.Children.Add(new TextBlock
-        {
-            Text = "۷ روز آینده",
+                {
+                    Tag = "ZurvanKeepForeground",
+                    Text = "۷ روز آینده",
             FontSize = 11,
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
             Foreground = ThemeService.Brush("#FFFFFFFF"),
@@ -76,8 +81,9 @@ public sealed partial class MainWindow
         var futureScroll = CreateWeatherDayScroller(_weatherFutureDays);
         layout.Children.Add(futureScroll);
         layout.Children.Add(new TextBlock
-        {
-            Text = "داده‌ها: Open-Meteo • دما بر حسب °C",
+                {
+                    Tag = "ZurvanKeepForeground",
+                    Text = "داده‌ها: Open-Meteo • دما بر حسب °C",
             FontSize = 10,
             Opacity = 0.6
         });
@@ -187,13 +193,17 @@ public sealed partial class MainWindow
                 if (hour < new DateTime(locationNow.Year, locationNow.Month, locationNow.Day, locationNow.Hour, 0, 0))
                     continue;
                 var hourTile = new StackPanel { Spacing = 4, Width = 46 };
-                hourTile.Children.Add(new TextBlock {
+                hourTile.Children.Add(new TextBlock
+                {
+                    Tag = "ZurvanKeepForeground",
                     Text = hour.ToString("HH:mm", CultureInfo.InvariantCulture),
                     FontSize = 10, Foreground = ThemeService.Brush("#FFFFFFFF"),
                     TextAlignment = TextAlignment.Center });
                 hourTile.Children.Add(BuildWeatherGlyph(
                     hourlyCodes[i].GetInt32(), hourlyDay[i].GetInt32() == 1, 30));
-                hourTile.Children.Add(new TextBlock {
+                hourTile.Children.Add(new TextBlock
+                {
+                    Tag = "ZurvanKeepForeground",
                     Text = hourlyTemps[i].GetDouble().ToString("0", CultureInfo.InvariantCulture) + "°",
                     FontSize = 12, Foreground = ThemeService.Brush("#FFFFFFFF"),
                     TextAlignment = TextAlignment.Center });
@@ -222,18 +232,26 @@ public sealed partial class MainWindow
                     date == today.AddDays(1) ? "فردا" :
                     date.ToString("ddd", culture);
                 var tile = new StackPanel { Spacing = 4, Width = 48, HorizontalAlignment = HorizontalAlignment.Center };
-                tile.Children.Add(new TextBlock {
+                tile.Children.Add(new TextBlock
+                {
+                    Tag = "ZurvanKeepForeground",
                     Text = label, FontSize = 10,
                     Foreground = ThemeService.Brush("#FFFFFFFF"), TextAlignment = TextAlignment.Center });
-                tile.Children.Add(new TextBlock {
+                tile.Children.Add(new TextBlock
+                {
+                    Tag = "ZurvanKeepForeground",
                     Text = date.ToString("MM/dd", CultureInfo.InvariantCulture),
                     FontSize = 9, Opacity = 0.7,
                     Foreground = ThemeService.Brush("#FFFFFFFF"), TextAlignment = TextAlignment.Center });
                 tile.Children.Add(BuildWeatherGlyph(codeDay, true, 32));
-                tile.Children.Add(new TextBlock {
+                tile.Children.Add(new TextBlock
+                {
+                    Tag = "ZurvanKeepForeground",
                     Text = high.ToString("0", CultureInfo.InvariantCulture) + "°",
                     FontSize = 11, Foreground = ThemeService.Brush("#FFFFFFFF"), TextAlignment = TextAlignment.Center });
-                tile.Children.Add(new TextBlock {
+                tile.Children.Add(new TextBlock
+                {
+                    Tag = "ZurvanKeepForeground",
                     Text = low.ToString("0", CultureInfo.InvariantCulture) + "°",
                     FontSize = 10, Opacity = 0.75,
                     Foreground = ThemeService.Brush("#FFFFFFFF"), TextAlignment = TextAlignment.Center });
