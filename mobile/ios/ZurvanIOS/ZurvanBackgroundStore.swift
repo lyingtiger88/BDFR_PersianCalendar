@@ -45,12 +45,52 @@ struct ZurvanBackgroundView: View {
     @AppStorage("zurvan.appearance.theme") private var themeID = "windows-light"
     @AppStorage("zurvan.elena.image") private var elenaIndex = 1
     var body: some View {
-        if let image = ZurvanBackgroundStore.image(themeID: themeID, elenaIndex: elenaIndex) {
+        if themeID == "bloom-pastel" {
+            BloomPastelWallpaperView().allowsHitTesting(false)
+        } else if let image = ZurvanBackgroundStore.image(themeID: themeID, elenaIndex: elenaIndex) {
             Image(uiImage: image)
                 .resizable()
                 .scaledToFill()
                 .opacity(0.23)
                 .allowsHitTesting(false)
         }
+    }
+}
+
+private struct BloomPastelWallpaperView: View {
+    private let flowers: [Color] = [
+        Color(red: 0.92, green: 0.66, blue: 0.70).opacity(0.48),
+        Color(red: 0.91, green: 0.77, blue: 0.61).opacity(0.48),
+        Color(red: 0.77, green: 0.72, blue: 0.86).opacity(0.48),
+        Color(red: 0.93, green: 0.74, blue: 0.66).opacity(0.48)
+    ]
+    var body: some View {
+        Canvas { context, size in
+            let stepX: CGFloat = 92
+            let stepY: CGFloat = 88
+            var row = 0
+            var y: CGFloat = 22
+            while y < size.height + stepY {
+                var x: CGFloat = row.isMultiple(of: 2) ? 20 : 64
+                while x < size.width + stepX {
+                    let color = flowers[(row + Int(x / stepX)) % flowers.count]
+                    for petal in 0..<5 {
+                        let angle = Double(petal) * 2 * Double.pi / 5
+                        let px = x + cos(angle) * 6
+                        let py = y + sin(angle) * 6
+                        context.fill(Path(ellipseIn: CGRect(x: px - 4.5, y: py - 4.5, width: 9, height: 9)), with: .color(color))
+                    }
+                    context.fill(Path(ellipseIn: CGRect(x: x - 2.5, y: y - 2.5, width: 5, height: 5)), with: .color(Color(red: 0.85, green: 0.72, blue: 0.44).opacity(0.65)))
+                    var stem = Path()
+                    stem.move(to: CGPoint(x: x, y: y + 9))
+                    stem.addQuadCurve(to: CGPoint(x: x - 5, y: y + 24), control: CGPoint(x: x - 2, y: y + 17))
+                    context.stroke(stem, with: .color(Color(red: 0.61, green: 0.68, blue: 0.55).opacity(0.28)), lineWidth: 1)
+                    x += stepX
+                }
+                y += stepY
+                row += 1
+            }
+        }
+        .background(Color(red: 1.0, green: 0.973, blue: 0.961))
     }
 }
