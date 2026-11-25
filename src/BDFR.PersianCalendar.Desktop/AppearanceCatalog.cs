@@ -21,6 +21,7 @@ public static class AppearanceCatalog
     public static readonly ThemeCatalogItem[] Themes =
     [
         new("zara-pastel", "Zara Pastel", "پاستلی رنگارنگ و روشن"),
+        new("bloom-pastel", "Bloom Pastel", "پاستلی گل‌گلی با شکوفه‌های ریز و لطیف"),
         new("windows-light", "Windows Light", "روشن و مینیمال با حس Fluent ویندوز"),
         new("azure-glass", "Azure Glass", "شیشه‌ای با طیف آبی و پنل‌های سرد"),
         new("graphite-night", "Graphite Night", "تیره، گرافیتی و مناسب استفاده شب"),
