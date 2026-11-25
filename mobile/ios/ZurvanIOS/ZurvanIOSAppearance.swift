@@ -8,6 +8,7 @@ enum ZurvanIOSAppearance {
         ("graphite-night", "Graphite Night"),
         ("warm-sand", "Warm Sand"),
         ("zara-pastel", "Zara Pastel"),
+        ("bloom-pastel", "Bloom Pastel · شکوفه‌های پاستلی"),
         ("season-vibe", "Season Vibe"),
         ("elena-mode", "Elena Mode")
     ]
@@ -28,6 +29,7 @@ enum ZurvanIOSAppearance {
         case "warm-sand": return Color(red: 0.72, green: 0.48, blue: 0.25)
         case "season-vibe": return Color(red: 0.34, green: 0.61, blue: 0.85)
         case "elena-mode": return Color(red: 0.75, green: 0.54, blue: 0.38)
+        case "bloom-pastel": return Color(red: 0.90, green: 0.63, blue: 0.70)
         case "zara-pastel": return Color(red: 0.49, green: 0.67, blue: 0.86)
         default: return Color(red: 0.28, green: 0.52, blue: 0.85)
         }
@@ -53,11 +55,11 @@ enum ZurvanIOSAppearance {
         }
         if key == "accent" { return accent(theme) }
         switch key {
-        case "holiday": return Color.red
+        case "holiday": return theme == "bloom-pastel" ? Color(red: 0.83, green: 0.44, blue: 0.49) : Color.red
         case "text": return theme == "graphite-night" ? .white : .primary
-        case "background": return theme == "graphite-night" ? Color(red: 0.09, green: 0.10, blue: 0.12) : .white
-        case "card": return theme == "graphite-night" ? Color(red: 0.16, green: 0.18, blue: 0.21) : Color(white: 0.96)
-        default: return theme == "graphite-night" ? Color(red: 0.13, green: 0.15, blue: 0.18) : Color(white: 0.98)
+        case "background": return theme == "graphite-night" ? Color(red: 0.09, green: 0.10, blue: 0.12) : (theme == "bloom-pastel" ? Color(red: 1.0, green: 0.973, blue: 0.961) : .white)
+        case "card": return theme == "graphite-night" ? Color(red: 0.16, green: 0.18, blue: 0.21) : (theme == "bloom-pastel" ? Color(red: 0.98, green: 0.93, blue: 0.93) : Color(white: 0.96))
+        default: return theme == "graphite-night" ? Color(red: 0.13, green: 0.15, blue: 0.18) : (theme == "bloom-pastel" ? Color(red: 0.91, green: 0.94, blue: 0.90) : Color(white: 0.98))
         }
     }
 
