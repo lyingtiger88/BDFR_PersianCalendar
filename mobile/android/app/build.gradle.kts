@@ -75,6 +75,13 @@ android {
         }
     }
     buildTypes {
+        getByName("debug") {
+            // Use the same persistent signing identity as Release so every CI
+            // debug build can update the installed app without signature mismatch.
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("kaliiaRelease")
+            }
+        }
         getByName("release") {
             if (hasReleaseSigning) {
                 signingConfig = signingConfigs.getByName("kaliiaRelease")
