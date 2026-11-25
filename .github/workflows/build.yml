@@ -159,6 +159,29 @@ jobs:
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" "build-tools;35.0.0"
 
+      - name: Reconstruct and validate persistent Android signing key
+        shell: bash
+        env:
+          KEYSTORE_B64: ${{ secrets.ZURVAN_ANDROID_KEYSTORE_B64 }}
+          STORE_PASSWORD: ${{ secrets.ZURVAN_ANDROID_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ZURVAN_ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ZURVAN_ANDROID_KEY_PASSWORD }}
+          EXPECTED_SHA256: 29434EDEB1227348B4DA7FB8F1CDA4D607E433A800DB8E498E3978426860FBE8
+        run: |
+          set -euo pipefail
+          for name in KEYSTORE_B64 STORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            if [[ -z "${!name:-}" ]]; then echo "::error::Missing Android signing secret: $name"; exit 1; fi
+          done
+          printf '%s' "$KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/android-release.jks"
+          chmod 600 "$RUNNER_TEMP/android-release.jks"
+          ACTUAL="$(keytool -list -v -keystore "$RUNNER_TEMP/android-release.jks" -storepass "$STORE_PASSWORD" -alias "$KEY_ALIAS" | sed -n 's/.*SHA256: //p' | head -n 1 | tr -d '[:space:]:')"
+          test "${ACTUAL^^}" = "$EXPECTED_SHA256" || { echo "::error::Unexpected Android signing certificate."; exit 1; }
+          {
+            echo "ZURVAN_ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/android-release.jks"
+            echo "ZURVAN_ANDROID_STORE_PASSWORD=$STORE_PASSWORD"
+            echo "ZURVAN_ANDROID_KEY_ALIAS=$KEY_ALIAS"
+            echo "ZURVAN_ANDROID_KEY_PASSWORD=$KEY_PASSWORD"
+          } >> "$GITHUB_ENV"
       - name: Build Android debug app
         env:
           ZURVAN_PUBLIC_KEY_B64: ${{ vars.ZURVAN_LICENSE_PUBLIC_KEY_B64 }}
@@ -182,6 +205,11 @@ jobs:
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$apk"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -E "^(package:|sdkVersion:|targetSdkVersion:|native-code:)"
           sha256sum "$apk" | tee "mobile/android/app/build/outputs/apk/debug/app-debug.apk.sha256"
+
+      - name: Remove temporary Android signing key
+        if: always()
+        shell: bash
+        run: rm -f "$RUNNER_TEMP/android-release.jks"
 
       - name: Upload Android debug APK
         if: github.event_name == 'push'
