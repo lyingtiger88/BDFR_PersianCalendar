@@ -3833,18 +3833,13 @@ public sealed partial class MainWindow : Window
             _settings.ThemeId = themeId;
             _settings.UseSeasonalBackground = false;
 
-            if (string.Equals(themeId, "bloom-pastel", StringComparison.OrdinalIgnoreCase))
-            {
-                if (!string.Equals(_settings.BackgroundMode, "custom", StringComparison.OrdinalIgnoreCase))
-                    _settings.BackgroundMode = "theme-default";
-            }
-            else if (string.Equals(_settings.BackgroundMode, "theme-default", StringComparison.OrdinalIgnoreCase))
-            {
-                _settings.BackgroundMode = "none";
-            }
-
-            if (string.Equals(_settings.BackgroundMode, "elena", StringComparison.OrdinalIgnoreCase))
-                _settings.BackgroundMode = "none";
+            // Strict theme wallpaper policy:
+            // every theme switch discards the previous custom image and starts
+            // from the newly selected theme's bundled default wallpaper.
+            _settings.CustomBackgroundPath = null;
+            _settings.BackgroundMode = "theme-default";
+            _settings.WallpaperMode = "manual";
+            _settings.LastRandomWallpaperPath = null;
 
             _settingsService.Save(_settings);
             StopSeasonCarousel();
