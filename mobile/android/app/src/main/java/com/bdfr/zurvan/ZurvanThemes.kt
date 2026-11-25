@@ -24,6 +24,7 @@ object ZurvanThemes {
         ZurvanPalette("graphite-night","Graphite Night",Color(0xFF171A1F),Color(0xFF22262D),Color(0xFF2A2F37),Color(0xFFF1F5F9),Color(0xFF586D88),Color(0xFFFF7A86)),
         ZurvanPalette("warm-sand","Warm Sand",Color(0xFFFFF8F3),Color(0xFFFFF9F0),Color(0xFFFFFDF8),Color(0xFF40362C),Color(0xFFDDB78B),Color(0xFFC95C57)),
         ZurvanPalette("zara-pastel","Zara Pastel",Color(0xFFFDF9F6),Color.White,Color.White,Color(0xFF1E2A44),Color(0xFF7CC9F5),Color(0xFFD65A6F)),
+        ZurvanPalette("bloom-pastel","Bloom Pastel",Color(0xFFFFF8F5),Color(0xFFE8FFFFFF),Color(0xFFF0FFFFFF),Color(0xFF403044),Color(0xFFE5A0B0),Color(0xFFD46F78)),
         ZurvanPalette("season-vibe","Season Vibe",Color(0xFFE7F1FB),Color(0xFFF1F7FC),Color(0xFFE4F0FC),Color(0xFF19304A),Color(0xFF6AA4D8),Color(0xFFCE4452)),
         ZurvanPalette("elena-mode","Elena Mode",Color(0xFFFFF5EA),Color(0xFFFFF9F2),Color(0xFFF6E8DA),Color(0xFF523D34),Color(0xFFC08A61),Color(0xFFC35159))
     )
@@ -193,6 +194,7 @@ object ZurvanThemes {
         }
         // Translucent window must stay opaque for all other themes.
         androidx.compose.foundation.layout.Box(modifier.background(active.current.background))
+        if (theme == "bloom-pastel") { BloomPastelWallpaper(modifier); return }
         val bitmap = remember(activePath, asset) {
             runCatching {
                 if (activePath != null) BitmapFactory.decodeFile(activePath)?.asImageBitmap()
@@ -205,5 +207,31 @@ object ZurvanThemes {
         Image(bitmap = bitmap, contentDescription = null,
             modifier = modifier, contentScale = ContentScale.Crop,
             alpha = if (theme == "liquid-glass") 0.5f else 0.28f)
+    }
+}
+
+@Composable
+private fun BloomPastelWallpaper(modifier: Modifier = Modifier) {
+    androidx.compose.foundation.Canvas(modifier) {
+        val colors = listOf(Color(0x66EBA7AF), Color(0x66E8C49A), Color(0x66C5B7DB), Color(0x66F1B9A4))
+        var row = 0
+        var y = 28f
+        while (y < size.height + 104f) {
+            var x = if (row % 2 == 0) 24f else 76f
+            while (x < size.width + 112f) {
+                val color = colors[(row + (x / 112f).toInt()) % colors.size]
+                for (petal in 0 until 5) {
+                    val angle = petal * (Math.PI * 2.0 / 5.0)
+                    val px = x + kotlin.math.cos(angle).toFloat() * 7f
+                    val py = y + kotlin.math.sin(angle).toFloat() * 7f
+                    drawCircle(color, 5.5f, androidx.compose.ui.geometry.Offset(px, py))
+                }
+                drawCircle(Color(0x99D9B76E), 2.8f, androidx.compose.ui.geometry.Offset(x, y))
+                drawLine(Color(0x339BA98B), androidx.compose.ui.geometry.Offset(x, y + 10f), androidx.compose.ui.geometry.Offset(x - 5f, y + 28f), 1.5f)
+                x += 112f
+            }
+            y += 104f
+            row++
+        }
     }
 }
