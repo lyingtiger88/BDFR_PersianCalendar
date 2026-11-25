@@ -154,8 +154,15 @@ object ZurvanThemes {
                 }.apply()
             },
             active provides palette, setActive provides { id ->
+            if (selected != id) {
+                // A theme change always restores that theme's own default art.
+                // User wallpaper is only retained until the next theme switch.
+                wallpaperPath = null
+                prefs.edit().remove("wallpaper").putString("theme", id).apply()
+            } else {
+                prefs.edit().putString("theme", id).apply()
+            }
             selected = id
-            prefs.edit().putString("theme", id).apply()
         }) {
             MaterialTheme(colorScheme=colors, content=content)
         }
