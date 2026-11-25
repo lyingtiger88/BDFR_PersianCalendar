@@ -276,6 +276,25 @@ public sealed class ThemeService
                     "#FF303843", "#FF29313A", "#FF303843", "#FF422F35"
                 ]
             },
+            "bloom-pastel" => new ThemeDefinition
+            {
+                Id = "bloom-pastel",
+                DisplayName = "Bloom Pastel",
+                DefaultWallpaperFile = "floral-pattern.svg",
+                WindowBackground = "#FFFFF8F5",
+                PanelBackground = "#E8FFFFFF",
+                CardBackground = "#F0FFFFFF",
+                PrimaryText = "#FF403044",
+                SecondaryText = "#FF88747E",
+                Accent = "#FFE5A0B0",
+                SelectedDay = "#FFB8D7D0",
+                HolidayText = "#FFD46F78",
+                WeekdayColors =
+                [
+                    "#FFF7E2E5", "#FFFFEED8", "#FFE7F0DE", "#FFDDEFEA",
+                    "#FFE5E8F8", "#FFF0E5F1", "#FFF8E1E6"
+                ]
+            },
             "warm-sand" => new ThemeDefinition
             {
                 Id = "warm-sand",
